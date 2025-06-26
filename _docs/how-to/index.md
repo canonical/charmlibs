@@ -1,4 +1,4 @@
-# How To
+# How-to guides
 
 ```{toctree}
 :maxdepth: 1
