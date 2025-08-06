@@ -273,7 +273,7 @@ intersphinx_mapping = {
     'ops': ('https://documentation.ubuntu.com/ops/latest', None),
     'python': ('https://docs.python.org/3', None),
     'juju': ('https://documentation.ubuntu.com/juju/3.6', None),
-    'charmcraft': ('https://canonical-charmcraft.readthedocs-hosted.com/en/latest', None),
+    'charmcraft': ('https://documentation.ubuntu.com/charmcraft/latest/', None),
 }
 
 maximum_signature_line_length = 80
