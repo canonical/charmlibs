@@ -6,6 +6,6 @@ This namespace is for packages designed to be used by [Juju charms](https://juju
 
 See more:
 
-- Get started with charm development, using [Charmcraft tutorials](https://canonical-charmcraft.readthedocs-hosted.com/en/stable/tutorial/) and [Ops tutorials](https://ops.readthedocs.io/en/latest/tutorial/index.html)
-- Learn how to [use and write charm libraries](https://ops.readthedocs.io/en/latest/howto/manage-libraries.html)
+- Get started with charm development, using [Charmcraft tutorials](https://canonical-charmcraft.readthedocs-hosted.com/en/stable/tutorial/) and [Ops tutorials](https://documentation.ubuntu.com/ops/latest/tutorial/)
+- Learn how to [use and write charm libraries](https://documentation.ubuntu.com/ops/latest/howto/manage-libraries/)
 - Learn how to [distribute your own charm library as a Python package](https://canonical-charmlibs.readthedocs-hosted.com/how-to/python-package/)
