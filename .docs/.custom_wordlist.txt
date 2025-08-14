@@ -29,6 +29,7 @@ requirer
 stateful
 subclasses
 subdirectory
+subprocess
 symlink
 symlinks
 templating
