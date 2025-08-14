@@ -11,8 +11,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  lint:
-    uses: ./.github/workflows/lint.yaml
+  fast-lint:
+    uses: ./.github/workflows/fast-lint.yaml
 
   get-packages:
     runs-on: ubuntu-latest
@@ -24,14 +24,14 @@ jobs:
           fetch-depth: 0
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v6
 
       - name: Collect changed packages
         id: packages
         run: uv run --no-project --script .github/get-packages.py ${{ github.base_ref }}
 
   tests:
-    needs: get-packages
+    needs: [fast-lint, get-packages]
     if: ${{ needs.get-packages.outputs.packages != '[]' }}
     strategy:
       matrix:

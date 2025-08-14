@@ -30,25 +30,25 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v6
       - name: Spelling
         id: spellcheck-step
         if: success() || failure()
         uses: canonical/documentation-workflows/spellcheck@main
         with:
-          working-directory: _docs
+          working-directory: .docs
       - name: Links
         id: linkcheck-step
         if: success() || failure()
         uses: canonical/documentation-workflows/linkcheck@main
         with:
-          working-directory: _docs
+          working-directory: .docs
       - name: Markdown lint
         id: markdown-step
         if: success() || failure()
         uses: DavidAnson/markdownlint-cli2-action@v20
         with:
-          config: "_docs/.sphinx/.markdownlint.json"
+          config: ".docs/.sphinx/.markdownlint.json"
       - name: Local Sphinx extensions static analysis
         if: success() || failure()
         run: uvx --from=rust-just just docs ext-static

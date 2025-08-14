@@ -33,7 +33,7 @@ exclude_also = [
 [tool.ruff]
 line-length = 99
 target-version = "py38"
-extend-exclude = ["__pycache__", "*.egg_info", "htmlcov", "_docs/.sphinx", "_docs/conf.py"]
+extend-exclude = ["__pycache__", "*.egg_info", "htmlcov", ".docs/.sphinx", ".docs/conf.py"]
 
 # Ruff formatter configuration
 [tool.ruff.format]
@@ -132,6 +132,7 @@ convention = "google"
 check-hidden = true
 quiet-level = 3  # disable warnings about (1) wrong encoding + (2) binary files
 skip = [
+    ".docs",
     ".git",
     ".mypy_cache",
     ".pytest_cache",
@@ -140,7 +141,6 @@ skip = [
     ".tox",
     ".venv*",
     ".vscode",
-    "_docs",
     "build",
 ]
 

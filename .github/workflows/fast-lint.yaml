@@ -1,0 +1,17 @@
+name: Fast lint
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Run linting
+        run: uvx --from rust-just just fast-lint

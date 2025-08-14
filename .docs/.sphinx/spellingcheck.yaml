@@ -1,0 +1,43 @@
+matrix:
+  - name: rST files
+    aspell:
+      lang: en
+      d: en_GB
+    dictionary:
+      wordlists:
+        - .sphinx/.wordlist.txt
+        - .custom_wordlist.txt
+      output: .sphinx/.wordlist.dic
+    sources:
+      - _build/**/*.html|!_build/genindex/index.html
+    pipeline:
+      - pyspelling.filters.html:
+          comments: false
+          attributes:
+            - title
+            - alt
+          ignores:
+            - code
+            - pre
+            - spellexception
+            - link
+            - title
+            - div.relatedlinks
+            - strong.command
+            - div.visually-hidden
+            - img
+            - a.p-navigation__link
+            - a.contributor
+            - span.pre
+            - .sig-object
+            - '#module-apt em'
+            - '#module-apt strong'
+            - '#module-apt a.reference'
+            - a.reference[title^="apt."]
+            - a[href*="#apt"]
+            - '#module-pathops em'
+            - '#module-pathops strong'
+            - '#module-pathops a.reference'
+            - a.reference[title^="pathops."]
+            - a[href*="#pathops"]
+            - .no-spellcheck

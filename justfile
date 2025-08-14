@@ -12,7 +12,7 @@ _help:
     @just --list --unsorted --list-submodules
 
 [doc('Run `ruff` and `codespell`, failing afterwards if any errors are found.')]
-lint:
+fast-lint:
     #!/usr/bin/env bash
     set -xueo pipefail
     FAILURES=0
@@ -29,13 +29,17 @@ format:
     uv run ruff format --preview
 
 [doc('Run `pyright`, e.g. `just python=3.8 static pathops`.')]
-static package *pyright_args:
+lint package *pyright_args:
+    just --justfile='{{justfile()}}' python='{{python}}' fast-lint
     uv sync  # ensure venv exists before uv pip install
     uv pip install --editable './{{package}}'
     uv run pyright --pythonversion='{{python}}' {{pyright_args}} '{{package}}'
 
 [doc("Run unit tests with `coverage`, e.g. `just python=3.8 unit pathops`.")]
 unit package +flags='-rA': (_coverage package 'unit' flags)
+
+[doc("Run ubuntu integration tests with `coverage`, e.g. `just python=3.8 ubuntu pathops`.")]
+ubuntu package +flags='-rA': (_coverage package 'integration/ubuntu' flags)
 
 [doc("Run pebble integration tests with `coverage`. Requires `pebble`.")]
 pebble package +flags='-rA':
@@ -60,7 +64,7 @@ _coverage package test_subdir +flags:
     uv pip install --editable './{{package}}'
     source .venv/bin/activate
     cd '{{package}}'
-    export COVERAGE_RCFILE=../pyproject.toml
+    export COVERAGE_RCFILE='{{justfile_directory()}}/pyproject.toml'
     DATA_FILE=".report/coverage-$(basename {{test_subdir}})-{{python}}.db"
     uv run --active coverage run --data-file="$DATA_FILE" --source='src' \
         -m pytest --tb=native -vv {{flags}} 'tests/{{test_subdir}}'
@@ -72,7 +76,7 @@ combine-coverage package:
     set -xueo pipefail
     : 'Collect the coverage data files that exist for this package.'
     data_files=()
-    for test_id in unit pebble juju; do
+    for test_id in unit ubuntu pebble juju; do
         data_file="{{package}}/.report/coverage-$test_id-{{python}}.db"
         if [ -e "$data_file" ]; then
             data_files+=("$data_file")

@@ -1,4 +1,4 @@
-set working-directory := '_docs'
+set working-directory := '.docs'
 
 build_dir := env('READTHEDOCS_OUTPUT', '_build')
 
@@ -28,6 +28,7 @@ clean:
     rm -rf .sphinx/node_modules/
     rm -rf .sphinx/styles
     rm -rf .sphinx/vale.ini
+    rm -rf reference/charmlibs
     rm -rf reference/generated
 
 [doc('Run `pyright` for local sphinx extensions.')]

@@ -1,4 +1,0 @@
-pathops
-========
-
-.. automodule:: pathops

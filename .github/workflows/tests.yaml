@@ -9,12 +9,26 @@ on:
       package:
         required: true
         type: string
+      skip-juju:
+        required: false
+        type: boolean
+  workflow_dispatch:
+    inputs:
+      package:
+        description: Package (by path) to run tests for.
+        required: true
+        type: string
+      skip-juju:
+        description: Skip Juju integration tests.
+        required: false
+        type: boolean
 
 jobs:
-  get-tests:
+  init:
     runs-on: ubuntu-latest
     outputs:
       tests: ${{ steps.tests.outputs.tests }}
+      py-versions: ${{ steps.py-versions.outputs.versions }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -23,12 +37,19 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v6
 
+      - name: Check which Python versions this package supports
+        id: py-versions
+        run: uv run --no-project --script .github/get-supported-python-versions.py ${{ inputs.package }}
+
       - name: Check which test suites this package has
         id: tests
         run: |
           tests=()
           if [ -d ${{ inputs.package }}/tests/unit ]; then
             tests+=('unit')
+          fi
+          if [ -d ${{ inputs.package }}/tests/integration/ubuntu ]; then
+            tests+=('ubuntu')
           fi
           if [ -d ${{ inputs.package }}/tests/integration/pebble ]; then
             tests+=('pebble')
@@ -40,39 +61,30 @@ jobs:
           echo "tests=$js"
           echo "tests=$js" >> "$GITHUB_OUTPUT"
 
-  static:
+  lint:
+    needs: init
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        python-version: [
-          '3.8',  # Ubuntu 20.04 (oldest supported by ops)
-          '3.10',  # Ubuntu 22.04
-          '3.12',  # Ubuntu 24.04
-          '3.13',  # latest Python release
-        ]
+        python-version: ${{ fromJson(needs.init.outputs.py-versions).lint }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Install uv
         uses: astral-sh/setup-uv@v6
 
-      - name: Run static analysis
-        run: uvx --from rust-just just python=${{ matrix.python-version }} static ${{ inputs.package }}
+      - name: Run static analysis and other checks
+        run: uvx --from rust-just just python=${{ matrix.python-version }} lint ${{ inputs.package }}
 
   unit:
-    needs: get-tests
-    if: contains(fromJson(needs.get-tests.outputs.tests), 'unit')
+    needs: init
+    if: contains(fromJson(needs.init.outputs.tests), 'unit')
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        python-version: [
-          '3.8',  # Ubuntu 20.04 (oldest supported by ops)
-          '3.10',  # Ubuntu 22.04
-          '3.12',  # Ubuntu 24.04
-          '3.13',  # latest Python release
-        ]
+        python-version: ${{ fromJson(needs.init.outputs.py-versions).unit }}
     steps:
       - uses: actions/checkout@v4
 
@@ -82,9 +94,26 @@ jobs:
       - name: Run unit tests
         run: uvx --from rust-just just python=${{ matrix.python-version }} unit ${{ inputs.package }}
 
+  ubuntu:
+    needs: init
+    if: contains(fromJson(needs.init.outputs.tests), 'ubuntu')
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Run Ubuntu integration tests (with sudo)
+        run: sudo env "PATH=$PATH" uvx --from rust-just just ubuntu ${{ inputs.package }}
+
   pebble:
-    needs: get-tests
-    if: contains(fromJson(needs.get-tests.outputs.tests), 'pebble')
+    needs: init
+    if: contains(fromJson(needs.init.outputs.tests), 'pebble')
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -96,12 +125,7 @@ jobs:
           # 'v1.19.0',  # Juju 3.6.4 LTS
           'master',
         ]
-        python-version: [
-          '3.8',  # Ubuntu 20.04 (oldest supported by ops)
-          # '3.10',  # Ubuntu 22.04
-          # '3.12',  # Ubuntu 24.04
-          '3.13',  # latest Python release
-        ]
+        python-version: ${{ fromJson(needs.init.outputs.py-versions).pebble }}
     steps:
       - uses: actions/checkout@v4
 
@@ -122,8 +146,8 @@ jobs:
         run: uvx --from rust-just just python=${{ matrix.python-version }} pebble ${{ inputs.package }}
 
   juju:
-    needs: get-tests
-    if: contains(fromJson(needs.get-tests.outputs.tests), 'juju')
+    needs: init
+    if: contains(fromJson(needs.init.outputs.tests), 'juju') && !inputs.skip-juju
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false

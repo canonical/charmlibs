@@ -8,7 +8,7 @@ To install, add `charmlibs-pathops` to your requirements. Then in your Python co
 from charmlibs import pathops
 ```
 
-Check out the reference docs [here](https://canonical-charmlibs.readthedocs-hosted.com/reference/pathops/).
+Check out the reference docs on the [charmlibs docsite](https://canonical-charmlibs.readthedocs-hosted.com/reference/charmlibs/pathops/).
 
 # Getting started
 

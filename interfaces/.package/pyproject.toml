@@ -1,0 +1,30 @@
+[project]
+name = "charmlibs-interfaces"
+description = "The charmlibs.interfaces namespace. This package should not be installed."
+readme = "README.md"
+requires-python = ">=3.8"
+authors = [
+    {name="The Charm Tech team at Canonical Ltd."},
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+    "Intended Audience :: Developers",
+    "Operating System :: POSIX :: Linux",
+    "Development Status :: 5 - Production/Stable",
+]
+dynamic = ["version"]
+
+[project.urls]
+"Repository" = "https://github.com/canonical/charmlibs"
+"Issues" = "https://github.com/canonical/charmlibs/issues"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/charmlibs"]
+
+[tool.hatch.version]
+path = "src/charmlibs/interfaces/__init__.py"
