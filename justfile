@@ -38,11 +38,11 @@ lint package *pyright_args:
 [doc("Run unit tests with `coverage`, e.g. `just python=3.8 unit pathops`.")]
 unit package +flags='-rA': (_coverage package 'unit' flags)
 
-[doc("Run ubuntu integration tests with `coverage`, e.g. `just python=3.8 ubuntu pathops`.")]
-ubuntu package +flags='-rA': (_coverage package 'integration/ubuntu' flags)
+[doc("Run functional tests with `coverage`, e.g. `just python=3.8 functional pathops`.")]
+functional package +flags='-rA': (_coverage package 'functional' flags)
 
-[doc("Run pebble integration tests with `coverage`. Requires `pebble`.")]
-pebble package +flags='-rA':
+[doc("Run functional tests with `coverage` and a live `pebble` running. Requires `pebble`.")]
+functional-pebble package +flags='-rA':
     #!/usr/bin/env bash
     set -xueo pipefail
     export PEBBLE=/tmp/pebble-test
@@ -50,7 +50,7 @@ pebble package +flags='-rA':
     pebble run --create-dirs &>/dev/null &
     PEBBLE_PID=$!
     set +e  # don't exit if the tests fail
-    just --justfile='{{justfile()}}' python='{{python}}' _coverage '{{package}}' 'integration/pebble' {{flags}}
+    just --justfile='{{justfile()}}' python='{{python}}' _coverage '{{package}}' 'functional' {{flags}}
     EXITCODE=$?
     set -e  # do exit if anything goes wrong now
     kill $PEBBLE_PID
@@ -76,7 +76,7 @@ combine-coverage package:
     set -xueo pipefail
     : 'Collect the coverage data files that exist for this package.'
     data_files=()
-    for test_id in unit ubuntu pebble juju; do
+    for test_id in unit functional juju; do
         data_file="{{package}}/.report/coverage-$test_id-{{python}}.db"
         if [ -e "$data_file" ]; then
             data_files+=("$data_file")
@@ -102,21 +102,21 @@ pack-vm package base='24.04': (_pack package 'machine' base)
 _pack package substrate base:
     #!/usr/bin/env bash
     set -xueo pipefail
-    cd '{{package}}/tests/integration/juju/charms'
+    cd '{{package}}/tests/integration/charms'
     ./pack.sh {{substrate}} {{base}}
 
 [doc("Run juju integration tests for packed Kubernetes charm(s). Requires `juju`.")]
-juju-k8s package +flags='-rA': (_juju package 'kubernetes' flags)
+integration-k8s package +flags='-rA': (_integration package 'kubernetes' flags)
 
 [doc("Run juju integration tests for packed Kubernetes charm(s). Requires `juju`.")]
-juju-vm package +flags='-rA': (_juju package 'machine' flags)
+integration-vm package +flags='-rA': (_integration package 'machine' flags)
 
 [doc("Run juju integration tests. Requires `juju`.")]
-_juju package substrate +flags:
+_integration package substrate +flags:
     #!/usr/bin/env bash
     set -xueo pipefail
     uv sync --python='{{python}}'
     uv pip install --editable './{{package}}'
     source .venv/bin/activate
     cd '{{package}}'
-    uv run --active pytest --tb=native -vv {{flags}} tests/integration/juju --substrate='{{substrate}}'
+    uv run --active pytest --tb=native -vv {{flags}} tests/integration --substrate='{{substrate}}'

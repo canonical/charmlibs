@@ -1,7 +1,7 @@
 name: Tests
 # runs tests for specified package
 # always runs static tests
-# runs unit and integration tests if the package implements them
+# runs unit, functional, and integration tests if the package implements them
 
 on:
   workflow_call:
@@ -28,7 +28,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       tests: ${{ steps.tests.outputs.tests }}
-      py-versions: ${{ steps.py-versions.outputs.versions }}
+      python: ${{ steps.python.outputs.versions }}
+      functional-matrix: ${{ steps.functional.outputs.matrix }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -38,7 +39,7 @@ jobs:
         uses: astral-sh/setup-uv@v6
 
       - name: Check which Python versions this package supports
-        id: py-versions
+        id: python
         run: uv run --no-project --script .github/get-supported-python-versions.py ${{ inputs.package }}
 
       - name: Check which test suites this package has
@@ -48,18 +49,20 @@ jobs:
           if [ -d ${{ inputs.package }}/tests/unit ]; then
             tests+=('unit')
           fi
-          if [ -d ${{ inputs.package }}/tests/integration/ubuntu ]; then
-            tests+=('ubuntu')
+          if [ -d ${{ inputs.package }}/tests/functional ]; then
+            tests+=('functional')
           fi
-          if [ -d ${{ inputs.package }}/tests/integration/pebble ]; then
-            tests+=('pebble')
-          fi
-          if [ -d ${{ inputs.package }}/tests/integration/juju ]; then
-            tests+=('juju')
+          if [ -d ${{ inputs.package }}/tests/integration ]; then
+            tests+=('integration')
           fi
           js=$(jq '$ARGS.positional' --null-input --compact-output --args "${tests[@]}")
           echo "tests=$js"
           echo "tests=$js" >> "$GITHUB_OUTPUT"
+
+      - name: Check requirements for functional tests
+        id: functional
+        if: contains(fromJson(steps.tests.outputs.tests), 'functional')
+        run: uv run --no-project --script .github/get-functional-test-matrix.py ${{ inputs.package }}
 
   lint:
     needs: init
@@ -67,7 +70,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ${{ fromJson(needs.init.outputs.py-versions).lint }}
+        python: ${{ fromJson(needs.init.outputs.python) }}
     steps:
       - uses: actions/checkout@v4
 
@@ -75,7 +78,7 @@ jobs:
         uses: astral-sh/setup-uv@v6
 
       - name: Run static analysis and other checks
-        run: uvx --from rust-just just python=${{ matrix.python-version }} lint ${{ inputs.package }}
+        run: uvx --from rust-just just python=${{ matrix.python }} lint ${{ inputs.package }}
 
   unit:
     needs: init
@@ -84,7 +87,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ${{ fromJson(needs.init.outputs.py-versions).unit }}
+        python: ${{ fromJson(needs.init.outputs.python) }}
     steps:
       - uses: actions/checkout@v4
 
@@ -92,40 +95,17 @@ jobs:
         uses: astral-sh/setup-uv@v6
 
       - name: Run unit tests
-        run: uvx --from rust-just just python=${{ matrix.python-version }} unit ${{ inputs.package }}
+        run: uvx --from rust-just just python=${{ matrix.python }} unit ${{ inputs.package }}
 
-  ubuntu:
+  functional:
     needs: init
-    if: contains(fromJson(needs.init.outputs.tests), 'ubuntu')
-    runs-on: ${{ matrix.os }}
+    if: contains(fromJson(needs.init.outputs.tests), 'functional')
     strategy:
       fail-fast: false
-      matrix:
-        os: [ubuntu-22.04, ubuntu-24.04]
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v6
-
-      - name: Run Ubuntu integration tests (with sudo)
-        run: sudo env "PATH=$PATH" uvx --from rust-just just ubuntu ${{ inputs.package }}
-
-  pebble:
-    needs: init
-    if: contains(fromJson(needs.init.outputs.tests), 'pebble')
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        pebble-version: [
-          'v1.1.1',  # Juju 2.9.50 LTS
-          # 'v1.7.4',  # Juju 3.4.6
-          # 'v1.10.2',  # Juju 3.5.7
-          # 'v1.19.0',  # Juju 3.6.4 LTS
-          'master',
-        ]
-        python-version: ${{ fromJson(needs.init.outputs.py-versions).pebble }}
+      matrix: ${{ fromJson(needs.init.outputs.functional-matrix) }}
+    runs-on: ${{ matrix.ubuntu }}
+    env:
+      RECIPE_SUFFIX: ${{ matrix.pebble != 'no-pebble' && '-pebble' || '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -137,17 +117,23 @@ jobs:
           cache: false
 
       - name: Install Pebble
-        run: go install github.com/canonical/pebble/cmd/pebble@${{ matrix.pebble-version }}
+        if: matrix.pebble != 'no-pebble'
+        run: go install github.com/canonical/pebble/cmd/${{ matrix.pebble }}
 
       - name: Install uv
         uses: astral-sh/setup-uv@v6
 
-      - name: Run Pebble integration tests
-        run: uvx --from rust-just just python=${{ matrix.python-version }} pebble ${{ inputs.package }}
+      - name: Run functional tests
+        if: matrix.sudo == 'no-sudo'
+        run: uvx --from rust-just just python=${{ matrix.python }} functional$RECIPE_SUFFIX ${{ inputs.package }}
 
-  juju:
+      - name: Run functional tests with sudo
+        if: matrix.sudo != 'no-sudo'
+        run: sudo env "PATH=$PATH" uvx --from rust-just just python=${{ matrix.python }} functional$RECIPE_SUFFIX ${{ inputs.package }}
+
+  integration:
     needs: init
-    if: contains(fromJson(needs.init.outputs.tests), 'juju') && !inputs.skip-juju
+    if: contains(fromJson(needs.init.outputs.tests), 'integration') && !inputs.skip-juju
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -175,4 +161,4 @@ jobs:
         run: uvx --from rust-just just pack-${{ matrix.substrate }} ${{ inputs.package }} ${{ matrix.base }}
 
       - name: Run Juju integration tests
-        run: uvx --from rust-just just juju-${{ matrix.substrate }} ${{ inputs.package }}
+        run: uvx --from rust-just just integration-${{ matrix.substrate }} ${{ inputs.package }}
