@@ -30,9 +30,14 @@ format:
 
 [doc('Run `pyright`, e.g. `just python=3.8 static pathops`.')]
 lint package *pyright_args:
+    #!/usr/bin/env bash
+    set -xueo pipefail
     just --justfile='{{justfile()}}' python='{{python}}' fast-lint
     uv sync  # ensure venv exists before uv pip install
-    uv pip install --editable './{{package}}'
+    if uv run python -c 'import pathlib, tomllib, sys; sys.exit(0 if "test" in tomllib.loads(pathlib.Path("./{{package}}/pyproject.toml").read_text()).get("dependency-groups", {}) else 1)'
+    then uv pip install --editable './{{package}}' --group './{{package}}/pyproject.toml:test'
+    else uv pip install --editable './{{package}}'
+    fi
     uv run pyright --pythonversion='{{python}}' {{pyright_args}} '{{package}}'
 
 [doc("Run unit tests with `coverage`, e.g. `just python=3.8 unit pathops`.")]
@@ -61,7 +66,10 @@ _coverage package test_subdir +flags:
     #!/usr/bin/env bash
     set -xueo pipefail
     uv sync --python='{{python}}'
-    uv pip install --editable './{{package}}'
+    if uv run python -c 'import pathlib, tomllib, sys; sys.exit(0 if "test" in tomllib.loads(pathlib.Path("./{{package}}/pyproject.toml").read_text()).get("dependency-groups", {}) else 1)'
+    then uv pip install --editable './{{package}}' --group './{{package}}/pyproject.toml:test'
+    else uv pip install --editable './{{package}}'
+    fi
     source .venv/bin/activate
     cd '{{package}}'
     export COVERAGE_RCFILE='{{justfile_directory()}}/pyproject.toml'
@@ -116,7 +124,10 @@ _juju package substrate +flags:
     #!/usr/bin/env bash
     set -xueo pipefail
     uv sync --python='{{python}}'
-    uv pip install --editable './{{package}}'
+    if uv run python -c 'import pathlib, tomllib, sys; sys.exit(0 if "test" in tomllib.loads(pathlib.Path("./{{package}}/pyproject.toml").read_text()).get("dependency-groups", {}) else 1)'
+    then uv pip install --editable './{{package}}' --group './{{package}}/pyproject.toml:test'
+    else uv pip install --editable './{{package}}'
+    fi
     source .venv/bin/activate
     cd '{{package}}'
     uv run --active pytest --tb=native -vv {{flags}} tests/integration/juju --substrate='{{substrate}}'
