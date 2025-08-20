@@ -2,7 +2,7 @@
 
 The `apt` library provides a Pythonic interface to manage the `apt` packages installed on a system. It's designed for use in Juju Charms.
 
-To install, add `charmlibs-pathops` to your requirements. Then in your Python code, import as:
+To install, add `charmlibs-apt` to your python dependencies. Then in your Python code, import as:
 
 ```py
 from charmlibs import apt
