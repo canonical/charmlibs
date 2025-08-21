@@ -37,9 +37,9 @@ To install packages with convenience methods::
     except PackageError as e:
         logger.error("could not install package. Reason: %s", e.message)
 
-The convenience methods do not raise :class:`PackageNotFoundError`. If any packages aren't found
-in the cache, :func:`apt.add_package` raises :class:`PackageError` with a message 'Failed to
-install packages: foo, bar'.
+The convenience methods don't raise :class:`PackageNotFoundError`. If any packages aren't found in
+the cache, :func:`apt.add_package` raises :class:`PackageError` with a message 'Failed to install
+packages: foo, bar'.
 
 To find details of a specific package::
 
