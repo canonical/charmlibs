@@ -37,8 +37,9 @@ To install packages with convenience methods::
     except PackageError as e:
         logger.error("could not install package. Reason: %s", e.message)
 
-The convenience methods do not raise :class:`PackageNotFoundError`. If a package is not found in
-the cache, :func:`apt.add_package` raises :class:`PackageError` with an appropriate message.
+The convenience methods do not raise :class:`PackageNotFoundError`. If any packages aren't found
+in the cache, :func:`apt.add_package` raises :class:`PackageError` with a message 'Failed to
+install packages: foo, bar'.
 
 To find details of a specific package::
 
@@ -147,8 +148,8 @@ class Error(Exception):
 class PackageError(Error):
     """Raised when there's an error installing or removing a package.
 
-    Additionally, :func:`apt.add_package` raises ``PackageError`` if a package is not found in the
-    cache.
+    Additionally, :func:`apt.add_package` raises ``PackageError`` if any packages aren't found in
+    the cache.
     """
 
 
@@ -769,7 +770,7 @@ def add_package(
 
     Raises:
         TypeError: if no package name is given, or explicit version is set for multiple packages
-        PackageError: if packages fail to install, including if packages are not found in the
+        PackageError: if packages fail to install, including if any packages aren't found in the
             cache
     """
     cache_refreshed = False
