@@ -1,0 +1,13 @@
+[project]
+name = "provider-charm"
+version = "0.0.0"
+description = "Test provider charm for integration tests"
+requires-python = ">=3.10"
+dependencies = [
+    "ops",
+    "cryptography",
+    "tls-certificates-interface",
+]
+
+[tool.uv.sources]
+tls-certificates-interface = { path = "package.tar.gz" }

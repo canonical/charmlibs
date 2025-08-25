@@ -1,0 +1,93 @@
+[project]
+name = "tls-certificates-interface"
+version = "0.1.0"
+requires-python = ">=3.10"
+
+dependencies = [
+    "cryptography",
+    "jsonschema",
+    "ops",
+    "pydantic",
+    "rpds-py==0.25.1"
+]
+
+[dependency-groups]
+unit = [
+    "ops[testing]",
+    "pkilint",
+]
+integration = [
+    "jubilant==1.0.1",
+    "juju>3",
+    "pytest-operator",
+    "pytest-asyncio==0.21.2",
+]
+
+# Testing tools configuration
+[tool.coverage.run]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+log_cli_level = "INFO"
+markers = [
+    "upgrade: mark a test as an upgrade test",
+]
+
+# Linting tools configuration
+[tool.ruff]
+line-length = 99
+src = ["src", "tests/unit/v1", "tests/integration/v1/provider_charm/src"]  # correctly sort local imports in tests
+
+[tool.ruff.lint]
+select = [
+    "E",
+    "W",
+    "F",
+    "C",
+    "N",
+    "D",
+    "I001",
+    "G001",  # Logging statement uses str.format
+    "G002",  # Logging statement uses %
+    "G003",  # Logging statement uses +
+    "G004",  # Logging statement uses an f-string
+]
+preview = true
+
+extend-ignore = [
+    "D203",
+    "D204",
+    "D213",
+    "D215",
+    "D400",
+    "D404",
+    "D406",
+    "D407",
+    "D408",
+    "D409",
+    "D413",
+    "D107",
+    "E501",  # Rely on formatter for enforcing line length where appropriate
+]
+
+[tool.ruff.lint.per-file-ignores]
+"./tests/*" = ["D100","D101","D102","D103","D104"]
+"./src/charmlibs/interfaces/tls_certificates/v0.py" = [
+    # Use `is` and `is not` for type comparisons, or `isinstance()` for isinstance checks
+    "E721",
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.codespell]
+skip = "build,venv,icon.svg,.tox,.git,.mypy_cache,.ruff_cache,.coverage"
+
+[tool.pyright]
+extend = "../../pyproject.toml"
+include = ["src", "tests"]
+pythonVersion = "3.10"
