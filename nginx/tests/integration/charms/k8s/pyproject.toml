@@ -1,0 +1,12 @@
+[project]
+name = "test"
+version = "0.1.0"
+description = "Test charm for integration tests"
+requires-python = ">=3.8"
+dependencies = [
+    "ops==2.*",
+    "charmlibs-pathops",
+]
+
+[tool.uv.sources]
+charmlibs-pathops = { path = "pathops" }
