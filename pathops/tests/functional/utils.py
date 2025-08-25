@@ -23,7 +23,7 @@ import tempfile
 import typing
 
 if typing.TYPE_CHECKING:
-    from typing import Callable, Mapping, Sequence
+    from collections.abc import Callable, Mapping, Sequence
 
     from ops import pebble
 

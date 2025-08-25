@@ -152,7 +152,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        base: ['20.04', '24.04']
+        base: ['22.04', '24.04']
         substrate: ${{ fromJson(needs.init.outputs.integration-substrates) }}
     env:
       CHARMLIBS_BASE: ${{ matrix.base }}
