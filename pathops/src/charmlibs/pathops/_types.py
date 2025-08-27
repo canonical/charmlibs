@@ -22,7 +22,7 @@ from . import _constants
 
 if typing.TYPE_CHECKING:
     import os
-    from typing import Generator, Sequence
+    from collections.abc import Generator, Sequence
 
     from typing_extensions import Self
 

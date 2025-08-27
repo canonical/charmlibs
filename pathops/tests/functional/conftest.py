@@ -24,7 +24,7 @@ import utils
 
 if typing.TYPE_CHECKING:
     import pathlib
-    from typing import Iterator
+    from collections.abc import Iterator
 
 
 @pytest.fixture(scope='session')

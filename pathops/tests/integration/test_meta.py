@@ -21,7 +21,7 @@ import pathlib
 import pytest
 import yaml
 
-BASES = ['20.04', '24.04']
+BASES = ['22.04', '24.04']
 
 
 def test_common_py():

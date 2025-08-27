@@ -2,7 +2,7 @@
 name = "charmlibs-pathops"
 description = "A pathlib-like interface for Juju K8s charms to interact with files in their workload container."
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 authors = [
     {name="The Charm Tech team at Canonical Ltd."},
 ]
@@ -46,7 +46,7 @@ src = ["src", "tests/unit", "tests/functional", "tests/integration"]  # correctl
 [tool.pyright]
 extend = "../pyproject.toml"
 include = ["src", "tests"]
-pythonVersion = "3.8"  # check no python > 3.8 features are used
+pythonVersion = "3.10"
 
 [tool.charmlibs.functional]
 pebble = ["v1.1.1","master"]
