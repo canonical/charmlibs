@@ -1,0 +1,25 @@
+# Copyright 2024 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+name: tls-certificates-provider
+description: tls-certificates-provider.
+summary: tls-certificates-provider.
+
+provides:
+  certificates:
+    interface: tls-certificates
+
+type: "charm"
+bases:
+  - build-on:
+      - name: "ubuntu"
+        channel: "22.04"
+    run-on:
+      - name: "ubuntu"
+        channel: "22.04"
+
+parts:
+  test-charm:
+    source: .
+    plugin: uv
+    build-snaps: [astral-uv]

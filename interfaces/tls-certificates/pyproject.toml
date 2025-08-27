@@ -1,0 +1,108 @@
+[project]
+name = "charmlibs-interfaces-tls_certificates"
+description = "Charm library for the tls_certificates interface."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    {name="The TLS team at Canonical Ltd."},
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+    "Intended Audience :: Developers",
+    "Operating System :: POSIX :: Linux",
+    "Development Status :: 5 - Production/Stable",
+]
+dynamic = ["version"]
+dependencies = [
+    "cryptography>=43.0.0",
+    "jsonschema",
+    "ops",
+    "pydantic",
+]
+
+[project.urls]
+"Repository" = "https://github.com/canonical/charmlibs"
+"Issues" = "https://github.com/canonical/charmlibs/issues"
+
+[dependency-groups]
+unit = [
+    "ops[testing]",
+    "pkilint",
+]
+integration = [
+    "jubilant==1.0.1",
+    "juju>3",
+    "pytest-operator",
+    "pytest-asyncio==0.21.2",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/charmlibs"]
+
+[tool.hatch.version]
+path = "src/charmlibs/interfaces/tls_certificates/__init__.py"
+
+[tool.ruff]
+extend = "../../pyproject.toml"
+src = ["src", "tests/unit/v1", "tests/integration/juju/v1"]  # correctly sort local imports in tests
+
+[tool.ruff.lint.per-file-ignores]
+"./src/charmlibs/interfaces/tls_certificates/v0.py" = [
+    # Use `is` and `is not` for type comparisons, or `isinstance()` for isinstance checks
+    "E721",
+
+    # `try`-`except` within a loop incurs performance overhead
+    "PERF203",
+]
+"./src/charmlibs/interfaces/tls_certificates/v1.py" = [
+    # Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+    "B904",
+
+    # Mutation to loop iterable `new_relation_data` during iteration
+    # Mutation to loop iterable `provider_certificates` during iteration
+    "B909",
+
+    # Undefined name `LIBID`
+    "F821",
+
+    # `try`-`except` within a loop incurs performance overhead
+    "PERF203",
+]
+"./tests/*" = [
+    # All documentation linting.
+    "D",
+]
+"./tests/integration/juju/v1/conftest.py" = [
+    # Missing copyright notice at top of file
+    "CPY001",
+]
+"./tests/unit/v0/test_v0.py" = [
+    # Line too long
+    "E501",
+
+    # `try`-`except` within a loop incurs performance overhead
+    "PERF203",
+
+    # Mutable class attributes should be annotated with `typing.ClassVar`
+    "RUF012",
+]
+"./tests/unit/v1/test_v1.py" = [
+    # Line too long
+    "E501",
+]
+
+[tool.pyright]
+extend = "../../pyproject.toml"
+include = ["src", "tests"]
+pythonVersion = "3.10"
+
+[tool.pytest.ini_options]
+addopts = ["--strict-markers"]
+markers = [
+    "upgrade: mark a test as an upgrade test",
+]

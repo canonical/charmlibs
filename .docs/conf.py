@@ -227,6 +227,12 @@ autodoc_default_options = {
     'undoc-members': None,
     'show-inheritance': None,
 }
+autodoc_mock_imports = [
+    'cryptography',
+    'jsonschema',
+    'opentelemetry',
+    'ops',
+]
 
 # Options for sphinx-datatables
 datatables_version = "1.13.4"  # set the version to use for DataTables plugin

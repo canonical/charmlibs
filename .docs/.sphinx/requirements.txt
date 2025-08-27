@@ -1,7 +1,7 @@
 canonical-sphinx[full]
+pydantic
 sphinx-autobuild
-sphinxcontrib-svg2pdfconverter[CairoSVG]
-sphinx-last-updated-by-git
-ops
 sphinx-datatables>=0.3
+sphinx-last-updated-by-git
 sphinx-sitemap~=2.8
+sphinxcontrib-svg2pdfconverter[CairoSVG]
