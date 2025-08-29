@@ -30,11 +30,14 @@ if typing.TYPE_CHECKING:
 def setup(app: sphinx.application.Sphinx) -> dict[str, str | bool]:
     """Entrypoint for Sphinx extensions, connects generation code to Sphinx event."""
     app.connect('builder-inited', _package_docs)
+    app.add_config_value('package', default=None, rebuild='')
     return {'version': '1.0.0', 'parallel_read_safe': False, 'parallel_write_safe': False}
 
 
 def _package_docs(app: sphinx.application.Sphinx) -> None:
-    _main(pathlib.Path(app.confdir))
+    package = app.config.package
+    if package is not None:
+        _main(docs_dir=pathlib.Path(app.confdir), package=package)
 
 
 ####################
@@ -57,27 +60,19 @@ AUTOMODULE_TEMPLATE = """
 """.strip()
 
 
-def _main(docs_dir: pathlib.Path) -> None:
-    _generate_files(docs_dir, exclude='interfaces')
-    _generate_files(docs_dir, subdir='interfaces')
-
-
-def _generate_files(docs_dir: pathlib.Path, subdir: str = '.', exclude: str | None = None) -> None:
+def _main(docs_dir: pathlib.Path, package: str) -> None:
+    subdir, _, package_dir_name = package.rpartition('/')
+    subdir = subdir or '.'
     generated_dir = docs_dir / 'reference' / 'charmlibs' / subdir
-    generated_dir.mkdir(exist_ok=True)
-    # Any directory starting with a-z is assumed to be a package (except the interfaces directory)
-    package_dir_names = sorted(
-        path.name
-        for path in (docs_dir.parent / subdir).glob(r'[a-z]*')
-        if path.is_dir() and path.name != exclude
+    generated_dir.mkdir(parents=True, exist_ok=True)
+    root = docs_dir.parent
+    assert (root / subdir / package_dir_name).is_dir()
+    prefix = 'charmlibs.' if subdir == '.' else f'charmlibs.{subdir}.'
+    module = package_dir_name.replace('-', '_')
+    content = AUTOMODULE_TEMPLATE.format(
+        prefix=prefix, package=module, underline='=' * len(package)
     )
-    for package_dir_name in package_dir_names:
-        prefix = 'charmlibs.' if subdir == '.' else f'charmlibs.{subdir}.'
-        package = package_dir_name.replace('-', '_')
-        automodule = AUTOMODULE_TEMPLATE.format(
-            prefix=prefix, package=package, underline='=' * len(package)
-        )
-        _write_if_needed(path=generated_dir / f'{package}.rst', content=automodule)
+    _write_if_needed(path=generated_dir / f'{package}.rst', content=content)
 
 
 def _write_if_needed(path: pathlib.Path, content: str) -> None:
