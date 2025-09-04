@@ -17,7 +17,9 @@ pytestmark = pytest.mark.k8s_only
 def test_deployment(juju: jubilant.Juju, charm: str):
     deploy(juju, charm)
     assert charm in juju.status().apps
-    juju.wait(lambda status: jubilant.all_active(status, charm))
+    juju.wait(
+        lambda status: jubilant.all_active(status, charm), timeout=2000, successes=6, delay=10
+    )
 
 
 def test_nginx_service_running(juju: jubilant.Juju, charm: str):
