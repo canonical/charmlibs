@@ -67,12 +67,14 @@ jobs:
         run: |
           substrates=()
           for substrate in k8s machine; do
+            set +e  # don't abort if the next process has a non-zero exit code
             uvx --from rust-just just integration-$substrate ${{ inputs.package }} --collect-only -q
             case $? in
                 0) substrates+=($substrate);;
                 5) echo "No tests for $substrate";;
                 *) echo "Unexpected exit code $?"; exit 1;;
             esac
+            set -e  # return to aborting if processes fail
           done
           js=$(jq '$ARGS.positional' --null-input --compact-output --args "${substrates[@]}")
           echo "substrates=$js"
