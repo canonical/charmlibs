@@ -30,8 +30,8 @@ class MyCharm(ops.CharmBase):
             nginx_config=nginx.NginxConfig(
                 server_name="foo",
                 upstream_configs=[
-                    nginx.NginxUpstream(name="foo", port=4040, worker_role="backend"),
-                    nginx.NginxUpstream(name="bar", port=4041, worker_role="frontend")
+                    nginx.NginxUpstream(name="foo", port=4040, group="backend"),
+                    nginx.NginxUpstream(name="bar", port=4041, group="frontend")
                 ],
                 server_ports_to_locations={8080: [
                     nginx.NginxLocationConfig(path='/', backend='foo', backend_url="/api/v1", headers={'a': 'b'},

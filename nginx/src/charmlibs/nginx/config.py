@@ -170,15 +170,12 @@ class NginxUpstream:
 
     Our coordinators assume that all servers under an upstream share the same port.
     """
-    worker_role: str
-    """The worker role that corresponds to this upstream.
+    group: str | None = None
+    """Group that this upstream belongs to.
 
-    This role will be used to look up workers (backend server) addresses for this upstream.
-    """
-    ignore_worker_role: bool = False
-    """If True, overrides `worker_role` and routes to all available backend servers.
-
-    Use this when the upstream should be generic and include any available backend.
+    Used for mapping multiple upstreams to a single group of backends (loadbalancing between all).
+    If you leave it None, this upstream will be routed to all available backends
+    (loadbalancing between them).
     """
 
 
@@ -220,13 +217,12 @@ class NginxConfig:
             proxy_read_timeout: Proxy read timeout.
             proxy_connect_timeout: Proxy connect timeout.
 
-
         Example:
             .. code-block:: python
             NginxConfig(
             server_name = "tempo-0.tempo-endpoints.model.svc.cluster.local",
             upstreams = [
-                NginxUpstream(name="zipkin", port=9411, worker_role="distributor"),
+                NginxUpstream(name="zipkin", port=9411, group="distributor"),
             ],
             server_ports_to_locations = {
                 9411: [
@@ -405,13 +401,13 @@ class NginxConfig:
         nginx_upstreams: list[Any] = []
 
         for upstream_config in self._upstream_configs:
-            if upstream_config.ignore_worker_role:
+            if upstream_config.group is None:
                 # include all available addresses
                 addresses: set[str] | None = set()
                 for address_set in upstreams_to_addresses.values():
                     addresses.update(address_set)
             else:
-                addresses = upstreams_to_addresses.get(upstream_config.worker_role)
+                addresses = upstreams_to_addresses.get(upstream_config.group)
 
             # don't add an upstream block if there are no addresses
             if addresses:
