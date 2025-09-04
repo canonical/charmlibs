@@ -11,6 +11,10 @@ _help:
     @echo 'All recipes require {{CYAN}}`uv`{{NORMAL}} to be available.'
     @just --list --unsorted --list-submodules
 
+[doc('Create the files for a new charmlibs package interactively.')]
+new *args:
+    uvx cookiecutter .template {{args}}
+
 [doc('Run `uv add` for package, respecting the global test dependency constraints.')]
 add package +args:
     #!/usr/bin/env -S bash -xueo pipefail

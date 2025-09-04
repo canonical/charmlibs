@@ -50,3 +50,16 @@ jobs:
         run: |
           echo '${{ toJSON(needs) }}'
           exit 1
+
+  template-and-example-in-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: |
+          uvx --from rust-just just new --no-input
+          rm -rf .example
+          mv example .example
+          STATUS=$(git status --porcelain)
+          echo "$STATUS"
+          test -z "$STATUS"

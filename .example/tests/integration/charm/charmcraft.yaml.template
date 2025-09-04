@@ -1,0 +1,22 @@
+name: {charm_name}
+type: charm
+summary: A small charm for use in integration tests.
+description: A small charm for use in integration tests.
+
+base: ubuntu@24.04
+platforms:
+  amd64:
+
+parts:
+  test-charm:
+    source: .
+    plugin: uv
+    build-snaps: [astral-uv]
+
+actions:
+  exec:
+    params:
+      code:
+        type: string
+
+{suffix}
