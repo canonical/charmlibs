@@ -34,6 +34,7 @@ jobs:
     needs: [fast-lint, get-packages]
     if: ${{ needs.get-packages.outputs.packages != '[]' }}
     strategy:
+      fail-fast: false
       matrix:
         package: ${{ fromJson(needs.get-packages.outputs.packages) }}
     uses: ./.github/workflows/tests.yaml
