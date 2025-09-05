@@ -1,0 +1,4 @@
+[tool.pyright]
+typeCheckingMode = "strict"
+reportPrivateUsage = false
+reportUnnecessaryTypeIgnoreComment = "error"
