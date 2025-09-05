@@ -15,6 +15,12 @@ classifiers = [
 ]
 dynamic = ["version"]
 
+[dependency-groups]
+lint = []
+unit = []
+functional = []
+integration = []
+
 [project.urls]
 "Repository" = "https://github.com/canonical/charmtech-charmlibs"
 "Issues" = "https://github.com/canonical/charmtech-charmlibs/issues"

@@ -28,8 +28,10 @@ lint = [
 requires-dist = [{ name = "ops", specifier = ">=2.19,<4" }]
 
 [package.metadata.requires-dev]
+functional = []
 integration = [{ name = "jubilant" }]
 lint = [{ name = "typing-extensions" }]
+unit = []
 
 [[package]]
 name = "deprecated"

@@ -22,6 +22,8 @@ dependencies = [
 lint = [
     "typing_extensions",
 ]
+unit = []
+functional = []
 integration = [
     "jubilant",
 ]

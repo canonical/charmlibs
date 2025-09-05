@@ -18,6 +18,12 @@ dependencies = [
     "opentelemetry-api",
 ]
 
+[dependency-groups]
+lint = []
+unit = []
+functional = []
+integration = []
+
 [project.urls]
 "Repository" = "https://github.com/canonical/charmlibs"
 "Issues" = "https://github.com/canonical/charmlibs/issues"
