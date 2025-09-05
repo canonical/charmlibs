@@ -29,7 +29,7 @@ import ops
 import charmlibs.pathops as pathops
 
 if typing.TYPE_CHECKING:
-    from typing import Sequence
+    from collections.abc import Sequence
 
 logger = logging.getLogger(__name__)
 
