@@ -4,6 +4,8 @@ set ignore-comments  # don't print comment lines in recipes
 
 # set on the commandline as needed, e.g. `just package=pathops python=3.8 unit`
 python := '3.10'
+# for integration tests, e.g. `just tag=24.04 pack-k8s` `just tag=foo integration-machine`
+tag := env('CHARMLIBS_TAG', '')
 
 _coverage := 'coverage==7.6.1'
 _pyright := 'pyright==1.1.397'
@@ -98,26 +100,26 @@ combine-coverage package:
     uv run coverage report --data-file="$DATA_FILE"
 
 [doc("Execute pack script to pack Kubernetes charm(s) for Juju integration tests.")]
-pack-k8s package base='24.04': (_pack package 'k8s' base)
+pack-k8s package *args: (_pack package 'k8s' args)
 
 [doc("Execute pack script to pack machine charm(s) for Juju integration tests.")]
-pack-machine package base='24.04': (_pack package 'machine' base)
+pack-machine package *args: (_pack package 'machine' args)
 
-[doc("Execute the pack script for the given package and substrate.")]
-_pack package substrate base:
+[doc("Execute the pack script for the given package, setting CHARMLIBS_SUBSTRATE and CHARMLIBS_TAG.")]
+_pack package substrate *args:
     #!/usr/bin/env -S bash -xueo pipefail
     cd '{{package}}/tests/integration'
-    CHARMLIBS_SUBSTRATE={{substrate}} CHARMLIBS_BASE={{base}} ./pack.sh
+    CHARMLIBS_SUBSTRATE='{{substrate}}' CHARMLIBS_TAG='{{tag}}' ./pack.sh {{args}}
 
-[doc("Run juju integration tests for packed Kubernetes charm(s). Requires `juju`.")]
+[doc("Run juju integration tests for packed k8s charm(s), setting CHARMLIBS_SUBSTRATE and CHARMLIBS_TAG, and selecting 'not machine_only'.")]
 integration-k8s package +flags='-rA': (_integration package 'k8s' 'not machine_only' flags)
 
-[doc("Run juju integration tests for packed Kubernetes charm(s). Requires `juju`.")]
+[doc("Run juju integration tests for packed machine charm(s), setting CHARMLIBS_SUBSTRATE and CHARMLIBS_TAG, and selecting 'not k8s_only'.")]
 integration-machine package +flags='-rA': (_integration package 'machine' 'not k8s_only' flags)
 
 [doc("Run juju integration tests. Requires `juju`.")]
 _integration package substrate label +flags:
     #!/usr/bin/env -S bash -xueo pipefail
     cd '{{package}}'
-    CHARMLIBS_SUBSTRATE={{substrate}} uv run {{_with_test_deps}} --group integration \
+    CHARMLIBS_SUBSTRATE={{substrate}} CHARMLIBS_TAG='{{tag}}' uv run {{_with_test_deps}} --group integration \
         pytest --tb=native -vv -m '{{label}}' tests/integration  {{flags}}

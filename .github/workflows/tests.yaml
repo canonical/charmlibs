@@ -30,7 +30,8 @@ jobs:
       tests: ${{ steps.tests.outputs.tests }}
       python: ${{ steps.python.outputs.versions }}
       functional-matrix: ${{ steps.functional.outputs.matrix }}
-      integration-substrates: ${{ steps.integration.outputs.substrates }}
+      integration-substrates: ${{ steps.integration-substrates.outputs.substrates }}
+      integration-tags: ${{ steps.integration-tags.outputs.tags }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -62,7 +63,7 @@ jobs:
         run: uv run --no-project --script .github/get-functional-test-matrix.py ${{ inputs.package }}
 
       - name: Check substrates needed for integration tests
-        id: integration
+        id: integration-substrates
         if: contains(fromJson(steps.tests.outputs.tests), 'integration')
         run: |
           substrates=()
@@ -79,6 +80,20 @@ jobs:
           js=$(jq '$ARGS.positional' --null-input --compact-output --args "${substrates[@]}")
           echo "substrates=$js"
           echo "substrates=$js" >> "$GITHUB_OUTPUT"
+
+      - name: Check tags to run integration tests with
+        id: integration-tags
+        if: contains(fromJson(steps.tests.outputs.tests), 'integration')
+        shell: python
+        run: |
+          import json, os, pathlib, tomllib
+          pyproject_toml = tomllib.loads(pathlib.Path('${{ inputs.package }}', 'pyproject.toml').read_text())
+          tags = pyproject_toml.get('tool', {}).get('charmlibs', {}).get('integration', {}).get('tags') or ['']
+          line = f'tags={json.dumps(tags)}'
+          print(line)
+          with pathlib.Path(os.environ['GITHUB_OUTPUT']).open('a') as f:
+            print(line, file=f)
+
 
   lint:
     needs: init
@@ -154,10 +169,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        base: ['20.04', '24.04']
+        tag: ${{ fromJson(needs.init.outputs.integration-tags) }}
         substrate: ${{ fromJson(needs.init.outputs.integration-substrates) }}
-    env:
-      CHARMLIBS_BASE: ${{ matrix.base }}
     steps:
       - uses: actions/checkout@v4
 
@@ -177,7 +190,7 @@ jobs:
 
       - name: Pack charms
         if: ${{ hashFiles(format('{0}/tests/integration/pack.sh', inputs.package)) != '' }}
-        run: uvx --from rust-just just pack-${{ matrix.substrate }} ${{ inputs.package }} ${{ matrix.base }}
+        run: uvx --from rust-just just tag='${{ matrix.tag }}' pack-${{ matrix.substrate }} ${{ inputs.package }}
 
       - name: Run Juju integration tests
-        run: uvx --from rust-just just integration-${{ matrix.substrate }} ${{ inputs.package }}
+        run: uvx --from rust-just just tag='${{ matrix.tag }}' integration-${{ matrix.substrate }} ${{ inputs.package }}
