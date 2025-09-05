@@ -27,6 +27,7 @@ lint = [
 unit = [
     "pytest==8.3.5",
 ]
+functional = []
 integration = [
     "jubilant",
     "pytest-jubilant"
