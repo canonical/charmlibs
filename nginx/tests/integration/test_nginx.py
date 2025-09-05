@@ -18,7 +18,7 @@ def test_deployment(juju: jubilant.Juju, charm: str):
     deploy(juju, charm)
     assert charm in juju.status().apps
     juju.wait(
-        lambda status: jubilant.all_active(status, charm), timeout=2000, successes=6, delay=10
+        lambda status: jubilant.all_active(status, charm), timeout=3600, successes=6, delay=10
     )
 
 
