@@ -1,0 +1,24 @@
+root := shell('git rev-parse --show-toplevel')
+package := file_name(justfile_directory())
+
+help:
+    @echo 'Local justfile for {{CYAN}}{{package}}/{{NORMAL}}.'
+    @echo 'All these recipes from the global justfile are available:'
+    @cd {{root}} && just --list --unsorted --list-heading=''
+    @echo 'However, the package argument must be omitted from these recipes:'
+    @just --list --unsorted --list-heading=''
+
+_package recipe +args:
+    cd '{{root}}' && just {{recipe}} {{package}} {{args}}
+
+add *args: (_package 'add' args)
+lint *args: (_package 'lint' args)
+static *args: (_package 'static' args)
+unit *args: (_package 'unit' args)
+functional *args: (_package 'functional' args)
+functional-pebble *args: (_package 'functional-pebble' args)
+combine-coverage *args: (_package 'combine-coverage' args)
+pack-k8s *args: (_package 'pack-k8s' args)
+pack-machine *args: (_package 'pack-machine' args)
+integration-k8s *args: (_package 'integration-k8s' args)
+integration-machine *args: (_package 'integration-machine' args)
