@@ -23,7 +23,8 @@ def deploy(juju: jubilant.Juju, charm: str) -> None:
         juju.deploy(
             _get_packed_charm_path(charm),
             resources={
-                'nginx': 'ghcr.io/canonical/nginx@sha256:6415a2c5f25f1d313c87315a681bdc84be80f3c79c304c6744737f9b34207993',
+                'nginx': 'ghcr.io/canonical/nginx@sha256:6415a2c5f25f1d313c87315a681bdc84be80'
+                'f3c79c304c6744737f9b34207993',
                 'nginx-pexp': 'ubuntu/nginx-prometheus-exporter:1.4-24.04_stable',
             },
         )

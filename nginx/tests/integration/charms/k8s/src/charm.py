@@ -64,9 +64,7 @@ class Charm(ops.CharmBase):
             nginx_pexp_pebble.autostart_services()
 
     def _on_collect_unit_status(self, event: ops.CollectStatusEvent):
-        if not self.nginx_pexp_container.pebble.get_services()[
-            0
-        ].is_running():
+        if not self.nginx_pexp_container.pebble.get_services()[0].is_running():
             event.add_status(ops.BlockedStatus('nginx-pexp service down'))
         if not self.nginx_container.pebble.get_services()[0].is_running():
             event.add_status(ops.BlockedStatus('nginx service down'))
