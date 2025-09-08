@@ -58,17 +58,17 @@ class Charm(ops.CharmBase):
         # nginx-pexp can error out if started too quickly==before nginx is up
         nginx_pexp_pebble = self.nginx_pexp_container.pebble
         for _ in range(5):
-            if nginx_pexp_pebble.get_services('nginx-prometheus-exporter')[0].is_running():
+            if nginx_pexp_pebble.get_services()[0].is_running():
                 return
             time.sleep(0.5)
             nginx_pexp_pebble.autostart_services()
 
     def _on_collect_unit_status(self, event: ops.CollectStatusEvent):
-        if not self.nginx_pexp_container.pebble.get_services('nginx-prometheus-exporter')[
+        if not self.nginx_pexp_container.pebble.get_services()[
             0
         ].is_running():
             event.add_status(ops.BlockedStatus('nginx-pexp service down'))
-        if not self.nginx_container.pebble.get_services('nginx')[0].is_running():
+        if not self.nginx_container.pebble.get_services()[0].is_running():
             event.add_status(ops.BlockedStatus('nginx service down'))
         event.add_status(ops.ActiveStatus())
 

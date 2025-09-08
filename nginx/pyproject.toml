@@ -58,3 +58,6 @@ pythonVersion = "3.8"  # check no python > 3.8 features are used
 [tool.charmlibs.functional]
 pebble = ["v1.1.1","master"]
 ubuntu = ["22.04", "latest"]
+
+[tools.charmlibs.integration]
+tags = ['20.04', '24.04']
