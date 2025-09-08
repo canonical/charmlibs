@@ -4,7 +4,7 @@ set -xueo pipefail
 cd charms
 
 CHARMDIR="$CHARMLIBS_SUBSTRATE"  # k8s or machine
-BASE="$CHARMLIBS_BASE"  # 20.04, 24.04, etc
+BASE="$CHARMLIBS_TAG"  # 20.04, 24.04, etc
 
 
 TMPDIR=".$CHARMDIR"
