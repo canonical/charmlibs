@@ -28,9 +28,10 @@ from . import _constants, _errors, _fileinfo
 
 if typing.TYPE_CHECKING:
     import os
-    from typing import Generator, Literal
+    from collections.abc import Generator
+    from typing import Literal, TypeGuard
 
-    from typing_extensions import Self, TypeGuard
+    from typing_extensions import Self
 
 
 class RelativePathError(ValueError):

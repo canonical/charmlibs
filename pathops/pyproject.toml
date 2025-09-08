@@ -2,7 +2,7 @@
 name = "charmlibs-pathops"
 description = "A pathlib-like interface for Juju K8s charms to interact with files in their workload container."
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 authors = [
     {name="The Charm Tech team at Canonical Ltd."},
 ]
@@ -22,13 +22,17 @@ dependencies = [
 lint = [
     "typing_extensions",
 ]
+unit = []
+functional = []
 integration = [
     "jubilant",
 ]
 
 [project.urls]
-"Repository" = "https://github.com/canonical/charmtech-charmlibs"
-"Issues" = "https://github.com/canonical/charmtech-charmlibs/issues"
+"Documentation" = "https://documentation.ubuntu.com/charmlibs"
+"Repository" = "https://github.com/canonical/charmlibs"
+"Issues" = "https://github.com/canonical/charmlibs/issues"
+"Changelog" = "https://github.com/canonical/charmlibs/blob/main/pathops/CHANGELOG.md"
 
 [build-system]
 requires = [
@@ -46,8 +50,11 @@ src = ["src", "tests/unit", "tests/functional", "tests/integration"]  # correctl
 [tool.pyright]
 extend = "../pyproject.toml"
 include = ["src", "tests"]
-pythonVersion = "3.8"  # check no python > 3.8 features are used
+pythonVersion = "3.10"
 
 [tool.charmlibs.functional]
 pebble = ["v1.1.1","master"]
 ubuntu = ["22.04", "latest"]
+
+[tool.charmlibs.integration]
+tags = ["22.04", "24.04"]

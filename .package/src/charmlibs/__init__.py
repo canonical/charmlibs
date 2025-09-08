@@ -19,6 +19,6 @@ For more information, see the PyPI page at https://pypi.org/project/charmlibs
 
 import warnings
 
-__version__ = '1.0.0a0'
+__version__ = '1.0.0a1'
 
 warnings.warn('This package should not be installed.', stacklevel=1)

@@ -2,7 +2,7 @@
 name = "charmlibs"
 description = "The charmlibs namespace. This package should not be installed."
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 authors = [
     {name="The Charm Tech team at Canonical Ltd."},
 ]
@@ -15,9 +15,16 @@ classifiers = [
 ]
 dynamic = ["version"]
 
+[dependency-groups]
+lint = []
+unit = []
+functional = []
+integration = []
+
 [project.urls]
-"Repository" = "https://github.com/canonical/charmtech-charmlibs"
-"Issues" = "https://github.com/canonical/charmtech-charmlibs/issues"
+"Documentation" = "https://documentation.ubuntu.com/charmlibs"
+"Repository" = "https://github.com/canonical/charmlibs"
+"Issues" = "https://github.com/canonical/charmlibs/issues"
 
 [build-system]
 requires = [

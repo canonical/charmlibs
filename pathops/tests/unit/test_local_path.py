@@ -20,7 +20,6 @@ import grp
 import pwd
 import re
 import shutil
-import sys
 import typing
 from dataclasses import dataclass
 
@@ -135,17 +134,15 @@ def test_file_creation_methods_call_chown(
 )
 def test_write_text_newline(tmp_path: pathlib.Path, data: str, newline: str | None, result: str):
     path = tmp_path / 'path'
-    if sys.version_info >= (3, 10):
-        path.write_text(data, newline=newline)
-        assert path.read_bytes() == result.encode()
+    path.write_text(data, newline=newline)
+    assert path.read_bytes() == result.encode()
     LocalPath(path).write_text(data, newline=newline)
     assert path.read_bytes() == result.encode()
 
 
 def test_write_text_newline_value_error(tmp_path: pathlib.Path):
     path = tmp_path / 'path'
-    if sys.version_info >= (3, 10):
-        with pytest.raises(ValueError):
-            path.write_text('', newline='bad')
+    with pytest.raises(ValueError):
+        path.write_text('', newline='bad')
     with pytest.raises(ValueError):
         LocalPath(path).write_text('', newline='bad')

@@ -18,6 +18,12 @@ dependencies = [
     "opentelemetry-api",
 ]
 
+[dependency-groups]
+lint = []
+unit = []
+functional = []
+integration = []
+
 [project.urls]
 "Repository" = "https://github.com/canonical/charmlibs"
 "Issues" = "https://github.com/canonical/charmlibs/issues"
@@ -39,7 +45,7 @@ src = ["src", "tests/unit", "tests/functional", "tests/integration"]  # correctl
 [tool.pyright]
 extend = "../pyproject.toml"
 include = ["src", "tests"]
-pythonVersion = "3.8"  # check no python > 3.8 features are used
+pythonVersion = "3.10"
 
 [tool.charmlibs.functional]
 ubuntu = ["22.04", "24.04", "latest"]

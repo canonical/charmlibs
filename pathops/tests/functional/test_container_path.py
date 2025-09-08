@@ -30,7 +30,8 @@ import utils
 from charmlibs.pathops import ContainerPath, LocalPath
 
 if typing.TYPE_CHECKING:
-    from typing import Any, Callable
+    from collections.abc import Callable
+    from typing import Any
 
     import ops
 

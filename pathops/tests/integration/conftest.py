@@ -22,7 +22,7 @@ import jubilant
 import pytest
 
 if typing.TYPE_CHECKING:
-    from typing import Iterator
+    from collections.abc import Iterator
 
 
 def pytest_addoption(parser: pytest.OptionGroup):

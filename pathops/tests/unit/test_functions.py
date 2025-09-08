@@ -27,7 +27,8 @@ from charmlibs.pathops import ContainerPath
 from charmlibs.pathops._functions import _get_fileinfo
 
 if typing.TYPE_CHECKING:
-    from typing import Any, Callable
+    from collections.abc import Callable
+    from typing import Any
 
 
 @pytest.mark.parametrize(

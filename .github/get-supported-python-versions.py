@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # /// script
-# requires-python = '>=3.8'
+# requires-python = '>=3.10'
 # dependencies = [
 #     'packaging',
 #     'tomli',
@@ -37,7 +37,6 @@ import packaging.specifiers
 import tomli
 
 VERSIONS = [
-    '3.8',  # Ubuntu 20.04  (ops 2)
     '3.10',  # Ubuntu 22.04  (ops 3)
     '3.12',  # Ubuntu 24.04
     '3.13',  # latest Python release

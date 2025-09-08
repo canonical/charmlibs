@@ -3,11 +3,9 @@ type: charm
 summary: A small Kubernetes charm for use in integration tests.
 description: A small Kubernetes charm for use in integration tests.
 
-bases:
-  - name: ubuntu
-    channel: '20.04'
-    architectures:
-      - amd64
+base: ubuntu@22.04
+platforms:
+  amd64:
 
 parts:
   test-charm:

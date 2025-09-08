@@ -12,11 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Generate automodule files and table of contents for packages."""
+"""Handle generation, saving, and restoration of package reference docs.
+
+Packages are not guaranteed to have compatible dependencies, so we generate their reference docs
+in separate invocations of ``sphinx-build``. If the ``package`` config option is set, we write
+an ``audodoc`` ``automodule`` directive for that package, and then save the resulting doctree and
+index information for that package. If the ``package`` config option is not set, we restore any
+saved information when doctrees are resolved.
+"""
 
 from __future__ import annotations
 
 import pathlib
+import pickle  # noqa: S403
 import typing
 
 ####################
@@ -24,30 +32,60 @@ import typing
 ####################
 
 if typing.TYPE_CHECKING:
+    import docutils.nodes
     import sphinx.application
 
 
 def setup(app: sphinx.application.Sphinx) -> dict[str, str | bool]:
     """Entrypoint for Sphinx extensions, connects generation code to Sphinx event."""
     app.connect('builder-inited', _package_docs)
+    app.connect('doctree-read', _load_on_doctree_read)
+    app.connect('doctree-resolved', _save_on_doctree_resolved)
     app.add_config_value('package', default=None, rebuild='')
     return {'version': '1.0.0', 'parallel_read_safe': False, 'parallel_write_safe': False}
 
 
 def _package_docs(app: sphinx.application.Sphinx) -> None:
+    _main(docs_dir=pathlib.Path(app.confdir), package=app.config.package)
+
+
+def _load_on_doctree_read(app: sphinx.application.Sphinx, doctree: docutils.nodes.document):
+    """Load pickle file named after docname if it exists, and replace doctree contents in-place."""
+    if app.config.package is not None:  # only load when not building docs for a specific package
+        return
+    if not (source := pathlib.Path('.save', app.env.docname)).exists():
+        return
+    saved, objects, modules = pickle.loads(source.read_bytes())  # noqa: S301
+    # restore saved doctree
+    doctree.clear()
+    for node in saved.children:
+        doctree.append(node)
+    # restore domain inventory for cross-refs
+    app.env.domains['py'].data['objects'].update(objects)
+    app.env.domains['py'].data['modules'].update(modules)
+
+
+def _save_on_doctree_resolved(
+    app: sphinx.application.Sphinx, doctree: docutils.nodes.document, docname: str
+):
+    """Dump doctree to pickle file named after docname."""
     package = app.config.package
-    # generate reference docs for the current package
-    # package is None if not set explicitly
-    # e.g. when running `just docs run` or `just docs linkcheck`
-    if package is not None:
-        _main(docs_dir=pathlib.Path(app.confdir), package=package)
+    # only save when building docs for a specific package
+    # only save package reference docs
+    if package is None or docname != f'reference/charmlibs/{package}':
+        return
+    objects = app.env.domains['py'].data['objects']
+    modules = app.env.domains['py'].data['modules']
+    target = pathlib.Path('.save', docname)
+    target.parent.mkdir(exist_ok=True, parents=True)
+    target.write_bytes(pickle.dumps((doctree, objects, modules)))
 
 
 ####################
 # generation logic #
 ####################
 
-AUTOMODULE_TEMPLATE = """
+RST_TEMPLATE = """
 .. raw:: html
 
    <style>
@@ -58,24 +96,32 @@ AUTOMODULE_TEMPLATE = """
 
 {package}
 {underline}
+""".strip()
+AUTOMODULE_TEMPLATE = """
 
 .. automodule:: {package}
-""".strip()
+""".rstrip()
 
 
-def _main(docs_dir: pathlib.Path, package: str) -> None:
-    subdir, _, package_dir_name = package.rpartition('/')
-    subdir = subdir or '.'
-    generated_dir = docs_dir / 'reference' / 'charmlibs' / subdir
-    generated_dir.mkdir(parents=True, exist_ok=True)
+def _main(docs_dir: pathlib.Path, package: str | None) -> None:
+    """Write automodule file for package and placeholders rst files for all other packages."""
     root = docs_dir.parent
-    assert (root / subdir / package_dir_name).is_dir()
-    prefix = 'charmlibs.' if subdir == '.' else f'charmlibs.{subdir}.'
-    module = package_dir_name.replace('-', '_')
-    content = AUTOMODULE_TEMPLATE.format(
-        prefix=prefix, package=module, underline='=' * len(package)
-    )
-    _write_if_needed(path=generated_dir / f'{package}.rst', content=content)
+    ref_dir = docs_dir / 'reference'
+    (ref_dir / 'charmlibs' / 'interfaces').mkdir(parents=True, exist_ok=True)
+    # Any directory (or subdirectory of interfaces/) starting with a-z is assumed to be a package.
+    for subdir, p in (
+        *(('', p.name) for p in root.glob(r'[a-z]*') if p.is_dir() and p.name != 'interfaces'),
+        *(('interfaces', p.name) for p in (root / 'interfaces').glob(r'[a-z]*') if p.is_dir()),
+    ):
+        module = p.replace('-', '_')
+        content = RST_TEMPLATE.format(
+            prefix=f'charmlibs.{subdir}.' if subdir else 'charmlibs.',
+            package=module,
+            underline='=' * len(module),
+        )
+        if package is not None and package == str(pathlib.Path(subdir, p)):
+            content += AUTOMODULE_TEMPLATE.format(package=module)
+        _write_if_needed(path=ref_dir / 'charmlibs' / subdir / f'{p}.rst', content=content)
 
 
 def _write_if_needed(path: pathlib.Path, content: str) -> None:

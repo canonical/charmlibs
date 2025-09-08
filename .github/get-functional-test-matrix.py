@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # /// script
-# requires-python = '>=3.8'
+# requires-python = '>=3.10'
 # dependencies = [
 #     'tomli',
 # ]

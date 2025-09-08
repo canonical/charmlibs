@@ -28,7 +28,8 @@ import utils
 from charmlibs.pathops import ContainerPath, LocalPath, RelativePathError, _constants, _fileinfo
 
 if typing.TYPE_CHECKING:
-    from typing import Any, Callable
+    from collections.abc import Callable
+    from typing import Any
 
 
 class TestInit:

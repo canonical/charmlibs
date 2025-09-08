@@ -12,6 +12,12 @@ dependencies = [
 [package.metadata]
 requires-dist = [{ name = "opentelemetry-api" }]
 
+[package.metadata.requires-dev]
+functional = []
+integration = []
+lint = []
+unit = []
+
 [[package]]
 name = "importlib-metadata"
 version = "8.7.0"
