@@ -68,7 +68,7 @@ class Charm(ops.CharmBase):
 
     def _on_collect_unit_status(self, event: ops.CollectStatusEvent):
         if not (self.nginx_container.can_connect() and self.nginx_pexp_container.can_connect()):
-            event.add_status(ops.WaitingStatus("waiting for containers..."))
+            event.add_status(ops.WaitingStatus('waiting for containers...'))
         else:
             if not self.nginx_pexp_container.pebble.get_services()[0].is_running():
                 event.add_status(ops.BlockedStatus('nginx-pexp service down'))
