@@ -18,6 +18,10 @@ _help:
     @echo 'All recipes require {{CYAN}}`uv`{{NORMAL}} to be available.'
     @just --list --unsorted --list-submodules
 
+[doc('Create the files for a new charmlibs package interactively.')]
+new *args:
+    env CHARMLIBS_TEMPLATE=$(realpath .template) uvx cookiecutter .template {{args}}
+
 [doc('Run `ruff` and `codespell`, failing afterwards if any errors are found.')]
 fast-lint:
     #!/usr/bin/env -S bash -xueo pipefail
