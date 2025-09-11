@@ -14,6 +14,10 @@
 
 r""":mod:`pathlib`-like interface for local and :class:`ops.Container` filesystem paths.
 
+:mod:`apt`
+
+:ref:`Charmhub-hosted libraries <charm-libs-charmhub-hosted>`
+
 The ``pathops`` charm library provides:
 
 - :class:`PathProtocol`: defines the interface of methods common to both local and container paths.
