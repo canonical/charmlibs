@@ -98,7 +98,8 @@ redirects = {}
 
 # A regex list of URLs that are ignored by 'make linkcheck'
 linkcheck_ignore = [
-    "http://127.0.0.1:8000"
+    "http://127.0.0.1:8000",
+    "https://matrix.to/#/*",
 ]
 
 # A regex list of URLs where anchors are ignored by 'make linkcheck'

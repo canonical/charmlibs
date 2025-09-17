@@ -4,6 +4,7 @@
 :maxdepth: 3
 :hidden: false
 
+tutorial
 how-to/index
 reference/index
 explanation/index

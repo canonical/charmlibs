@@ -180,3 +180,4 @@ cython_debug/
 
 # uv.lock from example as we don't commit this
 .example/**/uv.lock
+.tutorial/**/uv.lock

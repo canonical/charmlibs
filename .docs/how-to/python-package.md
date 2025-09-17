@@ -1,6 +1,10 @@
 (how-to-python-package)=
 # How to distribute charm libraries
 
+```{warning}
+This guide has not yet been updated to reflect the latest recommendations: all new charm libraries intended for wide use should be developed as Python packages in the `charmlibs` monorepo and distributed on PyPI under the `charmlibs` namespace. Likewise for interface libraries, but distributed under the `charmlibs.interfaces` namespace. Charmhub-hosted libraries will be deprecated going forward.
+```
+
 This guide details when and how you should create your charm libraries as Python packages, instead of {doc}`Charmcraft-style charm libs <charmcraft:reference/commands/fetch-libs>`.
 
 
