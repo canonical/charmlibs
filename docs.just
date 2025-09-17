@@ -24,10 +24,12 @@ _packages *packages:
     import pathlib, subprocess
     ROOT = pathlib.Path('{{justfile_directory()}}')
     # Any directory (or subdirectory of interfaces) starting with a-z is assumed to be a package.
-    for package in '{{packages}}'.split() or [
+    PACKAGES = '{{packages}}'.split() or [
         *sorted(p.name for p in ROOT.glob(r'[a-z]*') if p.is_dir() and p.name != 'interfaces'),
         *sorted(f'interfaces/{p.name}' for p in (ROOT / 'interfaces').glob(r'[a-z]*') if p.is_dir()),
-    ]:
+    ]
+    # sphinx-build command for specific package and save targets
+    def build(package: str, save_objects: bool, save_doctrees: bool) -> None:
         cmd = [
             'uvx',
             '--from', 'sphinx',
@@ -39,11 +41,19 @@ _packages *packages:
             '-d', '.sphinx/.doctrees',
             '-D', 'language=en',
             '-D', f'package={package}',
+            '-D', f'save_objects={int(save_objects)}',  # bool config options set as 0 or 1
+            '-D', f'save_doctrees={int(save_doctrees)}',  # bool config options set as 0 or 1
             '-D', 'suppress_warnings=ref.ref,ref.doc,myst.xref_missing',
             '.', '{{build_dir}}/html',
         ]
         print(cmd)
         subprocess.check_call(cmd)
+    print('Building docs once per package to save inventory for links.')
+    for pkg in PACKAGES:
+        build(pkg, save_objects=True, save_doctrees=False)
+    print('Building docs once per package to save doctrees for final build.')
+    for pkg in PACKAGES:
+        build(pkg, save_objects=False, save_doctrees=True)
 
 [doc('Show help for the docs recipes.')]
 help:

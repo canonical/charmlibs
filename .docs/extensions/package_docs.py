@@ -34,14 +34,21 @@ import typing
 if typing.TYPE_CHECKING:
     import docutils.nodes
     import sphinx.application
+    import sphinx.environment
+
+SAVED_OBJECTS = pathlib.Path('.save', 'objects')
+SAVED_DOCTREES = pathlib.Path('.save', 'doctrees')
 
 
 def setup(app: sphinx.application.Sphinx) -> dict[str, str | bool]:
     """Entrypoint for Sphinx extensions, connects generation code to Sphinx event."""
     app.connect('builder-inited', _package_docs)
-    app.connect('doctree-read', _load_on_doctree_read)
+    app.connect('env-before-read-docs', _load_domain_objects_on_env_before_read_docs)
+    app.connect('doctree-read', _load_doctree_on_doctree_read)
     app.connect('doctree-resolved', _save_on_doctree_resolved)
     app.add_config_value('package', default=None, rebuild='')
+    app.add_config_value('save_objects', default=False, rebuild='', types=[bool])
+    app.add_config_value('save_doctrees', default=False, rebuild='', types=[bool])
     return {'version': '1.0.0', 'parallel_read_safe': False, 'parallel_write_safe': False}
 
 
@@ -49,20 +56,37 @@ def _package_docs(app: sphinx.application.Sphinx) -> None:
     _main(docs_dir=pathlib.Path(app.confdir), package=app.config.package)
 
 
-def _load_on_doctree_read(app: sphinx.application.Sphinx, doctree: docutils.nodes.document):
+def _load_domain_objects_on_env_before_read_docs(
+    app: sphinx.application.Sphinx, env: sphinx.environment.BuildEnvironment, docnames: list[str]
+) -> None:
+    if app.config.save_objects:  # only load when not saving objects so we cleanly save separately
+        return
+    python_domain_data = env.domains['py'].data
+    for path in SAVED_OBJECTS.rglob('*'):
+        if path.is_dir():
+            continue
+        docname = str(path.relative_to(SAVED_OBJECTS))
+        assert docname in env.found_docs, f'Unknown {docname=}, perhaps run `just docs clean`?'
+        objects, modules = pickle.loads(path.read_bytes())  # noqa: S301
+        python_domain_data['objects'].update(objects)
+        python_domain_data['modules'].update(modules)
+    if app.config.package is None:  # building docs for all packages, so ensure all links rebuild
+        docnames[:] = sorted(env.found_docs)
+
+
+def _load_doctree_on_doctree_read(
+    app: sphinx.application.Sphinx, doctree: docutils.nodes.document
+) -> None:
     """Load pickle file named after docname if it exists, and replace doctree contents in-place."""
     if app.config.package is not None:  # only load when not building docs for a specific package
         return
-    if not (source := pathlib.Path('.save', app.env.docname)).exists():
+    if not (source := SAVED_DOCTREES / app.env.docname).exists():
         return
-    saved, objects, modules = pickle.loads(source.read_bytes())  # noqa: S301
+    saved = pickle.loads(source.read_bytes())  # noqa: S301
     # restore saved doctree
     doctree.clear()
     for node in saved.children:
         doctree.append(node)
-    # restore domain inventory for cross-refs
-    app.env.domains['py'].data['objects'].update(objects)
-    app.env.domains['py'].data['modules'].update(modules)
 
 
 def _save_on_doctree_resolved(
@@ -74,11 +98,16 @@ def _save_on_doctree_resolved(
     # only save package reference docs
     if package is None or docname != f'reference/charmlibs/{package}':
         return
-    objects = app.env.domains['py'].data['objects']
-    modules = app.env.domains['py'].data['modules']
-    target = pathlib.Path('.save', docname)
-    target.parent.mkdir(exist_ok=True, parents=True)
-    target.write_bytes(pickle.dumps((doctree, objects, modules)))
+    if app.config.save_objects:
+        objects = app.env.domains['py'].data['objects']
+        modules = app.env.domains['py'].data['modules']
+        target = SAVED_OBJECTS / docname
+        target.parent.mkdir(exist_ok=True, parents=True)
+        target.write_bytes(pickle.dumps((objects, modules)))
+    if app.config.save_doctrees:
+        target = SAVED_DOCTREES / docname
+        target.parent.mkdir(exist_ok=True, parents=True)
+        target.write_bytes(pickle.dumps(doctree))
 
 
 ####################

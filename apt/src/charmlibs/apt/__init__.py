@@ -14,6 +14,10 @@
 
 """Abstractions for the system's Debian/Ubuntu package information and repositories.
 
+:class:`pathops.ContainerPath`
+
+:doc:`pathops`
+
 This module contains abstractions and wrappers around Debian/Ubuntu-style repositories and
 packages, in order to easily provide an idiomatic and Pythonic mechanism for adding packages and/or
 repositories to systems for use in machine charms.
