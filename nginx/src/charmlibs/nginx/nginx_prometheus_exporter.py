@@ -1,0 +1,48 @@
+# Copyright 2025 Canonical
+# See LICENSE file for licensing details.
+
+"""Nginx-prometheus-exporter module."""
+
+import ops
+
+
+class NginxPrometheusExporter:
+    """Helper class to manage the nginx prometheus exporter workload."""
+
+    def __init__(
+        self,
+        container: ops.Container,
+        nginx_port: int = 8080,
+        nginx_insecure: bool = False,
+        nginx_prometheus_exporter_port: int = 9113,
+    ) -> None:
+        self._container = container
+        self._nginx_insecure = nginx_insecure
+        self._nginx_port = nginx_port
+        self._nginx_prometheus_exporter_port = nginx_prometheus_exporter_port
+
+    def reconcile(self):
+        """Configure pebble layer and restart if necessary."""
+        if self._container.can_connect():
+            self._container.add_layer('nginx-prometheus-exporter', self.layer, combine=True)
+            self._container.autostart()
+
+    @property
+    def layer(self) -> ops.pebble.Layer:
+        """Return the Pebble layer for Nginx Prometheus exporter."""
+        scheme = 'http' if self._nginx_insecure else 'https'
+        return ops.pebble.Layer({
+            'summary': 'nginx prometheus exporter layer',
+            'description': 'pebble config layer for Nginx Prometheus exporter',
+            'services': {
+                'nginx-prometheus-exporter': {
+                    'override': 'replace',
+                    'summary': 'nginx prometheus exporter',
+                    'command': f'nginx-prometheus-exporter '
+                    f'--no-nginx.ssl-verify '
+                    f'--web.listen-address=:{self._nginx_prometheus_exporter_port} '
+                    f'--nginx.scrape-uri={scheme}://127.0.0.1:{self._nginx_port}/status',
+                    'startup': 'enabled',
+                }
+            },
+        })
