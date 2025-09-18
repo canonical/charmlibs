@@ -1,0 +1,78 @@
+{
+  "type": "sync",
+  "status-code": 200,
+  "status": "OK",
+  "result": [
+    {
+      "id": "jFJhGxzO7zh4xPun3oLzsYPesPvyGblh",
+      "title": "curl",
+      "summary": "CLI tool for transferring data with URL syntax (HTTP, HTTPS, etc)",
+      "description": "A command line tool and library for transferring data with URL syntax, \nsupporting HTTP, HTTPS, FTP, FTPS, GOPHER, TFTP, SCP, SFTP, SMB, TELNET, \nDICT, LDAP, LDAPS, FILE, IMAP, SMTP, POP3, RTSP and RTMP. \ncurl offers a myriad of powerful features",
+      "download-size": 6524928,
+      "name": "curl",
+      "publisher": {
+        "id": "trElzADL6BSHUJX2R38cUoXIElh2BYRZ",
+        "username": "woutervb",
+        "display-name": "Wouter van Bommel",
+        "validation": "unproven"
+      },
+      "store-url": "https://snapcraft.io/curl",
+      "developer": "woutervb",
+      "status": "available",
+      "type": "app",
+      "base": "core20",
+      "version": "7.78.0",
+      "channel": "stable",
+      "ignore-validation": false,
+      "revision": "233",
+      "confinement": "strict",
+      "private": false,
+      "devmode": false,
+      "jailmode": false,
+      "contact": "https://github.com/woutervb/snap-curl",
+      "license": "curl",
+      "website": "https://github.com/woutervb/snap-curl",
+      "channels": {
+        "latest/edge": {
+          "revision": "275",
+          "confinement": "strict",
+          "version": "7.78.0",
+          "channel": "latest/edge",
+          "epoch": {
+            "read": [
+              0
+            ],
+            "write": [
+              0
+            ]
+          },
+          "size": 6524928,
+          "released-at": "2021-08-19T06:15:44.601272Z"
+        },
+        "latest/stable": {
+          "revision": "233",
+          "confinement": "strict",
+          "version": "7.78.0",
+          "channel": "latest/stable",
+          "epoch": {
+            "read": [
+              0
+            ],
+            "write": [
+              0
+            ]
+          },
+          "size": 6524928,
+          "released-at": "2021-07-29T23:20:37.945102Z"
+        }
+      },
+      "tracks": [
+        "latest"
+      ]
+    }
+  ],
+  "sources": [
+    "store"
+  ],
+  "suggested-currency": "USD"
+}

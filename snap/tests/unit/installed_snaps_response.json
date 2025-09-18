@@ -1,0 +1,89 @@
+{
+  "type": "sync",
+  "status-code": 200,
+  "status": "OK",
+  "result": [
+    {
+      "id": "gcqfpVCOUvmDuYT0Dh5PjdeGypSEzNdV",
+      "title": "charmcraft",
+      "summary": "The charming tool",
+      "description": "Charmcraft enables charm creators to build, publish, and manage charmed operators for Kubernetes, metal and virtual machines.",
+      "icon": "https://dashboard.snapcraft.io/site_media/appmedia/2021/06/image-juju-256.svg.png",
+      "installed-size": 55361536,
+      "name": "charmcraft",
+      "publisher": {
+        "id": "canonical",
+        "username": "canonical",
+        "display-name": "Canonical",
+        "validation": "verified"
+      },
+      "developer": "canonical",
+      "status": "active",
+      "type": "app",
+      "base": "core20",
+      "version": "1.2.1",
+      "channel": "latest/stable",
+      "tracking-channel": "latest/stable",
+      "ignore-validation": false,
+      "revision": "603",
+      "confinement": "classic",
+      "private": false,
+      "devmode": false,
+      "jailmode": false,
+      "apps": [
+        {
+          "snap": "charmcraft",
+          "name": "charmcraft"
+        },
+        {
+          "snap": "charmcraft",
+          "name": "foo_service",
+          "daemon": "simple",
+          "enabled": true
+        }
+      ],
+      "contact": "",
+      "license": "Apache-2.0",
+      "mounted-from": "/var/lib/snapd/snaps/charmcraft_603.snap",
+      "website": "https://github.com/canonical/charmcraft/",
+      "media": [
+        {
+          "type": "icon",
+          "url": "https://dashboard.snapcraft.io/site_media/appmedia/2021/06/image-juju-256.svg.png",
+          "width": 256,
+          "height": 256
+        }
+      ],
+      "install-date": "2021-08-20T00:10:20.074917847Z"
+    },
+    {
+      "id": "99T7MUlRhtI3U0QFgl5mXXESAiSwt776",
+      "title": "core",
+      "summary": "snapd runtime environment",
+      "description": "The core runtime environment for snapd",
+      "installed-size": 104210432,
+      "name": "core",
+      "publisher": {
+        "id": "canonical",
+        "username": "canonical",
+        "display-name": "Canonical",
+        "validation": "verified"
+      },
+      "developer": "canonical",
+      "status": "active",
+      "type": "os",
+      "version": "16-2.51.3",
+      "channel": "latest/stable",
+      "tracking-channel": "latest/stable",
+      "ignore-validation": false,
+      "revision": "11420",
+      "confinement": "strict",
+      "private": false,
+      "devmode": false,
+      "jailmode": false,
+      "contact": "mailto:snaps@canonical.com",
+      "mounted-from": "/var/lib/snapd/snaps/core_11420.snap",
+      "install-date": "2021-07-27T13:24:00.522211469Z"
+    }
+  ]
+}
