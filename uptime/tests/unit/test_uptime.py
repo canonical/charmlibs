@@ -17,5 +17,5 @@
 from charmlibs import uptime
 
 
-def test_version():
-    assert isinstance(uptime.__version__, str)
+def test_uptime():
+    assert uptime.uptime().total_seconds() > 20 * 365 * 24 * 60 * 60

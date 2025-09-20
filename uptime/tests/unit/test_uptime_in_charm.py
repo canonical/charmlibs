@@ -28,11 +28,11 @@ class Charm(ops.CharmBase):
         framework.observe(self.on.start, self._on_start)
 
     def _on_start(self, event: ops.StartEvent):
-        self.package_version = uptime.__version__
+        self.uptime = uptime.uptime()
 
 
-def test_version():
+def test_uptime():
     ctx = ops.testing.Context(Charm, meta={'name': 'charm'})
     with ctx(ctx.on.start(), ops.testing.State()) as manager:
         manager.run()
-        assert isinstance(manager.charm.package_version, str)
+        assert manager.charm.uptime.total_seconds() > 20 * 365 * 24 * 60 * 60

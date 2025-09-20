@@ -16,6 +16,7 @@ classifiers = [
 dynamic = ["version"]
 dependencies = [
     # "ops",
+    "psutil>=7.1.0",
 ]
 
 [dependency-groups]

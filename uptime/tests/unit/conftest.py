@@ -13,3 +13,13 @@
 # limitations under the License.
 
 """Fixtures for unit tests, typically mocking out parts of the external system."""
+
+import datetime
+
+import psutil
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def mock_boot_time(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(psutil, 'boot_time', lambda: datetime.datetime(2004, 10, 20).timestamp())

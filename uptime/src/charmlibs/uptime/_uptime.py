@@ -12,11 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""The charmlibs.uptime package."""
+"""Private module defining the core logic of the uptime package."""
 
-from ._uptime import uptime
-from ._version import __version__ as __version__
+import datetime
 
-__all__ = [
-    'uptime',
-]
+import psutil
+
+
+def uptime() -> datetime.timedelta:
+    """Get the uptime for the system where the charm is running."""
+    utc_now = datetime.datetime.now(tz=datetime.timezone.utc)
+    utc_boot_time = datetime.datetime.fromtimestamp(psutil.boot_time(), tz=datetime.timezone.utc)
+    return utc_now - utc_boot_time
