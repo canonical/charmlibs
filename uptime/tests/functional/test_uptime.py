@@ -17,5 +17,5 @@
 from charmlibs import uptime
 
 
-def test_version():
-    assert isinstance(uptime.__version__, str)
+def test_hostname():
+    assert uptime.uptime().total_seconds() > 0.0
