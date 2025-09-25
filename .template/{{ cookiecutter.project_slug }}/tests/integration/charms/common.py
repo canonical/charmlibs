@@ -21,7 +21,7 @@ import logging
 
 import ops
 
-from charmlibs import {{ cookiecutter.project_slug }}
+from charmlibs{{ '.interfaces' if cookiecutter._interface else '' }} import {{ cookiecutter.project_slug }}
 
 logger = logging.getLogger(__name__)
 

@@ -20,9 +20,25 @@ import shutil
 import sys
 import warnings
 
+##############################################################################
+# move src/charmlibs/* to src/charmlibs/interfaces/* for interface libraries #
+##############################################################################
+
+# evaluated with jinja2 by cookiecutter
+# False by default, set to True by `just interface init`
+if {{cookiecutter._interface}}:  # noqa: F821
+    charmlibs = pathlib.Path('src', 'charmlibs')
+    tmp = charmlibs.rename('.tmp')
+    charmlibs.mkdir()
+    tmp.rename(charmlibs / 'interfaces')
+
+#########################################################################################
+# unresolve symlinks -- we use these in the template for a better maintainer experience #
+#########################################################################################
+
 # abort if CHARMLIBS_TEMPLATE environment  variable is not set
 ABORT_MSG = """
-CHARMLIBS_TEMPLATE is not set, did you run cookiecutter via `just new`?
+CHARMLIBS_TEMPLATE is not set, did you run cookiecutter via `just init`?
 Aborting `post_gen_project` hook without restoring symlinks ...
 """.strip()
 TEMPLATE_DIR = os.environ.get('CHARMLIBS_TEMPLATE')

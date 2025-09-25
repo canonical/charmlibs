@@ -2,6 +2,7 @@
   "project_slug": "example",
   "min_python_version": "3.10",
   "author": "The Charm Tech team at Canonical",
+  "_interface": false,
   "__prompts__": {
     "project_slug": "The package name (without the charmlibs prefix), e.g.",
     "min_python_version": "The minimum Python version supported by the package",

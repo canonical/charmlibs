@@ -22,4 +22,5 @@ import pytest
 
 @pytest.fixture(autouse=True)
 def mock_boot_time(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(psutil, 'boot_time', lambda: datetime.datetime(2004, 10, 20).timestamp())
+    timestamp = datetime.datetime(2004, 10, 20).timestamp()
+    monkeypatch.setattr(psutil, 'boot_time', lambda: timestamp)

@@ -14,7 +14,7 @@
 
 """Unit tests for library code, not involving charm code."""
 
-from charmlibs import {{ cookiecutter.project_slug }}
+from charmlibs{{ '.interfaces' if cookiecutter._interface else '' }} import {{ cookiecutter.project_slug }}
 
 
 def test_version():

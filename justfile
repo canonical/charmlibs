@@ -1,3 +1,4 @@
+mod interface  # load interface module to expose interface subcommands
 mod docs  # load docs module to expose docs subcommands
 
 set ignore-comments  # don't print comment lines in recipes
@@ -60,20 +61,21 @@ static package *args:
 unit package +flags='-rA': (_coverage package 'unit' flags)
 
 [doc("Run functional tests with `coverage`, e.g. `just python=3.10 functional pathops`.")]
-functional package +flags='-rA': (_coverage package 'functional' flags)
-
-[doc("Run functional tests with `coverage` and a live `pebble` running. Requires `pebble`.")]
-functional-pebble package +flags='-rA':
+[positional-arguments]  # pass recipe args to recipe script positionally to enable correct quoting when forwarding variadic args
+functional package +flags='-rA':
     #!/usr/bin/env -S bash -xueo pipefail
-    export PEBBLE=/tmp/pebble-test
-    umask 0
-    pebble run --create-dirs &>/dev/null &
-    PEBBLE_PID=$!
+    shift 1  # drop $1 (package) from $@ it's just +flags
+    cd '{{package}}'
+    if [ -e tests/functional/setup.sh ]; then
+        source ./tests/functional/setup.sh
+    fi
     set +e  # don't exit if the tests fail
-    just --justfile='{{justfile()}}' python='{{python}}' functional '{{package}}' {{flags}}
+    just --justfile='{{justfile()}}' python='{{python}}' _coverage '{{package}}' functional "${@}"
     EXITCODE=$?
     set -e  # do exit if anything goes wrong now
-    kill $PEBBLE_PID
+    if [ -e tests/functional/teardown.sh ]; then
+        source ./tests/functional/teardown.sh
+    fi
     exit $EXITCODE
 
 [doc("Use uv to install and run coverage for the specified package's tests.")]

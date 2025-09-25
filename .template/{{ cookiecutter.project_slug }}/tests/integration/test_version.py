@@ -16,7 +16,7 @@
 
 import jubilant
 
-from charmlibs import {{ cookiecutter.project_slug }}
+from charmlibs{{ '.interfaces' if cookiecutter._interface else '' }} import {{ cookiecutter.project_slug }}
 
 
 def test_deploy(juju: jubilant.Juju, charm: str):

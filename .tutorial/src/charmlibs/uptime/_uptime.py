@@ -21,6 +21,7 @@ import psutil
 
 def uptime() -> datetime.timedelta:
     """Get the uptime for the system where the charm is running."""
-    utc_now = datetime.datetime.now(tz=datetime.timezone.utc)
-    utc_boot_time = datetime.datetime.fromtimestamp(psutil.boot_time(), tz=datetime.timezone.utc)
+    utc = datetime.timezone.utc
+    utc_now = datetime.datetime.now(tz=utc)
+    utc_boot_time = datetime.datetime.fromtimestamp(psutil.boot_time(), tz=utc)
     return utc_now - utc_boot_time

@@ -14,7 +14,7 @@
 
 """Functional tests interacting with the real system, but not with Juju."""
 
-from charmlibs import {{ cookiecutter.project_slug }}
+from charmlibs{{ '.interfaces' if cookiecutter._interface else '' }} import {{ cookiecutter.project_slug }}
 
 
 def test_version():

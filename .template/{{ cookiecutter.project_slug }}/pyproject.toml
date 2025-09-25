@@ -1,6 +1,6 @@
 [project]
-name = "charmlibs-{{ cookiecutter.project_slug }}"
-description = "The charmlibs.{{ cookiecutter.project_slug }} package."
+name = "charmlibs-{{ 'interfaces-' if cookiecutter._interface else '' }}{{ cookiecutter.project_slug }}"
+description = "The charmlibs.{{ 'interfaces.' if cookiecutter._interface else '' }}{{ cookiecutter.project_slug }} package."
 readme = "README.md"
 requires-python = ">={{ cookiecutter.min_python_version }}"
 authors = [
@@ -19,15 +19,15 @@ dependencies = [
 ]
 
 [dependency-groups]
-lint = [  # installed for `just lint {{ cookiecutter.project_slug }}` (unit, functional, and integration are also installed)
+lint = [  # installed for `just lint {{ 'interfaces/' if cookiecutter._interface else '' }}{{ cookiecutter.project_slug }}` (unit, functional, and integration are also installed)
     # "typing_extensions",
 ]
-unit = [  # installed for `just unit {{ cookiecutter.project_slug }}`
+unit = [  # installed for `just unit {{ 'interfaces/' if cookiecutter._interface else '' }}{{ cookiecutter.project_slug }}`
     "ops[testing]",
 ]
-functional = [  # installed for `just functional {{ cookiecutter.project_slug }}`
+functional = [  # installed for `just functional {{ 'interfaces/' if cookiecutter._interface else '' }}{{ cookiecutter.project_slug }}`
 ]
-integration = [  # installed for `just integration {{ cookiecutter.project_slug }}`
+integration = [  # installed for `just integration {{ 'interfaces/' if cookiecutter._interface else '' }}{{ cookiecutter.project_slug }}`
     "jubilant",
 ]
 
@@ -43,14 +43,20 @@ build-backend = "hatchling.build"
 packages = ["src/charmlibs"]
 
 [tool.hatch.version]
-path = "src/charmlibs/{{ cookiecutter.project_slug }}/_version.py"
+path = "src/charmlibs{{ '/interfaces' if cookiecutter._interface else '' }}/{{ cookiecutter.project_slug }}/_version.py"
 
 [tool.ruff]
-extend = "../pyproject.toml"
+extend = "{{ '../' if cookiecutter._interface else '' }}../pyproject.toml"
 src = ["src", "tests/unit", "tests/functional", "tests/integration"]  # correctly sort local imports in tests
 
+[tool.ruff.lint.extend-per-file-ignores]
+# add additional per-file-ignores here to avoid overriding repo-level config
+"tests/**/*" = [
+    # "E501",  # line too long
+]
+
 [tool.pyright]
-extends = "../pyproject.toml"
+extends = "{{ '../' if cookiecutter._interface else '' }}../pyproject.toml"
 include = ["src", "tests"]
 pythonVersion = "{{ cookiecutter.min_python_version }}"  # check no python > {{ cookiecutter.min_python_version }} features are used
 

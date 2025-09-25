@@ -7,8 +7,8 @@ description = "Charm for integration tests."
 requires-python = ">={{ cookiecutter.min_python_version }}"
 dependencies = [
     "ops==3.*",
-    "charmlibs-{{ cookiecutter.project_slug }}",
+    "charmlibs-{{ 'interfaces-' if cookiecutter._interface else '' }}{{ cookiecutter.project_slug }}",
 ]
 
 [tool.uv.sources]
-"charmlibs-{{ cookiecutter.project_slug }}" = { path = "library", editable = true }
+"charmlibs-{{ 'interfaces-' if cookiecutter._interface else '' }}{{ cookiecutter.project_slug }}" = { path = "library", editable = true }
