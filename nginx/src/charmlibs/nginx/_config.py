@@ -1,92 +1,6 @@
 # Copyright 2025 Canonical
 # See LICENSE file for licensing details.
-"""NginxConfig.
-
-## Usage
-
-To generate an Nginx configuration for a charm, instantiate the `NginxConfig` class with the
-  required inputs:
-
-1. `server_name`: The name of the server (e.g. charm fqdn), which is used to identify the
-  server in Nginx configurations.
-2. `upstream_configs`: List of `NginxUpstream` used to generate Nginx `upstream` blocks.
-3. `server_ports_to_locations`: Mapping from server ports to a list of `NginxLocationConfig`.
-
-
-## Charm usage
-Any charm can instantiate `NginxConfig` to generate its own Nginx configuration as follows:
-```python
-    from charmlibs.nginx.config import NginxConfig, NginxUpstream, NginxLocationConfig
-    ...
-
-    class AnyCharm(CharmBase):
-        ...
-        def __init__(self, *args):
-            super().__init__(*args)
-            ...
-            self._container = self.unit.get_container("nginx")
-            self._nginx = NginxConfig(
-                server_name=self.hostname,
-                upstream_configs=self._nginx_upstreams(),
-                server_ports_to_locations=self._server_ports_to_locations(),
-            )
-            ...
-            self._reconcile()
-
-
-        ...
-        @property
-        def hostname(self) -> str:
-            return socket.getfqdn()
-
-        @property
-        def _nginx_locations(self) -> List[NginxLocationConfig]:
-            return [
-                NginxLocationConfig(path="/api/v1", backend="upstream1",modifier="~"),
-                NginxLocationConfig(path="/status", backend="upstream2",modifier="="),
-            ]
-
-        @property
-        def _upstream_addresses(self) -> Dict[str, Set[str]]:
-            # a mapping from an upstream "role" to the set of addresses
-            # that belong to this upstream
-            return {
-                "upstream1": {"address1", "address2"},
-                "upstream2": {"address3", "address4"},
-            }
-
-        @property
-        def _tls_available(self) -> bool:
-            # return if the Nginx config should have TLS enabled
-            pass
-
-        def _reconcile(self):
-            if self._container.can_connect():
-                new_config: str = self._nginx.get_config(self._upstream_addresses,
-                  self._tls_available)
-                should_restart: bool = self._has_config_changed(new_config)
-                self._container.push(self.config_path, new_config, make_dirs=True)
-                self._container.add_layer("nginx", self.layer, combine=True)
-                self._container.autostart()
-
-                if should_restart:
-                    logger.info("new nginx config: restarting the service")
-                    self.reload()
-
-        def _nginx_upstreams(self) -> List[NginxUpstream]:
-            # UPSTREAMS is a list of backend services that we want to route traffic to
-            for upstream in UPSTREAMS:
-                # UPSTREAMS_PORT is the port the backend services are running on
-                upstreams.append(NginxUpstream(upstream, UPSTREAMS_PORT, upstream))
-                return upstreams
-
-        def _server_ports_to_locations(self) -> Dict[int, List[NginxLocationConfig]]:
-            # NGINX_PORT is the port an nginx server is running on
-            # Note that: you can define multiple server blocks, each running on a different port
-            return {NGINX_PORT: self._nginx_locations}
-
-```
-"""
+"""Nginx configuration generation utils."""
 
 import logging
 import subprocess
@@ -96,7 +10,7 @@ from typing import Any, Final, Literal, cast
 
 import crossplane as _crossplane
 
-from charmlibs.nginx._tls_config import TLSConfigManager
+from ._tls_config import TLSConfigManager
 
 logger = logging.getLogger(__name__)
 
@@ -191,7 +105,89 @@ def _is_ipv6_enabled() -> bool:
 
 
 class NginxConfig:
-    """Responsible for building a Nginx configuration file."""
+    """NginxConfig.
+
+    To generate an Nginx configuration for a charm, instantiate the `NginxConfig` class with the
+      required inputs:
+
+    1. `server_name`: The name of the server (e.g. charm fqdn), which is used to identify the
+      server in Nginx configurations.
+    2. `upstream_configs`: List of `NginxUpstream` used to generate Nginx `upstream` blocks.
+    3. `server_ports_to_locations`: Mapping from server ports to a list of `NginxLocationConfig`.
+
+    ## Charm usage
+    Any charm can instantiate `NginxConfig` to generate its own Nginx configuration as follows:
+
+    Example::
+        >>> # illustrative purposes only
+        >>> import socket
+        >>> from ops import CharmBase
+        >>> from charmlibs.nginx import NginxConfig, NginxUpstream, NginxLocationConfig
+        ...     #[...]
+        >>> class AnyCharm(CharmBase):
+        >>>     def __init__(self, *args):
+        >>>         super().__init__(*args)
+        ...          #[...]
+        >>>         self._container = self.unit.get_container("nginx")
+        >>>         self._nginx = NginxConfig(
+        >>>             server_name=self.hostname,
+        >>>             upstream_configs=self._nginx_upstreams(),
+        >>>             server_ports_to_locations=self._server_ports_to_locations(),
+        >>>         )
+        ...         #[...]
+        >>>         self._reconcile()
+        ...     #[...]
+        >>>     @property
+        >>>     def hostname(self) -> str:
+        >>>         return socket.getfqdn()
+        ...
+        >>>     @property
+        >>>     def _nginx_locations(self) -> List[NginxLocationConfig]:
+        >>>         return [
+        >>>             NginxLocationConfig(path="/api/v1", backend="upstream1",modifier="~"),
+        >>>             NginxLocationConfig(path="/status", backend="upstream2",modifier="="),
+        >>>         ]
+        ...
+        >>>     @property
+        >>>     def _upstream_addresses(self) -> Dict[str, Set[str]]:
+        >>>         # a mapping from an upstream "role" to the set of addresses
+        >>>         # that belong to this upstream
+        >>>         return {
+        >>>             "upstream1": {"address1", "address2"},
+        >>>             "upstream2": {"address3", "address4"},
+        >>>         }
+        ...
+        >>>     @property
+        >>>     def _tls_available(self) -> bool:
+        >>>         # return if the Nginx config should have TLS enabled
+        >>>         pass
+        ...
+        >>>     def _reconcile(self):
+        >>>         if self._container.can_connect():
+        >>>             new_config: str = self._nginx.get_config(self._upstream_addresses,
+        >>>               self._tls_available)
+        >>>             should_restart: bool = self._has_config_changed(new_config)
+        >>>             self._container.push(self.config_path, new_config, make_dirs=True)
+        >>>             self._container.add_layer("nginx", self.layer, combine=True)
+        >>>             self._container.autostart()
+        ...
+        >>>             if should_restart:
+        >>>                 logger.info("new nginx config: restarting the service")
+        >>>                 self.reload()
+        ...
+        >>>     def _nginx_upstreams(self) -> List[NginxUpstream]:
+        >>>         # UPSTREAMS is a list of backend services that we want to route traffic to
+        >>>         for upstream in UPSTREAMS:
+        >>>             # UPSTREAMS_PORT is the port the backend services are running on
+        >>>             upstreams.append(NginxUpstream(upstream, UPSTREAMS_PORT, upstream))
+        >>>             return upstreams
+        ...
+        >>>     def _server_ports_to_locations(self) -> Dict[int, List[NginxLocationConfig]]:
+        >>>         # NGINX_PORT is the port an nginx server is running on
+        >>>         # Note that you can define multiple server blocks,
+        >>>         # each running on a different port
+        >>>         return {NGINX_PORT: self._nginx_locations}
+    """
 
     _pid = '/tmp/nginx.pid'  # noqa
 
