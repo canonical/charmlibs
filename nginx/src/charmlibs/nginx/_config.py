@@ -187,6 +187,7 @@ class NginxConfig:
         >>>         # Note that you can define multiple server blocks,
         >>>         # each running on a different port
         >>>         return {NGINX_PORT: self._nginx_locations}
+
     """
 
     _pid = '/tmp/nginx.pid'  # noqa
