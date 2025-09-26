@@ -29,7 +29,38 @@ exclude_also = [
 [tool.ruff]
 line-length = 99
 target-version = "py38"
-extend-exclude = ["__pycache__", "*.egg_info", "htmlcov", ".docs/.sphinx", ".docs/conf.py"]
+exclude = [
+    # These are the default values of ruff's exclude
+    # they're duplicated here instead of using extend-exclude
+    # so that libraries can use extend-exclude.
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "dist",
+    "node_modules",
+    "venv",
+    # These are the custom excludes specified by this repo.
+    "__pycache__",
+    "*.egg_info",
+    "htmlcov",
+    ".docs/.sphinx",
+    ".docs/conf.py",
+    ".template/\\{\\{ cookiecutter.project_slug \\}\\}",
+]
 
 # Ruff formatter configuration
 [tool.ruff.format]

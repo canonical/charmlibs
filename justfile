@@ -1,3 +1,4 @@
+mod interface  # load interface module to expose interface subcommands
 mod docs  # load docs module to expose docs subcommands
 
 set ignore-comments  # don't print comment lines in recipes
@@ -7,16 +8,17 @@ python := '3.10'
 # for integration tests, e.g. `just tag=24.04 pack-k8s` `just tag=foo integration-machine`
 tag := env('CHARMLIBS_TAG', '')
 
-_coverage := 'coverage==7.6.1'
-_pyright := 'pyright==1.1.397'
-_pytest := 'pytest==8.3.5'
-_with_test_deps := '--with ' + _coverage + ' --with ' + _pyright + ' --with ' + _pytest
+_uv_run_with_test_requirements := 'uv run --with-requirements ' + quote(join(justfile_dir(), 'test-requirements.txt'))
 
 # this is the first recipe in the file, so it will run if just is called without a recipe
 [doc('Describe usage and list the available recipes.')]
 _help:
     @echo 'All recipes require {{CYAN}}`uv`{{NORMAL}} to be available.'
     @just --list --unsorted --list-submodules
+
+[doc('Create the files for a new charmlibs package interactively.')]
+init *args:
+    env CHARMLIBS_TEMPLATE=$(realpath .template) uvx cookiecutter .template {{args}}
 
 [doc('Run `ruff` and `codespell`, failing afterwards if any errors are found.')]
 fast-lint:
@@ -31,38 +33,49 @@ fast-lint:
 
 [doc('Run `ruff check --fix` and `ruff --format`, modifying files in place.')]
 format:
-    uv run ruff format --preview
-    uv run ruff check --preview --fix
+    uv run --only-group=fast-lint ruff format --preview
+    uv run --only-group=fast-lint ruff check --preview --fix
+
+[doc("Run `uv add` for package, respecting repo-level version constraints, e.g. `just add pathops 'pydantic>=2'`.")]
+[positional-arguments]  # pass recipe args to recipe script positionally (so we can get correct quoting)
+add package +args:
+    #!/usr/bin/env -S bash -xueo pipefail
+    shift 1  # drop $1 (package) from $@ it's just +args
+    cd '{{package}}'
+    uv add --constraints {{quote(join(justfile_dir(), 'test-requirements.txt'))}} "${@}"
 
 [doc('Run global `fast-lint` and package specific `static` analysis, e.g. `just python=3.10 lint pathops`.')]
 lint package *pyright_args: fast-lint (static package pyright_args)
 
 [doc('Run package specific static analysis only, e.g. `just python=3.10 static pathops`.')]
+[positional-arguments]  # pass recipe args to recipe script positionally (so we can get correct quoting)
 static package *args:
     #!/usr/bin/env -S bash -xueo pipefail
+    shift 1  # drop $1 (package) from $@ it's just *args
     cd '{{package}}'
-    uv run {{_with_test_deps}} \
+    {{_uv_run_with_test_requirements}} \
         --group lint --group unit --group functional --group integration \
-        pyright --pythonversion='{{python}}' {{args}}
+        pyright --pythonversion='{{python}}' "${@}"
 
 [doc("Run unit tests with `coverage`, e.g. `just python=3.10 unit pathops`.")]
 unit package +flags='-rA': (_coverage package 'unit' flags)
 
 [doc("Run functional tests with `coverage`, e.g. `just python=3.10 functional pathops`.")]
-functional package +flags='-rA': (_coverage package 'functional' flags)
-
-[doc("Run functional tests with `coverage` and a live `pebble` running. Requires `pebble`.")]
-functional-pebble package +flags='-rA':
+[positional-arguments]  # pass recipe args to recipe script positionally to enable correct quoting when forwarding variadic args
+functional package +flags='-rA':
     #!/usr/bin/env -S bash -xueo pipefail
-    export PEBBLE=/tmp/pebble-test
-    umask 0
-    pebble run --create-dirs &>/dev/null &
-    PEBBLE_PID=$!
+    shift 1  # drop $1 (package) from $@ it's just +flags
+    cd '{{package}}'
+    if [ -e tests/functional/setup.sh ]; then
+        source ./tests/functional/setup.sh
+    fi
     set +e  # don't exit if the tests fail
-    just --justfile='{{justfile()}}' python='{{python}}' functional '{{package}}' {{flags}}
+    just --justfile='{{justfile()}}' python='{{python}}' _coverage '{{package}}' functional "${@}"
     EXITCODE=$?
     set -e  # do exit if anything goes wrong now
-    kill $PEBBLE_PID
+    if [ -e tests/functional/teardown.sh ]; then
+        source ./tests/functional/teardown.sh
+    fi
     exit $EXITCODE
 
 [doc("Use uv to install and run coverage for the specified package's tests.")]
@@ -71,10 +84,10 @@ _coverage package test_suite +flags:
     cd '{{package}}'
     export COVERAGE_RCFILE='{{justfile_directory()}}/pyproject.toml'
     DATA_FILE=".report/coverage-$(basename {{test_suite}})-{{python}}.db"
-    uv run {{_with_test_deps}} --group {{test_suite}} \
+    {{_uv_run_with_test_requirements}} --group {{test_suite}} \
         coverage run --data-file="$DATA_FILE" --source='src' \
         -m pytest --tb=native -vv {{flags}} 'tests/{{test_suite}}'
-    uv run {{_with_test_deps}} --group {{test_suite}} \
+    {{_uv_run_with_test_requirements}} --group {{test_suite}} \
         coverage report --data-file="$DATA_FILE"
 
 [doc("Combine `coverage` reports, e.g. `just python=3.10 combine-coverage pathops`.")]
@@ -93,11 +106,11 @@ combine-coverage package:
     export COVERAGE_RCFILE='{{justfile_directory()}}/pyproject.toml'
     DATA_FILE='.report/coverage-all-{{python}}.db'
     HTML_DIR='.report/htmlcov-all-{{python}}'
-    uv run coverage combine --keep --data-file="$DATA_FILE" "${data_files[@]}"
-    uv run coverage xml --data-file="$DATA_FILE" -o '.report/coverage-all-{{python}}.xml'
+    {{_uv_run_with_test_requirements}} coverage combine --keep --data-file="$DATA_FILE" "${data_files[@]}"
+    {{_uv_run_with_test_requirements}} coverage xml --data-file="$DATA_FILE" -o '.report/coverage-all-{{python}}.xml'
     rm -rf "$HTML_DIR"  # let coverage create html directory from scratch
-    uv run coverage html --data-file="$DATA_FILE" --show-contexts --directory="$HTML_DIR"
-    uv run coverage report --data-file="$DATA_FILE"
+    {{_uv_run_with_test_requirements}} coverage html --data-file="$DATA_FILE" --show-contexts --directory="$HTML_DIR"
+    {{_uv_run_with_test_requirements}} coverage report --data-file="$DATA_FILE"
 
 [doc("Execute pack script to pack Kubernetes charm(s) for Juju integration tests.")]
 pack-k8s package *args: (_pack package 'k8s' args)
@@ -121,5 +134,5 @@ integration-machine package +flags='-rA': (_integration package 'machine' 'not k
 _integration package substrate label +flags:
     #!/usr/bin/env -S bash -xueo pipefail
     cd '{{package}}'
-    CHARMLIBS_SUBSTRATE={{substrate}} CHARMLIBS_TAG='{{tag}}' uv run {{_with_test_deps}} --group integration \
+    CHARMLIBS_SUBSTRATE={{substrate}} CHARMLIBS_TAG='{{tag}}' {{_uv_run_with_test_requirements}} --group integration \
         pytest --tb=native -vv -m '{{label}}' tests/integration  {{flags}}

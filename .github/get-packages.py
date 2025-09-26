@@ -62,7 +62,7 @@ def _get_changed_packages(git_base_ref: str) -> list[str]:
 
 def _get_packages(root: pathlib.Path | str, exclude: str | None = None) -> list[str]:
     root = pathlib.Path(root)
-    paths = [root / '.package', *root.glob(r'[a-z]*')]
+    paths = [root / '.package', root / '.example', root / '.tutorial', *root.glob(r'[a-z]*')]
     return sorted(str(path) for path in paths if path.is_dir() and path.name != exclude)
 
 
