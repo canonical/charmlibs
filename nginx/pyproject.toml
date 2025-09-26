@@ -1,0 +1,64 @@
+[project]
+name = "charmlibs-nginx"
+description = "Nginx sidecar abstractions."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    {name="The Observability team at Canonical Ltd."},
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+    "Intended Audience :: Developers",
+    "Operating System :: POSIX :: Linux",
+    "Development Status :: 5 - Production/Stable",
+]
+dynamic = ["version"]
+dependencies = [
+    "ops>=3,<4",
+    "crossplane",
+    "pytest==8.3.5",
+]
+
+[dependency-groups]
+lint = [
+    "typing_extensions",
+    "ops[testing]>=3,<4",
+]
+unit = [
+    "pytest==8.3.5",
+    "ops[testing]>=3,<4",
+]
+functional = []
+integration = [
+    "jubilant",
+    "pytest-jubilant"
+]
+
+[project.urls]
+"Documentation" = "https://documentation.ubuntu.com/charmlibs"
+"Repository" = "https://github.com/canonical/charmlibs"
+"Issues" = "https://github.com/canonical/charmlibs/issues"
+"Changelog" = "https://github.com/canonical/charmlibs/blob/main/nginx/CHANGELOG.md"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/charmlibs"]
+
+[tool.hatch.version]
+path = "src/charmlibs/nginx/__init__.py"
+
+[tool.ruff]
+extend = "../pyproject.toml"
+src = ["src", "tests/unit", "tests/functional", "tests/integration"]  # correctly sort local imports in tests
+
+[tool.pyright]
+extend = "../pyproject.toml"
+include = ["src"]
+pythonVersion = "3.10"
+
+[tool.charmlibs.integration]
+tags = ['24.04']
