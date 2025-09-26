@@ -38,10 +38,12 @@ class NginxPrometheusExporter:
                 'nginx-prometheus-exporter': {
                     'override': 'replace',
                     'summary': 'nginx prometheus exporter',
-                    'command': f'nginx-prometheus-exporter '
-                    f'--no-nginx.ssl-verify '
-                    f'--web.listen-address=:{self._nginx_prometheus_exporter_port} '
-                    f'--nginx.scrape-uri={scheme}://127.0.0.1:{self._nginx_port}/status',
+                    'command': (
+                        f'nginx-prometheus-exporter '
+                        f'--no-nginx.ssl-verify '
+                        f'--web.listen-address=:{self._nginx_prometheus_exporter_port} '
+                        f'--nginx.scrape-uri={scheme}://127.0.0.1:{self._nginx_port}/status'
+                    ),
                     'startup': 'enabled',
                 }
             },

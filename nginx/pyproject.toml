@@ -34,30 +34,29 @@ integration = [
 ]
 
 [project.urls]
-"Repository" = "https://github.com/canonical/charmtech-charmlibs"
-"Issues" = "https://github.com/canonical/charmtech-charmlibs/issues"
+"Documentation" = "https://documentation.ubuntu.com/charmlibs"
+"Repository" = "https://github.com/canonical/charmlibs"
+"Issues" = "https://github.com/canonical/charmlibs/issues"
+"Changelog" = "https://github.com/canonical/charmlibs/blob/main/nginx/CHANGELOG.md"
 
 [build-system]
-requires = [
-    "setuptools>=60",
-]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
-[tool.setuptools.dynamic]
-version = {file = ["src/charmlibs/nginx/_version.txt"]}
+[tool.hatch.build.targets.wheel]
+packages = ["src/charmlibs"]
+
+[tool.hatch.version]
+path = "src/charmlibs/nginx/__init__.py"
 
 [tool.ruff]
 extend = "../pyproject.toml"
 src = ["src", "tests/unit", "tests/functional", "tests/integration"]  # correctly sort local imports in tests
 
 [tool.pyright]
-extend = "../pyproject.toml"
+extends = "../pyproject.toml"
 include = ["src", "tests"]
-pythonVersion = "3.8"  # check no python > 3.8 features are used
-
-[tool.charmlibs.functional]
-pebble = ["v1.1.1","master"]
-ubuntu = ["22.04", "latest"]
+pythonVersion = "3.10"
 
 [tool.charmlibs.integration]
 tags = ['20.04', '24.04']
