@@ -27,3 +27,4 @@
 /pathops/ @canonical/charmlibs-maintainers
 
 # charmlibs.interfaces packages (alphabetical)
+/tls_certificates/ @canonical/tls

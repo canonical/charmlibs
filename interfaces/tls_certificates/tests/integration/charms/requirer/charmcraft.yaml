@@ -1,0 +1,63 @@
+# Copyright 2024 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+name: tls-certificates-requirer
+description: tls-certificates-requirer.
+summary: tls-certificates-requirer.
+
+requires:
+  certificates:
+    interface: tls-certificates
+
+type: "charm"
+bases:
+  - build-on:
+      - name: "ubuntu"
+        channel: "22.04"
+    run-on:
+      - name: "ubuntu"
+        channel: "22.04"
+
+parts:
+  charm:
+    source: .
+    plugin: uv
+    build-snaps: [astral-uv]
+
+config:
+  options:
+    common_name:
+      type: string
+      description: Certificate common name
+      default: "banana"
+    sans_dns:
+      type: string
+      description: Comma separated list of DNS Subject Alternative Names
+    sans_ip:
+      type: string
+      description: Comma separated list of IP Subject Alternative Names
+    organization_name:
+      type: string
+      description: Certificate organization name
+    organizational_unit_name:
+      type: string
+      description: Certificate organizational unit name
+    country_name:
+      type: string
+      description: Certificate country name
+    state_or_province_name:
+      type: string
+      description: Certificate state or province name
+    locality_name:
+      type: string
+      description: Certificate locality name
+    email_address:
+      type: string
+      description: Certificate email address
+
+actions:
+  get-certificate:
+    description: Returns the TLS Certificate.
+
+  renew-certificate:
+    description: Renews the TLS Certificate.
