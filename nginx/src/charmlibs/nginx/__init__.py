@@ -25,21 +25,19 @@ The ``nginx`` charm library provides:
 
 from __future__ import annotations
 
-from .config import (
+from ._config import (
     NginxConfig,
     NginxLocationConfig,
-    NginxLocationModifier,
     NginxUpstream,
 )
-from .nginx import Nginx
-from .nginx_prometheus_exporter import NginxPrometheusExporter
-from .tls_config_mgr import TLSConfig, TLSConfigManager
+from ._nginx import Nginx
+from ._nginx_prometheus_exporter import NginxPrometheusExporter
+from ._tls_config import TLSConfig, TLSConfigManager
 
 __all__ = (
     'Nginx',
     'NginxConfig',
     'NginxLocationConfig',
-    'NginxLocationModifier',
     'NginxPrometheusExporter',
     'NginxUpstream',
     'TLSConfig',

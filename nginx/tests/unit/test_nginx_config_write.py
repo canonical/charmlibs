@@ -5,7 +5,6 @@ import typing
 from ops.testing import CharmEvents
 
 from charmlibs.nginx import Nginx, NginxConfig
-from charmlibs.nginx.nginx import NGINX_CONFIG
 
 if typing.TYPE_CHECKING:
     import ops
@@ -21,5 +20,5 @@ def test_nginx_config_written(ctx: 'ops.testing.Context', null_state: 'ops.testi
         nginx.reconcile({})
 
     container_out = state_out.get_container('nginx')
-    nginx_config = container_out.get_filesystem(ctx) / NGINX_CONFIG[1:]
+    nginx_config = container_out.get_filesystem(ctx) / Nginx.NGINX_CONFIG[1:]
     assert nginx_config.exists()

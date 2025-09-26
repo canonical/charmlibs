@@ -15,7 +15,7 @@ classifiers = [
 ]
 dynamic = ["version"]
 dependencies = [
-    "ops[testing]>=3,<4",
+    "ops>=3,<4",
     "crossplane",
     "pytest==8.3.5",
 ]
@@ -26,6 +26,7 @@ lint = [
 ]
 unit = [
     "pytest==8.3.5",
+    "ops[testing]>=3,<4",
 ]
 functional = []
 integration = [

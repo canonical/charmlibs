@@ -21,17 +21,17 @@ import logging
 import ops
 from ops import pebble
 
+from ._config import NginxConfig
+from ._tls_config import TLSConfig, TLSConfigManager
 from ._tracer import tracer as _tracer
-from .config import NginxConfig
-from .tls_config_mgr import TLSConfig, TLSConfigManager
 
 logger = logging.getLogger(__name__)
-
-NGINX_CONFIG = '/etc/nginx/nginx.conf'
 
 
 class Nginx:
     """Helper class to manage the nginx workload."""
+
+    NGINX_CONFIG = '/etc/nginx/nginx.conf'
 
     _name = 'nginx'
 
@@ -66,7 +66,7 @@ class Nginx:
         should_restart = self._has_config_changed(new_config)
 
         with _tracer.start_as_current_span('write config'):
-            self._container.push(NGINX_CONFIG, new_config, make_dirs=True)
+            self._container.push(self.NGINX_CONFIG, new_config, make_dirs=True)
 
         self._container.add_layer('nginx', self._layer, combine=True)
         self._container.autostart()
@@ -84,7 +84,7 @@ class Nginx:
 
         try:
             with _tracer.start_as_current_span('read config'):
-                current_config = self._container.pull(NGINX_CONFIG).read()
+                current_config = self._container.pull(self.NGINX_CONFIG).read()
         except pebble.PathError:
             # file does not exist!
             return True

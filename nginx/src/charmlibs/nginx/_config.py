@@ -94,9 +94,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Final, Literal, cast
 
-import crossplane
+import crossplane as _crossplane
 
-from charmlibs.nginx.tls_config_mgr import CERT_PATH, KEY_PATH
+from charmlibs.nginx._tls_config import TLSConfigManager
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +105,7 @@ DEFAULT_TLS_VERSIONS: Final[list[str]] = ['TLSv1', 'TLSv1.1', 'TLSv1.2', 'TLSv1.
 
 # Define valid Nginx `location` block modifiers.
 # cfr. https://www.digitalocean.com/community/tutorials/nginx-location-directive#nginx-location-directive-syntax
-NginxLocationModifier = Literal[
+_NginxLocationModifier = Literal[
     '',  # prefix match
     '=',  # exact match
     '~',  # case-sensitive regex match
@@ -116,7 +116,7 @@ NginxLocationModifier = Literal[
 
 @dataclass
 class NginxLocationConfig:
-    """Represents a `location` block in an Nginx configuration.
+    """Represents a `location` block in a Nginx configuration file.
 
     For example::
 
@@ -148,7 +148,7 @@ class NginxLocationConfig:
     """An optional URL path to append when forwarding to the upstream (e.g., '/v1')."""
     headers: dict[str, str] = field(default_factory=lambda: cast('dict[str, str]', {}))
     """Custom headers to include in the proxied request."""
-    modifier: NginxLocationModifier = ''
+    modifier: _NginxLocationModifier = ''
     """The Nginx location modifier."""
     is_grpc: bool = False
     """Whether to use gRPC proxying (i.e. `grpc_pass` instead of `proxy_pass`)."""
@@ -277,7 +277,7 @@ class NginxConfig:
             root_path: If provided, it is used as a location where static files will be served.
         """
         full_config = self._prepare_config(upstreams_to_addresses, listen_tls, root_path)
-        return crossplane.build(full_config)  # type: ignore
+        return _crossplane.build(full_config)  # type: ignore
 
     def _prepare_config(
         self,
@@ -489,8 +489,11 @@ class NginxConfig:
                     {'directive': 'server_name', 'args': [self._server_name]},
                     *(
                         [
-                            {'directive': 'ssl_certificate', 'args': [CERT_PATH]},
-                            {'directive': 'ssl_certificate_key', 'args': [KEY_PATH]},
+                            {'directive': 'ssl_certificate', 'args': [TLSConfigManager.CERT_PATH]},
+                            {
+                                'directive': 'ssl_certificate_key',
+                                'args': [TLSConfigManager.KEY_PATH],
+                            },
                             {
                                 'directive': 'ssl_protocols',
                                 'args': self._supported_tls_versions,

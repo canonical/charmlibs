@@ -7,7 +7,7 @@ name = "charmlibs-nginx"
 source = { editable = "." }
 dependencies = [
     { name = "crossplane" },
-    { name = "ops", extra = ["testing"] },
+    { name = "ops" },
     { name = "pytest" },
 ]
 
@@ -20,13 +20,14 @@ lint = [
     { name = "typing-extensions" },
 ]
 unit = [
+    { name = "ops", extra = ["testing"] },
     { name = "pytest" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "crossplane" },
-    { name = "ops", extras = ["testing"], specifier = ">=3,<4" },
+    { name = "ops", specifier = ">=3,<4" },
     { name = "pytest", specifier = "==8.3.5" },
 ]
 
@@ -37,7 +38,10 @@ integration = [
     { name = "pytest-jubilant" },
 ]
 lint = [{ name = "typing-extensions" }]
-unit = [{ name = "pytest", specifier = "==8.3.5" }]
+unit = [
+    { name = "ops", extras = ["testing"], specifier = ">=3,<4" },
+    { name = "pytest", specifier = "==8.3.5" },
+]
 
 [[package]]
 name = "colorama"
