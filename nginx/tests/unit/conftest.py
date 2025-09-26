@@ -33,7 +33,7 @@ def null_state() -> ops.testing.State:
 
 
 @pytest.fixture
-def ctx() -> ops.testing.Context:
+def ctx() -> ops.testing.Context[ops.CharmBase]:
     return ops.testing.Context(
         ops.CharmBase,
         meta={

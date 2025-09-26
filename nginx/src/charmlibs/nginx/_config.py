@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Final, Literal, cast
 
-import crossplane as _crossplane
+import crossplane as _crossplane  # type: ignore[reportMissingTypeStubs]
 
 from ._tls_config import TLSConfigManager
 

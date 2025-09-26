@@ -56,7 +56,7 @@ src = ["src", "tests/unit", "tests/functional", "tests/integration"]  # correctl
 
 [tool.pyright]
 extends = "../pyproject.toml"
-include = ["src", "tests"]
+include = ["src"]
 pythonVersion = "3.10"
 
 [tool.charmlibs.integration]

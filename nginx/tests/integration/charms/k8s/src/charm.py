@@ -52,7 +52,7 @@ class Charm(ops.CharmBase):
         framework.observe(self.on.collect_unit_status, self._on_collect_unit_status)
         framework.observe(self.on.inspect_action, self._on_inspect_action)
 
-    def _reconcile(self, _event):
+    def _reconcile(self, _):
         if self.nginx_container.can_connect():
             self.nginx.reconcile(upstreams_to_addresses={}, tls_config=None)
         if self.nginx_pexp_container.can_connect():

@@ -8,22 +8,22 @@ from charmlibs.nginx import Nginx, NginxConfig, NginxPrometheusExporter
 
 
 @pytest.fixture(params=[4242, 8080])
-def nginx_port(request):
+def nginx_port(request) -> int:
     return request.param
 
 
 @pytest.fixture(params=[True, False])
-def nginx_insecure(request):
+def nginx_insecure(request) -> bool:
     return request.param
 
 
 @pytest.fixture(params=[True, False])
-def update_cacerts(request):
+def update_cacerts(request) -> bool:
     return request.param
 
 
 @pytest.fixture(params=[3030, 5050])
-def nginx_pexp_port(request):
+def nginx_pexp_port(request) -> int:
     return request.param
 
 
