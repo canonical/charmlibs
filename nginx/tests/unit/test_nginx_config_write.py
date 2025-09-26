@@ -1,17 +1,14 @@
 # Copyright 2025 Canonical
 # See LICENSE file for licensing details.
-import typing
 
-from ops.testing import CharmEvents
+import ops
+import ops.testing as scenario
 
 from charmlibs.nginx import Nginx, NginxConfig
 
-if typing.TYPE_CHECKING:
-    import ops
 
-
-def test_nginx_config_written(ctx: 'ops.testing.Context', null_state: 'ops.testing.State'):
-    with ctx(event=CharmEvents.update_status(), state=null_state) as mgr:
+def test_nginx_config_written(ctx: 'scenario.Context', null_state: 'scenario.State'):
+    with ctx(event=scenario.CharmEvents.update_status(), state=null_state) as mgr:
         state_out = mgr.run()
         charm: ops.CharmBase = mgr.charm
         nginx = Nginx(

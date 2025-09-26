@@ -17,6 +17,7 @@ integration = [
     { name = "pytest-jubilant" },
 ]
 lint = [
+    { name = "ops", extra = ["testing"] },
     { name = "typing-extensions" },
 ]
 unit = [
@@ -37,7 +38,10 @@ integration = [
     { name = "jubilant" },
     { name = "pytest-jubilant" },
 ]
-lint = [{ name = "typing-extensions" }]
+lint = [
+    { name = "ops", extras = ["testing"], specifier = ">=3,<4" },
+    { name = "typing-extensions" },
+]
 unit = [
     { name = "ops", extras = ["testing"], specifier = ">=3,<4" },
     { name = "pytest", specifier = "==8.3.5" },

@@ -23,6 +23,7 @@ dependencies = [
 [dependency-groups]
 lint = [
     "typing_extensions",
+    "ops[testing]>=3,<4",
 ]
 unit = [
     "pytest==8.3.5",
@@ -55,9 +56,9 @@ extend = "../pyproject.toml"
 src = ["src", "tests/unit", "tests/functional", "tests/integration"]  # correctly sort local imports in tests
 
 [tool.pyright]
-extends = "../pyproject.toml"
+extend = "../pyproject.toml"
 include = ["src"]
 pythonVersion = "3.10"
 
 [tool.charmlibs.integration]
-tags = ['20.04', '24.04']
+tags = ['24.04']

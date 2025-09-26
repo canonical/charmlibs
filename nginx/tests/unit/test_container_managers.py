@@ -68,7 +68,7 @@ def base_state(update_cacerts: bool):
     )
 
 
-def test_nginx_container_service(ctx: ops.testing.Context, base_state: ops.testing.State):
+def test_nginx_container_service(ctx: scenario.Context, base_state: scenario.State):
     # given any event
     state_out = ctx.run(ctx.on.update_status(), state=base_state)
     # the services are running
@@ -77,8 +77,8 @@ def test_nginx_container_service(ctx: ops.testing.Context, base_state: ops.testi
 
 
 def test_layer_commands(
-    ctx: ops.testing.Context,
-    base_state: ops.testing.State,
+    ctx: scenario.Context,
+    base_state: scenario.State,
     nginx_pexp_port: int,
     nginx_insecure: bool,
     nginx_port: int,

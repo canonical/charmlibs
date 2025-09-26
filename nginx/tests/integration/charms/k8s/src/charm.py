@@ -78,7 +78,7 @@ class Charm(ops.CharmBase):
 
     def _on_inspect_action(self, event: ops.ActionEvent):
         event.set_results({
-            'nginx_config': self.nginx_container.pull(nginx.nginx.NGINX_CONFIG),
+            'nginx_config': self.nginx_container.pull(nginx.Nginx.NGINX_CONFIG),
             'nginx_prom_exporter_plan': self.nginx_pexp_container.get_plan().to_yaml(),
         })
 
