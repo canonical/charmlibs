@@ -1,8 +1,8 @@
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
 import ops
-import pytest
 import ops.testing as scenario
+import pytest
 
 from charmlibs.nginx import Nginx, NginxConfig, NginxPrometheusExporter
 

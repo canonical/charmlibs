@@ -26,7 +26,7 @@ class MyCharm(ops.CharmBase):
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
         self._nginx = nginx.Nginx(
-            self.unit.get_container('nginx-container'),
+            self.unit.get_container("nginx-container"),
             nginx_config=nginx.NginxConfig(
                 server_name="foo",
                 upstream_configs=[
@@ -34,9 +34,15 @@ class MyCharm(ops.CharmBase):
                     nginx.NginxUpstream(name="bar", port=4041, group="frontend")
                 ],
                 server_ports_to_locations={8080: [
-                    nginx.NginxLocationConfig(path='/', backend='foo', backend_url="/api/v1", headers={'a': 'b'},
-                                              modifier="=",
-                                              is_grpc=True, upstream_tls=True),
+                    nginx.NginxLocationConfig(
+                        path="/", 
+                        backend="foo", 
+                        backend_url="/api/v1", 
+                        headers={"a": "b"},
+                        modifier="=",
+                        is_grpc=True, 
+                        upstream_tls=True
+                    ),
                 ]}
             )
         )

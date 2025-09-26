@@ -37,4 +37,4 @@ def test_nginx_pexp_service_running(juju: jubilant.Juju, charm: str):
 
 
 def test_configs(juju: jubilant.Juju, charm: str):
-    pass # TODO: use inspect action to check nginx configuration
+    pass  # TODO: use inspect action to check nginx configuration

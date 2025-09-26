@@ -25,8 +25,6 @@ The ``nginx`` charm library provides:
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from .config import (
     NginxConfig,
     NginxLocationConfig,
@@ -48,4 +46,4 @@ __all__ = (
     'TLSConfigManager',
 )
 
-__version__ = "0.0.1"
+__version__ = '0.0.1'

@@ -21,9 +21,9 @@ import logging
 import ops
 from ops import pebble
 
+from ._tracer import tracer as _tracer
 from .config import NginxConfig
 from .tls_config_mgr import TLSConfig, TLSConfigManager
-from ._tracer import tracer as _tracer
 
 logger = logging.getLogger(__name__)
 

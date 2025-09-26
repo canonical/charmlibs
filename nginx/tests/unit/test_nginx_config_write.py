@@ -11,7 +11,7 @@ if typing.TYPE_CHECKING:
     import ops
 
 
-def test_nginx_config_written(ctx: "ops.testing.Context", null_state: "ops.testing.State"):
+def test_nginx_config_written(ctx: 'ops.testing.Context', null_state: 'ops.testing.State'):
     with ctx(event=CharmEvents.update_status(), state=null_state) as mgr:
         state_out = mgr.run()
         charm: ops.CharmBase = mgr.charm
