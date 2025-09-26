@@ -135,8 +135,6 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJson(needs.init.outputs.functional-matrix) }}
     runs-on: ${{ matrix.ubuntu }}
-    env:
-      RECIPE_SUFFIX: ${{ matrix.pebble != 'no-pebble' && '-pebble' || '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -156,11 +154,11 @@ jobs:
 
       - name: Run functional tests
         if: matrix.sudo == 'no-sudo'
-        run: uvx --from rust-just just python=${{ matrix.python }} functional$RECIPE_SUFFIX ${{ inputs.package }}
+        run: uvx --from rust-just just python=${{ matrix.python }} functional ${{ inputs.package }}
 
       - name: Run functional tests with sudo
         if: matrix.sudo != 'no-sudo'
-        run: sudo env "PATH=$PATH" uvx --from rust-just just python=${{ matrix.python }} functional$RECIPE_SUFFIX ${{ inputs.package }}
+        run: sudo env "PATH=$PATH" uvx --from rust-just just python=${{ matrix.python }} functional ${{ inputs.package }}
 
   integration:
     needs: init

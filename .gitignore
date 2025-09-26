@@ -174,3 +174,11 @@ cython_debug/
 
 # packed charms
 .packed
+
+# temporary directory for packing charms
+.tmp
+
+# uv.lock from example libraries as we don't commit these
+.example/**/uv.lock
+.tutorial/**/uv.lock
+interfaces/.example/**/uv.lock

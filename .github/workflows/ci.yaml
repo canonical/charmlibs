@@ -50,3 +50,34 @@ jobs:
         run: |
           echo '${{ toJSON(needs) }}'
           exit 1
+
+  template-and-example-in-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: |
+          uvx --from rust-just just init --no-input
+          rm -rf .example
+          mv example .example
+          # check if tracked files changed, or any new files were added
+          # (git diff --exit-code isn't effected by new files)
+          STATUS=$(git status --porcelain)
+          echo "$STATUS"
+          test -z "$STATUS"
+
+  template-and-interface-example-in-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - working-directory: interfaces
+        run: |
+          uvx --from rust-just just interface init --no-input
+          rm -rf .example
+          mv example .example
+          # check if tracked files changed, or any new files were added
+          # (git diff --exit-code isn't effected by new files)
+          STATUS=$(git status --porcelain)
+          echo "$STATUS"
+          test -z "$STATUS"
