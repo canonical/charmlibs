@@ -89,6 +89,7 @@ Any charm can instantiate `NginxConfig` to generate its own Nginx configuration 
 """
 
 import logging
+import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Final, Literal, cast
@@ -96,8 +97,6 @@ from typing import Any, Final, Literal, cast
 import crossplane
 
 from charmlibs.nginx.tls_config_mgr import CERT_PATH, KEY_PATH
-
-from .utils import is_ipv6_enabled
 
 logger = logging.getLogger(__name__)
 
@@ -179,6 +178,18 @@ class NginxUpstream:
     """
 
 
+def _is_ipv6_enabled() -> bool:
+    """Check if IPv6 is enabled on the container's network interfaces."""
+    try:
+        output = subprocess.run(
+            ['ip', '-6', 'address', 'show'], check=True, capture_output=True, text=True
+        )
+    except subprocess.CalledProcessError:
+        # if running the command failed for any reason, assume ipv6 is not enabled.
+        return False
+    return bool(output.stdout)
+
+
 class NginxConfig:
     """Responsible for building a Nginx configuration file."""
 
@@ -239,7 +250,7 @@ class NginxConfig:
         self._enable_health_check = enable_health_check
         self._enable_status_page = enable_status_page
         self._dns_IP_address = self._get_dns_ip_address()
-        self._ipv6_enabled = is_ipv6_enabled()
+        self._ipv6_enabled = _is_ipv6_enabled()
         self._supported_tls_versions = supported_tls_versions or DEFAULT_TLS_VERSIONS
         self._ssl_ciphers = ssl_ciphers or ['HIGH:!aNULL:!MD5']  # codespell:ignore anull
         self._worker_processes = worker_processes

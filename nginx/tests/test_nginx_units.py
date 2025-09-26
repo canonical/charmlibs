@@ -12,15 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Type checking statements for Nginx."""
-
 from charmlibs.nginx import Nginx
-from charmlibs.nginx.tls_config_mgr import TLSConfig
 
 
-def typecheck_reconcile_signature_null(nginx: Nginx) -> None:
+def test_reconcile(nginx: Nginx) -> None:
     nginx.reconcile(upstreams_to_addresses={}, tls_config=None)
-
-
-def typecheck_reconcile_signature_full(nginx: Nginx) -> None:
-    nginx.reconcile(upstreams_to_addresses={'a': {'b', 'c'}}, tls_config=TLSConfig('a', 'b', 'c'))

@@ -11,7 +11,7 @@ import typing
 from dataclasses import dataclass
 from pathlib import Path
 
-from charmlibs.nginx.tracer import tracer
+from ._tracer import tracer as _tracer
 
 if typing.TYPE_CHECKING:
     import ops
@@ -51,7 +51,7 @@ class TLSConfigManager:
     @property
     def is_tls_enabled(self) -> bool:
         """Return True if the certificates files are on disk."""
-        with tracer.start_as_current_span('check tls config files exist'):
+        with _tracer.start_as_current_span('check tls config files exist'):
             return (
                 self._container.can_connect()
                 and self._container.exists(CERT_PATH)
@@ -63,7 +63,7 @@ class TLSConfigManager:
         """Save the certificates file to disk and run update-ca-certificates."""
         if self._container.can_connect():
             # Read the current content of the files (if they exist)
-            with tracer.start_as_current_span('read tls config files'):
+            with _tracer.start_as_current_span('read tls config files'):
                 current_server_cert = (
                     self._container.pull(CERT_PATH).read()
                     if self._container.exists(CERT_PATH)
@@ -88,7 +88,7 @@ class TLSConfigManager:
                 # No update needed
                 return
 
-            with tracer.start_as_current_span('write tls config files'):
+            with _tracer.start_as_current_span('write tls config files'):
                 self._container.push(KEY_PATH, tls_config.private_key, make_dirs=True)
                 self._container.push(CERT_PATH, tls_config.server_cert, make_dirs=True)
                 self._container.push(CA_CERT_PATH, tls_config.ca_cert, make_dirs=True)
@@ -98,7 +98,7 @@ class TLSConfigManager:
 
     def _delete_certificates(self) -> None:
         """Delete the certificate files from disk and run update-ca-certificates."""
-        with tracer.start_as_current_span('delete tls config files'):
+        with _tracer.start_as_current_span('delete tls config files'):
             if Path(CA_CERT_PATH).exists():
                 Path(CA_CERT_PATH).unlink(missing_ok=True)
 

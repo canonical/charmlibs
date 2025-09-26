@@ -28,8 +28,6 @@ def deploy(juju: jubilant.Juju, charm: str) -> None:
                 'nginx-pexp': 'ubuntu/nginx-prometheus-exporter:1.4-24.04_stable',
             },
         )
-    elif charm == 'machine':
-        juju.deploy(_get_packed_charm_path(charm))
     else:
         raise ValueError(f'Unknown charm: {charm!r}')
 

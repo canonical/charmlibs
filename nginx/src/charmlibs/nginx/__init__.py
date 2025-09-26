@@ -48,5 +48,4 @@ __all__ = (
     'TLSConfigManager',
 )
 
-__version__ = (Path(__file__).parent / '_version.txt').read_text().strip()
-del Path  # do not export
+__version__ = "0.0.1"
