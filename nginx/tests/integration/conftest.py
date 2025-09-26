@@ -33,4 +33,4 @@ def deploy(juju: jubilant.Juju, charm: str) -> None:
 
 
 def _get_packed_charm_path(charm: str) -> pathlib.Path:
-    return pathlib.Path(__file__).parent / 'charms' / '.packed' / f'{charm}.charm'
+    return pathlib.Path(__file__).parent / 'charms' / charm / f'{charm}.charm'
