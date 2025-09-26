@@ -28,7 +28,7 @@ def nginx_pexp_port(request):
 
 
 @pytest.fixture
-def ctx(nginx_port, nginx_insecure, nginx_pexp_port, update_cacerts):
+def ctx(nginx_port: int, nginx_insecure: bool, nginx_pexp_port: int, update_cacerts: bool):
     class MyCharm(ops.CharmBase):
         META = {'name': 'jeremy', 'containers': {'nginx': {}, 'nginx-pexp': {}}}  # noqa: RUF012
 
@@ -55,7 +55,7 @@ def ctx(nginx_port, nginx_insecure, nginx_pexp_port, update_cacerts):
 
 
 @pytest.fixture
-def base_state(update_cacerts):
+def base_state(update_cacerts: bool):
     execs = {scenario.Exec(['nginx', '-s', 'reload'])}
     if update_cacerts:
         execs.add(scenario.Exec(['update-ca-certificates', '--fresh']))
@@ -68,7 +68,7 @@ def base_state(update_cacerts):
     )
 
 
-def test_nginx_container_service(ctx, base_state):
+def test_nginx_container_service(ctx: ops.testing.Context, base_state: ops.testing.State):
     # given any event
     state_out = ctx.run(ctx.on.update_status(), state=base_state)
     # the services are running
@@ -76,7 +76,13 @@ def test_nginx_container_service(ctx, base_state):
     assert state_out.get_container('nginx-pexp').services['nginx-prometheus-exporter'].is_running()
 
 
-def test_layer_commands(ctx, base_state, nginx_pexp_port, nginx_insecure, nginx_port):
+def test_layer_commands(
+    ctx: ops.testing.Context,
+    base_state: ops.testing.State,
+    nginx_pexp_port: int,
+    nginx_insecure: bool,
+    nginx_port: int,
+):
     # given any event
     state_out = ctx.run(ctx.on.update_status(), state=base_state)
     # the commands are running with the expected arguments

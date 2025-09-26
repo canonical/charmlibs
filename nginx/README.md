@@ -9,7 +9,7 @@ To install, add `charmlibs-nginx` to your requirements. Then in your Python code
 from charmlibs import nginx
 ```
 
-Check out the reference docs on the [charmlibs docsite](https://canonical-charmlibs.readthedocs-hosted.com/reference/charmlibs/pathops/).
+Check out the reference docs on the [charmlibs docsite](https://canonical-charmlibs.readthedocs-hosted.com/reference/charmlibs/nginx/).
 
 # Getting started
 
