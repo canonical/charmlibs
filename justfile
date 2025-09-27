@@ -20,6 +20,16 @@ _help:
 init *args:
     env CHARMLIBS_TEMPLATE=$(realpath .template) uvx cookiecutter .template {{args}}
 
+[doc('Start a fresh `ipython` shell with `package` imported, e.g. `just shell interfaces/.example --log-level=DEBUG`')]
+shell package *ipython_args:
+    #!/usr/bin/env -S bash -xueo pipefail
+    MODULE=$(basename '{{package}}' | sed 's/^\.//')  # interfaces/.example -> example
+    PACKAGE='charmlibs'
+    if [[ $(basename $(dirname '{{package}}')) == 'interfaces' ]]; then
+        PACKAGE+='.interfaces'
+    fi
+    uvx --with-editable='./{{package}}' ipython -i -c "from $PACKAGE import $MODULE" --pdb {{ipython_args}}
+
 [doc('Run `ruff` and `codespell`, failing afterwards if any errors are found.')]
 fast-lint:
     #!/usr/bin/env -S bash -xueo pipefail
