@@ -7,7 +7,9 @@ import ops.testing as scenario
 from charmlibs.nginx import Nginx, NginxConfig
 
 
-def test_nginx_config_written(ctx: 'scenario.Context', null_state: 'scenario.State'):
+def test_nginx_config_written(
+    ctx: 'scenario.Context[ops.CharmBase]', null_state: 'scenario.State'
+):
     with ctx(event=scenario.CharmEvents.update_status(), state=null_state) as mgr:
         state_out = mgr.run()
         charm: ops.CharmBase = mgr.charm

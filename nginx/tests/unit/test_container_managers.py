@@ -77,7 +77,7 @@ def test_nginx_container_service(ctx: scenario.Context, base_state: scenario.Sta
 
 
 def test_layer_commands(
-    ctx: scenario.Context,
+    ctx: scenario.Context[ops.CharmBase],
     base_state: scenario.State,
     nginx_pexp_port: int,
     nginx_insecure: bool,
