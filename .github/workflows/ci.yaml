@@ -19,7 +19,7 @@ jobs:
     outputs:
       packages: ${{ steps.packages.outputs.packages }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -54,7 +54,7 @@ jobs:
   template-and-example-in-sync:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: astral-sh/setup-uv@v6
       - run: |
           uvx --from rust-just just init --no-input
@@ -69,7 +69,7 @@ jobs:
   template-and-interface-example-in-sync:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: astral-sh/setup-uv@v6
       - working-directory: interfaces
         run: |
