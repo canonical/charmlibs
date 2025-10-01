@@ -17,9 +17,9 @@ r"""Nginx sidecar container management abstractions.
 The ``nginx`` charm library provides:
 
 - :class:`Nginx`: A class to manage a nginx sidecar container.
-  Includes regular nginx config file generation, tls configuration, and reload logic.
+      Includes regular nginx config file generation, tls configuration, and reload logic.
 - :class:`NginxPrometheusExpoerter`: A class to manage a nginx-prometheus-exporter
-  sidecar container.
+      sidecar container.
 - :class:`NginxConfig`: A nginx config file generation wrapper.
 """
 

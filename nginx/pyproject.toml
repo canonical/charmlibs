@@ -61,4 +61,4 @@ include = ["src"]
 pythonVersion = "3.10"
 
 [tool.charmlibs.integration]
-tags = ['24.04']
+tags = []

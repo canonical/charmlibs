@@ -2,8 +2,8 @@
 set -xueo pipefail
 cd charms
 
-uv lock  # required by uv charm plugin
 cd ./k8s
+uv lock  # required by uv charm plugin
 charmcraft pack
 mv *.charm k8s.charm  # rename to a predictable name
 cd ..
