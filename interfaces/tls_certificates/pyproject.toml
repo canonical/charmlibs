@@ -61,6 +61,10 @@ exclude = [
 quote-style = "double"
 
 [tool.ruff.lint.extend-per-file-ignores]
+"interface/v1/schema.py" = [
+    "CPY",  # copyright
+    "E501",  # line too long
+]
 "src/charmlibs/interfaces/tls_certificates/_tls_certificates.py" = [
     "B904",  # FIXME: use raise ... from
     "B909",  # FIXME: mutation to loop iterable during iteration
