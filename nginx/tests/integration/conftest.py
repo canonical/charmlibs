@@ -8,29 +8,32 @@ import pathlib
 import typing
 
 import pytest
+import yaml
 
 if typing.TYPE_CHECKING:
     import jubilant
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope="session")
 def charm() -> str:
-    return os.environ['CHARMLIBS_SUBSTRATE']
+    return os.environ["CHARMLIBS_SUBSTRATE"]
 
 
 def deploy(juju: jubilant.Juju, charm: str) -> None:
-    if charm == 'k8s':
+    if charm == "k8s":
         juju.deploy(
             _get_packed_charm_path(charm),
-            resources={
-                'nginx': 'ghcr.io/canonical/nginx@sha256:6415a2c5f25f1d313c87315a681bdc84be80'
-                'f3c79c304c6744737f9b34207993',
-                'nginx-pexp': 'ubuntu/nginx-prometheus-exporter:1.4-24.04_stable',
-            },
+            resources=_get_resources(charm),
         )
     else:
-        raise ValueError(f'Unknown charm: {charm!r}')
+        raise ValueError(f"Unknown charm: {charm!r}")
 
 
 def _get_packed_charm_path(charm: str) -> pathlib.Path:
-    return pathlib.Path(__file__).parent / 'charms' / charm / f'{charm}.charm'
+    return pathlib.Path(__file__).parent / ".packed" / f"{charm}.charm"
+
+
+def _get_resources(charm: str) -> dict[str, str]:
+    charmcraft = pathlib.Path(__file__).parent / "charms" / charm / "charmcraft.yaml"
+    yml = yaml.safe_load(charmcraft.read_text())
+    return {res: meta["upstream-source"] for res, meta in yml["resources"].items()}

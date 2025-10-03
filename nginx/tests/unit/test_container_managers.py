@@ -28,21 +28,28 @@ def nginx_pexp_port(request) -> int:
 
 
 @pytest.fixture
-def ctx(nginx_port: int, nginx_insecure: bool, nginx_pexp_port: int, update_cacerts: bool):
+def ctx(
+    nginx_port: int, nginx_insecure: bool, nginx_pexp_port: int, update_cacerts: bool
+):
     class MyCharm(ops.CharmBase):
-        META = {'name': 'jeremy', 'containers': {'nginx': {}, 'nginx-pexp': {}}}  # noqa: RUF012
+        META = {
+            "name": "jeremy",
+            "containers": {"nginx": {}, "nginx-pexp": {}},
+        }  # noqa: RUF012
 
         def __init__(self, f):
             super().__init__(f)
             self.nginx = Nginx(
-                self.unit.get_container('nginx'),
+                self.unit.get_container("nginx"),
                 NginxConfig(
-                    server_name='server', upstream_configs=[], server_ports_to_locations={}
+                    server_name="server",
+                    upstream_configs=[],
+                    server_ports_to_locations={},
                 ),
                 update_ca_certificates_on_restart=update_cacerts,
             )
             self.nginx_pexp = NginxPrometheusExporter(
-                self.unit.get_container('nginx-pexp'),
+                self.unit.get_container("nginx-pexp"),
                 nginx_port=nginx_port,
                 nginx_insecure=nginx_insecure,
                 nginx_prometheus_exporter_port=nginx_pexp_port,
@@ -56,14 +63,14 @@ def ctx(nginx_port: int, nginx_insecure: bool, nginx_pexp_port: int, update_cace
 
 @pytest.fixture
 def base_state(update_cacerts: bool):
-    execs = {scenario.Exec(['nginx', '-s', 'reload'])}
+    execs = {scenario.Exec(["nginx", "-s", "reload"])}
     if update_cacerts:
-        execs.add(scenario.Exec(['update-ca-certificates', '--fresh']))
+        execs.add(scenario.Exec(["update-ca-certificates", "--fresh"]))
     return scenario.State(
         leader=True,
         containers={
-            scenario.Container('nginx', can_connect=True, execs=execs),
-            scenario.Container('nginx-pexp', can_connect=True, execs=execs),
+            scenario.Container("nginx", can_connect=True, execs=execs),
+            scenario.Container("nginx-pexp", can_connect=True, execs=execs),
         },
     )
 
@@ -72,8 +79,12 @@ def test_nginx_container_service(ctx: scenario.Context, base_state: scenario.Sta
     # given any event
     state_out = ctx.run(ctx.on.update_status(), state=base_state)
     # the services are running
-    assert state_out.get_container('nginx').services['nginx'].is_running()
-    assert state_out.get_container('nginx-pexp').services['nginx-prometheus-exporter'].is_running()
+    assert state_out.get_container("nginx").services["nginx"].is_running()
+    assert (
+        state_out.get_container("nginx-pexp")
+        .services["nginx-prometheus-exporter"]
+        .is_running()
+    )
 
 
 def test_layer_commands(
@@ -87,16 +98,19 @@ def test_layer_commands(
     state_out = ctx.run(ctx.on.update_status(), state=base_state)
     # the commands are running with the expected arguments
     assert (
-        state_out.get_container('nginx').plan.services['nginx'].command == "nginx -g 'daemon off;'"
+        state_out.get_container("nginx").plan.services["nginx"].command
+        == "nginx -g 'daemon off;'"
     )
 
     pexp_command = (
-        state_out.get_container('nginx-pexp').plan.services['nginx-prometheus-exporter'].command
+        state_out.get_container("nginx-pexp")
+        .plan.services["nginx-prometheus-exporter"]
+        .command
     )
-    scheme = 'http' if nginx_insecure else 'https'
+    scheme = "http" if nginx_insecure else "https"
     assert (
-        pexp_command == f'nginx-prometheus-exporter '
-        f'--no-nginx.ssl-verify '
-        f'--web.listen-address=:{nginx_pexp_port} '
-        f'--nginx.scrape-uri={scheme}://127.0.0.1:{nginx_port}/status'
+        pexp_command == f"nginx-prometheus-exporter "
+        f"--no-nginx.ssl-verify "
+        f"--web.listen-address=:{nginx_pexp_port} "
+        f"--nginx.scrape-uri={scheme}://127.0.0.1:{nginx_port}/status"
     )

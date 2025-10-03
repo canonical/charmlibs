@@ -35,13 +35,13 @@ from ._nginx_prometheus_exporter import NginxPrometheusExporter
 from ._tls_config import TLSConfig, TLSConfigManager
 
 __all__ = (
-    'Nginx',
-    'NginxConfig',
-    'NginxLocationConfig',
-    'NginxPrometheusExporter',
-    'NginxUpstream',
-    'TLSConfig',
-    'TLSConfigManager',
+    "Nginx",
+    "NginxConfig",
+    "NginxLocationConfig",
+    "NginxPrometheusExporter",
+    "NginxUpstream",
+    "TLSConfig",
+    "TLSConfigManager",
 )
 
-__version__ = '0.0.1'
+__version__ = "0.0.1"
