@@ -19,6 +19,6 @@ def test_nginx_config_written(
         )
         nginx.reconcile({})
 
-    container_out = state_out.get_container('nginx')
-    nginx_config = container_out.get_filesystem(ctx) / Nginx.NGINX_CONFIG[1:]
+    container_out: scenario.Container = state_out.get_container('nginx')
+    nginx_config = container_out.get_filesystem(ctx) / Nginx.NGINX_CONFIG[1:]  # type: ignore
     assert nginx_config.exists()

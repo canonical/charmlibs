@@ -10,34 +10,36 @@ from charmlibs.nginx import Nginx, NginxConfig, NginxPrometheusExporter
 
 
 @pytest.fixture(params=[4242, 8080])
-def nginx_port(request) -> int:
-    return request.param
+def nginx_port(request: pytest.FixtureRequest) -> int:
+    return typing.cast('int', request.param)
 
 
 @pytest.fixture(params=[True, False])
-def nginx_insecure(request) -> bool:
-    return request.param
+def nginx_insecure(request: pytest.FixtureRequest) -> bool:
+    return typing.cast('bool', request.param)
 
 
 @pytest.fixture(params=[True, False])
-def update_cacerts(request) -> bool:
-    return request.param
+def update_cacerts(request: pytest.FixtureRequest) -> bool:
+    return typing.cast('bool', request.param)
 
 
 @pytest.fixture(params=[3030, 5050])
-def nginx_pexp_port(request) -> int:
-    return request.param
+def nginx_pexp_port(request: pytest.FixtureRequest) -> int:
+    return typing.cast('int', request.param)
 
 
 @pytest.fixture
-def ctx(nginx_port: int, nginx_insecure: bool, nginx_pexp_port: int, update_cacerts: bool):
+def ctx(
+    nginx_port: int, nginx_insecure: bool, nginx_pexp_port: int, update_cacerts: bool
+) -> scenario.Context[ops.CharmBase]:
     class MyCharm(ops.CharmBase):
-        META: typing.ClassVar = {
+        META: typing.ClassVar[dict[str, typing.Any]] = {
             'name': 'jeremy',
             'containers': {'nginx': {}, 'nginx-pexp': {}},
         }
 
-        def __init__(self, f):
+        def __init__(self, f: ops.Framework):
             super().__init__(f)
             self.nginx = Nginx(
                 self.unit.get_container('nginx'),
@@ -75,7 +77,7 @@ def base_state(update_cacerts: bool):
     )
 
 
-def test_nginx_container_service(ctx: scenario.Context, base_state: scenario.State):
+def test_nginx_container_service(ctx: scenario.Context[ops.CharmBase], base_state: scenario.State):
     # given any event
     state_out = ctx.run(ctx.on.update_status(), state=base_state)
     # the services are running
