@@ -111,12 +111,11 @@ class NginxConfig:
       required inputs:
 
     1. `server_name`: The name of the server (e.g. charm fqdn), which is used to identify the
-      server in Nginx configurations.
+       server in Nginx configurations.
     2. `upstream_configs`: List of `NginxUpstream` used to generate Nginx `upstream` blocks.
     3. `server_ports_to_locations`: Mapping from server ports to a list of `NginxLocationConfig`.
 
-    ## Charm usage
-    Any charm can instantiate `NginxConfig` to generate its own Nginx configuration as follows:
+    Any charm can instantiate `NginxConfig` to generate an Nginx configuration as follows:
 
     Example::
         >>> # illustrative purposes only
