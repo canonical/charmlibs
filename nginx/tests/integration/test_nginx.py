@@ -42,8 +42,8 @@ def test_nginx_pexp_service_running(juju: jubilant.Juju, charm: str):
 def test_configs(juju: jubilant.Juju, charm: str):
     res = juju.run(charm + '/0', 'inspect').results
     # services are UP
-    assert res['nginx-up'] is True
-    assert res['nginx-pexp-up'] is True
+    assert res['nginx-up'] == 'True'
+    assert res['nginx-pexp-up'] == 'True'
 
     # nginx config is a complex format; make a couple of simple assertions to verify
     # expected structures are there.
