@@ -4,4 +4,4 @@
 
 from opentelemetry import trace
 
-tracer = trace.get_tracer("nginx.tracer")
+tracer = trace.get_tracer('nginx.tracer')

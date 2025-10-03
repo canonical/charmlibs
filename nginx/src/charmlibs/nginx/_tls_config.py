@@ -29,9 +29,9 @@ class TLSConfig:
 class TLSConfigManager:
     """TLSConfigManager."""
 
-    KEY_PATH = "/etc/nginx/certs/server.key"
-    CERT_PATH = "/etc/nginx/certs/server.cert"
-    CA_CERT_PATH = "/usr/local/share/ca-certificates/ca.cert"
+    KEY_PATH = '/etc/nginx/certs/server.key'
+    CERT_PATH = '/etc/nginx/certs/server.cert'
+    CA_CERT_PATH = '/usr/local/share/ca-certificates/ca.cert'
 
     def __init__(
         self,
@@ -51,7 +51,7 @@ class TLSConfigManager:
     @property
     def is_tls_enabled(self) -> bool:
         """Return True if the certificates files are on disk."""
-        with _tracer.start_as_current_span("check tls config files exist"):
+        with _tracer.start_as_current_span('check tls config files exist'):
             return (
                 self._container.can_connect()
                 and self._container.exists(self.CERT_PATH)
@@ -63,21 +63,21 @@ class TLSConfigManager:
         """Save the certificates file to disk and run update-ca-certificates."""
         if self._container.can_connect():
             # Read the current content of the files (if they exist)
-            with _tracer.start_as_current_span("read tls config files"):
+            with _tracer.start_as_current_span('read tls config files'):
                 current_server_cert = (
                     self._container.pull(self.CERT_PATH).read()
                     if self._container.exists(self.CERT_PATH)
-                    else ""
+                    else ''
                 )
                 current_private_key = (
                     self._container.pull(self.KEY_PATH).read()
                     if self._container.exists(self.KEY_PATH)
-                    else ""
+                    else ''
                 )
                 current_ca_cert = (
                     self._container.pull(self.CA_CERT_PATH).read()
                     if self._container.exists(self.CA_CERT_PATH)
-                    else ""
+                    else ''
                 )
 
             if (
@@ -88,23 +88,17 @@ class TLSConfigManager:
                 # No update needed
                 return
 
-            with _tracer.start_as_current_span("write tls config files"):
-                self._container.push(
-                    self.KEY_PATH, tls_config.private_key, make_dirs=True
-                )
-                self._container.push(
-                    self.CERT_PATH, tls_config.server_cert, make_dirs=True
-                )
-                self._container.push(
-                    self.CA_CERT_PATH, tls_config.ca_cert, make_dirs=True
-                )
+            with _tracer.start_as_current_span('write tls config files'):
+                self._container.push(self.KEY_PATH, tls_config.private_key, make_dirs=True)
+                self._container.push(self.CERT_PATH, tls_config.server_cert, make_dirs=True)
+                self._container.push(self.CA_CERT_PATH, tls_config.ca_cert, make_dirs=True)
 
             if self._update_ca_certificates_on_restart:
-                self._container.exec(["update-ca-certificates", "--fresh"])
+                self._container.exec(['update-ca-certificates', '--fresh'])
 
     def _delete_certificates(self) -> None:
         """Delete the certificate files from disk and run update-ca-certificates."""
-        with _tracer.start_as_current_span("delete tls config files"):
+        with _tracer.start_as_current_span('delete tls config files'):
             if Path(self.CA_CERT_PATH).exists():
                 Path(self.CA_CERT_PATH).unlink(missing_ok=True)
 
@@ -114,4 +108,4 @@ class TLSConfigManager:
                         self._container.remove_path(path, recursive=True)
 
         if self._container.can_connect() and self._update_ca_certificates_on_restart:
-            self._container.exec(["update-ca-certificates", "--fresh"])
+            self._container.exec(['update-ca-certificates', '--fresh'])

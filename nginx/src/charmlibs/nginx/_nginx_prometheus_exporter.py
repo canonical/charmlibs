@@ -24,31 +24,27 @@ class NginxPrometheusExporter:
     def reconcile(self):
         """Configure pebble layer and restart if necessary."""
         if self._container.can_connect():
-            self._container.add_layer(
-                "nginx-prometheus-exporter", self.layer, combine=True
-            )
+            self._container.add_layer('nginx-prometheus-exporter', self.layer, combine=True)
             self._container.autostart()
 
     @property
     def layer(self) -> ops.pebble.Layer:
         """Return the Pebble layer for Nginx Prometheus exporter."""
-        scheme = "http" if self._nginx_insecure else "https"
-        return ops.pebble.Layer(
-            {
-                "summary": "nginx prometheus exporter layer",
-                "description": "pebble config layer for Nginx Prometheus exporter",
-                "services": {
-                    "nginx-prometheus-exporter": {
-                        "override": "replace",
-                        "summary": "nginx prometheus exporter",
-                        "command": (
-                            f"nginx-prometheus-exporter "
-                            f"--no-nginx.ssl-verify "
-                            f"--web.listen-address=:{self._nginx_prometheus_exporter_port} "
-                            f"--nginx.scrape-uri={scheme}://127.0.0.1:{self._nginx_port}/status"
-                        ),
-                        "startup": "enabled",
-                    }
-                },
-            }
-        )
+        scheme = 'http' if self._nginx_insecure else 'https'
+        return ops.pebble.Layer({
+            'summary': 'nginx prometheus exporter layer',
+            'description': 'pebble config layer for Nginx Prometheus exporter',
+            'services': {
+                'nginx-prometheus-exporter': {
+                    'override': 'replace',
+                    'summary': 'nginx prometheus exporter',
+                    'command': (
+                        f'nginx-prometheus-exporter '
+                        f'--no-nginx.ssl-verify '
+                        f'--web.listen-address=:{self._nginx_prometheus_exporter_port} '
+                        f'--nginx.scrape-uri={scheme}://127.0.0.1:{self._nginx_port}/status'
+                    ),
+                    'startup': 'enabled',
+                }
+            },
+        })
