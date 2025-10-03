@@ -12,21 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Output changed packages, or all packages if global config files have changed.
-
-Assumes that the current working directory is the project root.
-The git reference to diff with must be provided as a commandline argument.
-"""
+"""Output changed packages, or all packages if global config files have changed."""
 
 from __future__ import annotations
 
 import argparse
-import json
+import logging
 import os
 import pathlib
 import subprocess
 
-_GLOBAL_FILES = ('.github', 'justfile', 'pyproject.toml')
+_GLOBAL_FILES = {'.github', 'justfile', 'pyproject.toml'}
+_REPO_ROOT = pathlib.Path(__file__).parent.parent
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(str(pathlib.Path(__file__).relative_to(_REPO_ROOT)))
 
 
 def _parse_args() -> str:
@@ -37,33 +37,25 @@ def _parse_args() -> str:
 
 
 def _main(git_base_ref: str) -> None:
-    packages = _get_changed_packages(git_base_ref=git_base_ref)
-    line = f'packages={json.dumps(packages)}'
-    print(line)
+    cmd = ['.scripts/ls.py', 'packages']
+    if not git_base_ref:
+        logger.info('Using all packages because no git base ref was provided:')
+    elif global_changes := _get_global_changes(git_base_ref):
+        logger.info('Using all packages because global files were changed: %s', global_changes)
+    else:
+        cmd.append(git_base_ref)
+    packages = subprocess.check_output(cmd, text=True).strip()
+    line = f'packages={packages}'
+    logger.info(line)
     with pathlib.Path(os.environ['GITHUB_OUTPUT']).open('a') as f:
         print(line, file=f)
 
 
-def _get_changed_packages(git_base_ref: str) -> list[str]:
-    all_packages = [*_get_packages('.', exclude='interfaces'), *_get_packages('interfaces')]
-    if not git_base_ref:
-        print('Using all packages because no git base ref was provided:')
-        return all_packages
-    cmd = ['git', 'diff', '--name-only', f'origin/{git_base_ref}']
-    output = subprocess.check_output(cmd, text=True)
-    diff = [p.split('/') for p in output.split('\n')]
-    changes = {*(p[0] for p in diff), *('/'.join(p[:2]) for p in diff)}
-    if global_changes := sorted(changes.intersection(_GLOBAL_FILES)):
-        print(f'Using all packages because global files were changed: {global_changes}')
-        return all_packages
-    print(f'Using packages that are changed compared to {git_base_ref}:')
-    return sorted(changes.intersection(all_packages))
-
-
-def _get_packages(root: pathlib.Path | str, exclude: str | None = None) -> list[str]:
-    root = pathlib.Path(root)
-    paths = [root / '.package', root / '.example', root / '.tutorial', *root.glob(r'[a-z]*')]
-    return sorted(str(path) for path in paths if path.is_dir() and path.name != exclude)
+def _get_global_changes(git_base_ref: str) -> list[str]:
+    cmd = ['git', 'diff', '--name-only', git_base_ref]
+    diff = subprocess.check_output(cmd, text=True).strip().splitlines()
+    changes = {c.split('/')[0] for c in diff}
+    return sorted(_GLOBAL_FILES.intersection(changes))
 
 
 if __name__ == '__main__':

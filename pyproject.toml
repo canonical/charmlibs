@@ -133,7 +133,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"./*/tests/*" = [
+"./**/tests/*" = [
     # All documentation linting.
     "D",
 

@@ -1,0 +1,58 @@
+# Copyright 2024 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+
+name: tls-certificates-interface-requirer
+
+description: |
+  Dummy tls-certificates-interface requirer.
+summary: |
+    Dummy tls-certificates-interface requirer.
+
+requires:
+  certificates:
+    interface: tls-certificates
+
+config:
+  options:
+    common_name:
+      type: string
+      description: Certificate common name
+    sans_dns:
+      type: string
+      description: Comma separated list of DNS Subject Alternative Names
+    sans_ip:
+      type: string
+      description: Comma separated list of IP Subject Alternative Names
+    organization_name:
+      type: string
+      description: Certificate organization name
+    organizational_unit_name:
+      type: string
+      description: Certificate organizational unit name
+    country_name:
+      type: string
+      description: Certificate country name
+    state_or_province_name:
+      type: string
+      description: Certificate state or province name
+    locality_name:
+      type: string
+      description: Certificate locality name
+    email_address:
+      type: string
+      description: Certificate email address
+    is_ca:
+      type: boolean
+      description: Is the certificate a CA certificate
+    private_key:
+      type: string
+      description: Private key
+
+actions:
+  regenerate-private-key:
+    description: Regenerate the private key
+  get-certificate:
+    description: Get the certificate
+  renew-certificates:
+    description: Renew the certificates

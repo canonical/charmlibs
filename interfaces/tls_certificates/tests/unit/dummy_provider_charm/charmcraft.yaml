@@ -1,0 +1,48 @@
+# Copyright 2024 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+name: tls-certificates-interface-provider
+
+description: |
+  Dummy tls-certificates-interface provider.
+summary: |
+  Dummy tls-certificates-interface provider.
+
+provides:
+  certificates:
+    interface: tls-certificates
+
+actions:
+  get-certificate-requests:
+    description: Get the certificate requests from the requirers
+  get-unsolicited-certificates:
+    description: Get the unsolicited certificates from the requirers
+  get-outstanding-certificate-requests:
+    description: Get the outstanding certificate requests from the requirers
+  get-issued-certificates:
+    description: Get the issued certificates to the requirers
+  set-certificate:
+    description: Set the certificate to the requirer
+    params:
+      relation-id:
+        type: integer
+        description: >-
+          ID of the relation between the manual-tls-certificates and the requirer.
+      certificate-signing-request:
+        type: string
+        description: >-
+          The request to which the certificate is being provided.
+      certificate:
+        type: string
+        description: >-
+          Base64 encoded TLS certificate.
+      ca-chain:
+        type: string
+        description: >-
+          Base64 encoded CA chain.
+      ca-certificate:
+        type: string
+        description: >-
+          Base64 encoded CA Certificate..
+  revoke-all-certificates:
+    description: Revoke all certificates

@@ -1,0 +1,10 @@
+name: tracing
+
+version: 1
+status: retired
+
+providers: []
+
+requirers: []
+
+maintainer: observability

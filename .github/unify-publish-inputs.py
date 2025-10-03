@@ -16,27 +16,27 @@
 
 from __future__ import annotations
 
-import io
 import json
-import logging
 import os
 import pathlib
 import subprocess
 import sys
-import tarfile
-import tempfile
-
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(str(pathlib.Path(__file__).relative_to(pathlib.Path().absolute())))
-logger.setLevel(logging.DEBUG)
 
 
 def _main() -> None:
     event_name = os.environ['GITHUB_EVENT_NAME']
     event = json.loads(pathlib.Path(os.environ['GITHUB_EVENT_PATH']).read_text())
     if event_name == 'push':
+        cmd = [
+            '.scripts/ls.py',
+            'packages',
+            event['before'],
+            os.environ['GITHUB_SHA'],
+            '--exclude-examples',
+            '--only-if-version-changed',
+        ]
         _output({
-            'packages': json.dumps(_get_packages(event['before'], os.environ['GITHUB_SHA'])),
+            'packages': subprocess.check_output(cmd, text=True).strip(),
             'skip-juju': 'false',
             'repository-url': 'https://upload.pypi.org/legacy/',
         })
@@ -49,78 +49,6 @@ def _main() -> None:
     else:
         print(f'Unexpected event name: {event_name}')
         sys.exit(1)
-
-
-def _get_packages(old_ref: str, new_ref: str) -> list[str]:
-    changes = _get_changes(old_ref, new_ref)
-    with tempfile.TemporaryDirectory() as td1:
-        new_root = pathlib.Path(td1)
-        _snapshot_repo(ref=new_ref, directory=new_root)
-        all_packages = [
-            str(pathlib.Path(p).relative_to(new_root))
-            for p in (
-                *_get_all_packages(new_root, exclude='interfaces'),
-                *_get_all_packages(new_root / 'interfaces'),
-            )
-        ]
-        changed_packages = sorted(changes.intersection(all_packages))
-        new_versions = {p: _get_version(new_root, p) for p in changed_packages}
-    with tempfile.TemporaryDirectory() as td2:
-        old_root = pathlib.Path(td2)
-        _snapshot_repo(ref=old_ref, directory=old_root)
-        old_versions = {p: _get_version(old_root, p) for p in changed_packages}
-    packages_to_release: list[str] = []
-    for p in changed_packages:
-        old = old_versions[p]
-        new = new_versions[p]
-        if new is not None and '.dev' not in new and old != new:
-            packages_to_release.append(p)
-            logger.info('%s: %s -> %s', p, old, new)
-    return packages_to_release
-
-
-def _get_changes(old_ref: str, new_ref: str) -> set[str]:
-    """Return the first and first two parts of the changed paths as a set.
-
-    e.g. If the file 'foo/bar/baz' has changed, return {'foo', 'foo/bar'}.
-    """
-    cmd = ['git', 'diff', '--name-only', old_ref, new_ref]
-    output = subprocess.check_output(cmd, text=True)
-    changes: set[str] = set()
-    for line in output.strip().split('\n'):
-        parts = pathlib.Path(line).parts
-        changes.add(parts[0])
-        changes.add(str(pathlib.Path(*parts[:2])))
-    return changes
-
-
-def _get_all_packages(root: pathlib.Path | str, exclude: str | None = None) -> list[str]:
-    root = pathlib.Path(root)
-    paths = [root / '.package', *root.glob(r'[a-z]*')]
-    return sorted(str(path) for path in paths if path.is_dir() and path.name != exclude)
-
-
-def _snapshot_repo(ref: str, directory: pathlib.Path) -> None:
-    git = subprocess.run(['git', 'archive', ref], stdout=subprocess.PIPE, check=True)
-    stream = io.BytesIO(git.stdout)
-    with tarfile.open(fileobj=stream) as tar:
-        tar.extractall(path=directory)  # noqa: S202
-
-
-def _get_version(root: pathlib.Path, package: str) -> str | None:
-    if not (root / package).exists():
-        return None
-    logger.debug('Computing version for %s', package)
-    dist_name = (
-        'charmlibs'
-        if package == '.package'
-        else 'charmlibs-interfaces'
-        if package == 'interfaces/.package'
-        else 'charmlibs.' + package.replace('/', '-')
-    )
-    script = f'import importlib.metadata; print(importlib.metadata.version("{dist_name}"))'
-    cmd = ['uv', 'run', '--no-project', '--with', f'./{package}', 'python', '-c', script]
-    return subprocess.check_output(cmd, cwd=root, text=True).strip()
 
 
 def _output(di: dict[str, str]) -> None:

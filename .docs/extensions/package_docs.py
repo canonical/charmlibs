@@ -23,8 +23,10 @@ saved information when doctrees are resolved.
 
 from __future__ import annotations
 
+import json
 import pathlib
 import pickle  # noqa: S403
+import subprocess
 import typing
 
 ####################
@@ -108,11 +110,10 @@ def _main(docs_dir: pathlib.Path, package: str | None) -> None:
     root = docs_dir.parent
     ref_dir = docs_dir / 'reference'
     (ref_dir / 'charmlibs' / 'interfaces').mkdir(parents=True, exist_ok=True)
-    # Any directory (or subdirectory of interfaces/) starting with a-z is assumed to be a package.
-    for subdir, p in (
-        *(('', p.name) for p in root.glob(r'[a-z]*') if p.is_dir() and p.name != 'interfaces'),
-        *(('interfaces', p.name) for p in (root / 'interfaces').glob(r'[a-z]*') if p.is_dir()),
-    ):
+    cmd = [root / '.scripts/ls.py', 'packages', '--exclude-examples', '--exclude-placeholders']
+    packages = json.loads(subprocess.check_output(cmd, text=True))
+    for raw_package in packages:
+        subdir, _, p = raw_package.rpartition('/')
         module = p.replace('-', '_')
         content = RST_TEMPLATE.format(
             prefix=f'charmlibs.{subdir}.' if subdir else 'charmlibs.',

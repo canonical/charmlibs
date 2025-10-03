@@ -1,0 +1,15 @@
+# TODO: change this to a pyproject.toml file after either:
+# merging support for non-package pyproject.toml files, or
+# adding the tracing lib to this directory
+
+extend = "../../pyproject.toml"
+
+[format]
+quote-style = "preserve"
+
+[lint.extend-per-file-ignores]
+"./**/schema.py" = [
+    "CPY",  # copyright
+    "D",  # docs
+    "E501",  # line too long
+]

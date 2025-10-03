@@ -28,7 +28,7 @@ jobs:
 
       - name: Collect changed packages
         id: packages
-        run: uv run --no-project --script .github/get-packages.py ${{ github.base_ref }}
+        run: uv run --no-project --script .github/get-packages.py ${{ github.event.pull_request.base.sha }}
 
   tests:
     needs: [fast-lint, get-packages]

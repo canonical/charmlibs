@@ -1,0 +1,11 @@
+[project]
+name = "requirer-charm"
+version = "0.0.0"
+description = "Test requirer charm for integration tests"
+requires-python = ">=3.10"
+dependencies = [
+    "ops",
+    # "charmlibs-interfaces-tls_certificates",  # TODO: uncomment after publishing
+    "cryptography>=43.0.0",
+    "pydantic",
+]
