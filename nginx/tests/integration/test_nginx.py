@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import jubilant
 import pytest
+import yaml
 
 from .conftest import deploy
 
@@ -52,5 +53,7 @@ def test_configs(juju: jubilant.Juju, charm: str):
     assert 'worker_processes 5' in nginx_cfg_raw  # the default number
 
     # check the nginx pexp plan
-    cmd = res['nginx-prom-exporter-plan']['services']['nginx-prometheus-exporter']['command']
+    cmd = yaml.safe_load(res['nginx-prom-exporter-plan'])['services']['nginx-prometheus-exporter'][
+        'command'
+    ]
     assert '--nginx.scrape-uri=https://127.0.0.1:8080/status' in cmd
