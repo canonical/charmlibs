@@ -5,8 +5,8 @@ description = "Test charm for integration tests"
 requires-python = ">=3.10"
 dependencies = [
     "ops==3.*",
-    "charmlibs-nginx",
+    "charmlibs-nginx-k8s",
 ]
 
 [tool.uv.sources]
-charmlibs-nginx = { path = "nginx-k8s" }
+charmlibs-nginx-k8s = { path = "nginx_k8s" }

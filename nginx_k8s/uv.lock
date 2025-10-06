@@ -3,7 +3,7 @@ revision = 3
 requires-python = ">=3.10"
 
 [[package]]
-name = "charmlibs-nginx"
+name = "charmlibs-nginx-k8s"
 source = { editable = "." }
 dependencies = [
     { name = "crossplane" },

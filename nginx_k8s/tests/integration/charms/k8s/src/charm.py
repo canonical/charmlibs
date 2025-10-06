@@ -14,7 +14,7 @@ import ops
 # TODO: switch to recommended form `from charmlibs import pathops`
 #       after next pyright release fixes:
 #       https://github.com/microsoft/pyright/issues/10203
-import charmlibs.nginx as nginx
+import charmlibs.nginx_k8s as nginx
 
 logger = logging.getLogger(__name__)
 
