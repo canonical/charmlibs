@@ -49,7 +49,7 @@ build-backend = "hatchling.build"
 packages = ["src/charmlibs"]
 
 [tool.hatch.version]
-path = "src/charmlibs/nginx/__init__.py"
+path = "src/charmlibs/nginx_k8s/__init__.py"
 
 [tool.ruff]
 extend = "../pyproject.toml"
