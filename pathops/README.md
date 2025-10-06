@@ -86,3 +86,4 @@ class KubernetesCharm(ops.CharmBase):
 `pathops.PathProtocol` provides a subset of the `pathlib.Path` API. `PathProtocol` doesn't support relative paths, `open`, or manipulating hardlinks and symlinks.
 
 `pathops` doesn't provide a separate `chmod` method, as Pebble doesn't currently support this. Instead, `mkdir`, `write_bytes`, and `write_text` have arguments `mode`, `user`, and `group` to set directory or file permissions and ownership. `ensure_contents` also has these arguments.
+
