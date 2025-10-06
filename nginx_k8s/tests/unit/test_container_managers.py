@@ -6,7 +6,7 @@ import ops
 import ops.testing as scenario
 import pytest
 
-from charmlibs.nginx import Nginx, NginxConfig, NginxPrometheusExporter
+from charmlibs.nginx_k8s import Nginx, NginxConfig, NginxPrometheusExporter
 
 
 @pytest.fixture(params=[4242, 8080])

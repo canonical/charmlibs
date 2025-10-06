@@ -121,7 +121,7 @@ class NginxConfig:
         >>> # illustrative purposes only
         >>> import socket
         >>> from ops import CharmBase
-        >>> from charmlibs.nginx import NginxConfig, NginxUpstream, NginxLocationConfig
+        >>> from charmlibs.nginx_k8s import NginxConfig, NginxUpstream, NginxLocationConfig
         ...     #[...]
         >>> class AnyCharm(CharmBase):
         >>>     def __init__(self, *args):

@@ -4,7 +4,7 @@
 import ops
 import ops.testing as scenario
 
-from charmlibs.nginx import Nginx, NginxConfig
+from charmlibs.nginx_k8s import Nginx, NginxConfig
 
 
 def test_nginx_config_written(

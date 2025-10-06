@@ -1,6 +1,6 @@
 [project]
-name = "charmlibs-nginx"
-description = "Nginx sidecar abstractions."
+name = "charmlibs-nginx-k8s"
+description = "Nginx sidecar container abstractions for k8s charms."
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [

@@ -9,4 +9,4 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-charmlibs-nginx = { path = "nginx" }
+charmlibs-nginx = { path = "nginx-k8s" }

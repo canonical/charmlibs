@@ -1,12 +1,12 @@
-# nginx
+# nginx-k8s
 
-`nginx` provides abstractions for Juju Charms to run a sidecar Nginx container and a corresponding Prometheus exporter.
+`nginx-k8s` provides abstractions for Juju Charms to run a sidecar Nginx container and a corresponding Prometheus exporter.
 The supported Nginx configuration is not meant to fully cover all Nginx features, but a minimal subset sufficient to cover our immediate use cases. 
 
-To install, add `charmlibs-nginx` to your requirements. Then in your Python code, import as:
+To install, add `charmlibs-nginx-k8s` to your requirements. Then in your Python code, import as:
 
 ```py
-from charmlibs import nginx
+from charmlibs import nginx_k8s
 ```
 
 Check out the reference docs on the [charmlibs docsite](https://canonical-charmlibs.readthedocs-hosted.com/reference/charmlibs/nginx/).
@@ -19,22 +19,22 @@ instantiate the `Nginx` and `NginxPrometheusExporter` classes in your initialize
 ```py
 import ops
 
-from charmlibs import nginx
+from charmlibs import nginx_k8s
 
 
 class MyCharm(ops.CharmBase):
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
-        self._nginx = nginx.Nginx(
+        self._nginx = nginx_k8s.Nginx(
             self.unit.get_container("nginx-container"),
-            nginx_config=nginx.NginxConfig(
+            nginx_config=nginx_k8s.NginxConfig(
                 server_name="foo",
                 upstream_configs=[
-                    nginx.NginxUpstream(name="foo", port=4040, group="backend"),
-                    nginx.NginxUpstream(name="bar", port=4041, group="frontend")
+                    nginx_k8s.NginxUpstream(name="foo", port=4040, group="backend"),
+                    nginx_k8s.NginxUpstream(name="bar", port=4041, group="frontend")
                 ],
                 server_ports_to_locations={8080: [
-                    nginx.NginxLocationConfig(
+                    nginx_k8s.NginxLocationConfig(
                         path="/", 
                         backend="foo", 
                         backend_url="/api/v1", 
@@ -46,7 +46,7 @@ class MyCharm(ops.CharmBase):
                 ]}
             )
         )
-        self._nginx_pexp = nginx.NginxPrometheusExporter(
+        self._nginx_pexp = nginx_k8s.NginxPrometheusExporter(
             self.unit.get_container('nginx-pexp-container')
         )
 

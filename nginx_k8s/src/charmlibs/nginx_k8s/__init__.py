@@ -14,7 +14,7 @@
 
 r"""Nginx sidecar container management abstractions.
 
-The ``nginx`` charm library provides:
+The ``nginx_k8s`` charm library provides:
 
 - :class:`Nginx`: A class to manage a nginx sidecar container.
        Includes regular nginx config file generation, tls configuration, and reload logic.
