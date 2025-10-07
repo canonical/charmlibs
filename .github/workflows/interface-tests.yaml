@@ -20,7 +20,7 @@ jobs:
     outputs:
       include: ${{ steps.include.outputs.result }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: astral-sh/setup-uv@v6
       - name: Define interface test matrix
         id: include
@@ -39,7 +39,7 @@ jobs:
         include: ${{ fromJSON(needs.init.outputs.include) }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: astral-sh/setup-uv@v6
       - name: Run interface tests
         run: |
