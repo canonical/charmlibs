@@ -8,6 +8,9 @@ import ops
 
 class NginxPrometheusExporter:
     """Helper class to manage the nginx prometheus exporter workload."""
+    _service_name = "nginx-prometheus-exporter"
+    _layer_name = "nginx-prometheus-exporter"
+    _executable_name = "nginx-prometheus-exporter"
 
     def __init__(
         self,
@@ -24,7 +27,7 @@ class NginxPrometheusExporter:
     def reconcile(self):
         """Configure pebble layer and restart if necessary."""
         if self._container.can_connect():
-            self._container.add_layer('nginx-prometheus-exporter', self.layer, combine=True)
+            self._container.add_layer(self._layer_name, self.layer, combine=True)
             self._container.autostart()
 
     @property
@@ -32,15 +35,16 @@ class NginxPrometheusExporter:
         """Return the Pebble layer for Nginx Prometheus exporter."""
         scheme = 'http' if self._nginx_insecure else 'https'
         return ops.pebble.Layer({
-            'summary': 'nginx prometheus exporter layer',
-            'description': 'pebble config layer for Nginx Prometheus exporter',
+            'summary': 'Nginx prometheus exporter layer.',
+            'description': 'Pebble config layer for the Nginx Prometheus exporter service.',
             'services': {
-                'nginx-prometheus-exporter': {
+                self._service_name: {
                     'override': 'replace',
-                    'summary': 'nginx prometheus exporter',
+                    'summary': 'Nginx prometheus exporter service.',
                     'command': (
-                        f'nginx-prometheus-exporter '
-                        f'--no-nginx.ssl-verify '
+                        self._executable_name + " "
+                        # needed because of https://github.com/canonical/grafana-agent-operator/commit/7885025cdfdd453cd20b7617e2657f3361a3ca28
+                        f'--no-nginx.ssl-verify '  
                         f'--web.listen-address=:{self._nginx_prometheus_exporter_port} '
                         f'--nginx.scrape-uri={scheme}://127.0.0.1:{self._nginx_port}/status'
                     ),

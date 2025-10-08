@@ -23,6 +23,7 @@ resources:
   nginx:
     type: oci-image
     description: OCI image for the 'nginx' container.
+    # this is our rock's v1.27.5
     upstream-source: ghcr.io/canonical/nginx@sha256:6415a2c5f25f1d313c87315a681bdc84be80f3c79c304c6744737f9b34207993
   nginx-pexp:
     type: oci-image

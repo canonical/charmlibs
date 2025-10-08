@@ -33,7 +33,9 @@ class Nginx:
 
     NGINX_CONFIG = '/etc/nginx/nginx.conf'
 
-    _name = 'nginx'
+    _layer_name = 'nginx'
+    _executable_name = 'nginx'
+    _service_name = 'nginx'
 
     def __init__(
         self,
@@ -68,13 +70,13 @@ class Nginx:
         with _tracer.start_as_current_span('write config'):
             self._container.push(self.NGINX_CONFIG, new_config, make_dirs=True)
 
-        self._container.add_layer('nginx', self._layer, combine=True)
+        self._container.add_layer(self._layer_name, self._layer, combine=True)
         self._container.autostart()
 
         if should_restart:
             logger.info('new nginx config: restarting the service')
             # Reload the nginx config without restarting the service
-            self._container.exec(['nginx', '-s', 'reload'])
+            self._container.exec([self._executable_name, '-s', 'reload'])
 
     def _has_config_changed(self, new_config: str) -> bool:
         """Return True if the passed config differs from the one on disk."""
@@ -86,7 +88,8 @@ class Nginx:
             with _tracer.start_as_current_span('read config'):
                 current_config = self._container.pull(self.NGINX_CONFIG).read()
         except pebble.PathError:
-            # file does not exist!
+            logger.debug('nginx configuration file not found at %s', str(self.NGINX_CONFIG))
+            # file does not exist! it's probably because it's the first time we're generating it.
             return True
         except pebble.ProtocolError as e:
             logger.warning(
@@ -101,15 +104,17 @@ class Nginx:
     @property
     def _layer(self) -> pebble.Layer:
         """Return the Pebble layer for Nginx."""
-        return pebble.Layer({
-            'summary': 'nginx layer',
-            'description': 'pebble config layer for Nginx',
-            'services': {
-                'nginx': {
-                    'override': 'replace',
-                    'summary': 'nginx',
-                    'command': "nginx -g 'daemon off;'",
-                    'startup': 'enabled',
-                }
-            },
-        })
+        return pebble.Layer(
+            {
+                'summary': 'Nginx service layer.',
+                'description': 'Pebble config layer for Nginx',
+                'services': {
+                    self._service_name: {
+                        'override': 'replace',
+                        'summary': 'Nginx service.',
+                        'command': f"{self._executable_name} -g 'daemon off;'",
+                        'startup': 'enabled',
+                    }
+                },
+            }
+        )

@@ -39,7 +39,6 @@ integration = [
 "Documentation" = "https://documentation.ubuntu.com/charmlibs"
 "Repository" = "https://github.com/canonical/charmlibs"
 "Issues" = "https://github.com/canonical/charmlibs/issues"
-"Changelog" = "https://github.com/canonical/charmlibs/blob/main/nginx/CHANGELOG.md"
 
 [build-system]
 requires = ["hatchling"]
