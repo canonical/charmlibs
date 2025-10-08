@@ -104,17 +104,15 @@ class Nginx:
     @property
     def _layer(self) -> pebble.Layer:
         """Return the Pebble layer for Nginx."""
-        return pebble.Layer(
-            {
-                'summary': 'Nginx service layer.',
-                'description': 'Pebble config layer for Nginx',
-                'services': {
-                    self._service_name: {
-                        'override': 'replace',
-                        'summary': 'Nginx service.',
-                        'command': f"{self._executable_name} -g 'daemon off;'",
-                        'startup': 'enabled',
-                    }
-                },
-            }
-        )
+        return pebble.Layer({
+            'summary': 'Nginx service layer.',
+            'description': 'Pebble config layer for Nginx',
+            'services': {
+                self._service_name: {
+                    'override': 'replace',
+                    'summary': 'Nginx service.',
+                    'command': f"{self._executable_name} -g 'daemon off;'",
+                    'startup': 'enabled',
+                }
+            },
+        })

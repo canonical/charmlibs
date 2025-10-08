@@ -8,9 +8,10 @@ import ops
 
 class NginxPrometheusExporter:
     """Helper class to manage the nginx prometheus exporter workload."""
-    _service_name = "nginx-prometheus-exporter"
-    _layer_name = "nginx-prometheus-exporter"
-    _executable_name = "nginx-prometheus-exporter"
+
+    _service_name = 'nginx-prometheus-exporter'
+    _layer_name = 'nginx-prometheus-exporter'
+    _executable_name = 'nginx-prometheus-exporter'
 
     def __init__(
         self,
@@ -42,9 +43,9 @@ class NginxPrometheusExporter:
                     'override': 'replace',
                     'summary': 'Nginx prometheus exporter service.',
                     'command': (
-                        self._executable_name + " "
+                        self._executable_name + ' '
                         # needed because of https://github.com/canonical/grafana-agent-operator/commit/7885025cdfdd453cd20b7617e2657f3361a3ca28
-                        f'--no-nginx.ssl-verify '  
+                        f'--no-nginx.ssl-verify '
                         f'--web.listen-address=:{self._nginx_prometheus_exporter_port} '
                         f'--nginx.scrape-uri={scheme}://127.0.0.1:{self._nginx_port}/status'
                     ),
