@@ -8,7 +8,6 @@ source = { editable = "." }
 dependencies = [
     { name = "crossplane" },
     { name = "ops" },
-    { name = "pytest" },
 ]
 
 [package.dev-dependencies]
@@ -17,19 +16,16 @@ integration = [
     { name = "pytest-jubilant" },
 ]
 lint = [
-    { name = "ops", extra = ["testing"] },
     { name = "typing-extensions" },
 ]
 unit = [
     { name = "ops", extra = ["testing"] },
-    { name = "pytest" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "crossplane" },
     { name = "ops", specifier = ">=3,<4" },
-    { name = "pytest", specifier = "==8.3.5" },
 ]
 
 [package.metadata.requires-dev]
@@ -38,14 +34,8 @@ integration = [
     { name = "jubilant" },
     { name = "pytest-jubilant" },
 ]
-lint = [
-    { name = "ops", extras = ["testing"], specifier = ">=3,<4" },
-    { name = "typing-extensions" },
-]
-unit = [
-    { name = "ops", extras = ["testing"], specifier = ">=3,<4" },
-    { name = "pytest", specifier = "==8.3.5" },
-]
+lint = [{ name = "typing-extensions" }]
+unit = [{ name = "ops", extras = ["testing"], specifier = ">=3,<4" }]
 
 [[package]]
 name = "colorama"
