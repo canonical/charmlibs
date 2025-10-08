@@ -11,22 +11,19 @@ classifiers = [
     "License :: OSI Approved :: Apache Software License",
     "Intended Audience :: Developers",
     "Operating System :: POSIX :: Linux",
-    "Development Status :: 5 - Production/Stable",
+    "Development Status :: 3 - Alpha",
 ]
 dynamic = ["version"]
 dependencies = [
     "ops>=3,<4",
     "crossplane",
-    "pytest==8.3.5",
 ]
 
 [dependency-groups]
 lint = [
     "typing_extensions",
-    "ops[testing]>=3,<4",
 ]
 unit = [
-    "pytest==8.3.5",
     "ops[testing]>=3,<4",
 ]
 functional = []
@@ -58,7 +55,6 @@ src = ["src", "tests/unit", "tests/functional", "tests/integration"]  # correctl
 [tool.pyright]
 extends = "../pyproject.toml"
 include = ["./src"]
-
 pythonVersion = "3.10"
 
 [tool.charmlibs.integration]
