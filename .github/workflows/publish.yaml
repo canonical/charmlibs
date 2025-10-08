@@ -23,7 +23,7 @@ jobs:
       skip-juju:  ${{ steps.main.outputs.skip-juju }}
       repository-url:  ${{ steps.main.outputs.repository-url }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - name: Install uv
@@ -57,14 +57,14 @@ jobs:
       attestations: write
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v6
       - name: Build
         run: uv build
         working-directory: ./${{ matrix.package }}
       - name: Attest build provenance
-        uses: actions/attest-build-provenance@v2.4.0
+        uses: actions/attest-build-provenance@v3.0.0
         with:
           subject-path: '${{ matrix.package }}/dist/*'
       - name: Publish

@@ -1,0 +1,52 @@
+name: Interface tests
+# runs tests for specified interface
+
+on:
+  workflow_call:
+    inputs:
+      interface:
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      interface:
+        description: Interface (by path) to run tests for.
+        required: true
+        type: string
+
+jobs:
+  init:
+    runs-on: ubuntu-latest
+    outputs:
+      include: ${{ steps.include.outputs.result }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+      - name: Define interface test matrix
+        id: include
+        run: |
+          set -xueo pipefail
+          INCLUDE=$(.scripts/get-interface-test-targets.py ${{ inputs.interface }})
+          echo "$INCLUDE" | jq  # logging
+          echo "result=$INCLUDE" >> "$GITHUB_OUTPUT"
+
+  tests:
+    needs: [init]
+    if: ${{ needs.init.outputs.include != '[]' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.init.outputs.include) }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+      - name: Run interface tests
+        run: |
+          set -xueo pipefail
+          .scripts/run-interface-tests.py \
+            ${{ matrix.interface }} \
+            ${{ matrix.version }} \
+            ${{ matrix.role }} \
+            ${{ matrix.charm_name }} \
+            ${{ matrix.endpoint }}

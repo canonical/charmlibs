@@ -1,7 +1,7 @@
 name: CI
 # runs linting for whole repository, and:
-# on PR: runs tests for packages with changes (or all if global files are changed)
-# on push to main or on dipatch: runs tests for all packages
+# on PR: runs tests for packages and interfaces with changes (or all if global files are changed)
+# on push to main or on dipatch: runs tests for all packages and interfaces
 
 on:
   push:
@@ -14,39 +14,63 @@ jobs:
   fast-lint:
     uses: ./.github/workflows/fast-lint.yaml
 
-  get-packages:
+  init:
     runs-on: ubuntu-latest
     outputs:
-      packages: ${{ steps.packages.outputs.packages }}
+      packages: ${{ steps.packages.outputs.result }}
+      interfaces: ${{ steps.interfaces.outputs.result }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v6
-
+      - uses: astral-sh/setup-uv@v6
       - name: Collect changed packages
         id: packages
-        run: uv run --no-project --script .github/get-packages.py ${{ github.event.pull_request.base.sha }}
+        run: .github/get-changed.py packages ${{ github.event.pull_request.base.sha }}
+      - name: Collect changed interfaces
+        id: interfaces
+        run: .github/get-changed.py interfaces ${{ github.event.pull_request.base.sha }}
 
   tests:
-    needs: [fast-lint, get-packages]
-    if: ${{ needs.get-packages.outputs.packages != '[]' }}
+    needs: [fast-lint, init]
+    if: ${{ needs.init.outputs.packages != '[]' }}
     strategy:
       fail-fast: false
       matrix:
-        package: ${{ fromJson(needs.get-packages.outputs.packages) }}
+        package: ${{ fromJson(needs.init.outputs.packages) }}
     uses: ./.github/workflows/tests.yaml
     with:
       package: ${{ matrix.package }}
 
-  tests-passed:
+  tests-passed:  # GitHub status checks require a static job name
     needs: [tests]
     if: ${{ !cancelled() }}  # run even if tests are skipped or failed
     runs-on: ubuntu-latest
     steps:
-      - if: ${{ needs.tests.result != 'success' && needs.tests.result != 'skipped' }}
+      - name: Fail if any tests failed
+        if: ${{ needs.tests.result != 'success' && needs.tests.result != 'skipped' }}
+        run: |
+          echo '${{ toJSON(needs) }}'
+          exit 1
+
+  interface:
+    needs: [fast-lint, init]
+    if: ${{ needs.init.outputs.interfaces != '[]' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        interface: ${{ fromJson(needs.init.outputs.interfaces) }}
+    uses: ./.github/workflows/interface-tests.yaml
+    with:
+      interface: ${{ matrix.interface }}
+
+  interfaces-passed:  # GitHub status checks require a static job name
+    needs: [interface]
+    if: ${{ !cancelled() }}  # run even if tests are skipped or failed
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if any interface tests failed
+        if: ${{ needs.interface.result != 'success' && needs.interface.result != 'skipped' }}
         run: |
           echo '${{ toJSON(needs) }}'
           exit 1
@@ -54,7 +78,7 @@ jobs:
   template-and-example-in-sync:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: astral-sh/setup-uv@v6
       - run: |
           uvx --from rust-just just init --no-input
@@ -69,7 +93,7 @@ jobs:
   template-and-interface-example-in-sync:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: astral-sh/setup-uv@v6
       - working-directory: interfaces
         run: |

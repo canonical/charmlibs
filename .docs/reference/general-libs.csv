@@ -1,5 +1,5 @@
 name,status,url,docs,src,kind,machine,K8s,description
-apt,recommended,https://charmhub.io/operator-libs-linux/libraries/apt,,https://github.com/canonical/operator-libs-linux,Charmhub,y,,Use ``apt`` to install and manage packages.
+apt,legacy,https://charmhub.io/operator-libs-linux/libraries/apt,,https://github.com/canonical/operator-libs-linux,Charmhub,y,,Use ``apt`` to install and manage packages. Deprecated in favor of ``charmlibs.apt``.
 architecture,team,https://charmhub.io/mysql/libraries/architecture,,https://github.com/canonical/mysql-operator,Charmhub,y,y,Shared code between the ``mysql`` and ``mysql-k8s`` charms.
 async_replication,team,https://charmhub.io/mysql/libraries/async_replication,,https://github.com/canonical/mysql-operator,Charmhub,y,y,Shared code between the ``mysql`` and ``mysql-k8s`` charms.
 awsjuju,unlisted,https://pypi.org/project/awsjuju/,,https://github.com/kapilt/awsjuju,PyPI,,,Legacy library for managing AWS resources.
@@ -17,7 +17,9 @@ charm-refresh-build-version,unlisted,https://pypi.org/project/charm-refresh-buil
 charm-upgrade,unlisted,https://pypi.org/project/charm-upgrade/,,https://github.com/canonical/charm-upgrade,PyPI,y,y,Alias for charm-refresh? (Repo URL redirects.)
 charmed-kubeflow-chisme,team,https://pypi.org/project/charmed-kubeflow-chisme/,,https://github.com/canonical/charmed-kubeflow-chisme,PyPI,y,y,Used internally by the Charmed Kubeflow team.
 charmed-service-mesh-helpers,team,https://pypi.org/project/charmed-service-mesh-helpers/,,https://github.com/canonical/charmed-service-mesh-helpers/,PyPI,,y,Used internally by the Service Mesh team.
-charmlibs.pathops,recommended,https://pypi.org/project/charmlibs-pathops,https://canonical-charmlibs.readthedocs-hosted.com,https://github.com/canonical/charmtech-charmlibs,PyPI,y,y,Substrate agnostic file operations.
+charmlibs.apt,recommended,https://pypi.org/project/charmlibs-apt,https://documentation.ubuntu.com/charmlibs/reference/charmlibs/apt,https://github.com/canonical/charmlibs/tree/main/apt,PyPI,y,,Use ``apt`` to install and manage packages.
+charmlibs.pathops,recommended,https://pypi.org/project/charmlibs-pathops,https://documentation.ubuntu.com/charmlibs/reference/charmlibs/pathops,https://github.com/canonical/charmlibs/tree/main/pathops,PyPI,y,y,Substrate agnostic file operations.
+charmlibs.snap,recommended,https://pypi.org/project/charmlibs-snap,https://documentation.ubuntu.com/charmlibs/reference/charmlibs/snap,https://github.com/canonical/charmlibs/tree/main/snap,PyPI,y,,Use ``snapd`` to install and manage packages.
 charms.contextual_status,experimental,https://pypi.org/project/charms.contextual-status/,,https://github.com/charmed-kubernetes/charm-lib-contextual-status,PyPI,y,y,Context manager based library for setting charm statuses.
 charms.docker,legacy,https://pypi.org/project/charms.docker/,,https://github.com/juju-solutions/charms.docker,PyPI,,,Legacy library used by the ``docker-layer`` reactive charm.
 charms.proxylib,,https://github.com/canonical/charms.proxylib,,https://github.com/canonical/charms.proxylib,PyPI,y,y,A library that helps charms direct HTTP requests and subprocess calls through the model-configured proxy environment.
@@ -55,7 +57,7 @@ rollingops,,https://charmhub.io/rolling-ops/libraries/rollingops,,https://github
 s3_helpers,team,https://charmhub.io/mysql/libraries/s3_helpers,,https://github.com/canonical/mysql-operator,Charmhub,y,y,Shared code between the ``mysql`` and ``mysql-k8s`` charms.
 sborl,legacy,https://pypi.org/project/sborl/,,https://github.com/canonical/sborl,PyPI,y,y,Legacy library for implementing interface libraries. New interface libraries can use the typed relation data feature available in Ops 2.23+.
 serialized-data-interface,legacy,https://pypi.org/project/serialized-data-interface/,,https://github.com/canonical/serialized-data-interface,PyPI,y,y,Relation data validation – use the features available in Ops instead.
-snap,recommended,https://charmhub.io/operator-libs-linux/libraries/snap,,https://github.com/canonical/operator-libs-linux,Charmhub,y,,Use ``snapd`` to install and manage packages.
+snap,legacy,https://charmhub.io/operator-libs-linux/libraries/snap,,https://github.com/canonical/operator-libs-linux,Charmhub,y,,Use ``snapd`` to install and manage packages. Deprecated in favor of ``charmlibs.snap``.
 sysctl,recommended,https://charmhub.io/operator-libs-linux/libraries/sysctl,,https://github.com/canonical/operator-libs-linux,Charmhub,y,,Create and configure ``sysctl`` options.
 systemd,recommended,https://charmhub.io/operator-libs-linux/libraries/systemd,,https://github.com/canonical/operator-libs-linux,Charmhub,y,,"Use ``systemd`` to start, stop, and manage system services."
 tls,team,https://charmhub.io/mysql/libraries/tls,,https://github.com/canonical/mysql-operator,Charmhub,y,y,Shared code between the ``mysql`` and ``mysql-k8s`` charms.
