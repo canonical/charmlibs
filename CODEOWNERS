@@ -24,7 +24,7 @@
 
 # charmlibs packages (alphabetical)
 /apt/ @canonical/charmlibs-maintainers
-/nginx/ @canonical/tracing-and-profiling
+/nginx_k8s/ @canonical/tracing-and-profiling
 /pathops/ @canonical/charmlibs-maintainers
 /snap/ @canonical/charmlibs-maintainers
 

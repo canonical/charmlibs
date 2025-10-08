@@ -9,7 +9,7 @@ To install, add `charmlibs-nginx-k8s` to your requirements. Then in your Python 
 from charmlibs import nginx_k8s
 ```
 
-Check out the reference docs on the [charmlibs docsite](https://canonical-charmlibs.readthedocs-hosted.com/reference/charmlibs/nginx/).
+Check out the reference docs on the [charmlibs docsite](https://canonical-charmlibs.readthedocs-hosted.com/reference/charmlibs/nginx-k8s/).
 
 # Getting started
 
@@ -26,12 +26,12 @@ class MyCharm(ops.CharmBase):
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
         self._nginx = nginx_k8s.Nginx(
-            self.unit.get_container("nginx-container"),
+            self.unit.get_container("nginx"),  # container name as defined in charmcraft.yaml
             nginx_config=nginx_k8s.NginxConfig(
                 server_name="foo",
                 upstream_configs=[
                     nginx_k8s.NginxUpstream(name="foo", port=4040, group="backend"),
-                    nginx_k8s.NginxUpstream(name="bar", port=4041, group="frontend")
+                    nginx_k8s.NginxUpstream(name="bar", port=4041, group="frontend"),
                 ],
                 server_ports_to_locations={8080: [
                     nginx_k8s.NginxLocationConfig(

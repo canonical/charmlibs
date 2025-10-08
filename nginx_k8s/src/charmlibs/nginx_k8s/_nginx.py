@@ -76,7 +76,7 @@ class Nginx:
         if should_restart:
             logger.info('new nginx config: restarting the service')
             # Reload the nginx config without restarting the service
-            self._container.exec([self._executable_name, '-s', 'reload'])
+            self._container.exec([self._executable_name, '-s', 'reload']).wait()
 
     def _has_config_changed(self, new_config: str) -> bool:
         """Return True if the passed config differs from the one on disk."""

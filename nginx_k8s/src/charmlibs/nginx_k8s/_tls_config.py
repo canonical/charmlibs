@@ -94,7 +94,7 @@ class TLSConfigManager:
                 self._container.push(self.CA_CERT_PATH, tls_config.ca_cert, make_dirs=True)
 
             if self._update_ca_certificates_on_restart:
-                self._container.exec(['update-ca-certificates', '--fresh'])
+                self._container.exec(['update-ca-certificates', '--fresh']).wait()
 
     def _delete_certificates(self) -> None:
         """Delete the certificate files from disk and run update-ca-certificates."""
@@ -108,4 +108,4 @@ class TLSConfigManager:
                         self._container.remove_path(path, recursive=True)
 
         if self._container.can_connect() and self._update_ca_certificates_on_restart:
-            self._container.exec(['update-ca-certificates', '--fresh'])
+            self._container.exec(['update-ca-certificates', '--fresh']).wait()
