@@ -46,14 +46,21 @@ def _main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument('interface', help='Path from repo root to specific interface directory.')
     parser.add_argument('--all', action='store_true', help='Include combinations with no tests.')
+    parser.add_argument(
+        '--include-interface', action='store_true', help='Include `interface` field in the output.'
+    )
     args = parser.parse_args()
-    targets = _target_from_interface(args.interface, has_tests_only=not args.all)
+    targets = _target_from_interface(
+        args.interface, has_tests_only=not args.all, include_interface=args.include_interface
+    )
     output = json.dumps(targets)
     logger.info(output)
     print(output)
 
 
-def _target_from_interface(interface_str: str, has_tests_only: bool) -> list[dict[str, str]]:
+def _target_from_interface(
+    interface_str: str, has_tests_only: bool, include_interface: bool
+) -> list[dict[str, str]]:
     """Return a list of interface test targets for this interface.
 
     Iterates over the interface versions, collects all provider and requirer charms, and clones
@@ -62,6 +69,7 @@ def _target_from_interface(interface_str: str, has_tests_only: bool) -> list[dic
     Args:
         interface_str: The interface path relative to the repo root, e.g. 'interfaces/tracing'.
         has_tests_only: If true, exclude any targets that don't actually have any tests defined.
+        include_interface: If true, include an `interface` entry in the output dictionaries.
 
     Returns:
         A list of interface test targets. Each target is a dictionary containing:
@@ -92,16 +100,15 @@ def _target_from_interface(interface_str: str, has_tests_only: bool) -> list[dic
                     charm_ref=charm.get('branch', 'main'),
                     charm_root=charm.get('test_setup', {}).get('charm_root', ''),
                 )
-                targets.extend(
-                    {
-                        'interface': interface.name,
-                        'version': v.name,
-                        'role': role,
-                        'charm_name': charm['name'],
-                        'endpoint': endpoint,
-                    }
-                    for endpoint in endpoints
-                )
+                for endpoint in endpoints:
+                    target: dict[str, str] = {}
+                    if include_interface:
+                        target['interface'] = interface.name
+                    target['version'] = v.name
+                    target['role'] = role
+                    target['charm_name'] = charm['name']
+                    target['endpoint'] = endpoint
+                    targets.append(target)
     return targets
 
 

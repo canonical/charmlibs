@@ -55,7 +55,7 @@ def _load_on_doctree_read(app: sphinx.application.Sphinx, doctree: docutils.node
     """Load pickle file named after docname if it exists, and replace doctree contents in-place."""
     if app.config.package is not None:  # only load when not building docs for a specific package
         return
-    if not (source := pathlib.Path('.save', app.env.docname)).exists():
+    if not (source := pathlib.Path('.save', f'{app.env.docname}.pickle')).exists():
         return
     saved, objects, modules = pickle.loads(source.read_bytes())  # noqa: S301
     # restore saved doctree
@@ -78,7 +78,7 @@ def _save_on_doctree_resolved(
         return
     objects = app.env.domains['py'].data['objects']
     modules = app.env.domains['py'].data['modules']
-    target = pathlib.Path('.save', docname)
+    target = pathlib.Path('.save', f'{docname}.pickle')
     target.parent.mkdir(exist_ok=True, parents=True)
     target.write_bytes(pickle.dumps((doctree, objects, modules)))
 

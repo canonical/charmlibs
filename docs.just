@@ -55,9 +55,9 @@ run: _packages
         sphinx-autobuild --watch .. --ignore '**/generated/*' -b dirhtml . '{{build_dir}}/html'
 
 [doc('Check links.')]
-linkcheck: _packages
+linkcheck *sphinx_args: _packages
     uvx --with-requirements=.sphinx/requirements.txt --from=sphinx \
-        sphinx-build -b linkcheck . '{{build_dir}}'
+        sphinx-build -b linkcheck . '{{build_dir}}' {{sphinx_args}}
 
 [doc('Check spelling.')]
 spelling: html
@@ -74,6 +74,7 @@ clean:
     rm -rf reference/generated
     # package reference docs
     rm -rf reference/charmlibs
+    rm -rf reference/interfaces
     rm -rf .save
 
 [doc('Run `pyright` for local sphinx extensions.')]

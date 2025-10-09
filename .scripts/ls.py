@@ -54,6 +54,7 @@ def _main() -> None:
     parser.add_argument('--exclude-examples', action='store_true')
     parser.add_argument('--exclude-placeholders', action='store_true')
     parser.add_argument('--only-if-version-changed', action='store_true')
+    parser.add_argument('--name-only', action='store_true')
     args = parser.parse_args()
     result = _ls(
         category=args.category,
@@ -61,6 +62,7 @@ def _main() -> None:
         include_examples=not args.exclude_examples,
         include_placeholders=not args.exclude_placeholders,
         only_if_version_changed=args.only_if_version_changed,
+        name_only=args.name_only,
     )
     print(json.dumps(result))
 
@@ -71,6 +73,7 @@ def _ls(
     only_if_version_changed: bool,
     include_examples: bool,
     include_placeholders: bool,
+    name_only: bool,
 ) -> list[str]:
     """Return directories matching the category and other options.
 
@@ -86,6 +89,8 @@ def _ls(
             Typically included for testing, but excluded from docs and publishing.
         include_placeholders: Whether to include the namespace placeholder packages.
             Typically included for testing and publishing, but excluded from docs.
+        name_only: Whether to only output the package or interface name. Otherwise
+            outputs the path from the repository root to the package or interface.
 
     Returns:
         A list of items from the specified category.
@@ -108,7 +113,7 @@ def _ls(
         dirs = _changed_only(dirs, old_ref=old_ref, new_ref=new_ref)
         if only_if_version_changed and category == 'packages':
             dirs = _changed_version_only(dirs, old_ref=old_ref, new_ref=new_ref)
-    return [str(p) for p in dirs]
+    return [p.name if name_only else str(p) for p in dirs]
 
 
 def _packages(include: list[str]) -> list[pathlib.Path]:

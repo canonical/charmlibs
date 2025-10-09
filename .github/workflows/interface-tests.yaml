@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       interface:
-        description: Interface (by path) to run tests for.
+        description: Name of interface to run tests for.
         required: true
         type: string
 
@@ -26,7 +26,7 @@ jobs:
         id: include
         run: |
           set -xueo pipefail
-          INCLUDE=$(.scripts/get-interface-test-targets.py ${{ inputs.interface }})
+          INCLUDE=$(.scripts/get-interface-test-targets.py interfaces/${{ inputs.interface }})
           echo "$INCLUDE" | jq  # logging
           echo "result=$INCLUDE" >> "$GITHUB_OUTPUT"
 
@@ -45,7 +45,7 @@ jobs:
         run: |
           set -xueo pipefail
           .scripts/run-interface-tests.py \
-            ${{ matrix.interface }} \
+            ${{ inputs.interface }} \
             ${{ matrix.version }} \
             ${{ matrix.role }} \
             ${{ matrix.charm_name }} \

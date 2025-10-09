@@ -1,4 +1,4 @@
-# `tracing`
+# `tracing/v1`
 
 ## Usage
 

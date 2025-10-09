@@ -4,7 +4,7 @@ import sys
 
 # local extensions
 sys.path.insert(0, str(pathlib.Path(__file__).parent / 'extensions'))
-local_extensions = ['generate_tables', 'package_docs']
+local_extensions = ['generate_tables', 'interface_docs', 'package_docs']
 
 # So that sphinx.ext.autodoc can find charmlibs code
 root = pathlib.Path(__file__).parent.parent
@@ -101,6 +101,8 @@ linkcheck_ignore = [
     "http://127.0.0.1:8000",
     "https://matrix.to/#/*",
 ]
+if 'check-github-links' not in tags:
+    linkcheck_ignore.append(r"https://github\.com/.*")
 
 # A regex list of URLs where anchors are ignored by 'make linkcheck'
 linkcheck_anchors_ignore_for_url = [r"https://github\.com/.*"]
@@ -130,6 +132,7 @@ linkcheck_retries = 3
 extensions = [
     "canonical_sphinx",
     "sphinxcontrib.cairosvgconverter",
+    "sphinxcontrib.mermaid",
     "sphinx_last_updated_by_git",
     "sphinx.ext.autodoc",
     'sphinx.ext.intersphinx',
@@ -239,3 +242,7 @@ datatables_options = {
     'paging': False,  # remove all paging options
     'search': {'regex': True},  # enable regex in search box
 }
+
+# Options for sphinxcontrib-mermaid
+myst_fence_as_directive = ["mermaid"]  # allow ```mermaid like GitHub does
+
