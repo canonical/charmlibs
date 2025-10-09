@@ -9,7 +9,7 @@ To install, add `charmlibs-nginx-k8s` to your requirements. Then in your Python 
 from charmlibs import nginx_k8s
 ```
 
-Check out the reference docs on the [charmlibs docsite](https://canonical-charmlibs.readthedocs-hosted.com/reference/charmlibs/nginx-k8s/).
+Check out the reference docs on the [charmlibs docsite](https://documentation.ubuntu.com/charmlibs/reference/charmlibs/nginx-k8s/).
 
 # Getting started
 
