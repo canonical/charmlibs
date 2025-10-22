@@ -1,0 +1,27 @@
+name: 'PR title follows conventional commits'
+
+on:
+  # We use the pull_request_target trigger to support running on PRs from forks.
+  # Using the safer pull_request trigger will apparently fail due to the token not being available.
+  # Read more: https://github.com/amannn/action-semantic-pull-request?tab=readme-ov-file#event-triggers
+  #
+  # This trigger should be safe to use because no files or code from the PR are used,
+  # as this action only reads the PR title.
+  # Read more: https://docs.zizmor.sh/audits/#dangerous-triggers
+  pull_request_target:  # zizmor: ignore[dangerous-triggers]
+    types:
+      - opened
+      - edited
+      - reopened
+
+permissions: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    steps:
+      - uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50  # v6.1.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
