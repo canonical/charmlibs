@@ -29,6 +29,8 @@ from __future__ import annotations
 from ._config import (
     NginxConfig,
     NginxLocationConfig,
+    NginxMapConfig,
+    NginxTracingConfig,
     NginxUpstream,
 )
 from ._nginx import Nginx
@@ -39,10 +41,12 @@ __all__ = (
     'Nginx',
     'NginxConfig',
     'NginxLocationConfig',
+    'NginxMapConfig',
     'NginxPrometheusExporter',
+    'NginxTracingConfig',
     'NginxUpstream',
     'TLSConfig',
     'TLSConfigManager',
 )
 
-__version__ = '0.0.1.post0'
+__version__ = '1.0.0'

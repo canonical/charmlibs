@@ -1,0 +1,64 @@
+worker_processes 5;
+error_log /dev/stderr error;
+pid /tmp/nginx.pid;
+worker_rlimit_nofile 8192;
+events {
+    worker_connections 4096;
+}
+http {
+    upstream auth {
+        zone auth_zone 64k;
+        server worker-address:3000 resolve;
+    }
+    upstream backend {
+        zone backend_zone 64k;
+        server worker-address:8080 resolve;
+    }
+    client_body_temp_path /tmp/client_temp;
+    proxy_temp_path /tmp/proxy_temp_path;
+    fastcgi_temp_path /tmp/fastcgi_temp;
+    uwsgi_temp_path /tmp/uwsgi_temp;
+    scgi_temp_path /tmp/scgi_temp;
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+    log_format main '$remote_addr - $remote_user [$time_local]  $status "$request" $body_bytes_sent "$http_referer" "$http_user_agent" "$http_x_forwarded_for"';
+    map $status $loggable {
+        ~^[23] 0;
+        default 1;
+    }
+    map $http_x_scope_orgid $ensured_x_scope_orgid {
+        default $http_x_scope_orgid;
+        '' anonymous;
+    }
+    map $http_upgrade $connection_upgrade {
+        default upgrade;
+        '' close;
+    }
+    access_log /dev/stderr;
+    sendfile on;
+    tcp_nopush on;
+    resolver 198.18.0.0;
+    proxy_read_timeout 300;
+    server {
+        listen 8185;
+        listen [::]:8185;
+        proxy_set_header X-Scope-OrgID $ensured_x_scope_orgid;
+        server_name localhost;
+        location / {
+            add_header Cache-Control no-cache;
+            try_files $uri /index.html;
+            autoindex on;
+        }
+        location /auth {
+            set $backend http://auth;
+            rewrite '^/auth(/.*)$' $1 break;
+            proxy_pass $backend;
+            proxy_connect_timeout 5s;
+        }
+        location /api {
+            set $backend http://backend;
+            proxy_pass $backend;
+            proxy_connect_timeout 5s;
+        }
+    }
+}

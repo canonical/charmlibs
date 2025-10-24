@@ -42,12 +42,7 @@ def ctx(
         def __init__(self, f: ops.Framework):
             super().__init__(f)
             self.nginx = Nginx(
-                self.unit.get_container('nginx'),
-                NginxConfig(
-                    server_name='server',
-                    upstream_configs=[],
-                    server_ports_to_locations={},
-                ),
+                container=self.unit.get_container('nginx'),
                 update_ca_certificates_on_restart=update_cacerts,
             )
             self.nginx_pexp = NginxPrometheusExporter(
@@ -57,17 +52,24 @@ def ctx(
                 nginx_prometheus_exporter_port=nginx_pexp_port,
             )
 
-            self.nginx.reconcile(upstreams_to_addresses={})
+            self.nginx.reconcile(
+                NginxConfig(
+                    server_name='server',
+                    upstream_configs=[],
+                    server_ports_to_locations={},
+                ).get_config(upstreams_to_addresses={}, listen_tls=False)
+            )
             self.nginx_pexp.reconcile()
 
     return scenario.Context(MyCharm, meta=MyCharm.META)
 
 
 @pytest.fixture
-def base_state(update_cacerts: bool):
-    execs = {scenario.Exec(['nginx', '-s', 'reload'])}
-    if update_cacerts:
-        execs.add(scenario.Exec(['update-ca-certificates', '--fresh']))
+def base_state():
+    execs = {
+        scenario.Exec(['nginx', '-s', 'reload']),
+        scenario.Exec(['update-ca-certificates', '--fresh']),
+    }
     return scenario.State(
         leader=True,
         containers={

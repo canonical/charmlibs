@@ -4,18 +4,20 @@
 
 import logging
 import subprocess
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Final, Literal, cast
 
 import crossplane as _crossplane  # type: ignore[reportMissingTypeStubs]
 
+from . import _directives as directives
 from ._tls_config import TLSConfigManager
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_TLS_VERSIONS: Final[list[str]] = ['TLSv1', 'TLSv1.1', 'TLSv1.2', 'TLSv1.3']
-
+RESOLV_CONF_PATH = '/etc/resolv.conf'
 
 # Define valid Nginx `location` block modifiers.
 # cfr. https://www.digitalocean.com/community/tutorials/nginx-location-directive#nginx-location-directive-syntax
@@ -56,7 +58,7 @@ class NginxLocationConfig:
 
     path: str
     """The location path (e.g., '/', '/api') to match incoming requests."""
-    backend: str
+    backend: str | None = None
     """The name of the upstream service to route requests to (e.g. an `upstream` block)."""
     backend_url: str = ''
     """An optional URL path to append when forwarding to the upstream (e.g., '/v1')."""
@@ -69,6 +71,14 @@ class NginxLocationConfig:
     upstream_tls: bool | None = None
     """Whether to connect to the upstream over TLS (e.g., https:// or grpcs://)
     If None, it will inherit the TLS setting from the server block that the location is part of.
+    """
+    rewrite: list[str] | None = None
+    """Custom rewrite, used i.e. to drop the subpath from the proxied request if needed.
+    Example: ['^/auth(/.*)$', '$1', 'break'] to drop `/auth` from the request.
+    """
+    extra_directives: dict[str, Any] = field(default_factory=lambda: cast('dict[str, Any]', {}))
+    """Dictionary of arbitrary location configuration keys and values.
+    Example: {"proxy_ssl_verify": ["off"]}
     """
 
 
@@ -83,13 +93,60 @@ class NginxUpstream:
 
     Our coordinators assume that all servers under an upstream share the same port.
     """
-    group: str | None = None
+    address_lookup_key: str | None = None
     """Group that this upstream belongs to.
 
     Used for mapping multiple upstreams to a single group of backends (loadbalancing between all).
     If you leave it None, this upstream will be routed to all available backends
     (loadbalancing between them).
     """
+    ignore_address_lookup_key: bool = False
+    """If True, overrides `address_lookup_key` and routes to all available backend servers.
+
+    Use this when the upstream should be generic and include any available backend.
+
+    TODO: This class is now used outside of the context of pure coordinated-workers.
+    This arg hence must be renamed to have a more generic name for eg. `ignore_address_lookup`.
+    See: https://github.com/canonical/cos-coordinated-workers/issues/105
+    """
+
+
+@dataclass
+class NginxMapConfig:
+    """Represents a `map` block of the Nginx config.
+
+    Example:
+    NginxMapConfig(
+        source_variable="$http_upgrade",
+        target_variable="$connection_upgrade",
+        value_mappings={
+            "default": ["upgrade"],
+            "": ["close"],
+        },
+    )
+    will result in the following `map` block:
+
+    map $http_upgrade $connection_upgrade {
+        default upgrade;
+        '' close;
+    }
+    """
+
+    source_variable: str
+    """Name of the variable to map from."""
+    target_variable: str
+    """Name of the variable to be created."""
+    value_mappings: dict[str, list[str]]
+    """Mapping of source values to target values."""
+
+
+@dataclass
+class NginxTracingConfig:
+    """Configuration for OTel tracing in Nginx."""
+
+    endpoint: str
+    service_name: str
+    resource_attributes: dict[str, str] = field(default_factory=lambda: {})
 
 
 def _is_ipv6_enabled() -> bool:
@@ -112,7 +169,7 @@ class NginxConfig:
 
     1. `server_name`: The name of the server (e.g. charm fqdn), which is used to identify the
        server in Nginx configurations.
-    2. `upstream_configs`: List of `NginxUpstream` used to generate Nginx `upstream` blocks.
+    2. `upstream_configs`: List of `NginxUpstream` used to generate Nginx `upstream` directives.
     3. `server_ports_to_locations`: Mapping from server ports to a list of `NginxLocationConfig`.
 
     Any charm can instantiate `NginxConfig` to generate an Nginx configuration as follows:
@@ -183,19 +240,38 @@ class NginxConfig:
         ...
         >>>     def _server_ports_to_locations(self) -> Dict[int, List[NginxLocationConfig]]:
         >>>         # NGINX_PORT is the port an nginx server is running on
-        >>>         # Note that you can define multiple server blocks,
+        >>>         # Note that you can define multiple server directives,
         >>>         # each running on a different port
         >>>         return {NGINX_PORT: self._nginx_locations}
 
     """
 
     _pid = '/tmp/nginx.pid'  # noqa
+    otel_module_path = '/etc/nginx/modules/ngx_otel_module.so'
+
+    _http_x_scope_orgid_map_config = NginxMapConfig(
+        source_variable='$http_x_scope_orgid',
+        target_variable='$ensured_x_scope_orgid',
+        value_mappings={
+            'default': ['$http_x_scope_orgid'],
+            '': ['anonymous'],
+        },
+    )
+    _logging_by_status_map_config = NginxMapConfig(
+        source_variable='$status',
+        target_variable='$loggable',
+        value_mappings={
+            '~^[23]': ['0'],
+            'default': ['1'],
+        },
+    )
 
     def __init__(
         self,
         server_name: str,
         upstream_configs: list[NginxUpstream],
         server_ports_to_locations: dict[int, list[NginxLocationConfig]],
+        map_configs: Sequence[NginxMapConfig] | None = None,
         enable_health_check: bool = False,
         enable_status_page: bool = False,
         supported_tls_versions: list[str] | None = None,
@@ -211,9 +287,10 @@ class NginxConfig:
             server_name: The name of the server (e.g. fqdn), which is used to identify
               the server in Nginx configurations.
             upstream_configs: List of Nginx upstream metadata configurations used to generate Nginx
-              `upstream` blocks.
+              `upstream` directives.
             server_ports_to_locations: Mapping from server ports to a list of Nginx location
               configurations.
+            map_configs: List of extra `map` directives to be put under the `http` directive.
             enable_health_check: If True, adds a `/` location that returns a basic 200 OK response.
             enable_status_page: If True, adds a `/status` location that enables `stub_status` for
               basic Nginx metrics.
@@ -237,12 +314,27 @@ class NginxConfig:
                         path="/",
                         backend="zipkin"
                     )
-                ]
+                ],
+            map_configs=[
+                NginxMapConfig(
+                    source_variable="$http_upgrade",
+                    target_variable="$connection_upgrade",
+                    value_mappings={
+                        "default": ["upgrade"],
+                        "": ["close"],
+                    },
+                )
+            ]
             })
         """
         self._server_name = server_name
         self._upstream_configs = upstream_configs
         self._server_ports_to_locations = server_ports_to_locations
+        self._map_configs = [
+            self._logging_by_status_map_config,
+            self._http_x_scope_orgid_map_config,
+            *(map_configs or ()),
+        ]
         self._enable_health_check = enable_health_check
         self._enable_status_page = enable_status_page
         self._dns_IP_address = self._get_dns_ip_address()
@@ -265,6 +357,7 @@ class NginxConfig:
         upstreams_to_addresses: dict[str, set[str]],
         listen_tls: bool,
         root_path: str | None = None,
+        tracing_config: NginxTracingConfig | None = None,
     ) -> str:
         """Render the Nginx configuration as a string.
 
@@ -273,8 +366,14 @@ class NginxConfig:
               associated with that upstream.
             listen_tls: Whether Nginx should listen for incoming traffic over TLS.
             root_path: If provided, it is used as a location where static files will be served.
+            tracing_config: Tracing configuration.
         """
-        full_config = self._prepare_config(upstreams_to_addresses, listen_tls, root_path)
+        full_config = self._prepare_config(
+            upstreams_to_addresses=upstreams_to_addresses,
+            listen_tls=listen_tls,
+            root_path=root_path,
+            tracing_config=tracing_config,
+        )
         return _crossplane.build(full_config)  # type: ignore
 
     def _prepare_config(
@@ -282,141 +381,81 @@ class NginxConfig:
         upstreams_to_addresses: dict[str, set[str]],
         listen_tls: bool,
         root_path: str | None = None,
+        tracing_config: NginxTracingConfig | None = None,
     ) -> list[dict[str, Any]]:
         upstreams = self._upstreams(upstreams_to_addresses)
-        # extract the upstream name
-        backends = [upstream['args'][0] for upstream in upstreams]
         # build the complete configuration
-        full_config = [
-            {'directive': 'worker_processes', 'args': [str(self._worker_processes)]},
-            {'directive': 'error_log', 'args': ['/dev/stderr', 'error']},
-            {'directive': 'pid', 'args': [self._pid]},
-            {
-                'directive': 'worker_rlimit_nofile',
-                'args': [str(self._worker_rlimit_nofile)],
-            },
-            {
-                'directive': 'events',
-                'args': [],
-                'block': [
-                    {
-                        'directive': 'worker_connections',
-                        'args': [str(self._worker_connections)],
-                    }
-                ],
-            },
-            {
-                'directive': 'http',
-                'args': [],
-                'block': [
+        full_config: list[directives.Directive] = [
+            *([directives.load_module(self.otel_module_path)] if tracing_config else []),
+            directives.worker_processes(str(self._worker_processes)),
+            directives.error_log('/dev/stderr', 'error'),
+            directives.pid(self._pid),
+            directives.worker_rlimit_nofile(str(self._worker_rlimit_nofile)),
+            directives.events(str(self._worker_connections)),
+            directives.http(
+                block=[
+                    *directives.tracing(tracing_config),
                     # upstreams (load balancing)
                     *upstreams,
                     # temp paths
-                    {
-                        'directive': 'client_body_temp_path',
-                        'args': ['/tmp/client_temp'],  # noqa
-                    },
-                    {
-                        'directive': 'proxy_temp_path',
-                        'args': ['/tmp/proxy_temp_path'],  # noqa
-                    },
-                    {
-                        'directive': 'fastcgi_temp_path',
-                        'args': ['/tmp/fastcgi_temp'],  # noqa
-                    },
-                    {
-                        'directive': 'uwsgi_temp_path',
-                        'args': ['/tmp/uwsgi_temp'],  # noqa
-                    },
-                    {'directive': 'scgi_temp_path', 'args': ['/tmp/scgi_temp']},  # noqa
+                    *directives.temp_paths,
+                    # include mime types so nginx can map file extensions correctly.
+                    # Without this, files may fall back to "application/octet-stream",
+                    # and when Nginx serves static files, browsers may download them
+                    # instead of rendering (e.g., JS, CSS, SVG).
+                    directives.include('/etc/nginx/mime.types'),
                     # logging
-                    {'directive': 'default_type', 'args': ['application/octet-stream']},
-                    {
-                        'directive': 'log_format',
-                        'args': [
-                            'main',
-                            '$remote_addr - $remote_user [$time_local]  '
-                            '$status "$request" '
-                            '$body_bytes_sent "$http_referer" '
-                            '"$http_user_agent" "$http_x_forwarded_for"',
-                        ],
-                    },
-                    *self._log_verbose(verbose=False),
-                    {'directive': 'sendfile', 'args': ['on']},
-                    {'directive': 'tcp_nopush', 'args': ['on']},
-                    *self._resolver(),
+                    directives.default_type('application/octet-stream'),
+                    directives.log_format(),
+                    *directives.map_configs(self._map_configs),
+                    directives.access_log(),
+                    directives.sendfile('on'),
+                    directives.tcp_nopush('on'),
+                    *directives.resolver(dns_ip_address=self._dns_IP_address),
                     # TODO: add custom http block for the user to config?
-                    {
-                        'directive': 'map',
-                        'args': ['$http_x_scope_orgid', '$ensured_x_scope_orgid'],
-                        'block': [
-                            {'directive': 'default', 'args': ['$http_x_scope_orgid']},
-                            {'directive': '', 'args': ['anonymous']},
-                        ],
-                    },
-                    {
-                        'directive': 'proxy_read_timeout',
-                        'args': [str(self._proxy_read_timeout)],
-                    },
+                    directives.proxy_read_timeout(str(self._proxy_read_timeout)),
                     # server block
-                    *self._build_servers_config(backends, listen_tls, root_path),
-                ],
-            },
+                    *directives.servers(
+                        ports_to_locations=self._server_ports_to_locations,
+                        backends=[upstream['args'][0] for upstream in upstreams],
+                        server_name=self._server_name,
+                        ipv6_enabled=self._ipv6_enabled,
+                        supported_tls_versions=self._supported_tls_versions,
+                        ssl_ciphers=self._ssl_ciphers,
+                        listen_tls=listen_tls,
+                        root_path=root_path,
+                        tls_cert_path=TLSConfigManager.CERT_PATH,
+                        tls_key_path=TLSConfigManager.KEY_PATH,
+                        enable_health_check=self._enable_health_check,
+                        enable_status_page=self._enable_status_page,
+                        proxy_connect_timeout=self._proxy_connect_timeout,
+                    ),
+                ]
+            ),
         ]
         return full_config
-
-    def _log_verbose(self, verbose: bool = True) -> list[dict[str, Any]]:
-        if verbose:
-            return [{'directive': 'access_log', 'args': ['/dev/stderr', 'main']}]
-        return [
-            {
-                'directive': 'map',
-                'args': ['$status', '$loggable'],
-                'block': [
-                    {'directive': '~^[23]', 'args': ['0']},
-                    {'directive': 'default', 'args': ['1']},
-                ],
-            },
-            {'directive': 'access_log', 'args': ['/dev/stderr']},
-        ]
-
-    def _resolver(
-        self,
-        custom_resolver: str | None = None,
-    ) -> list[dict[str, Any]]:
-        # pass a custom resolver, such as kube-dns.kube-system.svc.cluster.local.
-        if custom_resolver:
-            return [{'directive': 'resolver', 'args': [custom_resolver]}]
-
-        # by default, fetch the DNS resolver address from /etc/resolv.conf
-        return [
-            {
-                'directive': 'resolver',
-                'args': [self._dns_IP_address],
-            }
-        ]
 
     @staticmethod
     def _get_dns_ip_address() -> str:
         """Obtain DNS ip address from /etc/resolv.conf."""
-        resolv = Path('/etc/resolv.conf').read_text()
+        resolv = Path(RESOLV_CONF_PATH).read_text()
         for line in resolv.splitlines():
             if line.startswith('nameserver'):
                 # assume there's only one
                 return line.split()[1].strip()
-        raise RuntimeError('cannot find nameserver in /etc/resolv.conf')
+        raise RuntimeError(f'cannot find nameserver in {RESOLV_CONF_PATH}')
 
     def _upstreams(self, upstreams_to_addresses: dict[str, set[str]]) -> list[Any]:
         nginx_upstreams: list[Any] = []
 
         for upstream_config in self._upstream_configs:
-            if upstream_config.group is None:
+            if upstream_config.address_lookup_key is None:
                 # include all available addresses
                 addresses: set[str] | None = set()
                 for address_set in upstreams_to_addresses.values():
                     addresses.update(address_set)
             else:
-                addresses = upstreams_to_addresses.get(upstream_config.group)
+                addresses = upstreams_to_addresses.get(upstream_config.address_lookup_key)
 
             # don't add an upstream block if there are no addresses
             if addresses:
@@ -447,199 +486,3 @@ class NginxConfig:
                 })
 
         return nginx_upstreams
-
-    def _build_servers_config(
-        self,
-        backends: list[str],
-        listen_tls: bool = False,
-        root_path: str | None = None,
-    ) -> list[dict[str, Any]]:
-        servers: list[dict[str, Any]] = []
-        for port, locations in self._server_ports_to_locations.items():
-            server_config = self._build_server_config(
-                port, locations, backends, listen_tls, root_path
-            )
-            if server_config:
-                servers.append(server_config)
-        return servers
-
-    def _build_server_config(
-        self,
-        port: int,
-        locations: list[NginxLocationConfig],
-        backends: list[str],
-        listen_tls: bool = False,
-        root_path: str | None = None,
-    ) -> dict[str, Any]:
-        auth_enabled = False
-        is_grpc = any(loc.is_grpc for loc in locations)
-        nginx_locations = self._locations(locations, is_grpc, backends, listen_tls)
-        server_config = {}
-        if len(nginx_locations) > 0:
-            server_config = {
-                'directive': 'server',
-                'args': [],
-                'block': [
-                    *self._listen(port, ssl=listen_tls, http2=is_grpc),
-                    *self._root_path(root_path),
-                    *self._basic_auth(auth_enabled),
-                    {
-                        'directive': 'proxy_set_header',
-                        'args': ['X-Scope-OrgID', '$ensured_x_scope_orgid'],
-                    },
-                    {'directive': 'server_name', 'args': [self._server_name]},
-                    *(
-                        [
-                            {
-                                'directive': 'ssl_certificate',
-                                'args': [TLSConfigManager.CERT_PATH],
-                            },
-                            {
-                                'directive': 'ssl_certificate_key',
-                                'args': [TLSConfigManager.KEY_PATH],
-                            },
-                            {
-                                'directive': 'ssl_protocols',
-                                'args': self._supported_tls_versions,
-                            },
-                            {
-                                'directive': 'ssl_ciphers',
-                                'args': self._ssl_ciphers,
-                            },
-                        ]
-                        if listen_tls
-                        else []
-                    ),
-                    *nginx_locations,
-                ],
-            }
-
-        return server_config
-
-    def _root_path(self, root_path: str | None = None) -> list[dict[str, Any] | None]:
-        if root_path:
-            return [{'directive': 'root', 'args': [root_path]}]
-        return []
-
-    def _locations(
-        self,
-        locations: list[NginxLocationConfig],
-        grpc: bool,
-        backends: list[str],
-        listen_tls: bool,
-    ) -> list[dict[str, Any]]:
-        nginx_locations: list[dict[str, Any]] = []
-
-        if self._enable_health_check:
-            nginx_locations.append(
-                {
-                    'directive': 'location',
-                    'args': ['=', '/'],
-                    'block': [
-                        {
-                            'directive': 'return',
-                            'args': ['200', "'OK'"],
-                        },
-                        {
-                            'directive': 'auth_basic',
-                            'args': ['off'],
-                        },
-                    ],
-                },
-            )
-        if self._enable_status_page:
-            nginx_locations.append(
-                {
-                    'directive': 'location',
-                    'args': ['=', '/status'],
-                    'block': [
-                        {
-                            'directive': 'stub_status',
-                            'args': [],
-                        },
-                    ],
-                },
-            )
-
-        for location in locations:
-            # don't add a location block if the upstream backend doesn't exist in the config
-            if location.backend in backends:
-                # if upstream_tls is explicitly set for this location, use that; otherwise,
-                #   use the server's listen_tls setting.
-                tls = location.upstream_tls if location.upstream_tls is not None else listen_tls
-                s = 's' if tls else ''
-                protocol = f'grpc{s}' if grpc else f'http{s}'
-                nginx_locations.append({
-                    'directive': 'location',
-                    'args': (
-                        [location.path]
-                        if location.modifier == ''
-                        else [location.modifier, location.path]
-                    ),
-                    'block': [
-                        {
-                            'directive': 'set',
-                            'args': [
-                                '$backend',
-                                f'{protocol}://{location.backend}{location.backend_url}',
-                            ],
-                        },
-                        {
-                            'directive': 'grpc_pass' if grpc else 'proxy_pass',
-                            'args': ['$backend'],
-                        },
-                        # if a server is down, no need to wait for a long time to pass on the
-                        #  request to the next available server
-                        {
-                            'directive': 'proxy_connect_timeout',
-                            'args': [self._proxy_connect_timeout],
-                        },
-                        # add headers if any
-                        *(
-                            [
-                                {
-                                    'directive': 'proxy_set_header',
-                                    'args': [key, val],
-                                }
-                                for key, val in location.headers.items()
-                            ]
-                            if location.headers
-                            else []
-                        ),
-                    ],
-                })
-
-        return nginx_locations
-
-    def _basic_auth(self, enabled: bool) -> list[dict[str, Any] | None]:
-        if enabled:
-            return [
-                {'directive': 'auth_basic', 'args': ['"workload"']},
-                {
-                    'directive': 'auth_basic_user_file',
-                    'args': ['/etc/nginx/secrets/.htpasswd'],
-                },
-            ]
-        return []
-
-    def _listen(self, port: int, ssl: bool, http2: bool) -> list[dict[str, Any]]:
-        directives: list[dict[str, Any]] = []
-        directives.append({'directive': 'listen', 'args': self._listen_args(port, False, ssl)})
-        if self._ipv6_enabled:
-            directives.append({
-                'directive': 'listen',
-                'args': self._listen_args(port, True, ssl),
-            })
-        if http2:
-            directives.append({'directive': 'http2', 'args': ['on']})
-        return directives
-
-    def _listen_args(self, port: int, ipv6: bool, ssl: bool) -> list[str]:
-        args: list[str] = []
-        if ipv6:
-            args.append(f'[::]:{port}')
-        else:
-            args.append(f'{port}')
-        if ssl:
-            args.append('ssl')
-        return args

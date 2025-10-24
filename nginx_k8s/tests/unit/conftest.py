@@ -19,19 +19,28 @@ import pytest
 
 
 @pytest.fixture
-def null_state() -> ops.testing.State:
-    update_cacerts_mock = ops.testing.Exec(('update-ca-certificates', '--fresh'))
-    nginx_reload_mock = ops.testing.Exec(('nginx', '-s', 'reload'))
-    return ops.testing.State(
-        containers={
-            ops.testing.Container(
-                'nginx',
-                can_connect=True,
-                execs={update_cacerts_mock, nginx_reload_mock},
-            ),
-            ops.testing.Container('nginx-pexp', can_connect=True, execs={update_cacerts_mock}),
-        }
+def nginx_container():
+    return ops.testing.Container(
+        'nginx',
+        can_connect=True,
+        execs={
+            ops.testing.Exec(['update-ca-certificates', '--fresh'], return_code=0),
+            ops.testing.Exec(('nginx', '-s', 'reload')),
+        },
     )
+
+
+@pytest.fixture
+def nginx_prometheus_exporter_container():
+    return ops.testing.Container(
+        'nginx-pexp',
+        can_connect=True,
+    )
+
+
+@pytest.fixture
+def null_state(nginx_prometheus_exporter_container, nginx_container) -> ops.testing.State:
+    return ops.testing.State(containers={nginx_container, nginx_prometheus_exporter_container})
 
 
 @pytest.fixture
