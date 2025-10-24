@@ -137,7 +137,7 @@ class Nginx:
 
     def _reconcile_nginx_config(self, nginx_config: str):
         should_restart = self._has_config_changed(nginx_config)
-        self._container.push(self.NGINX_CONFIG, nginx_config, make_dirs=True)  # type: ignore
+        self._container.push(self.NGINX_CONFIG, nginx_config, make_dirs=True)
         self._container.add_layer('nginx', self._pebble_layer(), combine=True)
         try:
             self._container.autostart()

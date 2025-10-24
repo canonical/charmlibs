@@ -8,7 +8,7 @@ import typing
 if typing.TYPE_CHECKING:
     from ._config import NginxLocationConfig, NginxMapConfig, NginxTracingConfig
 
-Directive: typing.TypeAlias = dict[str, str] | None
+Directive: typing.TypeAlias = dict[str, typing.Any] | None
 
 temp_paths = (
     {

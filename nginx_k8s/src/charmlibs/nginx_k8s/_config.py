@@ -382,7 +382,7 @@ class NginxConfig:
         listen_tls: bool,
         root_path: str | None = None,
         tracing_config: NginxTracingConfig | None = None,
-    ) -> list[dict[str, Any]]:
+    ) -> list[directives.Directive]:
         upstreams = self._upstreams(upstreams_to_addresses)
         # build the complete configuration
         full_config: list[directives.Directive] = [

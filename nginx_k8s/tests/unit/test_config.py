@@ -37,7 +37,7 @@ def certificate_mounts(tmp_path):
         (Nginx.CA_CERT_PATH, 'cacert'),
     ):
         temp_file = tmp_path / tmpname
-        temp_file.write_text("foo")
+        temp_file.write_text('foo')
         mounts[path] = testing.Mount(location=path, source=str(temp_file))
 
     return mounts
