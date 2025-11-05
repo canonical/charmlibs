@@ -1,0 +1,121 @@
+worker_processes 5;
+error_log /dev/stderr error;
+pid /tmp/nginx.pid;
+worker_rlimit_nofile 8192;
+events {
+    worker_connections 4096;
+}
+http {
+    upstream distributor {
+        zone distributor_zone 64k;
+        server worker-address:8080 resolve;
+    }
+    upstream compactor {
+        zone compactor_zone 64k;
+        server worker-address:8080 resolve;
+    }
+    upstream querier {
+        zone querier_zone 64k;
+        server worker-address:8080 resolve;
+    }
+    upstream query-frontend {
+        zone query-frontend_zone 64k;
+        server worker-address:8080 resolve;
+    }
+    upstream ingester {
+        zone ingester_zone 64k;
+        server worker-address:8080 resolve;
+    }
+    upstream ruler {
+        zone ruler_zone 64k;
+        server worker-address:8080 resolve;
+    }
+    upstream store-gateway {
+        zone store-gateway_zone 64k;
+        server worker-address:8080 resolve;
+    }
+    client_body_temp_path /tmp/client_temp;
+    proxy_temp_path /tmp/proxy_temp_path;
+    fastcgi_temp_path /tmp/fastcgi_temp;
+    uwsgi_temp_path /tmp/uwsgi_temp;
+    scgi_temp_path /tmp/scgi_temp;
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+    log_format main '$remote_addr - $remote_user [$time_local]  $status "$request" $body_bytes_sent "$http_referer" "$http_user_agent" "$http_x_forwarded_for"';
+    map $status $loggable {
+        ~^[23] 0;
+        default 1;
+    }
+    map $http_x_scope_orgid $ensured_x_scope_orgid {
+        default $http_x_scope_orgid;
+        '' anonymous;
+    }
+    access_log /dev/stderr;
+    sendfile on;
+    tcp_nopush on;
+    resolver 198.18.0.0;
+    proxy_read_timeout 300;
+    server {
+        listen 8080;
+        listen [::]:8080;
+        proxy_set_header X-Scope-OrgID $ensured_x_scope_orgid;
+        server_name localhost;
+        location = / {
+            return 200 "'OK'";
+            auth_basic off;
+        }
+        location = /status {
+            stub_status;
+        }
+        location /distributor {
+            set $backend http://distributor;
+            proxy_pass $backend;
+            proxy_connect_timeout 5s;
+        }
+        location /api/v1/push {
+            set $backend http://distributor;
+            proxy_pass $backend;
+            proxy_connect_timeout 5s;
+        }
+        location /otlp/v1/metrics {
+            set $backend http://distributor;
+            proxy_pass $backend;
+            proxy_connect_timeout 5s;
+        }
+        location /prometheus/config/v1/rules {
+            set $backend http://ruler;
+            proxy_pass $backend;
+            proxy_connect_timeout 5s;
+        }
+        location /prometheus/api/v1/rules {
+            set $backend http://ruler;
+            proxy_pass $backend;
+            proxy_connect_timeout 5s;
+        }
+        location /prometheus/api/v1/alerts {
+            set $backend http://ruler;
+            proxy_pass $backend;
+            proxy_connect_timeout 5s;
+        }
+        location = /ruler/ring {
+            set $backend http://ruler;
+            proxy_pass $backend;
+            proxy_connect_timeout 5s;
+        }
+        location /prometheus {
+            set $backend http://query-frontend;
+            proxy_pass $backend;
+            proxy_connect_timeout 5s;
+        }
+        location = /api/v1/status/buildinfo {
+            set $backend http://query-frontend;
+            proxy_pass $backend;
+            proxy_connect_timeout 5s;
+        }
+        location = /api/v1/upload/block/ {
+            set $backend http://compactor;
+            proxy_pass $backend;
+            proxy_connect_timeout 5s;
+        }
+    }
+}
