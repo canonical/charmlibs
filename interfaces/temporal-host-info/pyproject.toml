@@ -4,7 +4,7 @@ description = "The charmlibs.interfaces.temporal_host_info package."
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [
-    {name="The MAAS team at Canonical"},
+    {name="The Charm Engineering team at Canonical"},
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
