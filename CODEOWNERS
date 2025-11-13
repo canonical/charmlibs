@@ -30,3 +30,4 @@
 
 # charmlibs.interfaces packages (alphabetical)
 /interfaces/tls-certificates/ @canonical/tls
+/interfaces/haproxy_spoe_auth/ @canonical/platform-engineering
