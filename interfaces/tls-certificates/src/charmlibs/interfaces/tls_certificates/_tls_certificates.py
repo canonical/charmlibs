@@ -29,14 +29,56 @@ from ops.model import Application, ModelError, Relation, SecretNotFoundError, Un
 
 if TYPE_CHECKING:
     from collections.abc import MutableMapping
-    from typing import Any
 
 # legacy Charmhub-hosted lib ID, used at runtime in this lib for labels
 LIBID = "afd8c2bccf834997afce12c2706d2ede"
 
+
 IS_PYDANTIC_V1 = int(pydantic.version.VERSION.split(".")[0]) < 2
 
 logger = logging.getLogger(__name__)
+
+NESTED_JSON_KEY = "owasp_event"
+
+
+@dataclass
+class _OWASPLogEvent:
+    """OWASP-compliant log event."""
+
+    datetime: str
+    event: str
+    level: str
+    description: str
+    type: str = "security"
+    labels: Dict[str, str] = field(default_factory=dict)
+
+    def to_json(self) -> str:
+        return json.dumps(self.to_dict(), ensure_ascii=False)
+
+    def to_dict(self) -> Dict:
+        log_event = dict(asdict(self), **self.labels)
+        log_event.pop("labels", None)
+        return {k: v for k, v in log_event.items() if v is not None}
+
+
+class _OWASPLogger:
+    """OWASP-compliant logger for security events."""
+
+    def __init__(self, application: Optional[str] = None):
+        self.application = application
+        self._logger = logging.getLogger(__name__)
+
+    def log_event(self, event: str, level: int, description: str, **labels: str):
+        if self.application and "application" not in labels:
+            labels["application"] = self.application
+        log = _OWASPLogEvent(
+            datetime=datetime.now(timezone.utc).astimezone().isoformat(),
+            event=event,
+            level=logging.getLevelName(level),
+            description=description,
+            labels=labels,
+        )
+        self._logger.log(level, log.to_json(), extra={NESTED_JSON_KEY: log.to_dict()})
 
 
 class TLSCertificatesError(Exception):
@@ -78,7 +120,7 @@ class _DatabagModel(pydantic.BaseModel):
     """Pydantic config."""
 
     @classmethod
-    def load(cls, databag: MutableMapping[str, str]):
+    def load(cls, databag: MutableMapping):
         """Load this model from a Juju databag."""
         if IS_PYDANTIC_V1:
             return cls._load_v1(databag)
@@ -106,17 +148,17 @@ class _DatabagModel(pydantic.BaseModel):
             raise DataValidationError(msg) from e
 
     @classmethod
-    def _load_v1(cls, databag: MutableMapping[str, str]):
+    def _load_v1(cls, databag: MutableMapping):
         """Load implementation for pydantic v1."""
         if cls._NEST_UNDER:
-            return cls.parse_obj(json.loads(databag[cls._NEST_UNDER]))  # pyright: ignore[reportDeprecated]
+            return cls.parse_obj(json.loads(databag[cls._NEST_UNDER]))
 
         try:
             data = {
                 k: json.loads(v)
                 for k, v in databag.items()
                 # Don't attempt to parse model-external values
-                if k in {f.alias for f in cls.__fields__.values()}  # pyright: ignore[reportDeprecated]
+                if k in {f.alias for f in cls.__fields__.values()}
             }
         except json.JSONDecodeError as e:
             msg = f"invalid databag contents: expecting json. {databag}"
@@ -130,7 +172,7 @@ class _DatabagModel(pydantic.BaseModel):
             logger.debug(msg, exc_info=True)
             raise DataValidationError(msg) from e
 
-    def dump(self, databag: MutableMapping[str, str] | None = None, clear: bool = True):
+    def dump(self, databag: Optional[MutableMapping] = None, clear: bool = True):
         """Write the contents of this model to Juju databag.
 
         Args:
@@ -160,7 +202,7 @@ class _DatabagModel(pydantic.BaseModel):
         databag.update({k: json.dumps(v) for k, v in dct.items()})
         return databag
 
-    def _dump_v1(self, databag: MutableMapping[str, str] | None = None, clear: bool = True):
+    def _dump_v1(self, databag: Optional[MutableMapping] = None, clear: bool = True):
         """Dump implementation for pydantic v1."""
         if clear and databag:
             databag.clear()
@@ -169,10 +211,10 @@ class _DatabagModel(pydantic.BaseModel):
             databag = {}
 
         if self._NEST_UNDER:
-            databag[self._NEST_UNDER] = self.json(by_alias=True, exclude_defaults=True)  # pyright: ignore[reportDeprecated]
+            databag[self._NEST_UNDER] = self.json(by_alias=True, exclude_defaults=True)
             return databag
 
-        dct = json.loads(self.json(by_alias=True, exclude_defaults=True))  # pyright: ignore[reportDeprecated]
+        dct = json.loads(self.json(by_alias=True, exclude_defaults=True))
         databag.update({k: json.dumps(v) for k, v in dct.items()})
 
         return databag
@@ -184,8 +226,8 @@ class _Certificate(pydantic.BaseModel):
     ca: str
     certificate_signing_request: str
     certificate: str
-    chain: list[str] | None = None
-    revoked: bool | None = None
+    chain: Optional[List[str]] = None
+    revoked: Optional[bool] = None
 
     def to_provider_certificate(self, relation_id: int) -> ProviderCertificate:
         """Convert to a ProviderCertificate."""
@@ -207,14 +249,13 @@ class _CertificateSigningRequest(pydantic.BaseModel):
     """Certificate signing request model."""
 
     certificate_signing_request: str
-    ca: bool | None
+    ca: Optional[bool]
 
 
 class _ProviderApplicationData(_DatabagModel):
     """Provider application data model."""
 
-    # FIXME: mutable default? should it be Field(default_factory=list)?
-    certificates: list[_Certificate] = []
+    certificates: List[_Certificate] = []
 
 
 class _RequirerData(_DatabagModel):
@@ -223,8 +264,7 @@ class _RequirerData(_DatabagModel):
     The same model is used for the unit and application data.
     """
 
-    # FIXME: mutable default? should it be Field(default_factory=list)?
-    certificate_signing_requests: list[_CertificateSigningRequest] = []
+    certificate_signing_requests: List[_CertificateSigningRequest] = []
 
 
 class Mode(Enum):
@@ -242,34 +282,56 @@ class Mode(Enum):
     APP = 2
 
 
-@dataclass(frozen=True)
 class PrivateKey:
     """This class represents a private key."""
 
-    raw: str
+    def __init__(
+        self, raw: Optional[str] = None, x509_object: Optional[rsa.RSAPrivateKey] = None
+    ) -> None:
+        """Initialize the PrivateKey object.
+
+        If both raw and x509_object are provided, x509_object takes precedence.
+        """
+        if x509_object:
+            self._private_key = x509_object
+        elif raw:
+            self._private_key = serialization.load_pem_private_key(
+                raw.encode(),
+                password=None,
+            )
+        else:
+            raise ValueError("Either raw private key string or x509_object must be provided")
+
+    @property
+    def raw(self) -> str:
+        """Return the PEM-formatted string representation of the private key."""
+        return str(self)
 
     def __str__(self):
-        """Return the private key as a string."""
-        return self.raw
+        """Return the private key as a string in PEM format."""
+        return (
+            self._private_key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.TraditionalOpenSSL,
+                encryption_algorithm=serialization.NoEncryption(),
+            )
+            .decode()
+            .strip()
+        )
 
     @classmethod
     def from_string(cls, private_key: str) -> PrivateKey:
         """Create a PrivateKey object from a private key."""
-        return cls(raw=private_key.strip())
+        return cls(raw=private_key)
 
     def is_valid(self) -> bool:
         """Validate that the private key is PEM-formatted, RSA, and at least 2048 bits."""
         try:
-            key = serialization.load_pem_private_key(
-                self.raw.encode(),
-                password=None,
-            )
-
-            if not isinstance(key, rsa.RSAPrivateKey):
+            if not isinstance(self._private_key, rsa.RSAPrivateKey):
                 logger.warning("Private key is not an RSA key")
                 return False
 
-            if key.key_size < 2048:
+            if self._private_key.key_size < 2048:
                 logger.warning("RSA key size is less than 2048 bits")
                 return False
 
@@ -278,29 +340,180 @@ class PrivateKey:
             logger.warning("Invalid private key format")
             return False
 
+    @classmethod
+    def generate(cls, key_size: int = 2048, public_exponent: int = 65537) -> PrivateKey:
+        """Generate a new RSA private key.
 
-@dataclass(frozen=True)
+        Args:
+            key_size: The size of the key in bits.
+            public_exponent: The public exponent of the key.
+
+        Returns:
+            PrivateKey: The generated private key.
+        """
+        private_key = rsa.generate_private_key(
+            public_exponent=public_exponent,
+            key_size=key_size,
+        )
+        _OWASPLogger().log_event(
+            event="private_key_generated",
+            level=logging.INFO,
+            description="Private key generated",
+            key_size=str(key_size),
+        )
+        return PrivateKey(x509_object=private_key)
+
+    def __eq__(self, other: object) -> bool:
+        """Check if two PrivateKey objects are equal."""
+        if not isinstance(other, PrivateKey):
+            return NotImplemented
+        return self.raw == other.raw
+
+
 class Certificate:
     """This class represents a certificate."""
 
-    raw: str
-    common_name: str
-    expiry_time: datetime
-    validity_start_time: datetime
-    is_ca: bool = False
-    sans_dns: frozenset[str] | None = frozenset()
-    sans_ip: frozenset[str] | None = frozenset()
-    sans_oid: frozenset[str] | None = frozenset()
-    email_address: str | None = None
-    organization: str | None = None
-    organizational_unit: str | None = None
-    country_name: str | None = None
-    state_or_province_name: str | None = None
-    locality_name: str | None = None
+    _cert: x509.Certificate
+
+    def __init__(
+        self,
+        raw: Optional[str] = None,  # Must remain first argument for backwards compatibility
+        # Old Interface fields (ignored)
+        common_name: Optional[str] = None,
+        expiry_time: Optional[datetime] = None,
+        validity_start_time: Optional[datetime] = None,
+        is_ca: Optional[bool] = None,
+        sans_dns: Optional[Set[str]] = None,
+        sans_ip: Optional[Set[str]] = None,
+        sans_oid: Optional[Set[str]] = None,
+        email_address: Optional[str] = None,
+        organization: Optional[str] = None,
+        organizational_unit: Optional[str] = None,
+        country_name: Optional[str] = None,
+        state_or_province_name: Optional[str] = None,
+        locality_name: Optional[str] = None,
+        # End Old Interface fields
+        x509_object: Optional[x509.Certificate] = None,
+    ) -> None:
+        """Initialize the Certificate object.
+
+        This initializer must maintain the old interface while also allowing
+        instantiation from an existing x509_object. It ignores all fields
+        other than raw and x509_object, preferring x509_object.
+        """
+        if x509_object:
+            self._cert = x509_object
+        elif raw:
+            self._cert = x509.load_pem_x509_certificate(data=raw.encode())
+        else:
+            raise ValueError("Either raw certificate string or x509_object must be provided")
+
+    @property
+    def raw(self) -> str:
+        """Return the PEM-formatted string representation of the certificate."""
+        return str(self)
+
+    @property
+    def common_name(self) -> str:
+        """Return the common name of the certificate."""
+        # We maintain compatibility with the old interface by returning
+        # an empty string if no common name is set.
+        common_name = self._cert.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
+        return str(common_name[0].value) if common_name else ""
+
+    @property
+    def expiry_time(self) -> datetime:
+        """Return the expiry time of the certificate."""
+        return self._cert.not_valid_after_utc
+
+    @property
+    def validity_start_time(self) -> datetime:
+        """Return the validity start time of the certificate."""
+        return self._cert.not_valid_before_utc
+
+    @property
+    def is_ca(self) -> bool:
+        """Return whether the certificate is a CA certificate."""
+        try:
+            return self._cert.extensions.get_extension_for_oid(
+                ExtensionOID.BASIC_CONSTRAINTS
+            ).value.ca  # type: ignore[reportAttributeAccessIssue]
+        except x509.ExtensionNotFound:
+            return False
+
+    @property
+    def sans_dns(self) -> Optional[Set[str]]:
+        """Return the DNS Subject Alternative Names of the certificate."""
+        with suppress(x509.ExtensionNotFound):
+            sans = self._cert.extensions.get_extension_for_class(x509.SubjectAlternativeName).value
+            return {str(san) for san in sans.get_values_for_type(x509.DNSName)}
+        return None
+
+    @property
+    def sans_ip(self) -> Optional[Set[str]]:
+        """Return the IP Subject Alternative Names of the certificate."""
+        with suppress(x509.ExtensionNotFound):
+            sans = self._cert.extensions.get_extension_for_class(x509.SubjectAlternativeName).value
+            return {str(san) for san in sans.get_values_for_type(x509.IPAddress)}
+        return None
+
+    @property
+    def sans_oid(self) -> Optional[Set[str]]:
+        """Return the OID Subject Alternative Names of the certificate."""
+        with suppress(x509.ExtensionNotFound):
+            sans = self._cert.extensions.get_extension_for_class(x509.SubjectAlternativeName).value
+            return {str(san.dotted_string) for san in sans.get_values_for_type(x509.RegisteredID)}
+        return None
+
+    @property
+    def email_address(self) -> Optional[str]:
+        """Return the email address of the certificate."""
+        email_address = self._cert.subject.get_attributes_for_oid(NameOID.EMAIL_ADDRESS)
+        return str(email_address[0].value) if email_address else None
+
+    @property
+    def organization(self) -> Optional[str]:
+        """Return the organization name of the certificate."""
+        organization = self._cert.subject.get_attributes_for_oid(NameOID.ORGANIZATION_NAME)
+        return str(organization[0].value) if organization else None
+
+    @property
+    def organizational_unit(self) -> Optional[str]:
+        """Return the organizational unit name of the certificate."""
+        organizational_unit = self._cert.subject.get_attributes_for_oid(
+            NameOID.ORGANIZATIONAL_UNIT_NAME
+        )
+        return str(organizational_unit[0].value) if organizational_unit else None
+
+    @property
+    def country_name(self) -> Optional[str]:
+        """Return the country name of the certificate."""
+        country_name = self._cert.subject.get_attributes_for_oid(NameOID.COUNTRY_NAME)
+        return str(country_name[0].value) if country_name else None
+
+    @property
+    def state_or_province_name(self) -> Optional[str]:
+        """Return the state or province name of the certificate."""
+        state_or_province_name = self._cert.subject.get_attributes_for_oid(
+            NameOID.STATE_OR_PROVINCE_NAME
+        )
+        return str(state_or_province_name[0].value) if state_or_province_name else None
+
+    @property
+    def locality_name(self) -> Optional[str]:
+        """Return the locality name of the certificate."""
+        locality_name = self._cert.subject.get_attributes_for_oid(NameOID.LOCALITY_NAME)
+        return str(locality_name[0].value) if locality_name else None
 
     def __str__(self) -> str:
         """Return the certificate as a string."""
-        return self.raw
+        return self._cert.public_bytes(serialization.Encoding.PEM).decode().strip()
+
+    def __eq__(self, other: object) -> bool:
+        """Check if two Certificate objects are equal."""
+        if not isinstance(other, Certificate):
+            return NotImplemented
+        return self.raw == other.raw
 
     @classmethod
     def from_string(cls, certificate: str) -> Certificate:
@@ -311,66 +524,7 @@ class Certificate:
             logger.error("Could not load certificate: %s", e)
             raise TLSCertificatesError("Could not load certificate")
 
-        common_name = certificate_object.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
-        country_name = certificate_object.subject.get_attributes_for_oid(NameOID.COUNTRY_NAME)
-        state_or_province_name = certificate_object.subject.get_attributes_for_oid(
-            NameOID.STATE_OR_PROVINCE_NAME
-        )
-        locality_name = certificate_object.subject.get_attributes_for_oid(NameOID.LOCALITY_NAME)
-        organization_name = certificate_object.subject.get_attributes_for_oid(
-            NameOID.ORGANIZATION_NAME
-        )
-        organizational_unit = certificate_object.subject.get_attributes_for_oid(
-            NameOID.ORGANIZATIONAL_UNIT_NAME
-        )
-        email_address = certificate_object.subject.get_attributes_for_oid(NameOID.EMAIL_ADDRESS)
-        sans_dns: list[str] = []
-        sans_ip: list[str] = []
-        sans_oid: list[str] = []
-        try:
-            sans = certificate_object.extensions.get_extension_for_class(
-                x509.SubjectAlternativeName
-            ).value
-            for san in sans:
-                if isinstance(san, x509.DNSName):
-                    sans_dns.append(san.value)
-                if isinstance(san, x509.IPAddress):
-                    sans_ip.append(str(san.value))
-                if isinstance(san, x509.RegisteredID):
-                    sans_oid.append(str(san.value))
-        except x509.ExtensionNotFound:
-            logger.debug("No SANs found in certificate")
-            sans_dns = []
-            sans_ip = []
-            sans_oid = []
-        expiry_time = certificate_object.not_valid_after_utc
-        validity_start_time = certificate_object.not_valid_before_utc
-        is_ca = False
-        try:
-            is_ca = certificate_object.extensions.get_extension_for_oid(  # pyright: ignore[reportUnknownVariableType]
-                ExtensionOID.BASIC_CONSTRAINTS
-            ).value.ca  # type: ignore[reportAttributeAccessIssue]
-        except x509.ExtensionNotFound:
-            pass
-
-        return cls(
-            raw=certificate.strip(),
-            common_name=str(common_name[0].value),
-            is_ca=is_ca,  # pyright: ignore[reportUnknownArgumentType]
-            country_name=str(country_name[0].value) if country_name else None,
-            state_or_province_name=str(state_or_province_name[0].value)
-            if state_or_province_name
-            else None,
-            locality_name=str(locality_name[0].value) if locality_name else None,
-            organization=str(organization_name[0].value) if organization_name else None,
-            organizational_unit=str(organizational_unit[0].value) if organizational_unit else None,
-            email_address=str(email_address[0].value) if email_address else None,
-            sans_dns=frozenset(sans_dns),
-            sans_ip=frozenset(sans_ip),
-            sans_oid=frozenset(sans_oid),
-            expiry_time=expiry_time,
-            validity_start_time=validity_start_time,
-        )
+        return cls(x509_object=certificate_object)
 
     def matches_private_key(self, private_key: PrivateKey) -> bool:
         """Check if this certificate matches a given private key.
@@ -382,13 +536,8 @@ class Certificate:
             bool: True if the certificate matches the private key, False otherwise.
         """
         try:
-            cert_object = x509.load_pem_x509_certificate(self.raw.encode())
-            key_object = serialization.load_pem_private_key(
-                private_key.raw.encode(), password=None
-            )
-
-            cert_public_key = cert_object.public_key()
-            key_public_key = key_object.public_key()
+            cert_public_key = self._cert.public_key()
+            key_public_key = private_key._private_key.public_key()
 
             if not isinstance(cert_public_key, rsa.RSAPublicKey):
                 logger.warning("Certificate does not use RSA public key")
@@ -403,88 +552,308 @@ class Certificate:
             logger.warning("Failed to validate certificate and private key match: %s", e)
             return False
 
+    @classmethod
+    def generate(
+        cls,
+        csr: CertificateSigningRequest,
+        ca: Certificate,
+        ca_private_key: PrivateKey,
+        validity: timedelta,
+        is_ca: bool = False,
+    ) -> Certificate:
+        """Generate a certificate from a CSR signed by the given CA and CA private key.
 
-@dataclass(frozen=True)
+        Args:
+            csr: The certificate signing request.
+            ca: The CA certificate.
+            ca_private_key: The CA private key.
+            validity: The validity period of the certificate.
+            is_ca: Whether the generated certificate is a CA certificate.
+
+        Returns:
+            Certificate: The generated certificate.
+        """
+        # Ideally, this would be the constructor, but we can't add new
+        # required parameters to the constructor without breaking backwards
+        # compatibility.
+        private_key = serialization.load_pem_private_key(
+            str(ca_private_key).encode(), password=None
+        )
+        assert isinstance(private_key, CertificateIssuerPrivateKeyTypes)
+
+        # Create a certificate builder
+        cert_builder = x509.CertificateBuilder(
+            subject_name=csr._csr.subject,
+            # issuer_name=ca._cert.subject,  # TODO: Validate this is correct, the old code used `issuer`
+            issuer_name=ca._cert.issuer,
+            public_key=csr._csr.public_key(),
+            serial_number=x509.random_serial_number(),
+            not_valid_before=datetime.now(timezone.utc),
+            not_valid_after=datetime.now(timezone.utc) + validity,
+        )
+        extensions = _generate_certificate_request_extensions(
+            authority_key_identifier=ca._cert.extensions.get_extension_for_class(
+                x509.SubjectKeyIdentifier
+            ).value.key_identifier,
+            csr=csr._csr,
+            is_ca=is_ca,
+        )
+        for extension in extensions:
+            try:
+                cert_builder = cert_builder.add_extension(extension.value, extension.critical)
+            except ValueError as e:
+                logger.error("Could not add extension to certificate: %s", e)
+                raise TLSCertificatesError("Could not add extension to certificate") from e
+
+        # Sign the certificate with the CA's private key
+        cert = cert_builder.sign(private_key=private_key, algorithm=hashes.SHA256())
+        _OWASPLogger().log_event(
+            event="certificate_generated",
+            level=logging.INFO,
+            description="Certificate generated from CSR",
+            common_name=csr.common_name,
+            is_ca=str(is_ca),
+            validity_days=str(validity.days),
+        )
+
+        return cls(x509_object=cert)
+
+    @classmethod
+    def generate_self_signed_ca(
+        cls,
+        attributes: CertificateRequestAttributes,
+        private_key: PrivateKey,
+        validity: timedelta,
+    ) -> Certificate:
+        """Generate a self-signed CA certificate.
+
+        Args:
+            attributes: The certificate request attributes.
+            private_key: The private key to sign the CA certificate.
+            validity: The validity period of the CA certificate.
+
+        Returns:
+            Certificate: The generated CA certificate.
+        """
+        assert isinstance(private_key._private_key, rsa.RSAPrivateKey)
+
+        public_key = private_key._private_key.public_key()
+
+        builder = x509.CertificateBuilder(
+            public_key=public_key,
+            serial_number=x509.random_serial_number(),
+            not_valid_before=datetime.now(timezone.utc),
+            not_valid_after=datetime.now(timezone.utc) + validity,
+        )
+
+        if subject_name := _extract_subject_name_attributes(attributes):
+            builder = builder.subject_name(subject_name).issuer_name(subject_name)
+
+        builder = (
+            builder.add_extension(
+                x509.SubjectKeyIdentifier.from_public_key(public_key), critical=False
+            )
+            .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+            .add_extension(
+                x509.KeyUsage(
+                    digital_signature=True,
+                    key_encipherment=True,
+                    key_cert_sign=True,
+                    key_agreement=False,
+                    content_commitment=False,
+                    data_encipherment=False,
+                    crl_sign=False,
+                    encipher_only=False,
+                    decipher_only=False,
+                ),
+                critical=True,
+            )
+        )
+
+        if san_extension := _san_extension(
+            email_address=attributes.email_address,
+            sans_dns=attributes.sans_dns,
+            sans_ip=attributes.sans_ip,
+            sans_oid=attributes.sans_oid,
+        ):
+            builder = builder.add_extension(san_extension, critical=False)
+
+        cert = cls(x509_object=builder.sign(private_key._private_key, algorithm=hashes.SHA256()))
+
+        _OWASPLogger().log_event(
+            event="ca_certificate_generated",
+            level=logging.INFO,
+            description="CA certificate generated",
+            common_name=cert.common_name,
+            validity_days=str(validity.days),
+        )
+
+        return cert
+
+
 class CertificateSigningRequest:
-    """This class represents a certificate signing request."""
+    """A representation of the certificate signing request."""
 
-    raw: str
-    common_name: str
-    sans_dns: frozenset[str] | None = None
-    sans_ip: frozenset[str] | None = None
-    sans_oid: frozenset[str] | None = None
-    email_address: str | None = None
-    organization: str | None = None
-    organizational_unit: str | None = None
-    country_name: str | None = None
-    state_or_province_name: str | None = None
-    locality_name: str | None = None
-    has_unique_identifier: bool = False
+    _csr: x509.CertificateSigningRequest
+
+    def __init__(
+        self,
+        raw: Optional[str] = None,  # Must remain first argument for backwards compatibility
+        # Old Interface fields (ignored)
+        common_name: Optional[str] = None,
+        sans_dns: Optional[Set[str]] = None,
+        sans_ip: Optional[Set[str]] = None,
+        sans_oid: Optional[Set[str]] = None,
+        email_address: Optional[str] = None,
+        organization: Optional[str] = None,
+        organizational_unit: Optional[str] = None,
+        country_name: Optional[str] = None,
+        state_or_province_name: Optional[str] = None,
+        locality_name: Optional[str] = None,
+        has_unique_identifier: Optional[bool] = None,
+        # End Old Interface fields
+        x509_object: Optional[x509.CertificateSigningRequest] = None,
+    ):
+        """Initialize the CertificateSigningRequest object.
+
+        This initializer must maintain the old interface while also allowing
+        instantiation from an existing x509_object. It ignores all fields
+        other than raw and x509_object, preferring x509_object.
+        """
+        if x509_object:
+            self._csr = x509_object
+            return
+        elif raw:
+            try:
+                self._csr = x509.load_pem_x509_csr(raw.encode())
+            except ValueError as e:
+                logger.error("Could not load CSR: %s", e)
+                raise TLSCertificatesError("Could not load CSR")
+            return
+        raise ValueError("Either raw CSR string or x509_object must be provided")
+
+    @property
+    def common_name(self) -> str:
+        """Return the common name of the CSR."""
+        common_name = self._csr.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
+        return str(common_name[0].value) if common_name else ""
+
+    @property
+    def sans_dns(self) -> Set[str]:
+        """Return the DNS Subject Alternative Names of the CSR."""
+        with suppress(x509.ExtensionNotFound):
+            sans = self._csr.extensions.get_extension_for_class(x509.SubjectAlternativeName).value
+            return {str(san) for san in sans.get_values_for_type(x509.DNSName)}
+        return set()
+
+    @property
+    def sans_ip(self) -> Set[str]:
+        """Return the IP Subject Alternative Names of the CSR."""
+        with suppress(x509.ExtensionNotFound):
+            sans = self._csr.extensions.get_extension_for_class(x509.SubjectAlternativeName).value
+            return {str(san) for san in sans.get_values_for_type(x509.IPAddress)}
+        return set()
+
+    @property
+    def sans_oid(self) -> Set[str]:
+        """Return the OID Subject Alternative Names of the CSR."""
+        with suppress(x509.ExtensionNotFound):
+            sans = self._csr.extensions.get_extension_for_class(x509.SubjectAlternativeName).value
+            return {str(san.dotted_string) for san in sans.get_values_for_type(x509.RegisteredID)}
+        return set()
+
+    @property
+    def email_address(self) -> Optional[str]:
+        """Return the email address of the CSR."""
+        email_address = self._csr.subject.get_attributes_for_oid(NameOID.EMAIL_ADDRESS)
+        return str(email_address[0].value) if email_address else None
+
+    @property
+    def organization(self) -> Optional[str]:
+        """Return the organization name of the CSR."""
+        organization = self._csr.subject.get_attributes_for_oid(NameOID.ORGANIZATION_NAME)
+        return str(organization[0].value) if organization else None
+
+    @property
+    def organizational_unit(self) -> Optional[str]:
+        """Return the organizational unit name of the CSR."""
+        organizational_unit = self._csr.subject.get_attributes_for_oid(
+            NameOID.ORGANIZATIONAL_UNIT_NAME
+        )
+        return str(organizational_unit[0].value) if organizational_unit else None
+
+    @property
+    def country_name(self) -> Optional[str]:
+        """Return the country name of the CSR."""
+        country_name = self._csr.subject.get_attributes_for_oid(NameOID.COUNTRY_NAME)
+        return str(country_name[0].value) if country_name else None
+
+    @property
+    def state_or_province_name(self) -> Optional[str]:
+        """Return the state or province name of the CSR."""
+        state_or_province_name = self._csr.subject.get_attributes_for_oid(
+            NameOID.STATE_OR_PROVINCE_NAME
+        )
+        return str(state_or_province_name[0].value) if state_or_province_name else None
+
+    @property
+    def locality_name(self) -> Optional[str]:
+        """Return the locality name of the CSR."""
+        locality_name = self._csr.subject.get_attributes_for_oid(NameOID.LOCALITY_NAME)
+        return str(locality_name[0].value) if locality_name else None
+
+    @property
+    def has_unique_identifier(self) -> bool:
+        """Return whether the CSR has a unique identifier."""
+        unique_identifier = self._csr.subject.get_attributes_for_oid(
+            NameOID.X500_UNIQUE_IDENTIFIER
+        )
+        return bool(unique_identifier)
+
+    @property
+    def raw(self) -> str:
+        """Return the PEM-formatted string representation of the CSR."""
+        return self.__str__()
+
+    def __str__(self) -> str:
+        """Return the CSR as a string."""
+        return self._csr.public_bytes(serialization.Encoding.PEM).decode().strip()
+
+    @property
+    def additional_critical_extensions(self) -> List[x509.ExtensionType]:
+        """Return additional critical extensions present on the CSR (excluding SAN)."""
+        extensions: List[x509.ExtensionType] = []
+        for extension in self._csr.extensions:
+            if extension.critical and extension.oid != ExtensionOID.SUBJECT_ALTERNATIVE_NAME:
+                extensions.append(extension.value)
+        return extensions
+
+    @classmethod
+    def from_string(cls, csr: str) -> CertificateSigningRequest:
+        """Create a CertificateSigningRequest object from a CSR."""
+        return cls(raw=csr)
+
+    @classmethod
+    def from_csr(cls, csr: x509.CertificateSigningRequest) -> CertificateSigningRequest:
+        """Create a CertificateSigningRequest object from a CSR."""
+        return cls(x509_object=csr)
 
     def __eq__(self, other: object) -> bool:
         """Check if two CertificateSigningRequest objects are equal."""
         if not isinstance(other, CertificateSigningRequest):
             return NotImplemented
-        return self.raw.strip() == other.raw.strip()
+        return self.raw == other.raw
 
-    def __str__(self) -> str:
-        """Return the CSR as a string."""
-        return self.raw
+    def matches_certificate(self, certificate: Certificate) -> bool:
+        """Check if this CSR matches a given certificate.
 
-    @classmethod
-    def from_string(cls, csr: str) -> CertificateSigningRequest:
-        """Create a CertificateSigningRequest object from a CSR."""
-        try:
-            csr_object = x509.load_pem_x509_csr(csr.encode())
-        except ValueError as e:
-            logger.error("Could not load CSR: %s", e)
-            raise TLSCertificatesError("Could not load CSR")
-        common_name = csr_object.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
-        country_name = csr_object.subject.get_attributes_for_oid(NameOID.COUNTRY_NAME)
-        state_or_province_name = csr_object.subject.get_attributes_for_oid(
-            NameOID.STATE_OR_PROVINCE_NAME
-        )
-        locality_name = csr_object.subject.get_attributes_for_oid(NameOID.LOCALITY_NAME)
-        organization_name = csr_object.subject.get_attributes_for_oid(NameOID.ORGANIZATION_NAME)
-        organizational_unit = csr_object.subject.get_attributes_for_oid(
-            NameOID.ORGANIZATIONAL_UNIT_NAME
-        )
-        email_address = csr_object.subject.get_attributes_for_oid(NameOID.EMAIL_ADDRESS)
-        unique_identifier = csr_object.subject.get_attributes_for_oid(
-            NameOID.X500_UNIQUE_IDENTIFIER
-        )
-        sans: x509.SubjectAlternativeName | frozenset[str]
-        sans_dns: frozenset[str]
-        sans_ip: frozenset[str]
-        sans_oid: frozenset[str]
-        try:
-            sans = csr_object.extensions.get_extension_for_class(x509.SubjectAlternativeName).value
-            sans_dns = frozenset(sans.get_values_for_type(x509.DNSName))
-            sans_ip = frozenset([str(san) for san in sans.get_values_for_type(x509.IPAddress)])
-            sans_oid = frozenset([
-                san.dotted_string for san in sans.get_values_for_type(x509.RegisteredID)
-            ])
-        except x509.ExtensionNotFound:
-            sans = frozenset()
-            sans_dns = frozenset()
-            sans_ip = frozenset()
-            sans_oid = frozenset()
-        return cls(
-            raw=csr.strip(),
-            common_name=str(common_name[0].value),
-            country_name=str(country_name[0].value) if country_name else None,
-            state_or_province_name=str(state_or_province_name[0].value)
-            if state_or_province_name
-            else None,
-            locality_name=str(locality_name[0].value) if locality_name else None,
-            organization=str(organization_name[0].value) if organization_name else None,
-            organizational_unit=str(organizational_unit[0].value) if organizational_unit else None,
-            email_address=str(email_address[0].value) if email_address else None,
-            sans_dns=sans_dns,
-            sans_ip=sans_ip,
-            sans_oid=sans_oid,
-            has_unique_identifier=bool(unique_identifier),
-        )
+        Args:
+            certificate (Certificate): The certificate to validate against.
+
+        Returns:
+            bool: True if the CSR matches the certificate, False otherwise.
+        """
+        return self._csr.public_key() == certificate._cert.public_key()
 
     def matches_private_key(self, key: PrivateKey) -> bool:
         """Check if a CSR matches a private key.
@@ -497,12 +866,8 @@ class CertificateSigningRequest:
             bool: True/False depending on whether the CSR matches the private key.
         """
         try:
-            csr_object = x509.load_pem_x509_csr(self.raw.encode("utf-8"))
-            key_object = serialization.load_pem_private_key(
-                data=key.raw.encode("utf-8"), password=None
-            )
-            key_object_public_key = key_object.public_key()
-            csr_object_public_key = csr_object.public_key()
+            key_object_public_key = key._private_key.public_key()
+            csr_object_public_key = self._csr.public_key()
             if not isinstance(key_object_public_key, rsa.RSAPublicKey):
                 logger.warning("Key is not an RSA key")
                 return False
@@ -520,82 +885,191 @@ class CertificateSigningRequest:
             return False
         return True
 
-    def matches_certificate(self, certificate: Certificate) -> bool:
-        """Check if a CSR matches a certificate.
-
-        Args:
-            certificate (Certificate): Certificate
-        Returns:
-            bool: True/False depending on whether the CSR matches the certificate.
-        """
-        csr_object = x509.load_pem_x509_csr(self.raw.encode("utf-8"))
-        cert_object = x509.load_pem_x509_certificate(certificate.raw.encode("utf-8"))
-        return csr_object.public_key() == cert_object.public_key()
-
     def get_sha256_hex(self) -> str:
         """Calculate the hash of the provided data and return the hexadecimal representation."""
         digest = hashes.Hash(hashes.SHA256())
         digest.update(self.raw.encode())
         return digest.finalize().hex()
 
-
-@dataclass(frozen=True)
-class CertificateRequestAttributes:
-    """A representation of the certificate request attributes.
-
-    This class should be used inside the requirer charm to specify the requested
-    attributes for the certificate.
-    """
-
-    common_name: str
-    sans_dns: frozenset[str] | None = frozenset()
-    sans_ip: frozenset[str] | None = frozenset()
-    sans_oid: frozenset[str] | None = frozenset()
-    email_address: str | None = None
-    organization: str | None = None
-    organizational_unit: str | None = None
-    country_name: str | None = None
-    state_or_province_name: str | None = None
-    locality_name: str | None = None
-    is_ca: bool = False
-    add_unique_id_to_subject_name: bool = True
-
-    def is_valid(self) -> bool:
-        """Check whether the certificate request is valid."""
-        if not self.common_name:
-            return False
-        return True
-
-    def generate_csr(
-        self,
-        private_key: PrivateKey,
-    ) -> CertificateSigningRequest:
-        """Generate a CSR using private key and subject.
+    def sign(
+        self, ca: Certificate, ca_private_key: PrivateKey, validity: timedelta, is_ca: bool = False
+    ) -> Certificate:
+        """Sign this CSR with the given CA and CA private key.
 
         Args:
-            private_key (PrivateKey): Private key
+            ca: The CA certificate.
+            ca_private_key: The CA private key.
+            validity: The validity period of the certificate.
+            is_ca: Whether the generated certificate is a CA certificate.
 
         Returns:
-            CertificateSigningRequest: CSR
+            Certificate: The signed certificate.
         """
-        return generate_csr(
-            private_key=private_key,
-            common_name=self.common_name,
-            sans_dns=self.sans_dns,
-            sans_ip=self.sans_ip,
-            sans_oid=self.sans_oid,
-            email_address=self.email_address,
-            organization=self.organization,
-            organizational_unit=self.organizational_unit,
-            country_name=self.country_name,
-            state_or_province_name=self.state_or_province_name,
-            locality_name=self.locality_name,
-            add_unique_id_to_subject_name=self.add_unique_id_to_subject_name,
+        return Certificate.generate(
+            csr=self,
+            ca=ca,
+            ca_private_key=ca_private_key,
+            validity=validity,
+            is_ca=is_ca,
         )
 
     @classmethod
-    def from_csr(cls, csr: CertificateSigningRequest, is_ca: bool):
-        """Create a ``CertificateRequestAttributes`` object from a CSR."""
+    def generate(
+        cls,
+        attributes: CertificateRequestAttributes,
+        private_key: PrivateKey,
+    ) -> CertificateSigningRequest:
+        """Generate a CSR using the supplied attributes and private key.
+
+        Args:
+            attributes (CertificateRequestAttributes): Certificate request attributes
+            private_key (PrivateKey): Private key
+        Returns:
+            CertificateSigningRequest: CSR
+        """
+        signing_key = private_key._private_key
+        assert isinstance(signing_key, CertificateIssuerPrivateKeyTypes)
+
+        csr_builder = x509.CertificateSigningRequestBuilder()
+        if subject_name := _extract_subject_name_attributes(attributes):
+            csr_builder = csr_builder.subject_name(subject_name)
+
+        _sans: List[x509.GeneralName] = []
+        if attributes.sans_oid:
+            _sans.extend([
+                x509.RegisteredID(x509.ObjectIdentifier(san)) for san in attributes.sans_oid
+            ])
+        if attributes.sans_ip:
+            _sans.extend([x509.IPAddress(ipaddress.ip_address(san)) for san in attributes.sans_ip])
+        if attributes.sans_dns:
+            _sans.extend([x509.DNSName(san) for san in attributes.sans_dns])
+        if _sans:
+            csr_builder = csr_builder.add_extension(
+                x509.SubjectAlternativeName(set(_sans)), critical=False
+            )
+        if attributes.additional_critical_extensions:
+            for extension in attributes.additional_critical_extensions:
+                csr_builder = csr_builder.add_extension(extension, critical=True)
+        signed_certificate_request = csr_builder.sign(signing_key, hashes.SHA256())
+        return cls(x509_object=signed_certificate_request)
+
+
+class CertificateRequestAttributes:
+    """A representation of the certificate request attributes."""
+
+    def __init__(
+        self,
+        common_name: Optional[str] = None,
+        sans_dns: Optional[Collection[str]] = None,
+        sans_ip: Optional[Collection[str]] = None,
+        sans_oid: Optional[Collection[str]] = None,
+        email_address: Optional[str] = None,
+        organization: Optional[str] = None,
+        organizational_unit: Optional[str] = None,
+        country_name: Optional[str] = None,
+        state_or_province_name: Optional[str] = None,
+        locality_name: Optional[str] = None,
+        is_ca: bool = False,
+        add_unique_id_to_subject_name: bool = True,
+        additional_critical_extensions: Optional[Collection[x509.ExtensionType]] = None,
+    ):
+        if not common_name and not sans_dns and not sans_ip and not sans_oid:
+            raise ValueError(
+                "At least one of common_name, sans_dns, sans_ip, or sans_oid must be provided"
+            )
+        self._common_name = common_name
+        self._sans_dns = set(sans_dns) if sans_dns else None
+        self._sans_ip = set(sans_ip) if sans_ip else None
+        self._sans_oid = set(sans_oid) if sans_oid else None
+        self._email_address = email_address
+        self._organization = organization
+        self._organizational_unit = organizational_unit
+        self._country_name = country_name
+        self._state_or_province_name = state_or_province_name
+        self._locality_name = locality_name
+        self._is_ca = is_ca
+        self._add_unique_id_to_subject_name = add_unique_id_to_subject_name
+        self._additional_critical_extensions = list(additional_critical_extensions or [])
+
+    @property
+    def common_name(self) -> str:
+        """Return the common name."""
+        # For legacy interface compatibility, return empty string if not set
+        return self._common_name if self._common_name else ""
+
+    @property
+    def sans_dns(self) -> Optional[Set[str]]:
+        """Return the DNS Subject Alternative Names."""
+        return self._sans_dns
+
+    @property
+    def sans_ip(self) -> Optional[Set[str]]:
+        """Return the IP Subject Alternative Names."""
+        return self._sans_ip
+
+    @property
+    def sans_oid(self) -> Optional[Set[str]]:
+        """Return the OID Subject Alternative Names."""
+        return self._sans_oid
+
+    @property
+    def email_address(self) -> Optional[str]:
+        """Return the email address."""
+        return self._email_address
+
+    @property
+    def organization(self) -> Optional[str]:
+        """Return the organization name."""
+        return self._organization
+
+    @property
+    def organizational_unit(self) -> Optional[str]:
+        """Return the organizational unit name."""
+        return self._organizational_unit
+
+    @property
+    def country_name(self) -> Optional[str]:
+        """Return the country name."""
+        return self._country_name
+
+    @property
+    def state_or_province_name(self) -> Optional[str]:
+        """Return the state or province name."""
+        return self._state_or_province_name
+
+    @property
+    def locality_name(self) -> Optional[str]:
+        """Return the locality name."""
+        return self._locality_name
+
+    @property
+    def is_ca(self) -> bool:
+        """Return whether the certificate is a CA certificate."""
+        return self._is_ca
+
+    @property
+    def add_unique_id_to_subject_name(self) -> bool:
+        """Return whether to add a unique identifier to the subject name."""
+        return self._add_unique_id_to_subject_name
+
+    @property
+    def additional_critical_extensions(self) -> List[x509.ExtensionType]:
+        """Return additional critical extensions to be added to the CSR."""
+        return self._additional_critical_extensions
+
+    @classmethod
+    def from_csr(
+        cls, csr: CertificateSigningRequest, is_ca: bool
+    ) -> CertificateRequestAttributes:
+        """Create CertificateRequestAttributes from a CertificateSigningRequest.
+
+        Args:
+            csr: The CSR to extract attributes from.
+            is_ca: Whether a CA certificate is being requested.
+
+        Returns:
+            CertificateRequestAttributes: The extracted attributes.
+        """
         return cls(
             common_name=csr.common_name,
             sans_dns=csr.sans_dns,
@@ -609,7 +1083,55 @@ class CertificateRequestAttributes:
             locality_name=csr.locality_name,
             is_ca=is_ca,
             add_unique_id_to_subject_name=csr.has_unique_identifier,
+            additional_critical_extensions=csr.additional_critical_extensions,
         )
+
+    def __eq__(self, other: object) -> bool:
+        """Check if two CertificateRequestAttributes objects are equal."""
+        if not isinstance(other, CertificateRequestAttributes):
+            return NotImplemented
+        return (
+            self.common_name == other.common_name
+            and self.sans_dns == other.sans_dns
+            and self.sans_ip == other.sans_ip
+            and self.sans_oid == other.sans_oid
+            and self.email_address == other.email_address
+            and self.organization == other.organization
+            and self.organizational_unit == other.organizational_unit
+            and self.country_name == other.country_name
+            and self.state_or_province_name == other.state_or_province_name
+            and self.locality_name == other.locality_name
+            and self.is_ca == other.is_ca
+            and self.add_unique_id_to_subject_name == other.add_unique_id_to_subject_name
+            and self.additional_critical_extensions == other.additional_critical_extensions
+        )
+
+    def is_valid(self) -> bool:
+        """Validate the attributes of the certificate request.
+
+        Returns:
+            bool: True if the attributes are valid, False otherwise.
+        """
+        if not self.common_name and not self.sans_dns and not self.sans_ip and not self.sans_oid:
+            logger.warning(
+                "At least one of common_name, sans_dns, sans_ip, or sans_oid must be provided"
+            )
+            return False
+        return True
+
+    def generate_csr(
+        self,
+        private_key: PrivateKey,
+    ) -> CertificateSigningRequest:
+        """Generate a CSR using the current attributes and a private key.
+
+        Args:
+            private_key (PrivateKey): Private key to sign the CSR.
+
+        Returns:
+            CertificateSigningRequest: The generated CSR.
+        """
+        return CertificateSigningRequest.generate(self, private_key)
 
 
 @dataclass(frozen=True)
@@ -620,8 +1142,8 @@ class ProviderCertificate:
     certificate: Certificate
     certificate_signing_request: CertificateSigningRequest
     ca: Certificate
-    chain: list[Certificate]
-    revoked: bool | None = None
+    chain: List[Certificate]
+    revoked: Optional[bool] = None
 
     def to_json(self) -> str:
         """Return the object as a JSON string.
@@ -656,7 +1178,7 @@ class CertificateAvailableEvent(EventBase):
         certificate: Certificate,
         certificate_signing_request: CertificateSigningRequest,
         ca: Certificate,
-        chain: list[Certificate],
+        chain: List[Certificate],
     ):
         super().__init__(handle)
         self.certificate = certificate
@@ -664,7 +1186,7 @@ class CertificateAvailableEvent(EventBase):
         self.ca = ca
         self.chain = chain
 
-    def snapshot(self) -> dict[str, str]:
+    def snapshot(self) -> dict:
         """Return snapshot."""
         return {
             "certificate": str(self.certificate),
@@ -673,7 +1195,7 @@ class CertificateAvailableEvent(EventBase):
             "chain": json.dumps([str(certificate) for certificate in self.chain]),
         }
 
-    def restore(self, snapshot: dict[str, str]):
+    def restore(self, snapshot: dict):
         """Restore snapshot."""
         self.certificate = Certificate.from_string(snapshot["certificate"])
         self.certificate_signing_request = CertificateSigningRequest.from_string(
@@ -701,18 +1223,11 @@ def generate_private_key(
     Returns:
         PrivateKey: Private Key
     """
-    if key_size < 2048:
-        raise ValueError("Key size must be at least 2048 bits for RSA security")
-    private_key = rsa.generate_private_key(
-        public_exponent=public_exponent,
-        key_size=key_size,
+    warnings.warn(
+        "generate_private_key() is deprecated. Use PrivateKey.generate() instead.",
+        DeprecationWarning,
     )
-    key_bytes = private_key.private_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PrivateFormat.TraditionalOpenSSL,
-        encryption_algorithm=serialization.NoEncryption(),
-    )
-    return PrivateKey.from_string(key_bytes.decode())
+    return PrivateKey.generate(key_size=key_size, public_exponent=public_exponent)
 
 
 def calculate_relative_datetime(target_time: datetime, fraction: float) -> datetime:
@@ -732,7 +1247,7 @@ def calculate_relative_datetime(target_time: datetime, fraction: float) -> datet
     return now + time_until_target * fraction
 
 
-def chain_has_valid_order(chain: list[str]) -> bool:
+def chain_has_valid_order(chain: List[str]) -> bool:
     """Check if the chain has a valid order.
 
     Validates that each certificate in the chain is properly signed by the next certificate.
@@ -761,15 +1276,15 @@ def chain_has_valid_order(chain: list[str]) -> bool:
 def generate_csr(
     private_key: PrivateKey,
     common_name: str,
-    sans_dns: frozenset[str] | None = frozenset(),
-    sans_ip: frozenset[str] | None = frozenset(),
-    sans_oid: frozenset[str] | None = frozenset(),
-    organization: str | None = None,
-    organizational_unit: str | None = None,
-    email_address: str | None = None,
-    country_name: str | None = None,
-    locality_name: str | None = None,
-    state_or_province_name: str | None = None,
+    sans_dns: Optional[FrozenSet[str]] = frozenset(),
+    sans_ip: Optional[FrozenSet[str]] = frozenset(),
+    sans_oid: Optional[FrozenSet[str]] = frozenset(),
+    organization: Optional[str] = None,
+    organizational_unit: Optional[str] = None,
+    email_address: Optional[str] = None,
+    country_name: Optional[str] = None,
+    locality_name: Optional[str] = None,
+    state_or_province_name: Optional[str] = None,
     add_unique_id_to_subject_name: bool = True,
 ) -> CertificateSigningRequest:
     """Generate a CSR using private key and subject.
@@ -793,159 +1308,85 @@ def generate_csr(
     Returns:
         CertificateSigningRequest: CSR
     """
-    signing_key = serialization.load_pem_private_key(str(private_key).encode(), password=None)
-    subject_name = [x509.NameAttribute(x509.NameOID.COMMON_NAME, common_name)]
-    if add_unique_id_to_subject_name:
-        unique_identifier = uuid.uuid4()
-        subject_name.append(
-            x509.NameAttribute(x509.NameOID.X500_UNIQUE_IDENTIFIER, str(unique_identifier))
-        )
-    if organization:
-        subject_name.append(x509.NameAttribute(x509.NameOID.ORGANIZATION_NAME, organization))
-    if organizational_unit:
-        subject_name.append(
-            x509.NameAttribute(x509.NameOID.ORGANIZATIONAL_UNIT_NAME, organizational_unit)
-        )
-    if email_address:
-        subject_name.append(x509.NameAttribute(x509.NameOID.EMAIL_ADDRESS, email_address))
-    if country_name:
-        subject_name.append(x509.NameAttribute(x509.NameOID.COUNTRY_NAME, country_name))
-    if state_or_province_name:
-        subject_name.append(
-            x509.NameAttribute(x509.NameOID.STATE_OR_PROVINCE_NAME, state_or_province_name)
-        )
-    if locality_name:
-        subject_name.append(x509.NameAttribute(x509.NameOID.LOCALITY_NAME, locality_name))
-    csr = x509.CertificateSigningRequestBuilder(subject_name=x509.Name(subject_name))
-
-    sans: list[x509.GeneralName] = []
-    if sans_oid:
-        sans.extend([x509.RegisteredID(x509.ObjectIdentifier(san)) for san in sans_oid])
-    if sans_ip:
-        sans.extend([x509.IPAddress(ipaddress.ip_address(san)) for san in sans_ip])
-    if sans_dns:
-        sans.extend([x509.DNSName(san) for san in sans_dns])
-    if sans:
-        csr = csr.add_extension(x509.SubjectAlternativeName(set(sans)), critical=False)
-    signed_certificate = csr.sign(signing_key, hashes.SHA256())  # type: ignore[arg-type]
-    csr_str = signed_certificate.public_bytes(serialization.Encoding.PEM).decode()
-    return CertificateSigningRequest.from_string(csr_str)
+    warnings.warn(
+        "generate_csr() is deprecated. Use CertificateRequestAttributes.generate_csr() or CertificateSigningRequest.generate() instead.",
+        DeprecationWarning,
+    )
+    return CertificateRequestAttributes(
+        common_name=common_name,
+        sans_dns=sans_dns,
+        sans_ip=sans_ip,
+        sans_oid=sans_oid,
+        organization=organization,
+        organizational_unit=organizational_unit,
+        email_address=email_address,
+        country_name=country_name,
+        state_or_province_name=state_or_province_name,
+        locality_name=locality_name,
+        add_unique_id_to_subject_name=add_unique_id_to_subject_name,
+    ).generate_csr(private_key=private_key)
 
 
 def generate_ca(
     private_key: PrivateKey,
     validity: timedelta,
     common_name: str,
-    sans_dns: frozenset[str] | None = frozenset(),
-    sans_ip: frozenset[str] | None = frozenset(),
-    sans_oid: frozenset[str] | None = frozenset(),
-    organization: str | None = None,
-    organizational_unit: str | None = None,
-    email_address: str | None = None,
-    country_name: str | None = None,
-    state_or_province_name: str | None = None,
-    locality_name: str | None = None,
+    sans_dns: Optional[FrozenSet[str]] = frozenset(),
+    sans_ip: Optional[FrozenSet[str]] = frozenset(),
+    sans_oid: Optional[FrozenSet[str]] = frozenset(),
+    organization: Optional[str] = None,
+    organizational_unit: Optional[str] = None,
+    email_address: Optional[str] = None,
+    country_name: Optional[str] = None,
+    state_or_province_name: Optional[str] = None,
+    locality_name: Optional[str] = None,
 ) -> Certificate:
     """Generate a self signed CA Certificate.
 
     Args:
-        private_key (PrivateKey): Private key
-        validity (timedelta): Certificate validity time
-        common_name (str): Common Name that can be an IP or a Full Qualified Domain Name (FQDN).
-        sans_dns (FrozenSet[str]): DNS Subject Alternative Names
-        sans_ip (FrozenSet[str]): IP Subject Alternative Names
-        sans_oid (FrozenSet[str]): OID Subject Alternative Names
-        organization (Optional[str]): Organization name
-        organizational_unit (Optional[str]): Organizational unit name
-        email_address (Optional[str]): Email address
-        country_name (str): Certificate Issuing country
-        state_or_province_name (str): Certificate Issuing state or province
-        locality_name (str): Certificate Issuing locality
+        private_key: Private key
+        validity: Certificate validity time
+        common_name: Common Name that can be an IP or a Full Qualified Domain Name (FQDN).
+        sans_dns: DNS Subject Alternative Names
+        sans_ip: IP Subject Alternative Names
+        sans_oid: OID Subject Alternative Names
+        organization: Organization name
+        organizational_unit: Organizational unit name
+        email_address: Email address
+        country_name: Certificate Issuing country
+        state_or_province_name: Certificate Issuing state or province
+        locality_name: Certificate Issuing locality
 
     Returns:
-        Certificate: CA Certificate.
+        CA Certificate.
     """
-    private_key_object = serialization.load_pem_private_key(
-        str(private_key).encode(), password=None
+    warnings.warn(
+        "generate_ca() is deprecated. Use Certificate.generate_self_signed_ca() instead.",
+        DeprecationWarning,
     )
-    assert isinstance(private_key_object, rsa.RSAPrivateKey)
-    subject_name = [x509.NameAttribute(x509.NameOID.COMMON_NAME, common_name)]
-    if organization:
-        subject_name.append(x509.NameAttribute(x509.NameOID.ORGANIZATION_NAME, organization))
-    if organizational_unit:
-        subject_name.append(
-            x509.NameAttribute(x509.NameOID.ORGANIZATIONAL_UNIT_NAME, organizational_unit)
-        )
-    if email_address:
-        subject_name.append(x509.NameAttribute(x509.NameOID.EMAIL_ADDRESS, email_address))
-    if country_name:
-        subject_name.append(x509.NameAttribute(x509.NameOID.COUNTRY_NAME, country_name))
-    if state_or_province_name:
-        subject_name.append(
-            x509.NameAttribute(x509.NameOID.STATE_OR_PROVINCE_NAME, state_or_province_name)
-        )
-    if locality_name:
-        subject_name.append(x509.NameAttribute(x509.NameOID.LOCALITY_NAME, locality_name))
-
-    subject_identifier_object = x509.SubjectKeyIdentifier.from_public_key(
-        private_key_object.public_key()
-    )
-    subject_identifier = key_identifier = subject_identifier_object.public_bytes()
-    key_usage = x509.KeyUsage(
-        digital_signature=True,
-        key_encipherment=True,
-        key_cert_sign=True,
-        key_agreement=False,
-        content_commitment=False,
-        data_encipherment=False,
-        crl_sign=False,
-        encipher_only=False,
-        decipher_only=False,
-    )
-
-    builder = (
-        x509.CertificateBuilder()
-        .subject_name(x509.Name(subject_name))
-        .issuer_name(x509.Name(subject_name))
-        .public_key(private_key_object.public_key())
-        .serial_number(x509.random_serial_number())
-        .not_valid_before(datetime.now(timezone.utc))
-        .not_valid_after(datetime.now(timezone.utc) + validity)
-        .add_extension(x509.SubjectKeyIdentifier(digest=subject_identifier), critical=False)
-        .add_extension(
-            x509.AuthorityKeyIdentifier(
-                key_identifier=key_identifier,
-                authority_cert_issuer=None,
-                authority_cert_serial_number=None,
-            ),
-            critical=False,
-        )
-        .add_extension(key_usage, critical=True)
-        .add_extension(
-            x509.BasicConstraints(ca=True, path_length=None),
-            critical=True,
-        )
-    )
-    san_extension = _san_extension(
-        email_address=email_address,
+    attributes = CertificateRequestAttributes(
+        common_name=common_name,
         sans_dns=sans_dns,
         sans_ip=sans_ip,
         sans_oid=sans_oid,
+        organization=organization,
+        organizational_unit=organizational_unit,
+        email_address=email_address,
+        country_name=country_name,
+        state_or_province_name=state_or_province_name,
+        locality_name=locality_name,
+        is_ca=True,
     )
-    if san_extension:
-        builder = builder.add_extension(san_extension, critical=False)
-    cert = builder.sign(private_key_object, hashes.SHA256())
-    ca_cert_str = cert.public_bytes(serialization.Encoding.PEM).decode().strip()
-    return Certificate.from_string(ca_cert_str)
+    return Certificate.generate_self_signed_ca(attributes, private_key, validity)
 
 
 def _san_extension(
-    email_address: str | None = None,
-    sans_dns: frozenset[str] | None = frozenset(),
-    sans_ip: frozenset[str] | None = frozenset(),
-    sans_oid: frozenset[str] | None = frozenset(),
-) -> x509.SubjectAlternativeName | None:
-    sans: list[x509.GeneralName] = []
+    email_address: Optional[str] = None,
+    sans_dns: Optional[Collection[str]] = frozenset(),
+    sans_ip: Optional[Collection[str]] = frozenset(),
+    sans_oid: Optional[Collection[str]] = frozenset(),
+) -> Optional[x509.SubjectAlternativeName]:
+    sans: List[x509.GeneralName] = []
     if email_address:
         # If an e-mail address was provided, it should always be in the SAN
         sans.append(x509.RFC822Name(email_address))
@@ -979,47 +1420,74 @@ def generate_certificate(
     Returns:
         Certificate: Certificate
     """
-    csr_object = x509.load_pem_x509_csr(str(csr).encode())
-    subject = csr_object.subject
-    ca_pem = x509.load_pem_x509_certificate(str(ca).encode())
-    issuer = ca_pem.issuer
-    private_key = serialization.load_pem_private_key(str(ca_private_key).encode(), password=None)
-
-    certificate_builder = (
-        x509.CertificateBuilder()
-        .subject_name(subject)
-        .issuer_name(issuer)
-        .public_key(csr_object.public_key())
-        .serial_number(x509.random_serial_number())
-        .not_valid_before(datetime.now(timezone.utc))
-        .not_valid_after(datetime.now(timezone.utc) + validity)
+    warnings.warn(
+        "generate_certificate() is deprecated. Use Certificate.generate() instead.",
+        DeprecationWarning,
     )
-    extensions = _generate_certificate_request_extensions(
-        authority_key_identifier=ca_pem.extensions.get_extension_for_class(
-            x509.SubjectKeyIdentifier
-        ).value.key_identifier,
-        csr=csr_object,
+    return Certificate.generate(
+        csr=csr,
+        ca=ca,
+        ca_private_key=ca_private_key,
+        validity=validity,
         is_ca=is_ca,
     )
-    for extension in extensions:
-        try:
-            certificate_builder = certificate_builder.add_extension(
-                extval=extension.value,
-                critical=extension.critical,
-            )
-        except ValueError as e:
-            logger.warning("Failed to add extension %s: %s", extension.oid, e)
 
-    cert = certificate_builder.sign(private_key, hashes.SHA256())  # type: ignore[arg-type]
-    cert_bytes = cert.public_bytes(serialization.Encoding.PEM)
-    return Certificate.from_string(cert_bytes.decode().strip())
+
+def _extract_subject_name_attributes(
+    attributes: CertificateRequestAttributes,
+) -> Optional[x509.Name]:
+    subject_name_attributes = []
+    if attributes.common_name:
+        subject_name_attributes.append(
+            x509.NameAttribute(x509.NameOID.COMMON_NAME, attributes.common_name)
+        )
+    if attributes.add_unique_id_to_subject_name:
+        unique_identifier = uuid.uuid4()
+        subject_name_attributes.append(
+            x509.NameAttribute(x509.NameOID.X500_UNIQUE_IDENTIFIER, str(unique_identifier))
+        )
+    if attributes.organization:
+        subject_name_attributes.append(
+            x509.NameAttribute(x509.NameOID.ORGANIZATION_NAME, attributes.organization)
+        )
+    if attributes.organizational_unit:
+        subject_name_attributes.append(
+            x509.NameAttribute(
+                x509.NameOID.ORGANIZATIONAL_UNIT_NAME,
+                attributes.organizational_unit,
+            )
+        )
+    if attributes.email_address:
+        subject_name_attributes.append(
+            x509.NameAttribute(x509.NameOID.EMAIL_ADDRESS, attributes.email_address)
+        )
+    if attributes.country_name:
+        subject_name_attributes.append(
+            x509.NameAttribute(x509.NameOID.COUNTRY_NAME, attributes.country_name)
+        )
+    if attributes.state_or_province_name:
+        subject_name_attributes.append(
+            x509.NameAttribute(
+                x509.NameOID.STATE_OR_PROVINCE_NAME,
+                attributes.state_or_province_name,
+            )
+        )
+    if attributes.locality_name:
+        subject_name_attributes.append(
+            x509.NameAttribute(x509.NameOID.LOCALITY_NAME, attributes.locality_name)
+        )
+
+    if subject_name_attributes:
+        return x509.Name(subject_name_attributes)
+
+    return None
 
 
 def _generate_certificate_request_extensions(
     authority_key_identifier: bytes,
     csr: x509.CertificateSigningRequest,
     is_ca: bool,
-) -> list[x509.Extension[Any]]:
+) -> List[x509.Extension]:
     """Generate a list of certificate extensions from a CSR and other known information.
 
     Args:
@@ -1030,7 +1498,7 @@ def _generate_certificate_request_extensions(
     Returns:
         List[x509.Extension]: List of extensions
     """
-    cert_extensions_list: list[x509.Extension[Any]] = [
+    cert_extensions_list: List[x509.Extension] = [
         x509.Extension(
             oid=ExtensionOID.AUTHORITY_KEY_IDENTIFIER,
             value=x509.AuthorityKeyIdentifier(
@@ -1087,8 +1555,8 @@ def _generate_certificate_request_extensions(
 
 def _generate_subject_alternative_name_extension(
     csr: x509.CertificateSigningRequest,
-) -> x509.Extension[Any] | None:
-    sans: list[x509.GeneralName] = []
+) -> Optional[x509.Extension]:
+    sans: List[x509.GeneralName] = []
     try:
         loaded_san_ext = csr.extensions.get_extension_for_class(x509.SubjectAlternativeName)
         sans.extend([
@@ -1141,10 +1609,10 @@ class TLSCertificatesRequiresV4(Object):
         self,
         charm: CharmBase,
         relationship_name: str,
-        certificate_requests: list[CertificateRequestAttributes],
+        certificate_requests: List[CertificateRequestAttributes],
         mode: Mode = Mode.UNIT,
-        refresh_events: list[BoundEvent] | None = None,
-        private_key: PrivateKey | None = None,
+        refresh_events: List[BoundEvent] = [],
+        private_key: Optional[PrivateKey] = None,
         renewal_relative_time: float = 0.9,
     ):
         """Create a new instance of the TLSCertificatesRequiresV4 class.
@@ -1178,8 +1646,6 @@ class TLSCertificatesRequiresV4(Object):
                 The minimum value is 0.5, meaning 50% of the validity period.
                 If an invalid value is provided, an exception will be raised.
         """
-        if refresh_events is None:
-            refresh_events = []
         super().__init__(charm, relationship_name)
         if not JujuVersion.from_environ().has_secrets:
             logger.warning("This version of the TLS library requires Juju secrets (Juju >= 3.0)")
@@ -1206,8 +1672,9 @@ class TLSCertificatesRequiresV4(Object):
         self.framework.observe(charm.on.secret_remove, self._on_secret_remove)
         for event in refresh_events:
             self.framework.observe(event, self._configure)
+        self._security_logger = _OWASPLogger(application=f"tls-certificates-{charm.app.name}")
 
-    def _configure(self, _: EventBase | None = None):
+    def _configure(self, _: Optional[EventBase] = None):
         """Handle TLS Certificates Relation Data.
 
         This method is called during any TLS relation event.
@@ -1317,7 +1784,7 @@ class TLSCertificatesRequiresV4(Object):
         except ModelError:
             logger.warning("Failed to update relation data")
 
-    def _get_app_or_unit(self) -> Application | Unit:
+    def _get_app_or_unit(self) -> Union[Application, Unit]:
         """Return the unit or app object based on the mode."""
         if self.mode == Mode.UNIT:
             return self.model.unit
@@ -1326,7 +1793,7 @@ class TLSCertificatesRequiresV4(Object):
         raise TLSCertificatesError("Invalid mode")
 
     @property
-    def private_key(self) -> PrivateKey | None:
+    def private_key(self) -> Optional[PrivateKey]:
         """Return the private key."""
         if self._private_key:
             return self._private_key
@@ -1449,7 +1916,7 @@ class TLSCertificatesRequiresV4(Object):
     def _certificate_requested_for_attributes(
         self,
         certificate_request: CertificateRequestAttributes,
-    ) -> RequirerCertificateRequest | None:
+    ) -> Optional[RequirerCertificateRequest]:
         for requirer_csr in self.get_csrs_from_requirer_relation_data():
             if certificate_request == CertificateRequestAttributes.from_csr(
                 requirer_csr.certificate_signing_request,
@@ -1458,7 +1925,7 @@ class TLSCertificatesRequiresV4(Object):
                 return requirer_csr
         return None
 
-    def get_csrs_from_requirer_relation_data(self) -> list[RequirerCertificateRequest]:
+    def get_csrs_from_requirer_relation_data(self) -> List[RequirerCertificateRequest]:
         """Return list of requirer's CSRs from relation data."""
         if self.mode == Mode.APP and not self.model.unit.is_leader():
             logger.debug("Not a leader unit - Skipping")
@@ -1473,23 +1940,24 @@ class TLSCertificatesRequiresV4(Object):
         except DataValidationError:
             logger.warning("Invalid relation data")
             return []
-        requirer_csrs = [
-            RequirerCertificateRequest(
-                relation_id=relation.id,
-                certificate_signing_request=CertificateSigningRequest.from_string(
-                    csr.certificate_signing_request
-                ),
-                is_ca=csr.ca if csr.ca else False,
+        requirer_csrs = []
+        for csr in requirer_relation_data.certificate_signing_requests:
+            requirer_csrs.append(
+                RequirerCertificateRequest(
+                    relation_id=relation.id,
+                    certificate_signing_request=CertificateSigningRequest.from_string(
+                        csr.certificate_signing_request
+                    ),
+                    is_ca=csr.ca if csr.ca else False,
+                )
             )
-            for csr in requirer_relation_data.certificate_signing_requests
-        ]
         return requirer_csrs
 
-    def get_provider_certificates(self) -> list[ProviderCertificate]:
+    def get_provider_certificates(self) -> List[ProviderCertificate]:
         """Return list of certificates from the provider's relation data."""
         return self._load_provider_certificates()
 
-    def _load_provider_certificates(self) -> list[ProviderCertificate]:
+    def _load_provider_certificates(self) -> List[ProviderCertificate]:
         relation = self.model.get_relation(self.relationship_name)
         if not relation:
             logger.debug("No relation: %s", self.relationship_name)
@@ -1552,7 +2020,7 @@ class TLSCertificatesRequiresV4(Object):
 
     def get_assigned_certificate(
         self, certificate_request: CertificateRequestAttributes
-    ) -> tuple[ProviderCertificate | None, PrivateKey | None]:
+    ) -> Tuple[Optional[ProviderCertificate], Optional[PrivateKey]]:
         """Get the certificate that was assigned to the given certificate request."""
         for requirer_csr in self.get_csrs_from_requirer_relation_data():
             if certificate_request == CertificateRequestAttributes.from_csr(
@@ -1564,18 +2032,17 @@ class TLSCertificatesRequiresV4(Object):
 
     def get_assigned_certificates(
         self,
-    ) -> tuple[list[ProviderCertificate], PrivateKey | None]:
+    ) -> Tuple[List[ProviderCertificate], Optional[PrivateKey]]:
         """Get a list of certificates that were assigned to this or app."""
-        assigned_certificates = [
-            cert
-            for requirer_csr in self.get_csrs_from_requirer_relation_data()
-            if (cert := self._find_certificate_in_relation_data(requirer_csr))
-        ]
+        assigned_certificates = []
+        for requirer_csr in self.get_csrs_from_requirer_relation_data():
+            if cert := self._find_certificate_in_relation_data(requirer_csr):
+                assigned_certificates.append(cert)
         return assigned_certificates, self.private_key
 
     def _find_certificate_in_relation_data(
         self, csr: RequirerCertificateRequest
-    ) -> ProviderCertificate | None:
+    ) -> Optional[ProviderCertificate]:
         """Return the certificate that matches the given CSR, validated against the private key."""
         if not self.private_key:
             return None
@@ -1738,6 +2205,7 @@ class TLSCertificatesProvidesV4(Object):
         self.framework.observe(charm.on.update_status, self._configure)
         self.charm = charm
         self.relationship_name = relationship_name
+        self._security_logger = _OWASPLogger(application=f"tls-certificates-{charm.app.name}")
 
     def _configure(self, _: EventBase) -> None:
         """Handle update status and tls relation changed events.
@@ -1765,7 +2233,7 @@ class TLSCertificatesProvidesV4(Object):
                     relation=tls_relation[0],
                 )
 
-    def _get_tls_relations(self, relation_id: int | None = None) -> list[Relation]:
+    def _get_tls_relations(self, relation_id: Optional[int] = None) -> List[Relation]:
         return (
             [
                 relation
@@ -1777,11 +2245,11 @@ class TLSCertificatesProvidesV4(Object):
         )
 
     def get_certificate_requests(
-        self, relation_id: int | None = None
-    ) -> list[RequirerCertificateRequest]:
+        self, relation_id: Optional[int] = None
+    ) -> List[RequirerCertificateRequest]:
         """Load certificate requests from the relation data."""
         relations = self._get_tls_relations(relation_id)
-        requirer_csrs: list[RequirerCertificateRequest] = []
+        requirer_csrs: List[RequirerCertificateRequest] = []
         for relation in relations:
             for unit in relation.units:
                 requirer_csrs.extend(self._load_requirer_databag(relation, unit))
@@ -1789,8 +2257,8 @@ class TLSCertificatesProvidesV4(Object):
         return requirer_csrs
 
     def _load_requirer_databag(
-        self, relation: Relation, unit_or_app: Application | Unit
-    ) -> list[RequirerCertificateRequest]:
+        self, relation: Relation, unit_or_app: Union[Application, Unit]
+    ) -> List[RequirerCertificateRequest]:
         try:
             requirer_relation_data = _RequirerData.load(relation.data.get(unit_or_app, {}))
         except DataValidationError:
@@ -1835,7 +2303,7 @@ class TLSCertificatesProvidesV4(Object):
         provider_certificates.append(new_certificate)
         self._dump_provider_certificates(relation=relation, certificates=provider_certificates)
 
-    def _load_provider_certificates(self, relation: Relation) -> list[_Certificate]:
+    def _load_provider_certificates(self, relation: Relation) -> List[_Certificate]:
         try:
             provider_relation_data = _ProviderApplicationData.load(relation.data[self.charm.app])
         except DataValidationError:
@@ -1843,7 +2311,7 @@ class TLSCertificatesProvidesV4(Object):
             return []
         return copy.deepcopy(provider_relation_data.certificates)
 
-    def _dump_provider_certificates(self, relation: Relation, certificates: list[_Certificate]):
+    def _dump_provider_certificates(self, relation: Relation, certificates: List[_Certificate]):
         try:
             _ProviderApplicationData(certificates=certificates).dump(relation.data[self.model.app])
             logger.info("Certificate relation data updated")
@@ -1853,8 +2321,8 @@ class TLSCertificatesProvidesV4(Object):
     def _remove_provider_certificate(
         self,
         relation: Relation,
-        certificate: Certificate | None = None,
-        certificate_signing_request: CertificateSigningRequest | None = None,
+        certificate: Optional[Certificate] = None,
+        certificate_signing_request: Optional[CertificateSigningRequest] = None,
     ) -> None:
         """Remove certificate based on certificate or certificate signing request."""
         provider_certificates = self._load_provider_certificates(relation)
@@ -1883,6 +2351,11 @@ class TLSCertificatesProvidesV4(Object):
             for certificate in provider_certificates:
                 certificate.revoked = True
             self._dump_provider_certificates(relation=relation, certificates=provider_certificates)
+        self._security_logger.log_event(
+            event="all_certificates_revoked",
+            level=logging.WARNING,
+            description="All certificates revoked",
+        )
 
     def set_relation_certificate(
         self,
@@ -1912,8 +2385,17 @@ class TLSCertificatesProvidesV4(Object):
             relation=certificates_relation,
             provider_certificate=provider_certificate,
         )
+        self._security_logger.log_event(
+            event="certificate_provided",
+            level=logging.INFO,
+            description="Certificate provided to requirer",
+            relation_id=str(provider_certificate.relation_id),
+            common_name=provider_certificate.certificate.common_name,
+        )
 
-    def get_issued_certificates(self, relation_id: int | None = None) -> list[ProviderCertificate]:
+    def get_issued_certificates(
+        self, relation_id: Optional[int] = None
+    ) -> List[ProviderCertificate]:
         """Return a List of issued (non revoked) certificates.
 
         Returns:
@@ -1926,41 +2408,38 @@ class TLSCertificatesProvidesV4(Object):
         return [certificate for certificate in provider_certificates if not certificate.revoked]
 
     def get_provider_certificates(
-        self, relation_id: int | None = None
-    ) -> list[ProviderCertificate]:
+        self, relation_id: Optional[int] = None
+    ) -> List[ProviderCertificate]:
         """Return a List of issued certificates."""
-        certificates: list[ProviderCertificate] = []
+        certificates: List[ProviderCertificate] = []
         relations = self._get_tls_relations(relation_id)
         for relation in relations:
             if not relation.app:
                 logger.warning("Relation %s does not have an application", relation.id)
                 continue
-            certificates.extend(
-                certificate.to_provider_certificate(relation_id=relation.id)
-                for certificate in self._load_provider_certificates(relation)
-            )
+            for certificate in self._load_provider_certificates(relation):
+                certificates.append(certificate.to_provider_certificate(relation_id=relation.id))
         return certificates
 
     def get_unsolicited_certificates(
-        self, relation_id: int | None = None
-    ) -> list[ProviderCertificate]:
+        self, relation_id: Optional[int] = None
+    ) -> List[ProviderCertificate]:
         """Return provider certificates for which no certificate requests exists.
 
         Those certificates should be revoked.
         """
+        unsolicited_certificates: List[ProviderCertificate] = []
         provider_certificates = self.get_provider_certificates(relation_id=relation_id)
         requirer_csrs = self.get_certificate_requests(relation_id=relation_id)
         list_of_csrs = [csr.certificate_signing_request for csr in requirer_csrs]
-        unsolicited_certificates: list[ProviderCertificate] = [
-            certificate
-            for certificate in provider_certificates
-            if certificate.certificate_signing_request not in list_of_csrs
-        ]
+        for certificate in provider_certificates:
+            if certificate.certificate_signing_request not in list_of_csrs:
+                unsolicited_certificates.append(certificate)
         return unsolicited_certificates
 
     def get_outstanding_certificate_requests(
-        self, relation_id: int | None = None
-    ) -> list[RequirerCertificateRequest]:
+        self, relation_id: Optional[int] = None
+    ) -> List[RequirerCertificateRequest]:
         """Return CSR's for which no certificate has been issued.
 
         Args:
@@ -1970,18 +2449,17 @@ class TLSCertificatesProvidesV4(Object):
             list: List of RequirerCertificateRequest objects.
         """
         requirer_csrs = self.get_certificate_requests(relation_id=relation_id)
-        outstanding_csrs: list[RequirerCertificateRequest] = [
-            relation_csr
-            for relation_csr in requirer_csrs
+        outstanding_csrs: List[RequirerCertificateRequest] = []
+        for relation_csr in requirer_csrs:
             if not self._certificate_issued_for_csr(
                 csr=relation_csr.certificate_signing_request,
                 relation_id=relation_id,
-            )
-        ]
+            ):
+                outstanding_csrs.append(relation_csr)
         return outstanding_csrs
 
     def _certificate_issued_for_csr(
-        self, csr: CertificateSigningRequest, relation_id: int | None
+        self, csr: CertificateSigningRequest, relation_id: Optional[int]
     ) -> bool:
         """Check whether a certificate has been issued for a given CSR."""
         issued_certificates_per_csr = self.get_issued_certificates(relation_id=relation_id)
