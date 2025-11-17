@@ -17,7 +17,7 @@ Follow the [tutorial](https://documentation.ubuntu.com/charmlibs/tutorial) to le
 
 # Working on an existing library
 
-Run `just check <my package> to run the following tests for your package:
+Run `just check <my package>` to run the following tests for your package:
 
 - `just lint <my package>` runs linters and static type checkers.
     - `just fast-lint` will run fast linters for all packages.
