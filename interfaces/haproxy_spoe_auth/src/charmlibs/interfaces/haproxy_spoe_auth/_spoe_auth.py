@@ -2,7 +2,51 @@
 # See LICENSE file for licensing details.
 
 # pylint: disable=duplicate-code
-"""Source code for the spoe-auth interface library."""
+"""Source code for the spoe-auth interface library.
+
+## Using the library as the Provider
+
+The provider charm should expose the interface as shown below:
+
+```yaml
+provides:
+    spoe-auth:
+        interface: spoe-auth
+```
+
+Then, add `charmlibs-interfaces-haproxy-spoe-auth` to your Python dependencies. Example using uv:
+```shell
+uv add charmlibs-interfaces-haproxy-spoe-auth
+```
+
+Then in your Python code, import the Provider class and confgure the relation as shown below:
+
+```python
+from charmlibs.interfaces.haproxy_spoe_auth import SpoeAuthProvider, HaproxyEvent
+
+class SpoeAuthCharm(CharmBase):
+    def __init__(self, *args):
+        super().__init__(*args)
+        self.spoe_auth = SpoeAuthProvider(self, relation_name="spoe-auth")
+
+        self.framework.observe(
+            self.on.config_changed, self._on_config_changed
+        )
+
+    def _on_config_changed(self, event):
+        # Publish the SPOE auth configuration
+        self.spoe_auth.provide_spoe_auth_requirements(
+            spop_port=8081,
+            oidc_callback_port=5000,
+            event=HaproxyEvent.ON_HTTP_REQUEST,
+            var_authenticated="var.sess.is_authenticated",
+            var_redirect_url="var.sess.redirect_url",
+            cookie_name="auth_session",
+            oidc_callback_hostname="auth.example.com",
+            oidc_callback_path="/oauth2/callback",
+        )
+```
+"""
 
 import json
 import logging
@@ -22,8 +66,8 @@ SPOE_AUTH_DEFAULT_RELATION_NAME = 'spoe-auth'
 HAPROXY_CONFIG_INVALID_CHARACTERS = '\n\t#\\\'"\r$ '
 # RFC-1034 and RFC-2181 compliance REGEX for validating FQDNs
 HOSTNAME_REGEX = (
-    r'(?=.{1,253})(?!.*--.*)(?:(?!-)(?![0-9])[a-zA-Z0-9-]'
-    r'{1,63}(?<!-)\.){1,}(?:(?!-)[a-zA-Z0-9-]{1,63}(?<!-))'
+    r'^(?=.{1,253})(?!.*--.*)(?:(?!-)(?![0-9])[a-zA-Z0-9-]'
+    r'{1,63}(?<!-)\.){1,}(?:(?!-)[a-zA-Z0-9-]{1,63}(?<!-))$'
 )
 
 
@@ -156,28 +200,13 @@ class _DatabagModel(BaseModel):
 
 
 class HaproxyEvent(StrEnum):
-    """Enumeration of HAProxy SPOE events.
-
-    Attributes:
-        ON_FRONTEND_HTTP_REQUEST: Event triggered on frontend HTTP request.
-    """
+    """Enumeration of HAProxy SPOE events."""
 
     ON_FRONTEND_HTTP_REQUEST = 'on-frontend-http-request'
 
 
 class SpoeAuthProviderAppData(_DatabagModel):
-    """Configuration model for SPOE authentication provider.
-
-    Attributes:
-        spop_port: The port on the agent listening for SPOP.
-        oidc_callback_port: The port on the agent handling OIDC callbacks.
-        event: The event that triggers SPOE messages (e.g., on-http-request).
-        var_authenticated: Name of the variable set by the SPOE agent for auth status.
-        var_redirect_url: Name of the variable set by the SPOE agent for IDP redirect URL.
-        cookie_name: Name of the authentication cookie used by the SPOE agent.
-        oidc_callback_path: Path for OIDC callback.
-        oidc_callback_hostname: The hostname HAProxy should route OIDC callbacks to.
-    """
+    """spoe-auth provider application data model."""
 
     spop_port: int = Field(
         description='The port on the agent listening for SPOP.',
@@ -210,21 +239,13 @@ class SpoeAuthProviderAppData(_DatabagModel):
 
 
 class SpoeAuthProviderUnitData(_DatabagModel):
-    """spoe-auth provider unit data.
-
-    Attributes:
-        address: IP address of the unit.
-    """
+    """spoe-auth provider unit data model."""
 
     address: IPvAnyAddress = Field(description='IP address of the unit.')
 
 
 class SpoeAuthProvider(Object):
-    """SPOE auth interface provider implementation.
-
-    Attributes:
-        relations: Related applications.
-    """
+    """SPOE auth interface provider implementation."""
 
     def __init__(
         self, charm: CharmBase, relation_name: str = SPOE_AUTH_DEFAULT_RELATION_NAME
@@ -315,7 +336,7 @@ class SpoeAuthProvider(Object):
             RequirerUnitData: The validated unit data model.
         """
         if not unit_address:
-            network_binding = self.charm.model.get_binding('juju-info')
+            network_binding = self.charm.model.get_binding(self.relation_name)
             if (
                 network_binding is not None
                 and (bind_address := network_binding.network.bind_address) is not None
@@ -348,12 +369,7 @@ class SpoeAuthRequirerEvents(CharmEvents):
 
 
 class SpoeAuthRequirer(Object):
-    """SPOE auth interface requirer implementation.
-
-    Attributes:
-        on: Custom events of the requirer.
-        relation: The related application.
-    """
+    """SPOE auth interface requirer implementation."""
 
     # Ignore this for pylance
     on = SpoeAuthRequirerEvents()  # type: ignore
