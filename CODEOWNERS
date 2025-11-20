@@ -27,6 +27,7 @@
 /nginx_k8s/ @canonical/tracing-and-profiling
 /pathops/ @canonical/charmlibs-maintainers
 /snap/ @canonical/charmlibs-maintainers
+/systemd/ @canonical/charmlibs-maintainers
 
 # charmlibs.interfaces packages (alphabetical)
 /interfaces/tls-certificates/ @canonical/tls
