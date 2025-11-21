@@ -66,7 +66,7 @@ class TemporalWorkerConsumerProvider(framework.Object):
         logger.info('Config changed, updating temporal-worker-consumer relation data')
         if self.charm.unit.is_leader():
             # Config could have changed, so update all relations
-            for relation in self.charm.model.relations.get('worker-consumer', ()):
+            for relation in self.charm.model.relations.get(RELATION_NAME, ()):
                 relation.data[self.charm.app]['namespace'] = str(self.charm.config['namespace'])
                 relation.data[self.charm.app]['queue'] = str(self.charm.config['queue'])
 
