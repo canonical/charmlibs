@@ -18,12 +18,8 @@ import jubilant
 
 from charmlibs.interfaces import temporal_host_info
 
-
-def test_deploy(juju: jubilant.Juju, charm: str):
-    """The deployment takes place in the module scoped `juju` fixture."""
-    assert charm in juju.status().apps
-
-
-def test_lib_version(juju: jubilant.Juju, charm: str):
-    result = juju.run(f'{charm}/0', 'lib-version')
+def test_lib_version(juju: jubilant.Juju, provider: str, requirer: str):
+    result = juju.run(f'{provider}/0', 'lib-version')
+    assert result.results['version'] == temporal_host_info.__version__
+    result = juju.run(f'{requirer}/0', 'lib-version')
     assert result.results['version'] == temporal_host_info.__version__
