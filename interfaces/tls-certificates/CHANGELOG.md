@@ -1,3 +1,7 @@
+# 1.0.0 - 24 November 2025
+
+Importing changes from 4.26 version of the lib on Charmhub and releasing.
+
 # 1.0.0.post2 - 19 November 2025
 
 Correct docs URL in README.md.
