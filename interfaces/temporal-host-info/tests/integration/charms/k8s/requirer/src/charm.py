@@ -12,14 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Machine charm for testing."""
+"""K8s charm for testing."""
 
 import logging
 
 import common
 import ops
+from charmlibs.interfaces import temporal_host_info
 
 logger = logging.getLogger(__name__)
+
+CONTAINER = 'workload'
 
 
 class Charm(common.Charm):
@@ -27,11 +30,15 @@ class Charm(common.Charm):
 
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
-        framework.observe(self.on.start, self._on_start)
+        framework.observe(self.on[CONTAINER].pebble_ready, self._configure)
+        self.host_info = temporal_host_info.TemporalHostInfoRequirer(self)
+        framework.observe(self.host_info.on.temporal_host_info_available, self._configure)
 
-    def _on_start(self, event: ops.StartEvent):
-        """Handle start event."""
-        self.unit.status = ops.ActiveStatus()
+    def _configure(self, event: ops.EventBase):
+        if self.host_info.host is None or self.host_info.port is None:
+            self.unit.status = ops.ActiveStatus('Waiting for temporal-host-info relation data')
+            return
+        self.unit.status = ops.ActiveStatus(f"Temporal host: {self.host_info.host}, port: {self.host_info.port}")
 
 
 if __name__ == '__main__':  # pragma: nocover

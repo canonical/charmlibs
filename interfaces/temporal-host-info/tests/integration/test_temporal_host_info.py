@@ -12,10 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Functional tests interacting with the real system, but not with Juju."""
+import jubilant
+import pytest
 
-from charmlibs.interfaces import temporal_host_info
 
-
-def test_version():
-    assert isinstance(temporal_host_info.__version__, str)
+def test_deploy(juju: jubilant.Juju, provider: str, requirer: str):
+    """The deployment takes place in the module scoped `juju` fixture."""
+    assert provider in juju.status().apps
+    assert requirer in juju.status().apps

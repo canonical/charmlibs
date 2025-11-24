@@ -18,6 +18,7 @@ import logging
 
 import common
 import ops
+from charmlibs.interfaces import temporal_host_info
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,9 @@ class Charm(common.Charm):
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
         framework.observe(self.on[CONTAINER].pebble_ready, self._on_pebble_ready)
+        self.temporal_host_info_provider = temporal_host_info.TemporalHostInfoProvider(
+            self, port=7233
+        )
 
     def _on_pebble_ready(self, event: ops.PebbleReadyEvent):
         """Handle pebble-ready event."""

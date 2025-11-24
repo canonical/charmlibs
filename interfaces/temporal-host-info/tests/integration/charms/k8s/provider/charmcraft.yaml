@@ -1,7 +1,7 @@
 # common charmcraft.yaml file symlinked by these charms
 # k8s charms can define containers + resources in metadata.yaml
 
-name: test
+name: temporal-host-info-provider
 type: charm
 summary: A small charm for use in integration tests.
 description: A small charm for use in integration tests.
@@ -24,4 +24,18 @@ resources:
   workload:
     type: oci-image
     description: OCI image for the 'workload' container.
-    upstream-source: some-repo/some-image:some-tag
+    upstream-source: ghcr.io/canonical/ubuntu-noble:latest
+
+provides:
+  temporal-host-info:
+    interface: temporal-host-info
+config:
+  options:
+    services:
+      type: string
+      default: frontend
+      description: The Temporal services to run.
+    external-hostname:
+      type: string
+      default: ""
+      description: The external hostname to use.
