@@ -22,10 +22,18 @@ cp --recursive --dereference "charms/$CHARMLIBS_SUBSTRATE/" "$TMP_DIR"
 
 : pack charm
 cd "$TMP_DIR"
+cd provider
 uv lock  # required by uv charm plugin
 charmcraft pack
-cd -
+cd ..
+cd requirer
+uv lock  # required by uv charm plugin
+charmcraft pack
+cd ../..
 
 : place packed charm in expected location
-mkdir -p "$PACKED_DIR"  # -p means create parents and don't complain if dir already exists
-mv "$TMP_DIR"/*.charm "$PACKED_DIR/$CHARMLIBS_SUBSTRATE.charm"  # read by conftest.py
+mkdir -p "$PACKED_DIR"
+mkdir -p "$PACKED_DIR/provider/"
+mkdir -p "$PACKED_DIR/requirer/"
+mv "$TMP_DIR"/provider/*.charm "$PACKED_DIR/provider/$CHARMLIBS_SUBSTRATE.charm"  # read by conftest.py
+mv "$TMP_DIR"/requirer/*.charm "$PACKED_DIR/requirer/$CHARMLIBS_SUBSTRATE.charm"  # read by conftest.py

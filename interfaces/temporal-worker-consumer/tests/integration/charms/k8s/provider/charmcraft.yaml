@@ -1,7 +1,7 @@
 # common charmcraft.yaml file symlinked by these charms
 # k8s charms can define containers + resources in metadata.yaml
 
-name: test
+name: temporal-worker-consumer-provider
 type: charm
 summary: A small charm for use in integration tests.
 description: A small charm for use in integration tests.
@@ -24,4 +24,18 @@ resources:
   workload:
     type: oci-image
     description: OCI image for the 'workload' container.
-    upstream-source: some-repo/some-image:some-tag
+    upstream-source: ghcr.io/canonical/ubuntu-noble:latest
+
+provides:
+  temporal-worker-consumer:
+    interface: temporal-worker-consumer
+config:
+  options:
+    queue:
+      type: string
+      default: default-queue
+      description: The Temporal task queue to use.
+    namespace:
+      type: string
+      default: default-namespace
+      description: The Temporal namespace to use.

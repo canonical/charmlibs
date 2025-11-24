@@ -16,6 +16,7 @@
 
 import logging
 
+from charmlibs.interfaces import temporal_worker_consumer
 import common
 import ops
 
@@ -29,11 +30,16 @@ class Charm(common.Charm):
 
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
-        framework.observe(self.on[CONTAINER].pebble_ready, self._on_pebble_ready)
+        framework.observe(self.on[CONTAINER].pebble_ready, self._configure)
+        self.worker_consumer = temporal_worker_consumer.TemporalWorkerConsumerRequirer(self)
+        framework.observe(self.worker_consumer.on.temporal_worker_consumer_available, self._configure)
 
-    def _on_pebble_ready(self, event: ops.PebbleReadyEvent):
+    def _configure(self, event: ops.EventBase):
         """Handle pebble-ready event."""
-        self.unit.status = ops.ActiveStatus()
+        if self.worker_consumer.namespace is None or self.worker_consumer.queue is None:
+            self.unit.status = ops.ActiveStatus('Waiting for temporal-worker-consumer relation data')
+            return
+        self.unit.status = ops.ActiveStatus(f"Namespace: {self.worker_consumer.namespace}, Queue: {self.worker_consumer.queue}")
 
 
 if __name__ == '__main__':  # pragma: nocover

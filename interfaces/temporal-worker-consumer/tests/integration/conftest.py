@@ -38,13 +38,17 @@ def pytest_addoption(parser: pytest.OptionGroup):
 
 
 @pytest.fixture(scope='session')
-def charm() -> str:
-    """Return the charm name."""
-    return 'test'  # determined by test charms' charmcraft.yaml
+def provider() -> str:
+    return 'temporal-worker-consumer-provider'
+
+
+@pytest.fixture(scope='session')
+def requirer() -> str:
+    return 'temporal-worker-consumer-requirer'
 
 
 @pytest.fixture(scope='module')
-def juju(request: pytest.FixtureRequest, charm: str) -> Iterator[jubilant.Juju]:
+def juju(request: pytest.FixtureRequest, provider: str, requirer: str) -> Iterator[jubilant.Juju]:
     """Pytest fixture that wraps :meth:`jubilant.with_model`.
 
     This adds command line parameter ``--keep-models`` (see help for details).
@@ -65,8 +69,12 @@ def juju(request: pytest.FixtureRequest, charm: str) -> Iterator[jubilant.Juju]:
 def _deploy(juju: jubilant.Juju) -> None:
     substrate = os.environ['CHARMLIBS_SUBSTRATE']
     # tag = os.environ.get('CHARMLIBS_TAG', '')  # get the tag if needed
-    path = pathlib.Path(__file__).parent / '.packed' / f'{substrate}.charm'  # set by pack.sh
-    if substrate == 'k8s':
-        juju.deploy(path, resources={'workload': 'ubuntu:latest'})  # name set in metadata.yaml
-    else:
-        juju.deploy(path)
+    paths = [
+        pathlib.Path(__file__).parent / '.packed' / "provider" / f'{substrate}.charm',
+        pathlib.Path(__file__).parent / '.packed' / "requirer" / f'{substrate}.charm',
+    ]
+    for path in paths:
+        if substrate == 'k8s':
+            juju.deploy(path, resources={'workload': 'ubuntu:latest'})  # name set in metadata.yaml
+        else:
+            juju.deploy(path)

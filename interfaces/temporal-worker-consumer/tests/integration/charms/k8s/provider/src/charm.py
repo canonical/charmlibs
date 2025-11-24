@@ -12,14 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Machine charm for testing."""
+"""K8s charm for testing."""
 
 import logging
 
+from charmlibs.interfaces import temporal_worker_consumer
 import common
 import ops
 
 logger = logging.getLogger(__name__)
+
+CONTAINER = 'workload'
 
 
 class Charm(common.Charm):
@@ -27,10 +30,13 @@ class Charm(common.Charm):
 
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
-        framework.observe(self.on.start, self._on_start)
+        framework.observe(self.on[CONTAINER].pebble_ready, self._on_pebble_ready)
+        self.temporal_worker_consumer_provider = temporal_worker_consumer.TemporalWorkerConsumerProvider(
+            self,
+        )
 
-    def _on_start(self, event: ops.StartEvent):
-        """Handle start event."""
+    def _on_pebble_ready(self, event: ops.PebbleReadyEvent):
+        """Handle pebble-ready event."""
         self.unit.status = ops.ActiveStatus()
 
 
