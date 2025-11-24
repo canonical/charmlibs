@@ -6,7 +6,7 @@ version = "0.0.0.dev0"
 description = "Charm for integration tests."
 requires-python = ">=3.10"
 dependencies = [
-    "ops==3.*",
+    "ops==2.21.1",
     "charmlibs-interfaces-temporal-host-info",
 ]
 
