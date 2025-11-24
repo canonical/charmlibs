@@ -29,7 +29,7 @@ cd ..
 cd requirer
 uv lock  # required by uv charm plugin
 charmcraft pack
-cd -
+cd ../..
 
 : place packed charm in expected location
 mkdir -p "$PACKED_DIR"

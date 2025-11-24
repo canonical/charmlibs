@@ -28,7 +28,7 @@ def test_integrate(juju: jubilant.Juju, provider: str, requirer: str):
     juju.integrate(f'{provider}:temporal-host-info', f'{requirer}:temporal-host-info')
     juju.wait(jubilant.all_active)
     status = juju.status()
-    assert status.apps[requirer].units["0"].juju_status.message == f"Temporal host: {hostname}, port: 7233"
+    assert status.apps[requirer].units[f'{requirer}/0'].workload_status.message == f'Temporal host: {hostname}, port: 7233'
 
 def test_config_changed(juju: jubilant.Juju, provider: str, requirer: str):
     """Test that changing the provider config updates the requirer status."""
@@ -36,4 +36,4 @@ def test_config_changed(juju: jubilant.Juju, provider: str, requirer: str):
     juju.config(provider, {'external-hostname': new_hostname})
     juju.wait(jubilant.all_active)
     status = juju.status()
-    assert status.apps[requirer].units["0"].juju_status.message == f"Temporal host: {new_hostname}, port: 7233"
+    assert status.apps[requirer].units[f'{requirer}/0'].workload_status.message == f'Temporal host: {new_hostname}, port: 7233'
