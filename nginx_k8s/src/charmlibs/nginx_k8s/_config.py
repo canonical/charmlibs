@@ -115,21 +115,23 @@ class NginxUpstream:
 class NginxMapConfig:
     """Represents a `map` block of the Nginx config.
 
-    Example:
-    NginxMapConfig(
-        source_variable="$http_upgrade",
-        target_variable="$connection_upgrade",
-        value_mappings={
-            "default": ["upgrade"],
-            "": ["close"],
-        },
-    )
-    will result in the following `map` block:
+    Example::
 
-    map $http_upgrade $connection_upgrade {
-        default upgrade;
-        '' close;
-    }
+        NginxMapConfig(
+            source_variable="$http_upgrade",
+            target_variable="$connection_upgrade",
+            value_mappings={
+                "default": ["upgrade"],
+                "": ["close"],
+            },
+        )
+
+    will result in the following `map` block::
+
+        map $http_upgrade $connection_upgrade {
+            default upgrade;
+            '' close;
+        }
     """
 
     source_variable: str
