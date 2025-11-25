@@ -18,6 +18,7 @@ import logging
 
 import common
 import ops
+
 from charmlibs.interfaces import temporal_host_info
 
 logger = logging.getLogger(__name__)
@@ -38,7 +39,9 @@ class Charm(common.Charm):
         if self.host_info.host is None or self.host_info.port is None:
             self.unit.status = ops.ActiveStatus('Waiting for temporal-host-info relation data')
             return
-        self.unit.status = ops.ActiveStatus(f"Temporal host: {self.host_info.host}, port: {self.host_info.port}")
+        self.unit.status = ops.ActiveStatus(
+            f'Temporal host: {self.host_info.host}, port: {self.host_info.port}'
+        )
 
 
 if __name__ == '__main__':  # pragma: nocover

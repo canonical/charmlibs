@@ -16,9 +16,10 @@
 
 import logging
 
-from charmlibs.interfaces import temporal_worker_consumer
 import common
 import ops
+
+from charmlibs.interfaces import temporal_worker_consumer
 
 logger = logging.getLogger(__name__)
 
@@ -31,8 +32,10 @@ class Charm(common.Charm):
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
         framework.observe(self.on[CONTAINER].pebble_ready, self._on_pebble_ready)
-        self.temporal_worker_consumer_provider = temporal_worker_consumer.TemporalWorkerConsumerProvider(
-            self,
+        self.temporal_worker_consumer_provider = (
+            temporal_worker_consumer.TemporalWorkerConsumerProvider(
+                self,
+            )
         )
 
     def _on_pebble_ready(self, event: ops.PebbleReadyEvent):

@@ -18,6 +18,7 @@ import logging
 
 import common
 import ops
+
 from charmlibs.interfaces import temporal_host_info
 
 logger = logging.getLogger(__name__)

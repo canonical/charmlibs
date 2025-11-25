@@ -70,8 +70,8 @@ def _deploy(juju: jubilant.Juju) -> None:
     substrate = os.environ['CHARMLIBS_SUBSTRATE']
     # tag = os.environ.get('CHARMLIBS_TAG', '')  # get the tag if needed
     paths = [
-        pathlib.Path(__file__).parent / '.packed' / "provider" / f'{substrate}.charm',
-        pathlib.Path(__file__).parent / '.packed' / "requirer" / f'{substrate}.charm',
+        pathlib.Path(__file__).parent / '.packed' / 'provider' / f'{substrate}.charm',
+        pathlib.Path(__file__).parent / '.packed' / 'requirer' / f'{substrate}.charm',
     ]
     for path in paths:
         if substrate == 'k8s':

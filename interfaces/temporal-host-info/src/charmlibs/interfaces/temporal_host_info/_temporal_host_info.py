@@ -124,7 +124,11 @@ class TemporalHostInfoRequirer(framework.Object):
 
         self.host_info = TemporalHostInfoRequirer(self)
         # update container with new host info
-        self.framework.observe(self.host_info.on.temporal_host_info_available, self._update)
+        framework.observe(self.host_info.on.temporal_host_info_available, self._update)
+
+        def _update(self, event):
+            host = self.host_info.host
+            port = self.host_info.port
     """
 
     on = TemporalHostInfoRequirerCharmEvents()  # type: ignore[reportAssignmentType]

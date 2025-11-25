@@ -18,6 +18,7 @@ import jubilant
 
 from charmlibs.interfaces import temporal_host_info
 
+
 def test_lib_version(juju: jubilant.Juju, provider: str, requirer: str):
     result = juju.run(f'{provider}/0', 'lib-version')
     assert result.results['version'] == temporal_host_info.__version__

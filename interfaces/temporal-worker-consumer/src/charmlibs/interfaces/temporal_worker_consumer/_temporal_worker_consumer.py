@@ -109,7 +109,11 @@ class TemporalWorkerConsumerRequirer(framework.Object):
 
         self.worker_consumer = TemporalWorkerConsumerRequirer(self)
         # update container with new worker consumer info
-        self.framework.observe(self.worker_consumer.on.temporal_worker_consumer_available, self._update)
+        framework.observe(self.worker_consumer.on.temporal_worker_consumer_available, self._update)
+
+        def _update(self, event):
+            namespace = self.worker_consumer.namespace
+            queue = self.worker_consumer.queue
     """
 
     on = TemporalWorkerConsumerRequirerCharmEvents()  # type: ignore[reportAssignmentType]

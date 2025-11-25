@@ -29,7 +29,11 @@ def test_integrate(juju: jubilant.Juju, provider: str, requirer: str):
     juju.integrate(f'{provider}:temporal-worker-consumer', f'{requirer}:temporal-worker-consumer')
     juju.wait(jubilant.all_active)
     status = juju.status()
-    assert status.apps[requirer].units[f'{requirer}/0'].workload_status.message == f'Namespace: {namespace}, Queue: {queue}'
+    assert (
+        status.apps[requirer].units[f'{requirer}/0'].workload_status.message
+        == f'Namespace: {namespace}, Queue: {queue}'
+    )
+
 
 def test_config_changed(juju: jubilant.Juju, provider: str, requirer: str):
     """Test that changing the provider config updates the requirer status."""
@@ -38,4 +42,7 @@ def test_config_changed(juju: jubilant.Juju, provider: str, requirer: str):
     juju.config(provider, {'namespace': new_namespace, 'queue': new_queue})
     juju.wait(jubilant.all_active)
     status = juju.status()
-    assert status.apps[requirer].units[f'{requirer}/0'].workload_status.message == f'Namespace: {new_namespace}, Queue: {new_queue}'
+    assert (
+        status.apps[requirer].units[f'{requirer}/0'].workload_status.message
+        == f'Namespace: {new_namespace}, Queue: {new_queue}'
+    )
