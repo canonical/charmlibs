@@ -26,7 +26,8 @@ class DummyWorkerConsumerRequirerCharm(CharmBase):
         super().__init__(*args)
         self.worker_consumer = TemporalWorkerConsumerRequirer(self)
         self.framework.observe(
-            self.worker_consumer.on.worker_consumer_available, self._on_worker_consumer_available
+            self.worker_consumer.on.temporal_worker_consumer_available,
+            self._on_worker_consumer_available,
         )
 
     def _on_worker_consumer_available(self, event: Any) -> None:
