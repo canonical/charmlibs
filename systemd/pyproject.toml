@@ -4,7 +4,7 @@ description = "The charmlibs.systemd package."
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [
-    {name="The HPC team at Canonical"},
+    {name="The Charm Tech team at Canonical"},
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -14,24 +14,21 @@ classifiers = [
     "Development Status :: 5 - Production/Stable",
 ]
 dynamic = ["version"]
-dependencies = [
-    # "ops",
-]
+dependencies = []
 
 [dependency-groups]
-lint = [  # installed for `just lint systemd` (unit, functional, and integration are also installed)
-    # "typing_extensions",
-]
-unit = [  # installed for `just unit systemd`
+lint = []
+unit = [
     "ops[testing]",
 ]
-functional = [  # installed for `just functional systemd`
-]
+functional = []
 integration = []
 
 [project.urls]
 "Repository" = "https://github.com/canonical/charmlibs"
 "Issues" = "https://github.com/canonical/charmlibs/issues"
+"Documentation" = "https://documentation.ubuntu.com/charmlibs/reference/charmlibs/systemd/"
+"Changelog" = "https://github.com/canonical/charmlibs/blob/main/systemd/CHANGELOG.md"
 
 [build-system]
 requires = ["hatchling"]
@@ -55,7 +52,7 @@ src = ["src", "tests/unit", "tests/functional", "tests/integration"]  # correctl
 
 [tool.pyright]
 extends = "../pyproject.toml"
-include = ["src"]
+include = ["src", "tests"]
 pythonVersion = "3.10"  # check no python > 3.10 features are used
 
 [tool.charmlibs.functional]

@@ -19,9 +19,10 @@ from unittest.mock import call
 import pytest
 
 from charmlibs import systemd
+from conftest import MakeMock
 
 
-def test_daemon_reload(make_mock):
+def test_daemon_reload(make_mock: MakeMock) -> None:
     mock_run, kwargs = make_mock([0, 1], check=True)
 
     systemd.daemon_reload()
@@ -33,7 +34,7 @@ def test_daemon_reload(make_mock):
     mock_run.assert_called_with(['systemctl', 'daemon-reload'], **kwargs)
 
 
-def test_service_running(make_mock):
+def test_service_running(make_mock: MakeMock) -> None:
     mock_run, kwargs = make_mock([0, 3])
 
     result = systemd.service_running('mysql')
@@ -45,7 +46,7 @@ def test_service_running(make_mock):
     assert result is False
 
 
-def test_service_failed(make_mock):
+def test_service_failed(make_mock: MakeMock) -> None:
     mock_run, kwargs = make_mock([0, 1])
 
     result = systemd.service_failed('mysql')
@@ -65,7 +66,7 @@ def test_service_failed(make_mock):
     assert result is False
 
 
-def test_service_start(make_mock):
+def test_service_start(make_mock: MakeMock) -> None:
     mock_run, kwargs = make_mock([0, 1], check=True)
 
     systemd.service_start('mysql')
@@ -76,7 +77,7 @@ def test_service_start(make_mock):
     mock_run.assert_called_with(['systemctl', 'start', 'mysql'], **kwargs)
 
 
-def test_service_stop(make_mock):
+def test_service_stop(make_mock: MakeMock) -> None:
     mock_run, kwargs = make_mock([0, 1], check=True)
 
     systemd.service_stop('mysql')
@@ -87,7 +88,7 @@ def test_service_stop(make_mock):
     mock_run.assert_called_with(['systemctl', 'stop', 'mysql'], **kwargs)
 
 
-def test_service_restart(make_mock):
+def test_service_restart(make_mock: MakeMock) -> None:
     mock_run, kwargs = make_mock([0, 1], check=True)
 
     systemd.service_restart('mysql')
@@ -98,7 +99,7 @@ def test_service_restart(make_mock):
     mock_run.assert_called_with(['systemctl', 'restart', 'mysql'], **kwargs)
 
 
-def test_service_enable(make_mock):
+def test_service_enable(make_mock: MakeMock) -> None:
     mock_run, kwargs = make_mock([0, 1], check=True)
 
     systemd.service_enable('slurmd')
@@ -109,7 +110,7 @@ def test_service_enable(make_mock):
     mock_run.assert_called_with(['systemctl', 'enable', 'slurmd'], **kwargs)
 
 
-def test_service_disable(make_mock):
+def test_service_disable(make_mock: MakeMock) -> None:
     mock_run, kwargs = make_mock([0, 1], check=True)
 
     systemd.service_disable('slurmd')
@@ -120,7 +121,7 @@ def test_service_disable(make_mock):
     mock_run.assert_called_with(['systemctl', 'disable', 'slurmd'], **kwargs)
 
 
-def test_service_reload(make_mock):
+def test_service_reload(make_mock: MakeMock) -> None:
     # We reload successfully.
     mock_run, kwargs = make_mock([0], check=True)
     systemd.service_reload('mysql')
@@ -150,7 +151,7 @@ def test_service_reload(make_mock):
     ])
 
 
-def test_service_pause(make_mock):
+def test_service_pause(make_mock: MakeMock) -> None:
     # Test pause
     mock_run, kwargs = make_mock([0, 0, 3])
 
@@ -172,7 +173,7 @@ def test_service_pause(make_mock):
     ])
 
 
-def test_service_resume(make_mock):
+def test_service_resume(make_mock: MakeMock) -> None:
     # Resume service.
     mock_run, kwargs = make_mock([0, 0, 0])
     systemd.service_resume('mysql')

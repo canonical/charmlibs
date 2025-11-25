@@ -15,29 +15,21 @@
 """Fixtures for unit tests, typically mocking out parts of the external system."""
 
 import subprocess
-from collections.abc import Callable, Iterable
+from collections.abc import Iterable
 from typing import Any
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, Mock
 
 import pytest
 
 
-@pytest.fixture(scope='function')
-def make_mock(
-    request: pytest.FixtureRequest,
-) -> Callable[[Iterable[int], bool], tuple[MagicMock, dict[str, Any]]]:
-    """Create a `subprocess.run` mock with side effects.
+class MakeMock:
+    def __init__(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        self.monkeypatch = monkeypatch
 
-    Examples:
-        >>> mock_run, kwargs = make_mock([0, 1], check=True)
-        >>> subprocess.run(...)
-        >>> mock_run.assert_called()
-        >>> with pytest.raises(subprocess.CalledProcessError)
-        ...     subprocess.run(...)
-    """
-
-    def _make(returncodes: Iterable[int], check: bool = False) -> tuple[MagicMock, dict[str, Any]]:
-        side_effects = []
+    def __call__(
+        self, returncodes: Iterable[int], check: bool = False
+    ) -> tuple[MagicMock, dict[str, Any]]:
+        side_effects: list[Any] = []
         for code in returncodes:
             if code != 0 and check:
                 side_effects.append(subprocess.CalledProcessError(code, cmd='systemctl fail'))
@@ -51,12 +43,11 @@ def make_mock(
 
         mock_run = MagicMock()
         mock_run.side_effect = side_effects
-
-        # Patch `subprocess.run` function for the test.
-        patcher = patch.object(subprocess, 'run', mock_run)
-        patcher.start()
-        request.addfinalizer(patcher.stop)
+        self.monkeypatch.setattr(subprocess, 'run', mock_run)
 
         return mock_run, {'capture_output': True, 'text': True, 'check': check}
 
-    return _make
+
+@pytest.fixture(scope='function')
+def make_mock(monkeypatch: pytest.MonkeyPatch) -> MakeMock:
+    return MakeMock(monkeypatch)

@@ -31,8 +31,11 @@ def _systemctl(*args: str, check: bool = False) -> int:
         args: Arguments to pass to the `systemctl` command.
         check: If set to `True`, raise an error if the command exits with a non-zero exit code.
 
+    Returns:
+        Returncode of `systemctl` command execution.
+
     Raises:
-        subprocess.CalledProcessError:
+        SystemdError:
             Raised if the called command fails and check is set to `True`.
     """
     cmd = ['systemctl', *args]
@@ -41,8 +44,9 @@ def _systemctl(*args: str, check: bool = False) -> int:
         result = subprocess.run(cmd, capture_output=True, text=True, check=check)
     except subprocess.CalledProcessError as e:
         raise SystemdError(
-            f"systemctl command '{' '.join(e.cmd)}' failed with exit code {e.returncode}. "
-            + f'reason: {e.stderr}'
+            f'Command {cmd} failed with returncode {e.returncode}. systemctl output:\n'
+            + f'stdout: {e.stdout}\n'
+            + f'stderr: {e.stderr}'
         ) from None
 
     _logger.debug(
@@ -61,7 +65,7 @@ def service_running(service_name: str) -> bool:
     Args:
         service_name: The name of the service to check.
 
-    Return:
+    Returns:
         True if service is running/active; False if not.
     """
     # If returncode is 0, this means that is service is active.
