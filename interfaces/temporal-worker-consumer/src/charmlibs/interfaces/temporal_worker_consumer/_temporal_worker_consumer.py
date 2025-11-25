@@ -97,7 +97,7 @@ class TemporalWorkerConsumerRelationReadyEvent(EventBase):
 class TemporalWorkerConsumerRequirerCharmEvents(ObjectEvents):
     """List of events that the worker-consumer requirer charm can leverage."""
 
-    worker_consumer_available = EventSource(TemporalWorkerConsumerRelationReadyEvent)
+    temporal_worker_consumer_available = EventSource(TemporalWorkerConsumerRelationReadyEvent)
 
 
 class TemporalWorkerConsumerRequirer(framework.Object):
@@ -109,7 +109,7 @@ class TemporalWorkerConsumerRequirer(framework.Object):
 
         self.worker_consumer = TemporalWorkerConsumerRequirer(self)
         # update container with new worker consumer info
-        self.framework.observe(self.worker_consumer.on.worker_consumer_available, self._update)
+        self.framework.observe(self.worker_consumer.on.temporal_worker_consumer_available, self._update)
     """
 
     on = TemporalWorkerConsumerRequirerCharmEvents()  # type: ignore[reportAssignmentType]
