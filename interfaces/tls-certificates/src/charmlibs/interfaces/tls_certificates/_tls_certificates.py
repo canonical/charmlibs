@@ -1350,6 +1350,9 @@ class TLSCertificatesRequiresV4(Object):
         if self._private_key_generated():
             logger.debug("Private key already generated")
             return
+        if self.mode == Mode.APP and not self.model.unit.is_leader():
+            logger.debug("Not leader, skipping private key generation in APP mode")
+            return
         self._generate_private_key()
 
     def regenerate_private_key(self) -> None:
@@ -1365,6 +1368,10 @@ class TLSCertificatesRequiresV4(Object):
             raise TLSCertificatesError(
                 "Private key is passed by the charm through the private_key parameter, "
                 "this function can't be used"
+            )
+        if self.mode == Mode.APP and not self.model.unit.is_leader():
+            raise TLSCertificatesError(
+                "Only the leader can regenerate the private key in APP mode"
             )
         if not self._private_key_generated():
             logger.warning("No private key to regenerate")
@@ -1402,13 +1409,22 @@ class TLSCertificatesRequiresV4(Object):
             secret.set_content({"private-key": str(private_key)})
             secret.get_content(refresh=True)
         except SecretNotFoundError:
-            self.charm.unit.add_secret(
-                content={"private-key": str(private_key)},
-                label=self._get_private_key_secret_label(),
-            )
+            if self.mode == Mode.APP:
+                self.charm.app.add_secret(
+                    content={"private-key": str(private_key)},
+                    label=self._get_private_key_secret_label(),
+                )
+            else:
+                self.charm.unit.add_secret(
+                    content={"private-key": str(private_key)},
+                    label=self._get_private_key_secret_label(),
+                )
 
     def _remove_private_key_secret(self) -> None:
         """Remove the private key secret."""
+        if self.mode == Mode.APP and not self.model.unit.is_leader():
+            logger.debug("Not leader, cannot remove app owned private key secret")
+            return
         try:
             secret = self.charm.model.get_secret(label=self._get_private_key_secret_label())
             secret.remove_all_revisions()
