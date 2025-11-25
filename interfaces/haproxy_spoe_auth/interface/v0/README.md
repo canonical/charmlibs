@@ -31,7 +31,7 @@ this port needs to be communicated to the requirer ( haproxy )
 
 ### Provider
 
-The provider exposes via its application databag informations about the SPOP and the OIDC callback endpoints via the `spop_port`, and `oidc_callback_*` attributes respectively. The provider also communicates the name of the variables for important flags such as "Is the user authenticated" (`var_authenticated`) or "The full URL to issue a redirect to the IDP" (`var_redirect_url`). The provider also exposes the event that should trigger the SPOE message and the name of the cookie to include in the SPOE message via the `event` and `cookie_name` attribute respectively.
+The provider exposes via its application databag informations about the SPOP and the OIDC callback endpoints via the `spop_port`, and `oidc_callback_*` attributes respectively. The provider also communicates the name of the variables for important flags such as "Is the user authenticated" (`var_authenticated`) or "The full URL to issue a redirect to the IDP" (`var_redirect_url`). The provider also exposes the name of the SPOE message, the event that should trigger the SPOE message and the name of the cookie to include in the SPOE message via the `message_name`, `event` and `cookie_name` attribute respectively.
 
 
 #### Example
@@ -43,12 +43,13 @@ unit_data:
 application_data:            
   spop_port: 12345
   event: on-frontend-http-request
+  message_name: try-auth-oidc
   var_authenticated: sess.auth.is_authenticated
   var_redirect_url: sess.auth.redirect_url
   cookie_name: sessioncookie
   oidc_callback_port: 5000
   oidc_callback_path: /oauth2/callback
-  oidc_callback_hostname: auth.haproxy.internal
+  hostname: auth.haproxy.internal
 ```
 
 ### Requirer

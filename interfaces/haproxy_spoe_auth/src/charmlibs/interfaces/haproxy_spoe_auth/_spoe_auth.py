@@ -42,7 +42,7 @@ class SpoeAuthCharm(CharmBase):
             var_authenticated="var.sess.is_authenticated",
             var_redirect_url="var.sess.redirect_url",
             cookie_name="auth_session",
-            oidc_callback_hostname="auth.example.com",
+            hostname="auth.example.com",
             oidc_callback_path="/oauth2/callback",
         )
 ```
@@ -221,6 +221,9 @@ class SpoeAuthProviderAppData(_DatabagModel):
     event: HaproxyEvent = Field(
         description='The event that triggers SPOE messages (e.g., on-http-request).',
     )
+    message_name: str = Field(
+        description='The name of the SPOE message that the provider expects.'
+    )
     var_authenticated: VALIDSTR = Field(
         description='Name of the variable set by the SPOE agent for auth status.',
     )
@@ -233,7 +236,7 @@ class SpoeAuthProviderAppData(_DatabagModel):
     oidc_callback_path: VALIDSTR = Field(
         description='Path for OIDC callback.', default='/oauth2/callback'
     )
-    oidc_callback_hostname: Annotated[str, BeforeValidator(validate_hostname)] = Field(
+    hostname: Annotated[str, BeforeValidator(validate_hostname)] = Field(
         description='The hostname HAProxy should route OIDC callbacks to.',
     )
 
@@ -276,10 +279,11 @@ class SpoeAuthProvider(Object):
         spop_port: int,
         oidc_callback_port: int,
         event: HaproxyEvent,
+        message_name: str,
         var_authenticated: str,
         var_redirect_url: str,
         cookie_name: str,
-        oidc_callback_hostname: str,
+        hostname: str,
         oidc_callback_path: str = '/oauth2/callback',
         unit_address: str | None = None,
     ) -> None:
@@ -290,10 +294,11 @@ class SpoeAuthProvider(Object):
             spop_port: The port on the agent listening for SPOP.
             oidc_callback_port: The port on the agent handling OIDC callbacks.
             event: The event that triggers SPOE messages.
+            message_name: The name of the SPOE message that the provider expects.
             var_authenticated: Name of the variable for auth status.
             var_redirect_url: Name of the variable for IDP redirect URL.
             cookie_name: Name of the authentication cookie.
-            oidc_callback_hostname: The hostname HAProxy should route OIDC callbacks to.
+            hostname: The hostname HAProxy should route OIDC callbacks to.
             oidc_callback_path: Path for OIDC callback.
             unit_address: The address of the unit.
 
@@ -309,10 +314,11 @@ class SpoeAuthProvider(Object):
                 spop_port=spop_port,
                 oidc_callback_port=oidc_callback_port,
                 event=event,
+                message_name=message_name,
                 var_authenticated=var_authenticated,
                 var_redirect_url=var_redirect_url,
                 cookie_name=cookie_name,
-                oidc_callback_hostname=oidc_callback_hostname,
+                hostname=hostname,
                 oidc_callback_path=oidc_callback_path,
             )
             unit_data = self._prepare_unit_data(unit_address)

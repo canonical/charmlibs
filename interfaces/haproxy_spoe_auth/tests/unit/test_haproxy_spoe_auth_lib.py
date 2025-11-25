@@ -23,7 +23,7 @@ PLACEHOLDER_OIDC_CALLBACK_PORT = 5000
 PLACEHOLDER_VAR_AUTHENTICATED = 'var.sess.is_authenticated'
 PLACEHOLDER_VAR_REDIRECT_URL = 'var.sess.redirect_url'
 PLACEHOLDER_COOKIE_NAME = 'auth_session'
-PLACEHOLDER_OIDC_CALLBACK_HOSTNAME = 'auth.example.com'
+PLACEHOLDER_hostname = 'auth.example.com'
 PLACEHOLDER_OIDC_CALLBACK_PATH = '/oauth2/callback'
 
 
@@ -34,11 +34,12 @@ def mock_provider_app_data_dict_fixture() -> dict[str, Any]:
         'spop_port': PLACEHOLDER_SPOP_PORT,
         'oidc_callback_port': PLACEHOLDER_OIDC_CALLBACK_PORT,
         'event': 'on-frontend-http-request',
+        'message_name': 'try-auth-oidc',
         'var_authenticated': PLACEHOLDER_VAR_AUTHENTICATED,
         'var_redirect_url': PLACEHOLDER_VAR_REDIRECT_URL,
         'cookie_name': PLACEHOLDER_COOKIE_NAME,
         'oidc_callback_path': PLACEHOLDER_OIDC_CALLBACK_PATH,
-        'oidc_callback_hostname': PLACEHOLDER_OIDC_CALLBACK_HOSTNAME,
+        'hostname': PLACEHOLDER_hostname,
     }
 
 
@@ -58,10 +59,11 @@ def test_spoe_auth_provider_app_data_validation():
         spop_port=PLACEHOLDER_SPOP_PORT,
         oidc_callback_port=PLACEHOLDER_OIDC_CALLBACK_PORT,
         event=HaproxyEvent.ON_FRONTEND_HTTP_REQUEST,
+        message_name='try-auth-oidc',
         var_authenticated=PLACEHOLDER_VAR_AUTHENTICATED,
         var_redirect_url=PLACEHOLDER_VAR_REDIRECT_URL,
         cookie_name=PLACEHOLDER_COOKIE_NAME,
-        oidc_callback_hostname=PLACEHOLDER_OIDC_CALLBACK_HOSTNAME,
+        hostname=PLACEHOLDER_hostname,
         oidc_callback_path=PLACEHOLDER_OIDC_CALLBACK_PATH,
     )
 
@@ -71,7 +73,7 @@ def test_spoe_auth_provider_app_data_validation():
     assert data.var_authenticated == PLACEHOLDER_VAR_AUTHENTICATED
     assert data.var_redirect_url == PLACEHOLDER_VAR_REDIRECT_URL
     assert data.cookie_name == PLACEHOLDER_COOKIE_NAME
-    assert data.oidc_callback_hostname == PLACEHOLDER_OIDC_CALLBACK_HOSTNAME
+    assert data.hostname == PLACEHOLDER_hostname
     assert data.oidc_callback_path == PLACEHOLDER_OIDC_CALLBACK_PATH
 
 
@@ -86,10 +88,11 @@ def test_spoe_auth_provider_app_data_default_callback_path():
         spop_port=PLACEHOLDER_SPOP_PORT,
         oidc_callback_port=PLACEHOLDER_OIDC_CALLBACK_PORT,
         event=HaproxyEvent.ON_FRONTEND_HTTP_REQUEST,
+        message_name='try-auth-oidc',
         var_authenticated=PLACEHOLDER_VAR_AUTHENTICATED,
         var_redirect_url=PLACEHOLDER_VAR_REDIRECT_URL,
         cookie_name=PLACEHOLDER_COOKIE_NAME,
-        oidc_callback_hostname=PLACEHOLDER_OIDC_CALLBACK_HOSTNAME,
+        hostname=PLACEHOLDER_hostname,
         oidc_callback_path='/oauth2/callback',  # Explicitly set to the default value
     )
 
@@ -108,10 +111,11 @@ def test_spoe_auth_provider_app_data_invalid_spop_port(port: int):
             spop_port=port,  # Invalid: port must be > 0 and <= 65525
             oidc_callback_port=PLACEHOLDER_OIDC_CALLBACK_PORT,
             event=HaproxyEvent.ON_FRONTEND_HTTP_REQUEST,
+            message_name='try-auth-oidc',
             var_authenticated=PLACEHOLDER_VAR_AUTHENTICATED,
             var_redirect_url=PLACEHOLDER_VAR_REDIRECT_URL,
             cookie_name=PLACEHOLDER_COOKIE_NAME,
-            oidc_callback_hostname=PLACEHOLDER_OIDC_CALLBACK_HOSTNAME,
+            hostname=PLACEHOLDER_hostname,
         )
 
 
@@ -127,10 +131,11 @@ def test_spoe_auth_provider_app_data_invalid_oidc_callback_port(port: int):
             spop_port=PLACEHOLDER_SPOP_PORT,
             oidc_callback_port=port,  # Invalid: port must be > 0 and <= 65525
             event=HaproxyEvent.ON_FRONTEND_HTTP_REQUEST,
+            message_name='try-auth-oidc',
             var_authenticated=PLACEHOLDER_VAR_AUTHENTICATED,
             var_redirect_url=PLACEHOLDER_VAR_REDIRECT_URL,
             cookie_name=PLACEHOLDER_COOKIE_NAME,
-            oidc_callback_hostname=PLACEHOLDER_OIDC_CALLBACK_HOSTNAME,
+            hostname=PLACEHOLDER_hostname,
         )
 
 
@@ -145,10 +150,11 @@ def test_spoe_auth_provider_app_data_invalid_hostname_format():
             spop_port=PLACEHOLDER_SPOP_PORT,
             oidc_callback_port=PLACEHOLDER_OIDC_CALLBACK_PORT,
             event=HaproxyEvent.ON_FRONTEND_HTTP_REQUEST,
+            message_name='try-auth-oidc',
             var_authenticated=PLACEHOLDER_VAR_AUTHENTICATED,
             var_redirect_url=PLACEHOLDER_VAR_REDIRECT_URL,
             cookie_name=PLACEHOLDER_COOKIE_NAME,
-            oidc_callback_hostname='invalid-hostname-!@#',  # Invalid: contains special chars
+            hostname='invalid-hostname-!@#',  # Invalid: contains special chars
         )
 
 
@@ -163,10 +169,11 @@ def test_spoe_auth_provider_app_data_invalid_char_in_var_authenticated():
             spop_port=PLACEHOLDER_SPOP_PORT,
             oidc_callback_port=PLACEHOLDER_OIDC_CALLBACK_PORT,
             event=HaproxyEvent.ON_FRONTEND_HTTP_REQUEST,
+            message_name='try-auth-oidc',
             var_authenticated='invalid\nvar',  # Invalid: newline character
             var_redirect_url=PLACEHOLDER_VAR_REDIRECT_URL,
             cookie_name=PLACEHOLDER_COOKIE_NAME,
-            oidc_callback_hostname=PLACEHOLDER_OIDC_CALLBACK_HOSTNAME,
+            hostname=PLACEHOLDER_hostname,
         )
 
 
@@ -219,7 +226,8 @@ def test_load_provider_app_data(mock_provider_app_data_dict: dict[str, Any]):
     assert data.var_redirect_url == PLACEHOLDER_VAR_REDIRECT_URL
     assert data.cookie_name == PLACEHOLDER_COOKIE_NAME
     assert data.oidc_callback_path == PLACEHOLDER_OIDC_CALLBACK_PATH
-    assert data.oidc_callback_hostname == PLACEHOLDER_OIDC_CALLBACK_HOSTNAME
+    assert data.hostname == PLACEHOLDER_hostname
+    assert data.message_name == 'try-auth-oidc'
 
 
 def test_load_provider_app_data_invalid_databag():
@@ -246,10 +254,11 @@ def test_dump_provider_app_data():
         spop_port=PLACEHOLDER_SPOP_PORT,
         oidc_callback_port=PLACEHOLDER_OIDC_CALLBACK_PORT,
         event=HaproxyEvent.ON_FRONTEND_HTTP_REQUEST,
+        message_name='try-auth-oidc',
         var_authenticated=PLACEHOLDER_VAR_AUTHENTICATED,
         var_redirect_url=PLACEHOLDER_VAR_REDIRECT_URL,
         cookie_name=PLACEHOLDER_COOKIE_NAME,
-        oidc_callback_hostname=PLACEHOLDER_OIDC_CALLBACK_HOSTNAME,
+        hostname=PLACEHOLDER_hostname,
         oidc_callback_path=PLACEHOLDER_OIDC_CALLBACK_PATH,
     )
 
@@ -267,7 +276,8 @@ def test_dump_provider_app_data():
     # oidc_callback_path should be included when explicitly set
     if 'oidc_callback_path' in databag:
         assert json.loads(databag['oidc_callback_path']) == PLACEHOLDER_OIDC_CALLBACK_PATH
-    assert json.loads(databag['oidc_callback_hostname']) == PLACEHOLDER_OIDC_CALLBACK_HOSTNAME
+    assert json.loads(databag['hostname']) == PLACEHOLDER_hostname
+    assert json.loads(databag['message_name']) == 'try-auth-oidc'
 
 
 def test_dump_and_load_provider_app_data_roundtrip():
@@ -280,10 +290,11 @@ def test_dump_and_load_provider_app_data_roundtrip():
         spop_port=PLACEHOLDER_SPOP_PORT,
         oidc_callback_port=PLACEHOLDER_OIDC_CALLBACK_PORT,
         event=HaproxyEvent.ON_FRONTEND_HTTP_REQUEST,
+        message_name='try-auth-oidc',
         var_authenticated=PLACEHOLDER_VAR_AUTHENTICATED,
         var_redirect_url=PLACEHOLDER_VAR_REDIRECT_URL,
         cookie_name=PLACEHOLDER_COOKIE_NAME,
-        oidc_callback_hostname=PLACEHOLDER_OIDC_CALLBACK_HOSTNAME,
+        hostname=PLACEHOLDER_hostname,
         oidc_callback_path=PLACEHOLDER_OIDC_CALLBACK_PATH,
     )
 
@@ -300,7 +311,7 @@ def test_dump_and_load_provider_app_data_roundtrip():
     assert loaded_data.var_authenticated == original_data.var_authenticated
     assert loaded_data.var_redirect_url == original_data.var_redirect_url
     assert loaded_data.cookie_name == original_data.cookie_name
-    assert loaded_data.oidc_callback_hostname == original_data.oidc_callback_hostname
+    assert loaded_data.hostname == original_data.hostname
     assert loaded_data.oidc_callback_path == original_data.oidc_callback_path
 
 
