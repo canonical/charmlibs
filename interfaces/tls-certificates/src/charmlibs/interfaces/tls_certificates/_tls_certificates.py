@@ -1409,16 +1409,11 @@ class TLSCertificatesRequiresV4(Object):
             secret.set_content({"private-key": str(private_key)})
             secret.get_content(refresh=True)
         except SecretNotFoundError:
-            if self.mode == Mode.APP:
-                self.charm.app.add_secret(
-                    content={"private-key": str(private_key)},
-                    label=self._get_private_key_secret_label(),
-                )
-            else:
-                self.charm.unit.add_secret(
-                    content={"private-key": str(private_key)},
-                    label=self._get_private_key_secret_label(),
-                )
+            app_or_unit = self._get_app_or_unit()
+            app_or_unit.add_secret(
+                content={"private-key": str(private_key)},
+                label=self._get_private_key_secret_label(),
+            )
 
     def _remove_private_key_secret(self) -> None:
         """Remove the private key secret."""
