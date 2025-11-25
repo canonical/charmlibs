@@ -163,4 +163,4 @@ class TemporalWorkerConsumerRequirer(framework.Object):
             event.defer()
             return
         self.charm.unit.status = ActiveStatus()
-        self.on.worker_consumer_available.emit(namespace=namespace, queue=queue)
+        self.on.temporal_worker_consumer_available.emit(namespace=namespace, queue=queue)
