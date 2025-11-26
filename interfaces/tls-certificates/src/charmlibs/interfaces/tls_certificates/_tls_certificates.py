@@ -1370,9 +1370,8 @@ class TLSCertificatesRequiresV4(Object):
                 "this function can't be used"
             )
         if self.mode == Mode.APP and not self.model.unit.is_leader():
-            raise TLSCertificatesError(
-                "Only the leader can regenerate the private key in APP mode"
-            )
+            logger.warning("Only the leader can regenerate the private key in APP mode")
+            return
         if not self._private_key_generated():
             logger.warning("No private key to regenerate")
             return
