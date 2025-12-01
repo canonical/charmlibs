@@ -30,7 +30,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Install uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v7
       - id: main
         run: uv run --no-project --script .github/unify-publish-inputs.py
 
@@ -64,7 +64,7 @@ jobs:
         with:
           persist-credentials: true  # needed to push tag
       - name: Install uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v7
         with:
           enable-cache: false  # avoid cache poisoning when publishing
       - name: Build

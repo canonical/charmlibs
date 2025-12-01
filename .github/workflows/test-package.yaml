@@ -41,7 +41,7 @@ jobs:
           persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v7
 
       - name: Check which Python versions this package supports
         id: python
@@ -111,7 +111,7 @@ jobs:
           persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v7
 
       - name: Run static analysis and other checks
         run: uvx --from rust-just just python=${{ matrix.python }} lint ${{ inputs.package }}
@@ -130,7 +130,7 @@ jobs:
           persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v7
 
       - name: Run unit tests
         run: uvx --from rust-just just python=${{ matrix.python }} unit ${{ inputs.package }}
@@ -159,7 +159,7 @@ jobs:
         run: go install github.com/canonical/pebble/cmd/${{ matrix.pebble }}
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v7
 
       - name: Run functional tests
         if: matrix.sudo == 'no-sudo'
@@ -195,7 +195,7 @@ jobs:
         run: sudo concierge prepare --verbose --juju-channel=3/stable --charmcraft-channel=3.x/stable -p machine
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v7
 
       - name: Pack charms
         if: ${{ hashFiles(format('{0}/tests/integration/pack.sh', inputs.package)) != '' }}
