@@ -1,10 +1,11 @@
 name: litmus_auth
-
-# `version` starts at `0` and increments with every breaking change in the interface specification.
 version: 0
-
-# `status` describes where the interface is in its lifecycle. Valid values are described in LEGEND.md.
 status: draft
+lib: litmus-libs
+summary: Exchange gRPC server endpoints for communication between Litmus auth and backend charms.
+description: |
+  The `litmus_auth` interface enables communication between Litmus auth and Litmus backend charms.
+  Both the provider and requirer publish their respective gPRC server's endpoint.
 
 providers:
   - name: litmus-auth-k8s
@@ -24,4 +25,4 @@ requirers:
       identifier: litmus_auth_tester
       pre_run: uv pip compile pyproject.toml --quiet --output-file requirements.txt
 
-maintainer: "observability"
+maintainer: observability

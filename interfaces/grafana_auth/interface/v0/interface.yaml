@@ -1,6 +1,13 @@
 name: grafana_auth
 version: 0
 status: draft
+lib: charms.grafana_k8s.grafana_auth
+summary: Provide authentication configuration for Grafana.
+description: |
+  The `grafana_auth` interface supports configuring Grafana authentication.
+  The provider sends the authentication mode and its configuration.
+  The requirer configures authentication with Grafana and replies with its publicly reachable URL.
+
 
 providers: []
 requirers:

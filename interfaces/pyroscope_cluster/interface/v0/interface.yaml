@@ -2,6 +2,9 @@ name: pyroscope_cluster
 internal: true
 version: 0
 status: draft
+summary: Pyroscope coordinator and worker charm communication.
+description: |
+  The `pyroscope_cluster` interface supports communication between the [pyroscope-coordinator-k8s](https://charmhub.io/pyroscope-coordinator-k8s) and [pyroscope-worker-k8s](https://charmhub.io/pyroscope-worker-k8s) charms.
 
 providers:
   - name: pyroscope-coordinator-k8s

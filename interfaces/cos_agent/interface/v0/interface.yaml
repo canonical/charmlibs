@@ -1,8 +1,13 @@
 name: cos_agent
 internal: true
-
 version: 0
 status: published
+lib: charms.grafana_agent.cos_agent
+summary: Machine-charm-specific interface for managing multiple observability-related data streams.
+description: |
+  The `cos_agent` interface allows machine charms to send telemetry — such as metrics, logs, dashboards, and alert rules — to Opentelemetry Colector or Grafana Agent charms.
+
+  This interface is designed specifically for machine charms, where the requirer is typically the [grafana-agent](https://charmhub.io/grafana-agent) and the [opentelemetry-collector](https://github.com/canonical/opentelemetry-collector-operator/) subordinate charms.
 
 providers:
   - name: zookeeper

@@ -4,9 +4,9 @@ status: published
 lib: charms.tempo_coordinator_k8s.tracing
 summary: Request endpoints for pushing trace data.
 description: |
-  The tracing interface supports push-based tracing.
+  The `tracing` interface supports push-based tracing.
   The requirer publishes the list of protocols it wants to use to send traces.
-  The provider reples with an API URL and an endpoint for each protocol, omitting those it does not support.
+  The provider replies with an API URL and an endpoint for each protocol, omitting those it does not support.
 
 providers:
   - name: tempo-coordinator-k8s

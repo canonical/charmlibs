@@ -1,10 +1,13 @@
 name: grafana_datasource
-
 internal: true
-
 version: 0
-
 status: published
+lib: charms.grafana_k8s.grafana_source
+summary: Provide Grafana data source servers.
+description: |
+  The `grafana_source` interface supports exposing servers implementing the Grafana source HTTP API.
+  The provider publishes the endpoint URL for the servers, one per unit.
+  The requirer replies with unique IDs for the Grafana application and a mapping of unique IDs for the units.
 
 providers:
   - name: tempo-coordinator-k8s

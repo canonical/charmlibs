@@ -2,6 +2,9 @@ name: tempo_cluster
 internal: true
 version: 1
 status: published
+summary: Tempo coordinator and worker charm communication.
+description: |
+  The `tempo_cluster` interface supports communication between the [tempo-coordinator-k8s](https://charmhub.io/tempo-coordinator-k8s) and [tempo-worker-k8s](https://charmhub.io/tempo-worker-k8s) charms.
 
 providers:
   - name: tempo-coordinator-k8s

@@ -1,8 +1,10 @@
 name: mimir_cluster
 internal: true
-
 version: 0
 status: draft
+summary: Mimir coordinator and worker charm communication.
+description: |
+  The `mimir_cluster` interface supports communication between the [mimir-coordinator-k8s](https://charmhub.io/mimir-coordinator-k8s) and [mimir-worker-k8s](https://charmhub.io/mimir-worker-k8s) charms.
 
 providers:
   - name: mimir-coordinator

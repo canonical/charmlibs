@@ -1,6 +1,12 @@
 name: prometheus_remote_write
 version: 0
 status: published
+lib: charms.prometheus_k8s.prometheus_remote_write
+summary: Write Prometheus metrics to remote endpoint.
+description: |
+  The `prometheus_remote_write` endpoint supports writing Prometheus metrics to a remote endpoint.
+  The provider publishes one or more endpoints, and emits alerts per rule files.
+  The requirer pushes metrics to the provided endpoints, and sends rule files to the provider.
 
 providers:
   - name: prometheus-k8s

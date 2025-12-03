@@ -56,11 +56,11 @@
   {
     "name": "cos_agent",
     "version": "0",
-    "lib": "",
-    "lib_url": "",
+    "lib": "charms.grafana_agent.cos_agent",
+    "lib_url": "https://charmhub.io/grafana-agent/libraries/cos_agent",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/cos_agent/",
-    "summary": "",
-    "description": ""
+    "summary": "Machine-charm-specific interface for managing multiple observability-related data streams.",
+    "description": "The `cos_agent` interface allows machine charms to send telemetry \u2014 such as metrics, logs, dashboards, and alert rules \u2014 to Opentelemetry Colector or Grafana Agent charms.\n\nThis interface is designed specifically for machine charms, where the requirer is typically the [grafana-agent](https://charmhub.io/grafana-agent) and the [opentelemetry-collector](https://github.com/canonical/opentelemetry-collector-operator/) subordinate charms."
   },
   {
     "name": "database_backup",
@@ -182,29 +182,29 @@
   {
     "name": "grafana_auth",
     "version": "0",
-    "lib": "",
-    "lib_url": "",
+    "lib": "charms.grafana_k8s.grafana_auth",
+    "lib_url": "https://charmhub.io/grafana-k8s/libraries/grafana_auth",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/grafana_auth/",
-    "summary": "",
-    "description": ""
+    "summary": "Provide authentication configuration for Grafana.",
+    "description": "The `grafana_auth` interface supports configuring Grafana authentication.\nThe provider sends the authentication mode and its configuration.\nThe requirer configures authentication with Grafana and replies with its publicly reachable URL."
   },
   {
     "name": "grafana_datasource",
     "version": "0",
-    "lib": "",
-    "lib_url": "",
+    "lib": "charms.grafana_k8s.grafana_source",
+    "lib_url": "https://charmhub.io/grafana-k8s/libraries/grafana_source",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/grafana_datasource/",
-    "summary": "",
-    "description": ""
+    "summary": "Provide Grafana data source servers.",
+    "description": "The `grafana_source` interface supports exposing servers implementing the Grafana source HTTP API.\nThe provider publishes the endpoint URL for the servers, one per unit.\nThe requirer replies with unique IDs for the Grafana application and a mapping of unique IDs for the units."
   },
   {
     "name": "grafana_datasource_exchange",
     "version": "0",
-    "lib": "",
-    "lib_url": "",
+    "lib": "cosl",
+    "lib_url": "https://pypi.org/project/cosl/",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/grafana_datasource_exchange/",
-    "summary": "",
-    "description": ""
+    "summary": "Share UIDs for Grafana datasources between charms.",
+    "description": "The `grafana_datasource_exchange` interface allows charms that generate telemetry and have a reference to the datasources where said telemetry is queriable, to share those references to other charms for correlation and cross-referencing purposes.\n\nThis is a symmetrical relation, where implementers broadcast the same information regardless of whether they are the provider or requirer.\nTo avoid constraints on integration topology, charms should implement both a requirer and provider endpoint for this interface."
   },
   {
     "name": "hydra_endpoints",
@@ -317,11 +317,11 @@
   {
     "name": "litmus_auth",
     "version": "0",
-    "lib": "",
+    "lib": "litmus-libs",
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/litmus_auth/",
-    "summary": "",
-    "description": ""
+    "summary": "Exchange gRPC server endpoints for communication between Litmus auth and backend charms.",
+    "description": "The `litmus_auth` interface enables communication between Litmus auth and Litmus backend charms.\nBoth the provider and requirer publish their respective gPRC server's endpoint."
   },
   {
     "name": "login_ui_endpoints",
@@ -347,8 +347,8 @@
     "lib": "",
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/mimir_cluster/",
-    "summary": "",
-    "description": ""
+    "summary": "Mimir coordinator and worker charm communication.",
+    "description": "The `mimir_cluster` interface supports communication between the [mimir-coordinator-k8s](https://charmhub.io/mimir-coordinator-k8s) and [mimir-worker-k8s](https://charmhub.io/mimir-worker-k8s) charms."
   },
   {
     "name": "mongodb_client",
@@ -443,20 +443,20 @@
   {
     "name": "prometheus_remote_write",
     "version": "0",
-    "lib": "",
-    "lib_url": "",
+    "lib": "charms.prometheus_k8s.prometheus_remote_write",
+    "lib_url": "https://charmhub.io/prometheus-k8s/libraries/prometheus_remote_write",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/prometheus_remote_write/",
-    "summary": "",
-    "description": ""
+    "summary": "Write Prometheus metrics to remote endpoint.",
+    "description": "The `prometheus_remote_write` endpoint supports writing Prometheus metrics to a remote endpoint.\nThe provider publishes one or more endpoints, and emits alerts per rule files.\nThe requirer pushes metrics to the provided endpoints, and sends rule files to the provider."
   },
   {
     "name": "prometheus_scrape",
     "version": "0",
-    "lib": "",
-    "lib_url": "",
+    "lib": "charms.prometheus_k8s.prometheus_scrape",
+    "lib_url": "https://charmhub.io/prometheus-k8s/libraries/prometheus_scrape",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/prometheus_scrape/",
-    "summary": "",
-    "description": ""
+    "summary": "Configure Prometheus scraping jobs.",
+    "description": "The `prometheus_scrape` interface supports configuring Prometheus scrape jobs and recording and alerting rules.\nThe provider specifies one or more scrape compatible metrics endpoints, and rule files.\nThe requirer then scrapes the provider's metrics and emits alerts per rule files."
   },
   {
     "name": "pyroscope_cluster",
@@ -464,8 +464,8 @@
     "lib": "",
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/pyroscope_cluster/",
-    "summary": "",
-    "description": ""
+    "summary": "Pyroscope coordinator and worker charm communication.",
+    "description": "The `pyroscope_cluster` interface supports communication between the [pyroscope-coordinator-k8s](https://charmhub.io/pyroscope-coordinator-k8s) and [pyroscope-worker-k8s](https://charmhub.io/pyroscope-worker-k8s) charms."
   },
   {
     "name": "s3",
@@ -527,8 +527,8 @@
     "lib": "",
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/tempo_cluster/",
-    "summary": "",
-    "description": ""
+    "summary": "Tempo coordinator and worker charm communication.",
+    "description": "The `tempo_cluster` interface supports communication between the [tempo-coordinator-k8s](https://charmhub.io/tempo-coordinator-k8s) and [tempo-worker-k8s](https://charmhub.io/tempo-worker-k8s) charms."
   },
   {
     "name": "tls-certificates",
@@ -546,7 +546,7 @@
     "lib_url": "https://charmhub.io/tempo-coordinator-k8s/libraries/tracing",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/tracing/",
     "summary": "Request endpoints for pushing trace data.",
-    "description": "The tracing interface supports push-based tracing.\nThe requirer publishes the list of protocols it wants to use to send traces.\nThe provider reples with an API URL and an endpoint for each protocol, omitting those it does not support."
+    "description": "The `tracing` interface supports push-based tracing.\nThe requirer publishes the list of protocols it wants to use to send traces.\nThe provider replies with an API URL and an endpoint for each protocol, omitting those it does not support."
   },
   {
     "name": "vault-autounseal",
