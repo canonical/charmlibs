@@ -1,4 +1,8 @@
-# 1.0.0 - 27 November 2025
+# 1.1.0 - 05 December 2025
+
+Adding missing **hash**() functions.
+
+# 1.1.0 - 27 November 2025
 
 Importing changes from 4.26 version of the lib on Charmhub and releasing.
 
