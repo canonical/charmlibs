@@ -375,6 +375,10 @@ class PrivateKey:
             return NotImplemented
         return self.raw == other.raw
 
+    def __hash__(self) -> int:
+        """Return hash of the PrivateKey object."""
+        return hash(self.raw)
+
 
 class Certificate:
     """This class represents a certificate."""
@@ -520,6 +524,10 @@ class Certificate:
         if not isinstance(other, Certificate):
             return NotImplemented
         return self.raw == other.raw
+
+    def __hash__(self) -> int:
+        """Return hash of the Certificate object."""
+        return hash(self.raw)
 
     @classmethod
     def from_string(cls, certificate: str) -> Certificate:
@@ -850,6 +858,10 @@ class CertificateSigningRequest:
         if not isinstance(other, CertificateSigningRequest):
             return NotImplemented
         return self.raw == other.raw
+
+    def __hash__(self) -> int:
+        """Return hash of the CertificateSigningRequest object."""
+        return hash(self.raw)
 
     def matches_certificate(self, certificate: Certificate) -> bool:
         """Check if this CSR matches a given certificate.
