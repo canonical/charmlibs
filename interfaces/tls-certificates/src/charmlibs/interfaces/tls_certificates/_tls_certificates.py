@@ -226,6 +226,37 @@ class _DatabagModel(pydantic.BaseModel):
         return databag
 
 
+class CertificateRequestErrorCode(int, Enum):
+    """Error codes for failed certificate requests.
+    
+    1XX: CSR errors - Errors related to the certificate request itself
+    2XX: Server errors - Server-related errors
+    9XX: Other errors - Other errors not covered by the above categories
+    """
+
+    # 1XX: CSR errors
+    IP_NOT_ALLOWED = 101
+    DOMAIN_NOT_ALLOWED = 102
+    WILDCARD_NOT_ALLOWED = 103
+    
+    # 2XX: Server errors
+    SERVER_NOT_AVAILABLE = 201
+    
+    # 9XX: Other
+    OTHER = 999
+
+
+class CertificateError(pydantic.BaseModel):
+    """Normalized provider-agnostic error reported for a CSR."""
+
+    code: int
+    name: str
+    message: str
+    reason: str | None = None
+    provider: str | None = None
+    endpoint: str | None = None
+
+
 class _Certificate(pydantic.BaseModel):
     """Certificate model."""
 
@@ -258,10 +289,18 @@ class _CertificateSigningRequest(pydantic.BaseModel):
     ca: bool | None
 
 
+class _RequestError(pydantic.BaseModel):
+    """Provider-side error entry for a CSR (lives in request_errors)."""
+
+    csr: str
+    error: CertificateError
+
+
 class _ProviderApplicationData(_DatabagModel):
     """Provider application data model."""
 
     certificates: list[_Certificate] = []
+    request_errors: list[_RequestError] = []
 
 
 class _RequirerData(_DatabagModel):
@@ -1186,6 +1225,15 @@ class RequirerCertificateRequest:
     is_ca: bool
 
 
+@dataclass(frozen=True)
+class ProviderCertificateError:
+    """This class represents a failed issuance for a CSR reported by the TLS provider."""
+
+    relation_id: int
+    certificate_signing_request: CertificateSigningRequest
+    error: CertificateError
+
+
 class CertificateAvailableEvent(EventBase):
     """Charm Event triggered when a TLS certificate is available."""
 
@@ -1225,6 +1273,41 @@ class CertificateAvailableEvent(EventBase):
     def chain_as_pem(self) -> str:
         """Return full certificate chain as a PEM string."""
         return "\n\n".join([str(cert) for cert in self.chain])
+
+
+class CertificateDeniedEvent(EventBase):
+    """Charm Event triggered when a TLS certificate cannot be issued for a CSR."""
+
+    def __init__(
+        self,
+        handle: Handle,
+        certificate_signing_request: CertificateSigningRequest,
+        error: CertificateError,
+    ):
+        super().__init__(handle)
+        self.certificate_signing_request = certificate_signing_request
+        self.error = error
+
+    def snapshot(self) -> dict:
+        """Return snapshot."""
+        if IS_PYDANTIC_V1:
+            error_json = self.error.json()  # type: ignore[attr-defined]
+        else:
+            error_json = self.error.model_dump_json()
+        return {
+            "certificate_signing_request": str(self.certificate_signing_request),
+            "error": error_json,
+        }
+
+    def restore(self, snapshot: dict):
+        """Restore snapshot."""
+        self.certificate_signing_request = CertificateSigningRequest.from_string(
+            snapshot["certificate_signing_request"]
+        )
+        if IS_PYDANTIC_V1:
+            self.error = CertificateError.parse_raw(snapshot["error"])  # type: ignore[attr-defined]
+        else:
+            self.error = CertificateError.model_validate_json(snapshot["error"])
 
 
 def generate_private_key(
@@ -1619,6 +1702,7 @@ class CertificatesRequirerCharmEvents(CharmEvents):
     """List of events that the TLS Certificates requirer charm can leverage."""
 
     certificate_available = EventSource(CertificateAvailableEvent)
+    certificate_denied = EventSource(CertificateDeniedEvent)
 
 
 class TLSCertificatesRequiresV4(Object):
@@ -1978,6 +2062,30 @@ class TLSCertificatesRequiresV4(Object):
         """Return list of certificates from the provider's relation data."""
         return self._load_provider_certificates()
 
+    def get_request_errors(self) -> list[ProviderCertificateError]:
+        """Get all request errors from the provider's relation data.
+            
+        Returns:
+            List of ProviderCertificateError objects representing failed certificate requests.
+        """
+        return self._load_provider_certificate_errors()
+
+    def get_request_error(
+        self, csr: CertificateSigningRequest
+    ) -> ProviderCertificateError | None:
+        """Get the request error for a specific CSR.
+        
+        Args:
+            csr: The certificate signing request to look up.
+            
+        Returns:
+            ProviderCertificateError if an error exists for this CSR, None otherwise.
+        """
+        for provider_error in self._load_provider_certificate_errors():
+            if str(provider_error.certificate_signing_request) == str(csr):
+                return provider_error
+        return None
+
     def _load_provider_certificates(self) -> list[ProviderCertificate]:
         relation = self.model.get_relation(self.relationship_name)
         if not relation:
@@ -1995,6 +2103,37 @@ class TLSCertificatesRequiresV4(Object):
             certificate.to_provider_certificate(relation_id=relation.id)
             for certificate in provider_relation_data.certificates
         ]
+
+    def _load_provider_certificate_errors(self) -> list[ProviderCertificateError]:
+        """Load provider certificate errors (failure reports)."""
+        relation = self.model.get_relation(self.relationship_name)
+        if not relation:
+            logger.debug("No relation: %s", self.relationship_name)
+            return []
+        if not relation.app:
+            logger.debug("No remote app in relation: %s", self.relationship_name)
+            return []
+        try:
+            provider_relation_data = _ProviderApplicationData.load(relation.data[relation.app])
+        except DataValidationError:
+            logger.warning("Invalid relation data")
+            return []
+        
+        errors: list[ProviderCertificateError] = []
+        for entry in provider_relation_data.request_errors:
+            try:
+                csr_obj = CertificateSigningRequest.from_string(entry.csr)
+                errors.append(
+                    ProviderCertificateError(
+                        relation_id=relation.id,
+                        certificate_signing_request=csr_obj,
+                        error=entry.error,
+                    )
+                )
+            except TLSCertificatesError:
+                logger.debug("Invalid CSR in provider error entry - Skipping")
+                continue
+        return errors
 
     def _request_certificate(self, csr: CertificateSigningRequest, is_ca: bool) -> None:
         """Add CSR to relation data."""
@@ -2157,6 +2296,13 @@ class TLSCertificatesRequiresV4(Object):
                         ca=provider_certificate.ca,
                         chain=provider_certificate.chain,
                     )
+        for provider_error in self._load_provider_certificate_errors():
+            if str(provider_error.certificate_signing_request) not in [str(csr) for csr in csrs]:
+                continue
+            self.on.certificate_denied.emit(
+                certificate_signing_request=provider_error.certificate_signing_request,
+                error=provider_error.error,
+            )
 
     def _cleanup_certificate_requests(self):
         """Clean up certificate requests.
@@ -2333,10 +2479,40 @@ class TLSCertificatesProvidesV4(Object):
             return []
         return copy.deepcopy(provider_relation_data.certificates)
 
-    def _dump_provider_certificates(self, relation: Relation, certificates: list[_Certificate]):
+    def _load_provider_request_errors(self, relation: Relation) -> list[_RequestError]:
+        """Load provider request errors from relation data."""
         try:
-            _ProviderApplicationData(certificates=certificates).dump(relation.data[self.model.app])
+            provider_relation_data = _ProviderApplicationData.load(relation.data[self.charm.app])
+        except DataValidationError:
+            logger.debug("Invalid provider relation data")
+            return []
+        return copy.deepcopy(provider_relation_data.request_errors)
+
+    def _dump_provider_certificates(self, relation: Relation, certificates: list[_Certificate]):
+        """Dump provider certificates to relation data, preserving request_errors."""
+        try:
+            provider_data = _ProviderApplicationData.load(relation.data[self.charm.app])
+        except DataValidationError:
+            logger.warning("Failed to load provider relation data")
+            return
+        provider_data.certificates = certificates
+        try:
+            provider_data.dump(relation.data[self.model.app])
             logger.info("Certificate relation data updated")
+        except ModelError:
+            logger.warning("Failed to update relation data")
+
+    def _dump_provider_request_errors(self, relation: Relation, request_errors: list[_RequestError]):
+        """Dump provider request errors to relation data, preserving certificates."""
+        try:
+            provider_data = _ProviderApplicationData.load(relation.data[self.charm.app])
+        except DataValidationError:
+            logger.warning("Failed to load provider relation data")
+            return
+        provider_data.request_errors = request_errors
+        try:
+            provider_data.dump(relation.data[self.model.app])
+            logger.info("Request errors relation data updated")
         except ModelError:
             logger.warning("Failed to update relation data")
 
@@ -2358,6 +2534,21 @@ class TLSCertificatesProvidesV4(Object):
             ):
                 provider_certificates.remove(provider_certificate)
         self._dump_provider_certificates(relation=relation, certificates=provider_certificates)
+
+    def _remove_request_error_for_csr(
+        self,
+        relation: Relation,
+        certificate_signing_request: CertificateSigningRequest,
+    ) -> None:
+        """Remove request_errors entries matching the CSR."""
+        request_errors = self._load_provider_request_errors(relation)
+        for entry in request_errors:
+            if (
+                CertificateSigningRequest.from_string(entry.csr)
+                == certificate_signing_request
+            ):
+                request_errors.remove(entry)
+        self._dump_provider_request_errors(relation=relation, request_errors=request_errors)
 
     def revoke_all_certificates(self) -> None:
         """Revoke all certificates of this provider.
@@ -2399,6 +2590,11 @@ class TLSCertificatesProvidesV4(Object):
         )
         if not certificates_relation:
             raise TLSCertificatesError(f"Relation {self.relationship_name} does not exist")
+        # Ensure exclusivity: remove any prior error for this CSR
+        self._remove_request_error_for_csr(
+            relation=certificates_relation,
+            certificate_signing_request=provider_certificate.certificate_signing_request,
+        )
         self._remove_provider_certificate(
             relation=certificates_relation,
             certificate_signing_request=provider_certificate.certificate_signing_request,
@@ -2413,6 +2609,51 @@ class TLSCertificatesProvidesV4(Object):
             description="Certificate provided to requirer",
             relation_id=str(provider_certificate.relation_id),
             common_name=provider_certificate.certificate.common_name,
+        )
+
+    def set_relation_error(
+        self,
+        provider_error: ProviderCertificateError,
+    ) -> None:
+        """Record an error for a CSR when issuance fails (without changing certificates).
+
+        Args:
+            provider_error: Error wrapper for a specific CSR/relation
+        """
+        if not self.model.unit.is_leader():
+            logger.warning("Unit is not a leader - will not set relation data")
+            return
+        certificates_relation = self.model.get_relation(
+            relation_name=self.relationship_name, relation_id=provider_error.relation_id
+        )
+        if not certificates_relation:
+            raise TLSCertificatesError(f"Relation {self.relationship_name} does not exist")
+        self._remove_provider_certificate(
+            relation=certificates_relation,
+            certificate_signing_request=provider_error.certificate_signing_request,
+        )
+        request_errors = self._load_provider_request_errors(certificates_relation)
+        for entry in request_errors:
+            if (
+                CertificateSigningRequest.from_string(entry.csr)
+                == provider_error.certificate_signing_request
+            ):
+                    request_errors.remove(entry)
+        request_errors.append(
+            _RequestError(
+                csr=str(provider_error.certificate_signing_request), error=provider_error.error
+            )
+        )
+        self._dump_provider_request_errors(
+            relation=certificates_relation, request_errors=request_errors
+        )
+        self._security_logger.log_event(
+            event="certificate_denied",
+            level=logging.WARNING,
+            description="Certificate issuance failed for CSR",
+            relation_id=str(provider_error.relation_id),
+            common_name=provider_error.certificate_signing_request.common_name,
+            code=str(provider_error.error.code),
         )
 
     def get_issued_certificates(self, relation_id: int | None = None) -> list[ProviderCertificate]:
