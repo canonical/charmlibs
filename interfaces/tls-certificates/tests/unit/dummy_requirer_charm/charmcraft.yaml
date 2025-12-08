@@ -56,3 +56,5 @@ actions:
     description: Get the certificate
   renew-certificates:
     description: Renew the certificates
+  get-request-errors:
+    description: Get all request errors from the provider

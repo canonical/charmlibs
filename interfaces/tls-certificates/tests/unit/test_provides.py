@@ -905,3 +905,198 @@ class TestTLSCertificatesProvidesV4:
         state_out = self.ctx.run(self.ctx.on.relation_changed(certificates_relation), state_in)
 
         assert state_out.get_relation(certificates_relation.id).local_app_data == local_app_data
+
+    def test_given_request_error_set_when_set_relation_certificate_called_then_error_is_removed(
+        self,
+    ):
+        requirer_private_key = generate_private_key()
+        csr = generate_csr(
+            private_key=requirer_private_key,
+            common_name="example.com",
+        )
+        provider_private_key = generate_private_key()
+        provider_ca_certificate = generate_ca(
+            private_key=provider_private_key,
+            common_name="example.com",
+        )
+        certificate = generate_certificate(
+            ca_key=provider_private_key,
+            csr=csr,
+            ca=provider_ca_certificate,
+        )
+        certificates_relation = scenario.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-requirer",
+            local_app_data={
+                "request_errors": json.dumps([
+                    {
+                        "csr": csr,
+                        "error": {
+                            "code": 101,
+                            "name": "IP_NOT_ALLOWED",
+                            "message": "IP address not allowed",
+                            "reason": "IP addresses are not permitted",
+                            "provider": "test-provider",
+                            "endpoint": "certificates",
+                        },
+                    }
+                ]),
+            },
+            remote_app_data={
+                "certificate_signing_requests": json.dumps([
+                    {
+                        "certificate_signing_request": csr,
+                        "ca": "false",
+                    }
+                ])
+            },
+        )
+        state_in = scenario.State(
+            relations={certificates_relation},
+            leader=True,
+        )
+
+        state_out = self.ctx.run(
+            self.ctx.on.action(
+                "set-certificate",
+                params={
+                    "relation-id": certificates_relation.id,
+                    "certificate": base64.b64encode(certificate.encode()).decode(),
+                    "certificate-signing-request": base64.b64encode(csr.encode()).decode(),
+                    "ca-certificate": base64.b64encode(provider_ca_certificate.encode()).decode(),
+                    "ca-chain": base64.b64encode(
+                        (certificate + provider_ca_certificate).encode()
+                    ).decode(),
+                },
+            ),
+            state_in,
+        )
+
+        relation_data = state_out.get_relation(certificates_relation.id).local_app_data
+        certificates_data = json.loads(relation_data["certificates"])
+        assert len(certificates_data) == 1
+        assert certificates_data[0]["certificate_signing_request"].strip() == csr.strip()
+        request_errors = json.loads(relation_data.get("request_errors", "[]"))
+        assert len(request_errors) == 0
+
+    def test_given_certificate_set_when_set_relation_error_called_then_certificate_is_removed(
+        self,
+    ):
+        """Test that setting an error removes any prior certificate for the same CSR."""
+        requirer_private_key = generate_private_key()
+        csr = generate_csr(
+            private_key=requirer_private_key,
+            common_name="example.com",
+        )
+        provider_private_key = generate_private_key()
+        provider_ca_certificate = generate_ca(
+            private_key=provider_private_key,
+            common_name="example.com",
+        )
+        certificate = generate_certificate(
+            ca_key=provider_private_key,
+            csr=csr,
+            ca=provider_ca_certificate,
+        )
+        certificates_relation = scenario.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-requirer",
+            local_app_data={
+                "certificates": json.dumps([
+                    {
+                        "certificate": certificate,
+                        "certificate_signing_request": csr,
+                        "ca": provider_ca_certificate,
+                        "chain": [provider_ca_certificate],
+                    }
+                ]),
+            },
+            remote_app_data={
+                "certificate_signing_requests": json.dumps([
+                    {
+                        "certificate_signing_request": csr,
+                        "ca": "false",
+                    }
+                ])
+            },
+        )
+        state_in = scenario.State(
+            relations={certificates_relation},
+            leader=True,
+        )
+
+        state_out = self.ctx.run(
+            self.ctx.on.action(
+                "set-relation-error",
+                params={
+                    "relation-id": certificates_relation.id,
+                    "certificate-signing-request": base64.b64encode(csr.encode()).decode(),
+                    "error-code": 101,
+                    "error-message": "IP address not allowed",
+                    "error-reason": "IP addresses are not permitted",
+                },
+            ),
+            state_in,
+        )
+
+        relation_data = state_out.get_relation(certificates_relation.id).local_app_data
+        certificates_data = json.loads(relation_data.get("certificates", "[]"))
+        assert len(certificates_data) == 0
+        
+        request_errors = json.loads(relation_data["request_errors"])
+        assert len(request_errors) == 1
+        assert request_errors[0]["csr"].strip() == csr.strip()
+        assert request_errors[0]["error"]["code"] == 101
+        assert request_errors[0]["error"]["message"] == "IP address not allowed"
+
+    def test_when_set_relation_error_called_then_error_is_added_to_relation_data(
+        self,
+    ):
+        """Test that setting an error adds it to relation data."""
+        requirer_private_key = generate_private_key()
+        csr = generate_csr(
+            private_key=requirer_private_key,
+            common_name="example.com",
+        )
+        certificates_relation = scenario.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-requirer",
+            remote_app_data={
+                "certificate_signing_requests": json.dumps([
+                    {
+                        "certificate_signing_request": csr,
+                        "ca": "false",
+                    }
+                ])
+            },
+        )
+        state_in = scenario.State(
+            relations={certificates_relation},
+            leader=True,
+        )
+
+        state_out = self.ctx.run(
+            self.ctx.on.action(
+                "set-relation-error",
+                params={
+                    "relation-id": certificates_relation.id,
+                    "certificate-signing-request": base64.b64encode(csr.encode()).decode(),
+                    "error-code": 102,
+                    "error-message": "Domain not allowed",
+                    "error-reason": "This domain is restricted",
+                },
+            ),
+            state_in,
+        )
+
+        relation_data = state_out.get_relation(certificates_relation.id).local_app_data
+        request_errors = json.loads(relation_data["request_errors"])
+        assert len(request_errors) == 1
+        assert request_errors[0]["csr"].strip() == csr.strip()
+        assert request_errors[0]["error"]["code"] == 102
+        assert request_errors[0]["error"]["name"] == "DOMAIN_NOT_ALLOWED"
+        assert request_errors[0]["error"]["message"] == "Domain not allowed"
+        assert request_errors[0]["error"]["reason"] == "This domain is restricted"

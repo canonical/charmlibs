@@ -1579,3 +1579,108 @@ class TestTLSCertificatesRequiresV4:
                     },
                 )
             })
+
+    def test_given_request_error_in_relation_data_when_get_request_errors_then_errors_are_returned(
+        self,
+    ):
+        private_key = generate_private_key()
+        csr = generate_csr(
+            private_key=private_key,
+            common_name="example.com",
+        )
+        certificates_relation = testing.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-provider",
+            remote_app_data={
+                "request_errors": json.dumps([
+                    {
+                        "csr": csr,
+                        "error": {
+                            "code": 101,
+                            "name": "IP_NOT_ALLOWED",
+                            "message": "IP address not allowed",
+                            "reason": "IP addresses are not permitted",
+                            "provider": "test-provider",
+                            "endpoint": "certificates",
+                        },
+                    }
+                ]),
+            },
+        )
+        state_in = testing.State(
+            relations={certificates_relation},
+            config={"common_name": "example.com"},
+            secrets=[
+                Secret(
+                    {"private-key": str(private_key)},
+                    label=f"{LIBID}-private-key-0-{certificates_relation.endpoint}",
+                    owner="unit",
+                )
+            ],
+        )
+
+        state_out = self.ctx.run(self.ctx.on.action("get-request-errors"), state_in)
+
+        assert self.ctx.action_results
+        errors = self.ctx.action_results["errors"]
+        assert len(errors) == 1
+        assert errors[0]["code"] == 101
+        assert errors[0]["message"] == "IP address not allowed"
+
+    def test_given_request_error_when_get_request_error_for_csr_then_specific_error_is_returned(
+        self,
+    ):
+        private_key = generate_private_key()
+        csr1 = generate_csr(
+            private_key=private_key,
+            common_name="example.com",
+        )
+        csr2 = generate_csr(
+            private_key=private_key,
+            common_name="example.org",
+        )
+        certificates_relation = testing.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-provider",
+            remote_app_data={
+                "request_errors": json.dumps([
+                    {
+                        "csr": csr1,
+                        "error": {
+                            "code": 101,
+                            "name": "IP_NOT_ALLOWED",
+                            "message": "IP address not allowed",
+                            "reason": "IP addresses are not permitted",
+                            "provider": "test-provider",
+                            "endpoint": "certificates",
+                        },
+                    },
+                    {
+                        "csr": csr2,
+                        "error": {
+                            "code": 102,
+                            "name": "DOMAIN_NOT_ALLOWED",
+                            "message": "Domain not allowed",
+                            "reason": "Domain is restricted",
+                            "provider": "test-provider",
+                            "endpoint": "certificates",
+                        },
+                    }
+                ]),
+            },
+        )
+        state_in = testing.State(
+            relations={certificates_relation},
+            config={"common_name": "example.com"},
+            secrets=[
+                Secret(
+                    {"private-key": str(private_key)},
+                    label=f"{LIBID}-private-key-0-{certificates_relation.endpoint}",
+                    owner="unit",
+                )
+            ],
+        )
+
+        state_out = self.ctx.run(self.ctx.on.relation_changed(certificates_relation), state_in)

@@ -46,3 +46,26 @@ actions:
           Base64 encoded CA Certificate..
   revoke-all-certificates:
     description: Revoke all certificates
+  set-relation-error:
+    description: Set an error for a certificate request
+    params:
+      relation-id:
+        type: integer
+        description: >-
+          ID of the relation between the provider and the requirer.
+      certificate-signing-request:
+        type: string
+        description: >-
+          Base64 encoded CSR for which the error is being reported.
+      error-code:
+        type: integer
+        description: >-
+          Error code (101=IP_NOT_ALLOWED, 102=DOMAIN_NOT_ALLOWED, etc.)
+      error-message:
+        type: string
+        description: >-
+          Human-readable error message.
+      error-reason:
+        type: string
+        description: >-
+          Detailed reason for the error (optional).

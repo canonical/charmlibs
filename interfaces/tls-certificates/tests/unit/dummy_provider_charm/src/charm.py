@@ -11,8 +11,11 @@ from ops.main import main
 
 from charmlibs.interfaces.tls_certificates import (
     Certificate,
+    CertificateError,
+    CertificateRequestErrorCode,
     CertificateSigningRequest,
     ProviderCertificate,
+    ProviderCertificateError,
     TLSCertificatesProvidesV4,
 )
 
@@ -68,6 +71,10 @@ class DummyTLSCertificatesProviderCharm(CharmBase):
         self.framework.observe(
             self.on.revoke_all_certificates_action,
             self._on_revoke_all_certificates_action,
+        )
+        self.framework.observe(
+            self.on.set_relation_error_action,
+            self._on_set_relation_error_action,
         )
 
     def _configure(self, _: EventBase) -> None:
@@ -137,6 +144,32 @@ class DummyTLSCertificatesProviderCharm(CharmBase):
 
     def _on_revoke_all_certificates_action(self, event: ActionEvent) -> None:
         self.certificates.revoke_all_certificates()
+
+    def _on_set_relation_error_action(self, event: ActionEvent) -> None:
+        csr_str = base64.b64decode(event.params["certificate-signing-request"]).decode("utf-8")
+        error_code = int(event.params["error-code"])
+        error_message = event.params["error-message"]
+        error_reason = event.params.get("error-reason", "")
+        
+        try:
+            error_code_enum = CertificateRequestErrorCode(error_code)
+        except ValueError:
+            error_code_enum = CertificateRequestErrorCode.OTHER
+        
+        self.certificates.set_relation_error(
+            provider_error=ProviderCertificateError(
+                relation_id=event.params["relation-id"],
+                certificate_signing_request=CertificateSigningRequest.from_string(csr_str),
+                error=CertificateError(
+                    code=error_code,
+                    name=error_code_enum.name,
+                    message=error_message,
+                    reason=error_reason,
+                    provider=self.model.app.name,
+                    endpoint="certificates",
+                ),
+            ),
+        )
 
 
 if __name__ == "__main__":

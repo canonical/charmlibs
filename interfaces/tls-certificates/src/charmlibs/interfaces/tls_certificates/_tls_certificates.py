@@ -247,7 +247,7 @@ class CertificateRequestErrorCode(int, Enum):
 
 
 class CertificateError(pydantic.BaseModel):
-    """Normalized provider-agnostic error reported for a CSR."""
+    """Error object reported by the provider for a CSR."""
 
     code: int
     name: str
@@ -290,7 +290,7 @@ class _CertificateSigningRequest(pydantic.BaseModel):
 
 
 class _RequestError(pydantic.BaseModel):
-    """Provider-side error entry for a CSR (lives in request_errors)."""
+    """Error model."""
 
     csr: str
     error: CertificateError
@@ -2105,7 +2105,7 @@ class TLSCertificatesRequiresV4(Object):
         ]
 
     def _load_provider_certificate_errors(self) -> list[ProviderCertificateError]:
-        """Load provider certificate errors (failure reports)."""
+        """Load provider certificate errors."""
         relation = self.model.get_relation(self.relationship_name)
         if not relation:
             logger.debug("No relation: %s", self.relationship_name)
@@ -2615,10 +2615,10 @@ class TLSCertificatesProvidesV4(Object):
         self,
         provider_error: ProviderCertificateError,
     ) -> None:
-        """Record an error for a CSR when issuance fails (without changing certificates).
+        """Record an error for a CSR when issuance fails.
 
         Args:
-            provider_error: Error wrapper for a specific CSR/relation
+            provider_error
         """
         if not self.model.unit.is_leader():
             logger.warning("Unit is not a leader - will not set relation data")
