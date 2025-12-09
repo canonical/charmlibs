@@ -228,7 +228,7 @@ class _DatabagModel(pydantic.BaseModel):
 
 class CertificateRequestErrorCode(int, Enum):
     """Error codes for failed certificate requests.
-    
+
     1XX: CSR errors - Errors related to the certificate request itself
     2XX: Server errors - Server-related errors
     9XX: Other errors - Other errors not covered by the above categories
@@ -238,10 +238,10 @@ class CertificateRequestErrorCode(int, Enum):
     IP_NOT_ALLOWED = 101
     DOMAIN_NOT_ALLOWED = 102
     WILDCARD_NOT_ALLOWED = 103
-    
+
     # 2XX: Server errors
     SERVER_NOT_AVAILABLE = 201
-    
+
     # 9XX: Other
     OTHER = 999
 
@@ -1290,10 +1290,7 @@ class CertificateDeniedEvent(EventBase):
 
     def snapshot(self) -> dict:
         """Return snapshot."""
-        if IS_PYDANTIC_V1:
-            error_json = self.error.json()  # type: ignore[attr-defined]
-        else:
-            error_json = self.error.model_dump_json()
+        error_json = self.error.json() if IS_PYDANTIC_V1 else self.error.model_dump_json()  # type: ignore[attr-defined]
         return {
             "certificate_signing_request": str(self.certificate_signing_request),
             "error": error_json,
@@ -2064,20 +2061,18 @@ class TLSCertificatesRequiresV4(Object):
 
     def get_request_errors(self) -> list[ProviderCertificateError]:
         """Get all request errors from the provider's relation data.
-            
+
         Returns:
             List of ProviderCertificateError objects representing failed certificate requests.
         """
         return self._load_provider_certificate_errors()
 
-    def get_request_error(
-        self, csr: CertificateSigningRequest
-    ) -> ProviderCertificateError | None:
+    def get_request_error(self, csr: CertificateSigningRequest) -> ProviderCertificateError | None:
         """Get the request error for a specific CSR.
-        
+
         Args:
             csr: The certificate signing request to look up.
-            
+
         Returns:
             ProviderCertificateError if an error exists for this CSR, None otherwise.
         """
@@ -2118,7 +2113,7 @@ class TLSCertificatesRequiresV4(Object):
         except DataValidationError:
             logger.warning("Invalid relation data")
             return []
-        
+
         errors: list[ProviderCertificateError] = []
         for entry in provider_relation_data.request_errors:
             try:
@@ -2502,7 +2497,9 @@ class TLSCertificatesProvidesV4(Object):
         except ModelError:
             logger.warning("Failed to update relation data")
 
-    def _dump_provider_request_errors(self, relation: Relation, request_errors: list[_RequestError]):
+    def _dump_provider_request_errors(
+        self, relation: Relation, request_errors: list[_RequestError]
+    ):
         """Dump provider request errors to relation data, preserving certificates."""
         try:
             provider_data = _ProviderApplicationData.load(relation.data[self.charm.app])
@@ -2543,10 +2540,7 @@ class TLSCertificatesProvidesV4(Object):
         """Remove request_errors entries matching the CSR."""
         request_errors = self._load_provider_request_errors(relation)
         for entry in request_errors:
-            if (
-                CertificateSigningRequest.from_string(entry.csr)
-                == certificate_signing_request
-            ):
+            if CertificateSigningRequest.from_string(entry.csr) == certificate_signing_request:
                 request_errors.remove(entry)
         self._dump_provider_request_errors(relation=relation, request_errors=request_errors)
 
@@ -2618,7 +2612,7 @@ class TLSCertificatesProvidesV4(Object):
         """Record an error for a CSR when issuance fails.
 
         Args:
-            provider_error
+            provider_error: The error information to set for the certificate request.
         """
         if not self.model.unit.is_leader():
             logger.warning("Unit is not a leader - will not set relation data")
@@ -2638,7 +2632,7 @@ class TLSCertificatesProvidesV4(Object):
                 CertificateSigningRequest.from_string(entry.csr)
                 == provider_error.certificate_signing_request
             ):
-                    request_errors.remove(entry)
+                request_errors.remove(entry)
         request_errors.append(
             _RequestError(
                 csr=str(provider_error.certificate_signing_request), error=provider_error.error

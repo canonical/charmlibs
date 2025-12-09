@@ -150,12 +150,12 @@ class DummyTLSCertificatesProviderCharm(CharmBase):
         error_code = int(event.params["error-code"])
         error_message = event.params["error-message"]
         error_reason = event.params.get("error-reason", "")
-        
+
         try:
             error_code_enum = CertificateRequestErrorCode(error_code)
         except ValueError:
             error_code_enum = CertificateRequestErrorCode.OTHER
-        
+
         self.certificates.set_relation_error(
             provider_error=ProviderCertificateError(
                 relation_id=event.params["relation-id"],

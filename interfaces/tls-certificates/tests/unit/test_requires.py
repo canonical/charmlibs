@@ -1620,7 +1620,7 @@ class TestTLSCertificatesRequiresV4:
             ],
         )
 
-        state_out = self.ctx.run(self.ctx.on.action("get-request-errors"), state_in)
+        self.ctx.run(self.ctx.on.action("get-request-errors"), state_in)
 
         assert self.ctx.action_results
         errors = self.ctx.action_results["errors"]
@@ -1667,7 +1667,7 @@ class TestTLSCertificatesRequiresV4:
                             "provider": "test-provider",
                             "endpoint": "certificates",
                         },
-                    }
+                    },
                 ]),
             },
         )
@@ -1683,4 +1683,4 @@ class TestTLSCertificatesRequiresV4:
             ],
         )
 
-        state_out = self.ctx.run(self.ctx.on.relation_changed(certificates_relation), state_in)
+        self.ctx.run(self.ctx.on.relation_changed(certificates_relation), state_in)

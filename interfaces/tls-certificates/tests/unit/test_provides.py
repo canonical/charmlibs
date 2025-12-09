@@ -1044,7 +1044,7 @@ class TestTLSCertificatesProvidesV4:
         relation_data = state_out.get_relation(certificates_relation.id).local_app_data
         certificates_data = json.loads(relation_data.get("certificates", "[]"))
         assert len(certificates_data) == 0
-        
+
         request_errors = json.loads(relation_data["request_errors"])
         assert len(request_errors) == 1
         assert request_errors[0]["csr"].strip() == csr.strip()
