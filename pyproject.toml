@@ -171,9 +171,6 @@ skip = [
     ".vscode",
     "build",
 ]
-ignore-words-list = [
-    "aNULL"
-]
 
 [tool.pyright]
 pythonPlatform = "All"
