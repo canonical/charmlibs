@@ -59,6 +59,3 @@ pythonVersion = "3.10"
 
 [tool.charmlibs.integration]
 tags = ["k8s"]
-
-[tool.codespell]
-ignore-words-list = ["aNULL"]
