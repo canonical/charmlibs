@@ -38,7 +38,7 @@ class Charm(ops.CharmBase):
                 8888: [nginx.NginxLocationConfig('/', 'foo')]
             },
         )
-        self.nginx = nginx.Nginx(container=self.nginx_container, nginx_config=self.nginx_config)
+        self.nginx = nginx.Nginx(container=self.nginx_container)
         self.nginx_pexp = nginx.NginxPrometheusExporter(container=self.nginx_pexp_container)
 
         for evt in (
@@ -54,7 +54,13 @@ class Charm(ops.CharmBase):
 
     def _reconcile(self, _: ops.EventBase):
         if self.nginx_container.can_connect():
-            self.nginx.reconcile(upstreams_to_addresses={}, tls_config=None)
+            self.nginx.reconcile(
+                nginx_config=self.nginx_config.get_config(
+                    upstreams_to_addresses={},
+                    listen_tls=False,
+                ),
+                tls_config=None,
+            )
         if self.nginx_pexp_container.can_connect():
             self.nginx_pexp.reconcile()
 
