@@ -8,6 +8,7 @@ from ops.main import main
 
 from charmlibs.interfaces.tls_certificates import (
     CertificateAvailableEvent,
+    CertificateDeniedEvent,
     CertificateRequestAttributes,
     Mode,
     PrivateKey,
@@ -33,11 +34,17 @@ class DummyTLSCertificatesRequirerCharm(CharmBase):
             self.certificates.on.certificate_available, self._on_certificate_available
         )
         self.framework.observe(
+            self.certificates.on.certificate_denied, self._on_certificate_denied
+        )
+        self.framework.observe(
             self.on.regenerate_private_key_action, self._on_regenerate_private_key_action
         )
         self.framework.observe(self.on.get_certificate_action, self._on_get_certificate_action)
         self.framework.observe(
             self.on.renew_certificates_action, self._on_renew_certificates_action
+        )
+        self.framework.observe(
+            self.on.get_request_errors_action, self._on_get_request_errors_action
         )
 
     def get_private_key(self) -> PrivateKey | None:
@@ -69,6 +76,9 @@ class DummyTLSCertificatesRequirerCharm(CharmBase):
             print("Certificate not available")
             return
         print("Certificate available for common name:", event.certificate.common_name)
+
+    def _on_certificate_denied(self, event: CertificateDeniedEvent) -> None:
+        print(f"Certificate denied: code={event.error.code}, message={event.error.message}")
 
     def _on_regenerate_private_key_action(self, event: ActionEvent) -> None:
         try:
@@ -138,6 +148,18 @@ class DummyTLSCertificatesRequirerCharm(CharmBase):
     def _relative_renewal_time(self) -> float:
         """Return renewal time for the certificates relative to its expiry."""
         return 1.0
+
+    def _on_get_request_errors_action(self, event: ActionEvent) -> None:
+        request_errors = self.certificates.get_request_errors()
+        errors = [
+            {
+                "csr": str(error.certificate_signing_request),
+                "code": error.error.code,
+                "message": error.error.message,
+            }
+            for error in request_errors
+        ]
+        event.set_results({"errors": errors})
 
 
 if __name__ == "__main__":

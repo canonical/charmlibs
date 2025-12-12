@@ -1,4 +1,8 @@
-# 1.1.0 - 05 December 2025
+# 1.3.0 - 09 December 2025
+
+Introduce the error field in relation data and specify error codes.
+
+# 1.2.0 - 05 December 2025
 
 Adding missing **hash**() functions.
 
