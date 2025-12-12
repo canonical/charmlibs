@@ -966,7 +966,7 @@ class TestTLSCertificatesProvidesV4:
                     "certificate-signing-request": base64.b64encode(csr.encode()).decode(),
                     "ca-certificate": base64.b64encode(provider_ca_certificate.encode()).decode(),
                     "ca-chain": base64.b64encode(
-                        (certificate + provider_ca_certificate).encode()
+                        (certificate + "\n" + provider_ca_certificate).encode()
                     ).decode(),
                 },
             ),
