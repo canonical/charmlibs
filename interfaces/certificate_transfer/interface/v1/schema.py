@@ -16,14 +16,13 @@ Examples:
         app:  <empty>
 """
 
-from typing import Set
 
 from interface_tester.schema_base import DataBagSchema
 from pydantic import BaseModel, Field
 
 
 class CertificateTransferProviderAppData(BaseModel):
-    certificates: Set[str] = Field(
+    certificates: set[str] = Field(
         description="The set of certificates that will be transferred to a requirer"
     )
     version: int = Field(
