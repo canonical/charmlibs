@@ -31,6 +31,7 @@
 
 # charmlibs.interfaces packages (alphabetical)
 /interfaces/cos_agent/ @canonical/observability
+/interfaces/certificate_transfer/ @canonical/tls
 /interfaces/grafana_auth/ @canonical/observability
 /interfaces/grafana_datasource/ @canonical/observability
 /interfaces/grafana_datasource_exchange/ @canonical/observability
