@@ -302,7 +302,7 @@ the databags except using the public methods in the provider library and use ver
         ))
         assert (
             "WARNING",
-            "certificate_transfer",
+            "_certificate_transfer",
             expected_msg,
         ) in logs
 

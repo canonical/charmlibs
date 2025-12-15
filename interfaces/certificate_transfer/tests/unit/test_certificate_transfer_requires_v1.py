@@ -104,7 +104,7 @@ class TestCertificateTransferRequiresV1:
         logs = [(record.levelname, record.module, record.message) for record in caplog.records]
         assert (
             "DEBUG",
-            "certificate_transfer",
+            "_certificate_transfer",
             "Only leader unit sets the version number in the app databag",
         ) in logs
 
@@ -244,7 +244,7 @@ the databags except using the public methods in the provider library and use ver
         logs = [(record.levelname, record.module, record.message) for record in caplog.records]
         assert (
             "ERROR",
-            "certificate_transfer",
+            "_certificate_transfer",
             error_msg,
         ) in logs
 
