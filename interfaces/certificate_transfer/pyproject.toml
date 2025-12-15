@@ -1,5 +1,5 @@
 [project]
-name = "charmlibs-interfaces-certificate-transfer"
+name = "charmlibs-interfaces-certificate_transfer"
 description = "The charmlibs.interfaces.certificate_transfer package."
 readme = "README.md"
 requires-python = ">=3.10"
