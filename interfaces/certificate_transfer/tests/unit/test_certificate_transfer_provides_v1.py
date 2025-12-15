@@ -92,7 +92,7 @@ class TestCertificateTransferProvidesV1:
         logs = [(record.levelname, record.module, record.message) for record in caplog.records]
         assert (
             "DEBUG",
-            "certificate_transfer",
+            "_certificate_transfer",
             "No active relations found with the relation name 'certificate_transfer'",
         ) in logs
 
@@ -118,7 +118,7 @@ class TestCertificateTransferProvidesV1:
         logs = [(record.levelname, record.module, record.message) for record in caplog.records]
         assert (
             "DEBUG",
-            "certificate_transfer",
+            "_certificate_transfer",
             "At least 1 matching relation ID not found with the relation name 'certificate_transfer'",
         ) in logs
 
@@ -164,7 +164,7 @@ the databags except using the public methods in the provider library and use ver
         logs = [(record.levelname, record.module, record.message) for record in caplog.records]
         assert (
             "ERROR",
-            "certificate_transfer",
+            "_certificate_transfer",
             error_msg,
         ) in logs
 
@@ -353,7 +353,7 @@ the databags except using the public methods in the provider library and use ver
         ))
         assert (
             "WARNING",
-            "certificate_transfer",
+            "_certificate_transfer",
             expected_msg,
         ) in logs
 
@@ -373,7 +373,7 @@ the databags except using the public methods in the provider library and use ver
         logs = [(record.levelname, record.module, record.message) for record in caplog.records]
         assert (
             "DEBUG",
-            "certificate_transfer",
+            "_certificate_transfer",
             "No active relations found with the relation name 'certificate_transfer'",
         ) in logs
 
@@ -399,7 +399,7 @@ the databags except using the public methods in the provider library and use ver
         logs = [(record.levelname, record.module, record.message) for record in caplog.records]
         assert (
             "DEBUG",
-            "certificate_transfer",
+            "_certificate_transfer",
             "At least 1 matching relation ID not found with the relation name 'certificate_transfer'",
         ) in logs
 

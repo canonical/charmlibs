@@ -24,7 +24,7 @@ dependencies = [
 lint = [  # installed for `just lint interfaces/certificate_transfer` (unit, functional, and integration are also installed)
 ]
 unit = [  # installed for `just unit interfaces/certificate_transfer`
-    "ops[testing]"
+    "ops[testing]",
 ]
 functional = [  # installed for `just functional interfaces/certificate_transfer`
 ]
