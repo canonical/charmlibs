@@ -31,7 +31,7 @@ dependencies = [
 
 [package.dev-dependencies]
 unit = [
-    { name = "scenario" },
+    { name = "ops", extra = ["testing"] },
 ]
 
 [package.metadata]
@@ -45,7 +45,7 @@ requires-dist = [
 functional = []
 integration = []
 lint = []
-unit = [{ name = "scenario" }]
+unit = [{ name = "ops", extras = ["testing"] }]
 
 [[package]]
 name = "importlib-metadata"
@@ -113,13 +113,22 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/ef/e6/262240beb2e3f2fd981ebb82412148c93f830606bfe1fcabf92cdb967c56/ops-3.4.0-py3-none-any.whl", hash = "sha256:d5ea906cd9bf403fe0e83d10ee5ab9bd2307596a97c1690784f937d54d5a738c", size = 211359, upload-time = "2025-11-27T04:45:54.161Z" },
 ]
 
+[package.optional-dependencies]
+testing = [
+    { name = "ops-scenario" },
+]
+
 [[package]]
-name = "packaging"
-version = "25.0"
+name = "ops-scenario"
+version = "8.4.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/a1/d4/1fc4078c65507b51b96ca8f8c3ba19e6a61c8253c72794544580a7b6c24d/packaging-25.0.tar.gz", hash = "sha256:d443872c98d677bf60f6a1f2f8c1cb748e8fe762d2bf9d3148b5599295b0fc4f", size = 165727, upload-time = "2025-04-19T11:48:59.673Z" }
+dependencies = [
+    { name = "ops" },
+    { name = "pyyaml" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/80/a4/50dbe351488fed7621931962626563c7a8c6b65035fae09616251f03f16f/ops_scenario-8.4.0.tar.gz", hash = "sha256:b8837dfe6d58596d1287589c62101cfe6ca350f43d8c64ba41c5305dd741af0c", size = 111219, upload-time = "2025-11-27T04:46:00.551Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/20/12/38679034af332785aac8774540895e234f4d07f7545804097de4b666afd8/packaging-25.0-py3-none-any.whl", hash = "sha256:29572ef2b1f17581046b3a2227d5c611fb25ec70ca1ba8554b24b0e69331a484", size = 66469, upload-time = "2025-04-19T11:48:57.875Z" },
+    { url = "https://files.pythonhosted.org/packages/80/1c/c0d3cccc0ff50c88d21dc3b5ce2944c71f8d094f8de9daa7e555b1dd30e1/ops_scenario-8.4.0-py3-none-any.whl", hash = "sha256:a8de25b75a896bdc8958d7e4dc38ab06ef6cb07bfaeb4c725e64cadde712a7dd", size = 63250, upload-time = "2025-11-27T04:45:55.776Z" },
 ]
 
 [[package]]
@@ -467,15 +476,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/26/ca/f5a344c534214cc2d41118c0699fffbdc2c1bc7046f2a2b9609765ab9c92/rpds_py-0.27.1-pp311-pypy311_pp73-musllinux_1_2_i686.whl", hash = "sha256:df8b74962e35c9249425d90144e721eed198e6555a0e22a563d29fe4486b51f6", size = 590482, upload-time = "2025-08-27T12:16:10.137Z" },
     { url = "https://files.pythonhosted.org/packages/ce/08/4349bdd5c64d9d193c360aa9db89adeee6f6682ab8825dca0a3f535f434f/rpds_py-0.27.1-pp311-pypy311_pp73-musllinux_1_2_x86_64.whl", hash = "sha256:dc23e6820e3b40847e2f4a7726462ba0cf53089512abe9ee16318c366494c17a", size = 556523, upload-time = "2025-08-27T12:16:12.188Z" },
 ]
-
-[[package]]
-name = "scenario"
-version = "1.3.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "packaging" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/34/7c/1dabaafb03876af82b53c450322464c9a43e05674207047a3b94ca08dc81/scenario-1.3.1.tar.gz", hash = "sha256:71b697753fe814b7697f2323a61a96225bdb14d46a70c86a64540d617faf189a", size = 151844, upload-time = "2021-10-25T15:34:13.046Z" }
 
 [[package]]
 name = "typing-extensions"

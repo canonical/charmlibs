@@ -24,7 +24,7 @@ dependencies = [
 lint = [  # installed for `just lint interfaces/certificate_transfer` (unit, functional, and integration are also installed)
 ]
 unit = [  # installed for `just unit interfaces/certificate_transfer`
-    "scenario",
+    "ops[testing]"
 ]
 functional = [  # installed for `just functional interfaces/certificate_transfer`
 ]
@@ -67,6 +67,15 @@ quote-style = "preserve"
 extends = "../../pyproject.toml"
 include = ["src", "tests"]
 pythonVersion = "3.10"  # check no python > 3.10 features are used
+
+# TODO: These are previously uncaught errors when moving the library over.
+# They should be removed eventually.
+reportUnknownParameterType = "none"
+reportUnknownMemberType = "none"
+reportUnknownVariableType = "none"
+reportUnknownArgumentType = "none"
+reportMissingTypeArgument = "none"
+reportDeprecated = "none"
 
 [tool.charmlibs.functional]
 ubuntu = []  # ubuntu versions to run functional tests with, e.g. "24.04" (defaults to just "latest")

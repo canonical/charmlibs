@@ -122,7 +122,7 @@ class DatabagModel(pydantic.BaseModel):
             raise DataValidationError(msg) from e
 
         try:
-            return cls.parse_raw(json.dumps(data))  # type: ignore
+            return cls.parse_raw(json.dumps(data))
         except pydantic.ValidationError as e:
             msg = f"failed to validate databag: {databag}"
             logger.debug(msg, exc_info=True)
@@ -328,7 +328,7 @@ class CertificateTransferProvides(Object):
             self._set_relation_data(relation, existing_data)
 
     def _get_active_relations(self, relation_id: int | None = None) -> list[Relation]:
-        """Get the relation if relation_id is given and the relation is active, all active relations otherwise."""
+        """Get the relation if relation is active and id is given, or all active relations."""
         if relation_id is not None:
             relation = self.model.get_relation(
                 relation_name=self.relationship_name, relation_id=relation_id
@@ -594,11 +594,12 @@ class CertificateTransferRequires(Object):
 
     def _get_active_relations(self, relation_id: int | None = None) -> list[Relation]:
         """Get the active relation if relation_id is given, all active relations otherwise."""
-        if relation_id is not None:
-            if relation := self.model.get_relation(
+        if relation_id is not None and (
+            relation := self.model.get_relation(
                 relation_name=self.relationship_name, relation_id=relation_id
-            ):
-                return [relation]
+            )
+        ):
+            return [relation]
         return [
             relation
             for relation in self.model.relations[self.relationship_name]
