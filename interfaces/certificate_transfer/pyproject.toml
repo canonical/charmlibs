@@ -15,7 +15,6 @@ classifiers = [
 ]
 dynamic = ["version"]
 dependencies = [
-    "jsonschema",
     "ops",
     "pydantic",
 ]
