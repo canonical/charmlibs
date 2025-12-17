@@ -44,7 +44,6 @@ Provider charm
 The provider charm is the charm providing public certificates to another charm that requires them.
 
 Example:
-
 ::
 
     from ops.charm import CharmBase, RelationJoinedEvent
@@ -57,14 +56,14 @@ Example:
     class DummyCertificateTransferProviderCharm(CharmBase):
         def __init__(self, *args):
             super().__init__(*args)
-            self.certificate_transfer = CertificateTransferProvides(self, "certificates")
+            self.ct = CertificateTransferProvides(self, "certificates")
             self.framework.observe(
                 self.on.certificates_relation_joined, self._on_certificates_relation_joined
             )
 
         def _on_certificates_relation_joined(self, event: RelationJoinedEvent):
             certificate = "my certificate"
-            self.certificate_transfer.add_certificates(certificate)
+            self.ct.add_certificates(certificate)
 
 
     if __name__ == "__main__":
@@ -77,7 +76,6 @@ Requirer charm
 The requirer charm is the charm requiring certificates from another charm that provides them.
 
 Example:
-
 ::
 
     import logging
@@ -95,12 +93,12 @@ Example:
     class DummyCertificateTransferRequirerCharm(CharmBase):
         def __init__(self, *args):
             super().__init__(*args)
-            self.certificate_transfer = CertificateTransferRequires(self, "certificates")
+            self.ct = CertificateTransferRequires(self, "certificates")
             self.framework.observe(
-                self.certificate_transfer.on.certificate_set_updated, self._on_certificates_available
+                self.ct.on.certificate_set_updated, self._on_certificates_available
             )
             self.framework.observe(
-                self.certificate_transfer.on.certificates_removed, self._on_certificates_removed
+                self.ct.on.certificates_removed, self._on_certificates_removed
             )
 
         def _on_certificates_available(self, event: CertificatesAvailableEvent):
