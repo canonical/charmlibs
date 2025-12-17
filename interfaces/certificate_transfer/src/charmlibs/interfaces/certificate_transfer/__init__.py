@@ -31,9 +31,7 @@ compatibility.
 Getting Started
 =================
 
-From a charm directory, fetch the library using `charmcraft`:
-
-::
+From a charm directory, fetch the library using ``charmcraft``::
 
     charmcraft fetch-lib charms.certificate_transfer_interface.v1.certificate_transfer
 
@@ -43,8 +41,7 @@ Provider charm
 
 The provider charm is the charm providing public certificates to another charm that requires them.
 
-Example:
-::
+Example::
 
     from ops.charm import CharmBase, RelationJoinedEvent
     from ops.main import main
@@ -75,8 +72,7 @@ Requirer charm
 =================
 The requirer charm is the charm requiring certificates from another charm that provides them.
 
-Example:
-::
+Example::
 
     import logging
 
@@ -112,9 +108,7 @@ Example:
     if __name__ == "__main__":
         main(DummyCertificateTransferRequirerCharm)
 
-You can integrate both charms by running:
-
-::
+You can integrate both charms by running::
 
     juju integrate <certificate_transfer provider charm> <certificate_transfer requirer charm>
 
