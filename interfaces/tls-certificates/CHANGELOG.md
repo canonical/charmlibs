@@ -1,4 +1,4 @@
-# 1.3.0 - 09 December 2025
+# 1.3.0 - 17 December 2025
 
 Introduce the error field in relation data and specify error codes.
 
