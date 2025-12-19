@@ -30,6 +30,7 @@
 /systemd/ @canonical/charmlibs-maintainers
 
 # charmlibs.interfaces packages (alphabetical)
+/interfaces/certificate_transfer/ @canonical/tls
 /interfaces/cos_agent/ @canonical/observability
 /interfaces/grafana_auth/ @canonical/observability
 /interfaces/grafana_datasource/ @canonical/observability
