@@ -75,7 +75,7 @@ jobs:
         run: uv build
         working-directory: ./${{ matrix.package }}
       - name: Attest build provenance
-        uses: actions/attest-build-provenance@v3.0.0
+        uses: actions/attest-build-provenance@v3.1.0
         with:
           subject-path: '${{ matrix.package }}/dist/*'
       - name: Publish
