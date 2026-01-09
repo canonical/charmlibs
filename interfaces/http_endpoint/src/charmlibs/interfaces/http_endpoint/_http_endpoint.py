@@ -167,6 +167,7 @@ class HttpEndpointRequirer(Object):
 
         self.framework.observe(charm.on[relation_name].relation_broken, self._configure)
         self.framework.observe(charm.on[relation_name].relation_changed, self._configure)
+        self.framework.observe(charm.on.upgrade_charm, self._configure)
 
     @property
     def http_endpoints(self) -> list[HttpEndpointDataModel]:

@@ -233,6 +233,39 @@ class TestHttpEndpointRequirer:
             assert endpoints[0].scheme == 'http'
             assert endpoints[0].hostname == '10.0.0.1'
 
+    def test_charm_upgrade_receives_endpoint_data(
+        self, requirer_charm_meta: dict[str, Any], requirer_charm_relation_1: ops.testing.Relation
+    ):
+        """Test that the requirer receives and parses endpoint data correctly after upgrade."""
+        ctx = ops.testing.Context(
+            RequirerCharm,
+            meta=requirer_charm_meta,
+        )
+
+        relation = requirer_charm_relation_1
+
+        state_in = ops.testing.State(
+            relations=[relation],
+        )
+
+        with ctx(ctx.on.relation_changed(relation), state_in) as manager:
+            manager.run()
+
+            endpoints = manager.charm.endpoints
+            assert len(endpoints) == 1
+            assert endpoints[0].port == '8080'
+            assert endpoints[0].scheme == 'http'
+            assert endpoints[0].hostname == '10.0.0.1'
+
+        with ctx(ctx.on.upgrade_charm(), state_in) as manager:
+            manager.run()
+
+            endpoints = manager.charm.endpoints
+            assert len(endpoints) == 1
+            assert endpoints[0].port == '8080'
+            assert endpoints[0].scheme == 'http'
+            assert endpoints[0].hostname == '10.0.0.1'
+
     def test_emits_unavailable_when_no_relations(self, requirer_charm_meta: dict[str, Any]):
         """Test that requirer emits unavailable event when there are no relations."""
         ctx = ops.testing.Context(
