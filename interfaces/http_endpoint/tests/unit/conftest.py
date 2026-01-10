@@ -33,16 +33,14 @@ class ProviderCharm(ops.CharmBase):
     def __init__(self, *args: typing.Any):
         super().__init__(*args)
         self.provider = HttpEndpointProvider(self, 'http-endpoint')
+        self.config_changed_event_emitted = False
         self.framework.observe(
-            self.provider.on.http_endpoint_config_required, self._on_config_required
+            self.provider.on.http_endpoint_config_changed, self._on_config_changed
         )
 
-        self.provider_config: dict[str, Any] = {}
-
-    def _on_config_required(self, _: ops.EventBase):
-        """Record config required events."""
-        if self.provider_config:
-            self.provider.update_config(**self.provider_config)
+    def _on_config_changed(self, _: ops.EventBase):
+        """Record when config changed event is emitted."""
+        self.config_changed_event_emitted = True
 
 
 class RequirerCharm(ops.CharmBase):
@@ -51,21 +49,25 @@ class RequirerCharm(ops.CharmBase):
     def __init__(self, *args: typing.Any):
         super().__init__(*args)
         self.requirer = HttpEndpointRequirer(self, 'http-endpoint')
-        self.framework.observe(
-            self.requirer.on.http_endpoint_available, self._on_endpoint_available
-        )
-        self.framework.observe(
-            self.requirer.on.http_endpoint_unavailable, self._on_endpoint_unavailable
-        )
+        self.framework.observe(self.requirer.on.http_endpoint_available, self._on_available)
+        self.framework.observe(self.requirer.on.http_endpoint_unavailable, self._on_unavailable)
         self.endpoints = []
+        self.available_event_emitted = False
+        self.unavailable_event_emitted = False
 
-    def _on_endpoint_available(self, _: ops.EventBase):
+    def _configure(self, _: ops.EventBase):
         """Record endpoint available events."""
-        self.endpoints = self.requirer.http_endpoints
+        self.endpoints = self.requirer.get_http_endpoints()
 
-    def _on_endpoint_unavailable(self, _: ops.EventBase):
-        """Record endpoint unavailable events."""
-        self.endpoints = self.requirer.http_endpoints
+    def _on_available(self, _: ops.EventBase):
+        """Record when available event is emitted."""
+        self.available_event_emitted = True
+        self.endpoints = self.requirer.get_http_endpoints()
+
+    def _on_unavailable(self, _: ops.EventBase):
+        """Record when unavailable event is emitted."""
+        self.unavailable_event_emitted = True
+        self.endpoints = self.requirer.get_http_endpoints()
 
 
 @pytest.fixture
@@ -94,9 +96,7 @@ def requirer_charm_relation_1() -> ops.testing.Relation:
         endpoint='http-endpoint',
         interface='http_endpoint',
         remote_app_data={
-            'scheme': 'http',
-            'port': '8080',
-            'hostname': '10.0.0.1',
+            'url': '"http://10.0.0.1:8080/"',
         },
     )
 
@@ -108,15 +108,22 @@ def requirer_charm_relation_2() -> ops.testing.Relation:
         endpoint='http-endpoint',
         interface='http_endpoint',
         remote_app_data={
-            'scheme': 'https',
-            'port': '8443',
-            'hostname': '10.0.0.2',
+            'url': '"https://10.0.0.2:8443/"',
         },
     )
 
 
 @pytest.fixture
-def provider_charm_relation() -> ops.testing.Relation:
+def provider_charm_relation_1() -> ops.testing.Relation:
+    """Return a relation for the ProviderCharm."""
+    return ops.testing.Relation(
+        endpoint='http-endpoint',
+        interface='http_endpoint',
+    )
+
+
+@pytest.fixture
+def provider_charm_relation_2() -> ops.testing.Relation:
     """Return a relation for the ProviderCharm."""
     return ops.testing.Relation(
         endpoint='http-endpoint',

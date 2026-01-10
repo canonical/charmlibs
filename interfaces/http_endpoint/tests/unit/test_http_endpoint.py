@@ -18,15 +18,64 @@ from typing import Any
 
 import ops
 import ops.testing
+import pytest
+from pydantic import HttpUrl
 
+from charmlibs.interfaces.http_endpoint._http_endpoint import (
+    DataValidationError,
+    HttpEndpointDataModel,
+)
 from conftest import ProviderCharm, RequirerCharm
+
+
+class TestHttpEndpointDataModel:
+    """Tests for HttpEndpointDataModel."""
+
+    def test_valid_url(self):
+        """Test that a valid URL is accepted and can be dumped/loaded."""
+        # Create a model with a valid URL
+        model = HttpEndpointDataModel(url=HttpUrl('https://example.com:8443/api'))
+
+        # Dump to databag format
+        databag = model.dump()
+
+        # Verify the databag format
+        assert 'url' in databag
+        assert isinstance(databag['url'], str)
+
+        # Load back from databag
+        loaded_model = HttpEndpointDataModel.load(databag)
+
+        # Verify the loaded model matches
+        assert str(loaded_model.url) == str(model.url)
+
+    def test_invalid_url(self):
+        """Test that an invalid URL raises DataValidationError."""
+        # Create an invalid databag with malformed URL
+        invalid_databag = {'url': '"not-a-valid-url"'}
+
+        # Should raise DataValidationError when loading
+        with pytest.raises(DataValidationError, match='failed to validate databag'):
+            HttpEndpointDataModel.load(invalid_databag)
+
+    def test_invalid_json(self):
+        """Test that invalid JSON in databag raises DataValidationError."""
+        # Create a databag with invalid JSON
+        invalid_databag = {'url': 'not-valid-json{'}
+
+        # Should raise DataValidationError when loading
+        with pytest.raises(DataValidationError, match='invalid databag contents'):
+            HttpEndpointDataModel.load(invalid_databag)
 
 
 class TestHttpEndpointProvider:
     """Tests for HttpEndpointProvider."""
 
     def test_publishes_endpoint_data_on_relation_changed(
-        self, provider_charm_meta: dict[str, Any], provider_charm_relation: ops.testing.Relation
+        self,
+        provider_charm_meta: dict[str, Any],
+        provider_charm_relation_1: ops.testing.Relation,
+        provider_charm_relation_2: ops.testing.Relation,
     ):
         """Test that the provider publishes endpoint data when the relation changes."""
         ctx = ops.testing.Context(
@@ -34,25 +83,29 @@ class TestHttpEndpointProvider:
             meta=provider_charm_meta,
         )
 
-        relation = provider_charm_relation
+        relation1 = provider_charm_relation_1
+        relation2 = provider_charm_relation_2
 
         state_in = ops.testing.State(
             leader=True,
-            relations=[relation],
+            relations=[relation1, relation2],
         )
 
-        with ctx(ctx.on.relation_changed(relation), state_in) as manager:
-            # Update config before emitting the event
-            manager.charm.provider.update_config(scheme='http', listen_port=8080)
+        with ctx(ctx.on.relation_changed(relation1), state_in) as manager:
             manager.run()
 
-            # Check the relation data on the charm
-            rel = manager.charm.model.relations['http-endpoint'][0]
-            assert rel.data[manager.charm.app]['port'] == '8080'
-            assert rel.data[manager.charm.app]['scheme'] == 'http'
+            # Both relations should have the data
+            relations = manager.charm.model.relations['http-endpoint']
+            assert len(relations) == 2
+
+            for rel in relations:
+                assert rel.data[manager.charm.app] != {}
 
     def test_update_config_emits_config_changed_event(
-        self, provider_charm_meta: dict[str, Any], provider_charm_relation: ops.testing.Relation
+        self,
+        provider_charm_meta: dict[str, Any],
+        provider_charm_relation_1: ops.testing.Relation,
+        provider_charm_relation_2: ops.testing.Relation,
     ):
         """Test that update_config emits the config_changed event."""
         ctx = ops.testing.Context(
@@ -60,28 +113,29 @@ class TestHttpEndpointProvider:
             meta=provider_charm_meta,
         )
 
-        relation = provider_charm_relation
+        relation_1 = provider_charm_relation_1
+        relation_2 = provider_charm_relation_2
 
         state_in = ops.testing.State(
             leader=True,
-            relations=[relation],
+            relations=[relation_1, relation_2],
         )
 
-        with ctx(ctx.on.start(), state_in) as manager:
-            # Before update_config, relation data should be empty
-            rel = manager.charm.model.relations['http-endpoint'][0]
-            assert 'port' not in rel.data[manager.charm.app]
-            assert 'scheme' not in rel.data[manager.charm.app]
+        with ctx(ctx.on.relation_changed(relation_1), state_in) as manager:
+            manager.charm.provider.update_config(path='/', scheme='https', listen_port=8443)
 
-            manager.charm.provider.update_config(scheme='https', listen_port=443)
-
-            # The update_config should emit http_endpoint_config_changed which triggers _configure
-            rel = manager.charm.model.relations['http-endpoint'][0]
-            assert rel.data[manager.charm.app]['port'] == '443'
-            assert rel.data[manager.charm.app]['scheme'] == 'https'
+            relations = manager.charm.model.relations['http-endpoint']
+            for rel in relations:
+                assert rel.data[manager.charm.app] != {}
+                assert '8443' in rel.data[manager.charm.app]['url']
+                assert 'https' in rel.data[manager.charm.app]['url']
+                assert manager.charm.config_changed_event_emitted is True
 
     def test_non_leader_does_not_publish(
-        self, provider_charm_meta: dict[str, Any], provider_charm_relation: ops.testing.Relation
+        self,
+        provider_charm_meta: dict[str, Any],
+        provider_charm_relation_1: ops.testing.Relation,
+        provider_charm_relation_2: ops.testing.Relation,
     ):
         """Test that non-leader units do not publish endpoint data."""
         ctx = ops.testing.Context(
@@ -89,47 +143,23 @@ class TestHttpEndpointProvider:
             meta=provider_charm_meta,
         )
 
-        relation = provider_charm_relation
+        relation_1 = provider_charm_relation_1
+        relation_2 = provider_charm_relation_2
 
         state_in = ops.testing.State(
             leader=False,
-            relations=[relation],
+            relations=[relation_1, relation_2],
         )
 
-        with ctx(ctx.on.relation_changed(relation), state_in) as manager:
-            manager.charm.provider.update_config(scheme='http', listen_port=8080)
+        with ctx(ctx.on.relation_changed(relation_1), state_in) as manager:
             manager.run()
 
             # Non-leader should not update relation data
-            rel = manager.charm.model.relations['http-endpoint'][0]
-            assert dict(rel.data[manager.charm.app]) == {}
+            relations = manager.charm.model.relations['http-endpoint']
+            for rel in relations:
+                assert rel.data[manager.charm.app] == {}
 
-    def test_emits_config_required_when_config_incomplete(
-        self, provider_charm_meta: dict[str, Any], provider_charm_relation: ops.testing.Relation
-    ):
-        """Test that provider emits config_required event when configuration is incomplete."""
-        ctx = ops.testing.Context(
-            ProviderCharm,
-            meta=provider_charm_meta,
-        )
-
-        relation = provider_charm_relation
-
-        state_in = ops.testing.State(
-            leader=True,
-            relations=[relation],
-        )
-
-        with ctx(ctx.on.relation_changed(relation), state_in) as manager:
-            # Set the charm to have no config
-            manager.charm.provider_config = {}
-            manager.run()
-
-            # The provider should not have published data since config is incomplete
-            rel = manager.charm.model.relations['http-endpoint'][0]
-            assert dict(rel.data[manager.charm.app]) == {}
-
-    def test_no_relations(self, provider_charm_meta: dict[str, Any]):
+    def test_noop_when_no_relations(self, provider_charm_meta: dict[str, Any]):
         """Test that provider handles gracefully when there are no relations."""
         ctx = ops.testing.Context(
             ProviderCharm,
@@ -141,49 +171,18 @@ class TestHttpEndpointProvider:
             relations=[],
         )
 
-        with ctx(ctx.on.start(), state_in) as manager:
-            manager.charm.provider.update_config(scheme='http', listen_port=8080)
+        with ctx(ctx.on.config_changed(), state_in) as manager:
             manager.run()
 
-            # Should not have any relations anymore
+            # Should not have any relations
             rel = manager.charm.model.relations['http-endpoint']
             assert len(rel) == 0
 
-    def test_multiple_relations(
-        self, provider_charm_meta: dict[str, Any], provider_charm_relation: ops.testing.Relation
-    ):
-        """Test that provider publishes to multiple relations."""
-        ctx = ops.testing.Context(
-            ProviderCharm,
-            meta=provider_charm_meta,
-        )
-
-        relation1 = provider_charm_relation
-
-        relation2 = ops.testing.Relation(
-            endpoint='http-endpoint',
-            interface='http_endpoint',
-        )
-
-        state_in = ops.testing.State(
-            leader=True,
-            relations=[relation1, relation2],
-        )
-
-        with ctx(ctx.on.relation_changed(relation1), state_in) as manager:
-            manager.charm.provider.update_config(scheme='https', listen_port=8443)
-            manager.run()
-
-            # Both relations should have the data
-            relations = manager.charm.model.relations['http-endpoint']
-            assert len(relations) == 2
-
-            for rel in relations:
-                assert rel.data[manager.charm.app]['port'] == '8443'
-                assert rel.data[manager.charm.app]['scheme'] == 'https'
-
     def test_relation_broken(
-        self, provider_charm_meta: dict[str, Any], provider_charm_relation: ops.testing.Relation
+        self,
+        provider_charm_meta: dict[str, Any],
+        provider_charm_relation_1: ops.testing.Relation,
+        provider_charm_relation_2: ops.testing.Relation,
     ):
         """Test that provider handles relation broken events."""
         ctx = ops.testing.Context(
@@ -191,26 +190,29 @@ class TestHttpEndpointProvider:
             meta=provider_charm_meta,
         )
 
-        relation = provider_charm_relation
+        relation_1 = provider_charm_relation_1
+        relation_2 = provider_charm_relation_2
 
         state_in = ops.testing.State(
             leader=True,
-            relations=[relation],
+            relations=[relation_1, relation_2],
         )
 
-        with ctx(ctx.on.relation_broken(relation), state_in) as manager:
-            manager.charm.provider.update_config(scheme='http', listen_port=8080)
+        with ctx(ctx.on.relation_broken(relation_1), state_in) as manager:
             manager.run()
 
-            rel = manager.charm.model.relations['http-endpoint']
-            assert len(rel) == 0
+            relations = manager.charm.model.relations['http-endpoint']
+            assert len(relations) == 1
 
 
 class TestHttpEndpointRequirer:
     """Tests for HttpEndpointRequirer."""
 
     def test_receives_endpoint_data(
-        self, requirer_charm_meta: dict[str, Any], requirer_charm_relation_1: ops.testing.Relation
+        self,
+        requirer_charm_meta: dict[str, Any],
+        requirer_charm_relation_1: ops.testing.Relation,
+        requirer_charm_relation_2: ops.testing.Relation,
     ):
         """Test that the requirer receives and parses endpoint data correctly."""
         ctx = ops.testing.Context(
@@ -218,56 +220,28 @@ class TestHttpEndpointRequirer:
             meta=requirer_charm_meta,
         )
 
-        relation = requirer_charm_relation_1
+        relation_1 = requirer_charm_relation_1
+        relation_2 = requirer_charm_relation_2
 
         state_in = ops.testing.State(
-            relations=[relation],
+            relations=[relation_1, relation_2],
         )
 
-        with ctx(ctx.on.relation_changed(relation), state_in) as manager:
+        with ctx(ctx.on.relation_changed(relation_1), state_in) as manager:
             manager.run()
 
             endpoints = manager.charm.endpoints
-            assert len(endpoints) == 1
-            assert endpoints[0].port == '8080'
-            assert endpoints[0].scheme == 'http'
-            assert endpoints[0].hostname == '10.0.0.1'
+            assert len(endpoints) == 2
 
-    def test_charm_upgrade_receives_endpoint_data(
-        self, requirer_charm_meta: dict[str, Any], requirer_charm_relation_1: ops.testing.Relation
-    ):
-        """Test that the requirer receives and parses endpoint data correctly after upgrade."""
-        ctx = ops.testing.Context(
-            RequirerCharm,
-            meta=requirer_charm_meta,
-        )
-
-        relation = requirer_charm_relation_1
-
-        state_in = ops.testing.State(
-            relations=[relation],
-        )
-
-        with ctx(ctx.on.relation_changed(relation), state_in) as manager:
-            manager.run()
-
-            endpoints = manager.charm.endpoints
-            assert len(endpoints) == 1
-            assert endpoints[0].port == '8080'
-            assert endpoints[0].scheme == 'http'
-            assert endpoints[0].hostname == '10.0.0.1'
-
-        with ctx(ctx.on.upgrade_charm(), state_in) as manager:
-            manager.run()
-
-            endpoints = manager.charm.endpoints
-            assert len(endpoints) == 1
-            assert endpoints[0].port == '8080'
-            assert endpoints[0].scheme == 'http'
-            assert endpoints[0].hostname == '10.0.0.1'
+            url_1 = HttpEndpointDataModel(url=HttpUrl('http://10.0.0.1:8080/'))
+            url_2 = HttpEndpointDataModel(url=HttpUrl('https://10.0.0.2:8443/'))
+            assert endpoints == [url_1, url_2]
 
     def test_charm_config_changed_receives_endpoint_data(
-        self, requirer_charm_meta: dict[str, Any], requirer_charm_relation_1: ops.testing.Relation
+        self,
+        requirer_charm_meta: dict[str, Any],
+        requirer_charm_relation_1: ops.testing.Relation,
+        requirer_charm_relation_2: ops.testing.Relation,
     ):
         """Test that the requirer receives and parses endpoint data correctly after configuring."""
         ctx = ops.testing.Context(
@@ -275,31 +249,24 @@ class TestHttpEndpointRequirer:
             meta=requirer_charm_meta,
         )
 
-        relation = requirer_charm_relation_1
+        relation_1 = requirer_charm_relation_1
+        relation_2 = requirer_charm_relation_2
 
         state_in = ops.testing.State(
-            relations=[relation],
+            relations=[relation_1, relation_2],
         )
-
-        with ctx(ctx.on.relation_changed(relation), state_in) as manager:
-            manager.run()
-
-            endpoints = manager.charm.endpoints
-            assert len(endpoints) == 1
-            assert endpoints[0].port == '8080'
-            assert endpoints[0].scheme == 'http'
-            assert endpoints[0].hostname == '10.0.0.1'
 
         with ctx(ctx.on.config_changed(), state_in) as manager:
             manager.run()
 
             endpoints = manager.charm.endpoints
-            assert len(endpoints) == 1
-            assert endpoints[0].port == '8080'
-            assert endpoints[0].scheme == 'http'
-            assert endpoints[0].hostname == '10.0.0.1'
+            assert len(endpoints) == 2
 
-    def test_emits_unavailable_when_no_relations(self, requirer_charm_meta: dict[str, Any]):
+            url_1 = HttpEndpointDataModel(url=HttpUrl('http://10.0.0.1:8080/'))
+            url_2 = HttpEndpointDataModel(url=HttpUrl('https://10.0.0.2:8443/'))
+            assert endpoints == [url_1, url_2]
+
+    def test_noop_when_no_relations(self, requirer_charm_meta: dict[str, Any]):
         """Test that requirer emits unavailable event when there are no relations."""
         ctx = ops.testing.Context(
             RequirerCharm,
@@ -311,16 +278,17 @@ class TestHttpEndpointRequirer:
         )
 
         with ctx(ctx.on.start(), state_in) as manager:
-            # Manually trigger _configure to simulate relation-changed
-            manager.charm.requirer._configure(
-                ops.EventBase(ops.Handle(manager.charm, 'test', 'test'))
-            )
-
-            # Should have no endpoints available
+            # Should be noop when there are no relations
+            manager.run()
             assert len(manager.charm.endpoints) == 0
+            assert manager.charm.available_event_emitted is False
+            assert manager.charm.unavailable_event_emitted is False
 
     def test_handles_relation_broken(
-        self, requirer_charm_meta: dict[str, Any], requirer_charm_relation_1: ops.testing.Relation
+        self,
+        requirer_charm_meta: dict[str, Any],
+        requirer_charm_relation_1: ops.testing.Relation,
+        requirer_charm_relation_2: ops.testing.Relation,
     ):
         """Test that requirer handles relation broken events."""
         ctx = ops.testing.Context(
@@ -328,50 +296,22 @@ class TestHttpEndpointRequirer:
             meta=requirer_charm_meta,
         )
 
-        relation = requirer_charm_relation_1
+        relation_1 = requirer_charm_relation_1
+        relation_2 = requirer_charm_relation_2
 
         state_in = ops.testing.State(
-            relations=[relation],
+            relations=[relation_1, relation_2],
         )
 
-        with ctx(ctx.on.relation_broken(relation), state_in) as manager:
-            manager.run()
-            # Should have no endpoints after relation is broken
-            assert len(manager.charm.endpoints) == 0
-
-    def test_multiple_relations(
-        self,
-        requirer_charm_meta: dict[str, Any],
-        requirer_charm_relation_1: ops.testing.Relation,
-        requirer_charm_relation_2: ops.testing.Relation,
-    ):
-        """Test that requirer can handle multiple relations."""
-        ctx = ops.testing.Context(
-            RequirerCharm,
-            meta=requirer_charm_meta,
-        )
-
-        relation1 = requirer_charm_relation_1
-        relation2 = requirer_charm_relation_2
-
-        state_in = ops.testing.State(
-            relations=[relation1, relation2],
-        )
-
-        with ctx(ctx.on.relation_changed(relation1), state_in) as manager:
+        with ctx(ctx.on.relation_broken(relation_1), state_in) as manager:
             manager.run()
 
+            # Should have one endpoint remaining after breaking one relation
             endpoints = manager.charm.endpoints
-            assert len(endpoints) == 2
+            assert len(endpoints) == 1
 
-            # Check endpoints (order may vary)
-            schemes = {ep.scheme for ep in endpoints}
-            ports = {ep.port for ep in endpoints}
-            hostnames = {ep.hostname for ep in endpoints}
-
-            assert schemes == {'http', 'https'}
-            assert ports == {'8080', '8443'}
-            assert hostnames == {'10.0.0.1', '10.0.0.2'}
+            url_2 = HttpEndpointDataModel(url=HttpUrl('https://10.0.0.2:8443/'))
+            assert endpoints == [url_2]
 
     def test_empty_relation_data(self, requirer_charm_meta: dict[str, Any]):
         """Test that requirer handles relations with no data gracefully."""
@@ -393,5 +333,30 @@ class TestHttpEndpointRequirer:
         with ctx(ctx.on.relation_changed(relation), state_in) as manager:
             manager.run()
 
-            # Should have no valid endpoints
             assert len(manager.charm.endpoints) == 0
+            assert manager.charm.available_event_emitted is False
+            assert manager.charm.unavailable_event_emitted is True
+
+    def test_relation_with_no_app_data(self, requirer_charm_meta: dict[str, Any]):
+        """Test that requirer handles relations where relation.app is None."""
+        ctx = ops.testing.Context(
+            RequirerCharm,
+            meta=requirer_charm_meta,
+        )
+
+        # Create a relation without remote app
+        relation = ops.testing.Relation(
+            endpoint='http-endpoint',
+            interface='http_endpoint',
+        )
+
+        state_in = ops.testing.State(
+            relations=[relation],
+        )
+
+        with ctx(ctx.on.relation_changed(relation), state_in) as manager:
+            manager.run()
+
+            # Should return empty list when relation.app is None
+            endpoints = manager.charm.requirer.get_http_endpoints()
+            assert len(endpoints) == 0

@@ -15,16 +15,23 @@
 """The charmlibs.interfaces.http_endpoint package."""
 
 from ._http_endpoint import (
+    HttpEndpointAvailableEvent,
+    HttpEndpointConfigChangedEvent,
     HttpEndpointDataModel,
     HttpEndpointProvider,
     HttpEndpointRequirer,
+    HttpEndpointUnavailableEvent,
     InvalidHttpEndpointDataError,
 )
 from ._version import __version__ as __version__
 
 __all__ = [
+    'HttpEndpointAvailableEvent',
+    'HttpEndpointConfigChangedEvent',
+    'HttpEndpointDataModel',
     'HttpEndpointDataModel',
     'HttpEndpointProvider',
     'HttpEndpointRequirer',
+    'HttpEndpointUnavailableEvent',
     'InvalidHttpEndpointDataError',
 ]
