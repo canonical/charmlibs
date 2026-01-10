@@ -231,11 +231,6 @@ class HttpEndpointRequirer(Object):
         This method retrieves and validates the HTTP endpoint data from the relation. The retrieved
         data will be stored in the `http_endpoint` attribute if valid.
         """
-        relations = self.charm.model.relations[self.relation_name]
-        if not relations:
-            logger.debug('No %s relations found', self.relation_name)
-            return
-
         if self.get_http_endpoints():
             self.on.http_endpoint_available.emit()
         else:

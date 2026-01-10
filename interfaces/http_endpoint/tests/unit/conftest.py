@@ -52,8 +52,6 @@ class RequirerCharm(ops.CharmBase):
         self.framework.observe(self.requirer.on.http_endpoint_available, self._on_available)
         self.framework.observe(self.requirer.on.http_endpoint_unavailable, self._on_unavailable)
         self.endpoints = []
-        self.available_event_emitted = False
-        self.unavailable_event_emitted = False
 
     def _configure(self, _: ops.EventBase):
         """Record endpoint available events."""

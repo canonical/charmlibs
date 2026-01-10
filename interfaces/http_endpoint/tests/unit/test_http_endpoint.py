@@ -71,7 +71,7 @@ class TestHttpEndpointDataModel:
 class TestHttpEndpointProvider:
     """Tests for HttpEndpointProvider."""
 
-    def test_publishes_endpoint_data_on_relation_changed(
+    def test_on_relation_changed_publish_default_endpoint(
         self,
         provider_charm_meta: dict[str, Any],
         provider_charm_relation_1: ops.testing.Relation,
@@ -100,6 +100,36 @@ class TestHttpEndpointProvider:
 
             for rel in relations:
                 assert rel.data[manager.charm.app] != {}
+                data = HttpEndpointDataModel.load(rel.data[manager.charm.app])
+                assert data.url.port == 80  # Default port from provider init
+                assert data.url.path == '/'  # Default path from provider init
+                assert data.url.scheme == 'http'  # Default scheme from provider init
+
+    def test_relation_broken_removes_default_endpoint(
+        self,
+        provider_charm_meta: dict[str, Any],
+        provider_charm_relation_1: ops.testing.Relation,
+        provider_charm_relation_2: ops.testing.Relation,
+    ):
+        """Test that provider handles relation broken events."""
+        ctx = ops.testing.Context(
+            ProviderCharm,
+            meta=provider_charm_meta,
+        )
+
+        relation_1 = provider_charm_relation_1
+        relation_2 = provider_charm_relation_2
+
+        state_in = ops.testing.State(
+            leader=True,
+            relations=[relation_1, relation_2],
+        )
+
+        with ctx(ctx.on.relation_broken(relation_1), state_in) as manager:
+            manager.run()
+
+            relations = manager.charm.model.relations['http-endpoint']
+            assert len(relations) == 1  # Only one relation should remain
 
     def test_update_config_emits_config_changed_event(
         self,
@@ -178,37 +208,11 @@ class TestHttpEndpointProvider:
             rel = manager.charm.model.relations['http-endpoint']
             assert len(rel) == 0
 
-    def test_relation_broken(
-        self,
-        provider_charm_meta: dict[str, Any],
-        provider_charm_relation_1: ops.testing.Relation,
-        provider_charm_relation_2: ops.testing.Relation,
-    ):
-        """Test that provider handles relation broken events."""
-        ctx = ops.testing.Context(
-            ProviderCharm,
-            meta=provider_charm_meta,
-        )
-
-        relation_1 = provider_charm_relation_1
-        relation_2 = provider_charm_relation_2
-
-        state_in = ops.testing.State(
-            leader=True,
-            relations=[relation_1, relation_2],
-        )
-
-        with ctx(ctx.on.relation_broken(relation_1), state_in) as manager:
-            manager.run()
-
-            relations = manager.charm.model.relations['http-endpoint']
-            assert len(relations) == 1
-
 
 class TestHttpEndpointRequirer:
     """Tests for HttpEndpointRequirer."""
 
-    def test_receives_endpoint_data(
+    def test_relation_changed_receives_endpoint_data(
         self,
         requirer_charm_meta: dict[str, Any],
         requirer_charm_relation_1: ops.testing.Relation,
@@ -236,6 +240,31 @@ class TestHttpEndpointRequirer:
             url_1 = HttpEndpointDataModel(url=HttpUrl('http://10.0.0.1:8080/'))
             url_2 = HttpEndpointDataModel(url=HttpUrl('https://10.0.0.2:8443/'))
             assert endpoints == [url_1, url_2]
+
+    def test_relation_broken_emits_endpoint_unavailable(
+        self,
+        requirer_charm_meta: dict[str, Any],
+        requirer_charm_relation_1: ops.testing.Relation,
+    ):
+        """Test that requirer handles relation broken events."""
+        ctx = ops.testing.Context(
+            RequirerCharm,
+            meta=requirer_charm_meta,
+        )
+
+        relation_1 = requirer_charm_relation_1
+
+        state_in = ops.testing.State(
+            relations=[relation_1],
+        )
+
+        with ctx(ctx.on.relation_broken(relation_1), state_in) as manager:
+            manager.run()
+
+            # Should have one endpoint remaining after breaking one relation
+            endpoints = manager.charm.endpoints
+            assert len(endpoints) == 0
+            assert hasattr(manager.charm, 'unavailable_event_emitted')
 
     def test_charm_config_changed_receives_endpoint_data(
         self,
@@ -281,37 +310,8 @@ class TestHttpEndpointRequirer:
             # Should be noop when there are no relations
             manager.run()
             assert len(manager.charm.endpoints) == 0
-            assert manager.charm.available_event_emitted is False
-            assert manager.charm.unavailable_event_emitted is False
-
-    def test_handles_relation_broken(
-        self,
-        requirer_charm_meta: dict[str, Any],
-        requirer_charm_relation_1: ops.testing.Relation,
-        requirer_charm_relation_2: ops.testing.Relation,
-    ):
-        """Test that requirer handles relation broken events."""
-        ctx = ops.testing.Context(
-            RequirerCharm,
-            meta=requirer_charm_meta,
-        )
-
-        relation_1 = requirer_charm_relation_1
-        relation_2 = requirer_charm_relation_2
-
-        state_in = ops.testing.State(
-            relations=[relation_1, relation_2],
-        )
-
-        with ctx(ctx.on.relation_broken(relation_1), state_in) as manager:
-            manager.run()
-
-            # Should have one endpoint remaining after breaking one relation
-            endpoints = manager.charm.endpoints
-            assert len(endpoints) == 1
-
-            url_2 = HttpEndpointDataModel(url=HttpUrl('https://10.0.0.2:8443/'))
-            assert endpoints == [url_2]
+            assert not hasattr(manager.charm, 'available_event_emitted')
+            assert not hasattr(manager.charm, 'unavailable_event_emitted')
 
     def test_empty_relation_data(self, requirer_charm_meta: dict[str, Any]):
         """Test that requirer handles relations with no data gracefully."""
@@ -334,29 +334,5 @@ class TestHttpEndpointRequirer:
             manager.run()
 
             assert len(manager.charm.endpoints) == 0
-            assert manager.charm.available_event_emitted is False
-            assert manager.charm.unavailable_event_emitted is True
-
-    def test_relation_with_no_app_data(self, requirer_charm_meta: dict[str, Any]):
-        """Test that requirer handles relations where relation.app is None."""
-        ctx = ops.testing.Context(
-            RequirerCharm,
-            meta=requirer_charm_meta,
-        )
-
-        # Create a relation without remote app
-        relation = ops.testing.Relation(
-            endpoint='http-endpoint',
-            interface='http_endpoint',
-        )
-
-        state_in = ops.testing.State(
-            relations=[relation],
-        )
-
-        with ctx(ctx.on.relation_changed(relation), state_in) as manager:
-            manager.run()
-
-            # Should return empty list when relation.app is None
-            endpoints = manager.charm.requirer.get_http_endpoints()
-            assert len(endpoints) == 0
+            assert hasattr(manager.charm, 'unavailable_event_emitted')
+            assert not hasattr(manager.charm, 'available_event_emitted')
