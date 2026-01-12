@@ -64,7 +64,6 @@ class HttpEndpointProvider(Object):
         self.listen_port = listen_port
         self.set_ports = set_ports
 
-        self.framework.observe(charm.on[relation_name].relation_broken, self._configure)
         self.framework.observe(charm.on[relation_name].relation_changed, self._configure)
         self.framework.observe(charm.on.config_changed, self._configure)
 

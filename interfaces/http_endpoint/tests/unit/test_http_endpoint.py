@@ -65,32 +65,6 @@ class TestHttpEndpointProvider:
                     assert data.url.port == 80  # Default port from provider init
                     assert data.url.scheme == 'http'  # Default scheme from provider init
 
-    def test_relation_broken_removes_default_endpoint(
-        self,
-        provider_charm_meta: dict[str, Any],
-        provider_charm_relation_1: ops.testing.Relation,
-        provider_charm_relation_2: ops.testing.Relation,
-    ):
-        """Test that provider handles relation broken events."""
-        ctx = ops.testing.Context(
-            ProviderCharm,
-            meta=provider_charm_meta,
-        )
-
-        relation_1 = provider_charm_relation_1
-        relation_2 = provider_charm_relation_2
-
-        state_in = ops.testing.State(
-            leader=True,
-            relations=[relation_1, relation_2],
-        )
-
-        with ctx(ctx.on.relation_broken(relation_1), state_in) as manager:
-            manager.run()
-
-            relations = manager.charm.model.relations['http-endpoint']
-            assert len(relations) == 1  # Only one relation should remain
-
     def test_update_config_with_valid_parameters(
         self,
         provider_charm_meta: dict[str, Any],
