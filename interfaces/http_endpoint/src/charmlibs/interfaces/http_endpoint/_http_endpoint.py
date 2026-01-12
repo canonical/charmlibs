@@ -3,77 +3,26 @@
 
 """Source code of `charmlibs.interfaces.http_endpoint` v1.0.0."""
 
-import json
 import logging
-from collections.abc import MutableMapping
 
-from ops import CharmBase, CharmEvents, EventBase, EventSource, Object
+from ops import CharmBase, EventBase, Object
 from pydantic import BaseModel, HttpUrl, ValidationError
 
 logger = logging.getLogger(__name__)
 
 
-class DataValidationError(Exception):
-    """Exception raised for invalid data."""
-
-
-class InvalidHttpEndpointDataError(Exception):
-    """Exception raised for invalid http_endpoint data."""
-
-
-class HttpEndpointDataModel(BaseModel):
+class _HttpEndpointDataModel(BaseModel):
     """Data model for http_endpoint interface."""
 
     url: HttpUrl
 
-    def dump(self) -> MutableMapping[str, str]:
-        """Output the contents of this model to be compatible with Juju databag.
 
-        Returns:
-            The databag as a string to string MutableMapping.
-        """
-        json_model = self.model_dump(mode='json')
-        return {k: json.dumps(v) for k, v in json_model.items()}
-
-    @classmethod
-    def load(cls, databag: MutableMapping[str, str]) -> 'HttpEndpointDataModel':
-        """Load this model from a Juju databag.
-
-        Args:
-            databag: The Juju databag to load from
-
-        Return:
-            An instance of this data model.
-        """
-        try:
-            data = {k: json.loads(v) for k, v in databag.items()}
-            data_model = cls.model_validate_json(json.dumps(data))
-        except ValidationError as e:
-            msg = f'failed to validate databag: {databag}'
-            logger.error(msg)
-            raise DataValidationError(msg) from e
-        except json.JSONDecodeError as e:
-            msg = f'invalid databag contents: expecting json. {databag}'
-            logger.error(msg)
-            raise DataValidationError(msg) from e
-
-        return data_model
-
-
-class HttpEndpointConfigChangedEvent(EventBase):
-    """Event emitted when the http endpoint configuration is changed."""
-
-
-class HttpEndpointProviderCharmEvents(CharmEvents):
-    """Custom events for HttpEndpointProvider."""
-
-    http_endpoint_config_changed = EventSource(HttpEndpointConfigChangedEvent)
+class HttpEndpointInvalidDataError(Exception):
+    """Exception raised for invalid http_endpoint data."""
 
 
 class HttpEndpointProvider(Object):
     """The http_endpoint interface provider."""
-
-    on = HttpEndpointProviderCharmEvents()  # type: ignore[reportAssignmentType]
 
     def __init__(
         self,
@@ -82,8 +31,21 @@ class HttpEndpointProvider(Object):
         path: str = '/',
         scheme: str = 'http',
         listen_port: int = 80,
+        set_ports: bool = False,
     ) -> None:
         """Initialize an instance of HttpEndpointProvider class.
+
+        The provider side of the http_endpoint interface publishes the HTTP endpoint information of
+        the leader unit in the relation application data bag. The provider can be initialized with
+        custom parameters (path, scheme, listen_port) if they are known in advanced. By default,
+        the endpoint will be assumed to be at the root path "/" using the "http" scheme on port 80.
+        Alternatively, if the scheme and port are not known at the beginning or depend on other
+        factors (e.g. config option or certificate relation), the provider can updated those
+        parameters later via `update_config` method.
+
+        The provider can also optionally set the port on the unit if specified, but the charm
+        author is responsible for ensuring that the related unit is able communicate over that
+        port.
 
         Args:
             charm: The charm instance.
@@ -91,23 +53,27 @@ class HttpEndpointProvider(Object):
             path: The url path.
             scheme: The scheme to use (only http or https).
             listen_port: The listen port to open [1, 65535].
+            set_ports: Whether to set the unit port on the charm.
         """
         super().__init__(charm, relation_name)
 
         self.charm = charm
         self.relation_name = relation_name
-
         self.path = path
         self.scheme = scheme
         self.listen_port = listen_port
+        self.set_ports = set_ports
 
         self.framework.observe(charm.on[relation_name].relation_broken, self._configure)
         self.framework.observe(charm.on[relation_name].relation_changed, self._configure)
-        self.framework.observe(self.on.http_endpoint_config_changed, self._configure)
         self.framework.observe(charm.on.config_changed, self._configure)
 
     def _configure(self, _: EventBase) -> None:
-        """Configure the provider side of http_endpoint interface idempotently.
+        """Configure the provider side of http_endpoint interface idempotently."""
+        self._update_config()
+
+    def _update_config(self) -> None:
+        """Update the provider side of http_endpoint interface idempotently.
 
         This method sets the HTTP endpoint information of the leader unit in the relation
         application data bag.
@@ -137,56 +103,43 @@ class HttpEndpointProvider(Object):
         # Publish the HTTP endpoint to all relations" application data bags
         url = f'{self.scheme}://{ingress_address}:{self.listen_port}/{self.path.lstrip("/")}'
         try:
-            http_endpoint = HttpEndpointDataModel(url=HttpUrl(url))
+            http_endpoint = _HttpEndpointDataModel(url=HttpUrl(url))
             for relation in relations:
-                relation_data = relation.data[self.charm.app]
-                relation_data.update(http_endpoint.dump())
+                relation.save(http_endpoint, self.charm.app)
                 logger.info(
                     'Published HTTP endpoint to relation %s: %s', relation.id, http_endpoint
                 )
-        except (ValidationError, DataValidationError) as e:
+        except ValidationError as e:
             msg = f'Invalid http endpoint data: url={url}'
             logger.error(msg)
-            raise InvalidHttpEndpointDataError(msg) from e
+            raise HttpEndpointInvalidDataError(msg) from e
 
-        self.charm.unit.set_ports(self.listen_port)
+        if self.set_ports:
+            self.charm.unit.set_ports(self.listen_port)
 
-    def update_config(self, path: str, scheme: str, listen_port: int) -> None:
+    def update_config(
+        self, path: str, scheme: str, listen_port: int, set_ports: bool = False
+    ) -> None:
         """Update http endpoint configuration.
 
         Args:
             path: The url path.
             scheme: The scheme to use (only http or https).
             listen_port: The listen port to open [1, 65535].
+            set_ports: Whether to set the unit ports on the charm.
 
         Raises:
-            InvalidHttpEndpointDataError if not valid scheme.
+            HttpEndpointInvalidDataError if not valid scheme.
         """
         self.path = path
         self.scheme = scheme
         self.listen_port = listen_port
-        self.on.http_endpoint_config_changed.emit()
-
-
-class HttpEndpointAvailableEvent(EventBase):
-    """Event emitted when an HTTP endpoint becomes available."""
-
-
-class HttpEndpointUnavailableEvent(EventBase):
-    """Event emitted when an HTTP endpoint becomes unavailable."""
-
-
-class HttpEndpointRequirerCharmEvents(CharmEvents):
-    """Custom events for HttpEndpointRequirer."""
-
-    http_endpoint_available = EventSource(HttpEndpointAvailableEvent)
-    http_endpoint_unavailable = EventSource(HttpEndpointUnavailableEvent)
+        self.set_ports = set_ports
+        self._update_config()
 
 
 class HttpEndpointRequirer(Object):
     """The http_endpoint interface requirer."""
-
-    on = HttpEndpointRequirerCharmEvents()  # type: ignore[reportAssignmentType]
 
     def __init__(self, charm: CharmBase, relation_name: str) -> None:
         """Initialize an instance of HttpEndpointRequirer class.
@@ -200,38 +153,26 @@ class HttpEndpointRequirer(Object):
         self.charm = charm
         self.relation_name = relation_name
 
-        self.framework.observe(charm.on[relation_name].relation_broken, self._configure)
-        self.framework.observe(charm.on[relation_name].relation_changed, self._configure)
-        self.framework.observe(charm.on.config_changed, self._configure)
-
-    def get_http_endpoints(self) -> list[HttpEndpointDataModel]:
-        """Get the list of HTTP endpoints of the leader units retrieved from the relation.
+    def get_urls(self) -> list[str]:
+        """Get the list of urls from HTTP endpoints of the leader units.
 
         Returns:
-            An instance of HttpEndpointDataModel containing the HTTP endpoint data if available.
+            A list of URLs from the HTTP endpoints of the leader units if available.
         """
         relations = self.charm.model.relations[self.relation_name]
         if not relations:
             logger.debug('No %s relations found', self.relation_name)
             return []
 
-        http_endpoints: list[HttpEndpointDataModel] = []
+        http_endpoints: list[str] = []
         for relation in relations:
-            data = relation.data.get(relation.app)
-            if not data:
+            if relation.app not in relation.data and not relation.data.get(relation.app):
                 logger.warning('Relation data (%s) is not ready', self.relation_name)
                 continue
-            http_endpoints.append(HttpEndpointDataModel.load(data))
-            logger.info('Retrieved HTTP output info from relation %s: %s', relation.id, data)
+            try:
+                data = relation.load(_HttpEndpointDataModel, relation.app)
+                http_endpoints.append(str(data.url))
+                logger.info('Retrieved URL from relation %s: %s', relation.id, data)
+            except ValidationError as e:
+                logger.error('Invalid URL endpoint data in relation %s: %s', relation.id, e)
         return http_endpoints
-
-    def _configure(self, _: EventBase) -> None:
-        """Configure the requirer side of http_endpoint interface idempotently.
-
-        This method retrieves and validates the HTTP endpoint data from the relation. The retrieved
-        data will be stored in the `http_endpoint` attribute if valid.
-        """
-        if self.get_http_endpoints():
-            self.on.http_endpoint_available.emit()
-        else:
-            self.on.http_endpoint_unavailable.emit()
