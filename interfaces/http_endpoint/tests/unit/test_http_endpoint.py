@@ -149,6 +149,33 @@ class TestHttpEndpointProvider:
                     path=path, scheme=scheme, listen_port=listen_port
                 )
 
+    def test_non_leader_does_not_publish(
+        self,
+        provider_charm_meta: dict[str, Any],
+        provider_charm_relation_1: ops.testing.Relation,
+        provider_charm_relation_2: ops.testing.Relation,
+    ):
+        """Test that non-leader units do not publish endpoint data."""
+        ctx = ops.testing.Context(
+            ProviderCharm,
+            meta=provider_charm_meta,
+        )
+
+        relation_1 = provider_charm_relation_1
+        relation_2 = provider_charm_relation_2
+
+        state_in = ops.testing.State(
+            leader=False,
+            relations=[relation_1, relation_2],
+        )
+
+        with patch('ops.Relation.save') as mock_save:
+            with ctx(ctx.on.relation_changed(relation_1), state_in) as manager:
+                manager.run()
+
+                # Non-leader should not update relation data
+                mock_save.assert_not_called()
+
     def test_noop_when_no_relations(self, provider_charm_meta: dict[str, Any]):
         """Test that provider handles gracefully when there are no relations."""
         ctx = ops.testing.Context(
@@ -195,20 +222,10 @@ class TestHttpEndpointRequirer:
             manager.run()
 
             # Check that URLs are strings and have the expected values defined in conftest.py
-            urls = manager.charm.requirer.get_unit_urls()
-            assert len(urls) == 6  # 3 units per relations (2 relations here)defined in conftest.py
-            assert urls['remote_0/0'] == 'http://10.0.0.1:8080/'
-            assert urls['remote_0/1'] == 'http://10.0.0.2:8080/'
-            assert urls['remote_0/2'] == 'http://10.0.0.3:8080/'
-            assert urls['remote_1/0'] == 'https://10.0.1.1:8443/'
-            assert urls['remote_1/1'] == 'https://10.0.1.2:8443/'
-            assert urls['remote_1/2'] == 'https://10.0.1.3:8443/'
-
-            # Check that URLs are strings and have the expected values defined in conftest.py
             leader_urls = manager.charm.requirer.get_app_urls()
             assert len(leader_urls) == 2
-            assert leader_urls['remote_0'] == 'http://10.0.0.1:8080/'
-            assert leader_urls['remote_1'] == 'https://10.0.1.1:8443/'
+            assert leader_urls['remote_1'] == 'http://10.0.0.1:8080/'
+            assert leader_urls['remote_2'] == 'https://10.0.1.1:8443/'
 
     def test_handle_invalid_relation_data(
         self,
@@ -252,5 +269,4 @@ class TestHttpEndpointRequirer:
             manager.run()
 
             # Should return an empty list when there are no relations
-            assert len(manager.charm.requirer.get_unit_urls()) == 0
             assert len(manager.charm.requirer.get_app_urls()) == 0

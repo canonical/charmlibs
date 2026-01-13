@@ -68,14 +68,9 @@ def requirer_charm_relation_1() -> ops.testing.Relation:
     return ops.testing.Relation(
         endpoint='http-endpoint',
         interface='http_endpoint',
-        remote_app_name='remote_0',
+        remote_app_name='remote_1',
         remote_app_data={
             'url': '"http://10.0.0.1:8080/"',
-        },
-        remote_units_data={
-            0: {'url': '"http://10.0.0.1:8080/"'},
-            1: {'url': '"http://10.0.0.2:8080/"'},
-            2: {'url': '"http://10.0.0.3:8080/"'},
         },
     )
 
@@ -86,14 +81,9 @@ def requirer_charm_relation_2() -> ops.testing.Relation:
     return ops.testing.Relation(
         endpoint='http-endpoint',
         interface='http_endpoint',
-        remote_app_name='remote_1',
+        remote_app_name='remote_2',
         remote_app_data={
             'url': '"https://10.0.1.1:8443/"',
-        },
-        remote_units_data={
-            0: {'url': '"https://10.0.1.1:8443/"'},
-            1: {'url': '"https://10.0.1.2:8443/"'},
-            2: {'url': '"https://10.0.1.3:8443/"'},
         },
     )
 
@@ -104,9 +94,6 @@ def provider_charm_relation_1() -> ops.testing.Relation:
     return ops.testing.Relation(
         endpoint='http-endpoint',
         interface='http_endpoint',
-        local_unit_data={
-            'ingress-address': '10.0.0.5',
-        },
     )
 
 

@@ -77,6 +77,10 @@ class HttpEndpointProvider(Object):
         This method sets the HTTP endpoint information of the leader unit in the relation
         application data bag.
         """
+        if not self.charm.unit.is_leader():
+            logger.debug('Only leader unit can set http endpoint information')
+            return
+
         relations = self.charm.model.relations[self.relation_name]
         if not relations:
             logger.debug('No %s relations found', self.relation_name)
@@ -95,13 +99,12 @@ class HttpEndpointProvider(Object):
             )
             return
 
+        # Publish the HTTP endpoint to all relations" application data bags
         url = f'{self.scheme}://{ingress_address}:{self.listen_port}/{self.path.lstrip("/")}'
         try:
             http_endpoint = _HttpEndpointDataModel(url=HttpUrl(url))
             for relation in relations:
-                relation.save(http_endpoint, self.charm.unit)
-                if self.charm.unit.is_leader():
-                    relation.save(http_endpoint, self.charm.app)
+                relation.save(http_endpoint, self.charm.app)
                 logger.info(
                     'Published HTTP endpoint to relation %s: %s', relation.id, http_endpoint
                 )
@@ -149,34 +152,6 @@ class HttpEndpointRequirer(Object):
         self.charm = charm
         self.relation_name = relation_name
 
-    def get_unit_urls(self) -> dict[str, str]:
-        """Get the list of urls from HTTP endpoints from all related units.
-
-        This method retrieves the URLs from the HTTP endpoints provided by all related units.
-
-        Returns:
-            A dictionary of unit names to URLs from the HTTP endpoints of all related units if
-            available.
-        """
-        relations = self.charm.model.relations[self.relation_name]
-        if not relations:
-            logger.debug('No %s relations found', self.relation_name)
-            return {}
-
-        http_endpoints: dict[str, str] = {}
-        for relation in relations:
-            for unit in relation.units:
-                if unit not in relation.data and not relation.data.get(unit):
-                    logger.warning('Relation data (%s) is not ready', self.relation_name)
-                    continue
-                try:
-                    data = relation.load(_HttpEndpointDataModel, unit)
-                    http_endpoints[unit.name] = str(data.url)
-                    logger.info('Retrieved URL from relation %s: %s', relation.id, data)
-                except ValidationError as e:
-                    logger.error('Invalid URL endpoint data in relation %s: %s', relation.id, e)
-        return http_endpoints
-
     def get_app_urls(self) -> dict[str, str]:
         """Get the list of urls from HTTP endpoints from all related applications.
 
@@ -184,7 +159,7 @@ class HttpEndpointRequirer(Object):
         related applications.
 
         Returns:
-            A dictionary of unit names to URLs from the HTTP endpoints of all leader units if
+            A dictionary of app names to URLs from the HTTP endpoints of all leader units if
             available.
         """
         relations = self.charm.model.relations[self.relation_name]
