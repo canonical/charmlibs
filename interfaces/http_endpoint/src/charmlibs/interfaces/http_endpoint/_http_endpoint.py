@@ -149,8 +149,10 @@ class HttpEndpointRequirer(Object):
         self.charm = charm
         self.relation_name = relation_name
 
-    def get_urls(self) -> dict[str, str]:
-        """Get the list of urls from HTTP endpoints of the from all related units.
+    def get_unit_urls(self) -> dict[str, str]:
+        """Get the list of urls from HTTP endpoints from all related units.
+
+        This method retrieves the URLs from the HTTP endpoints provided by all related units.
 
         Returns:
             A dictionary of unit names to URLs from the HTTP endpoints of all related units if
@@ -175,25 +177,29 @@ class HttpEndpointRequirer(Object):
                     logger.error('Invalid URL endpoint data in relation %s: %s', relation.id, e)
         return http_endpoints
 
-    def get_leader_urls(self) -> list[str]:
-        """Get the list of urls from HTTP endpoints of the leader units.
+    def get_app_urls(self) -> dict[str, str]:
+        """Get the list of urls from HTTP endpoints from all related applications.
+
+        This method retrieves the URLs from the HTTP endpoints provided by the leader unit from all
+        related applications.
 
         Returns:
-            A list of URLs from the HTTP endpoints of the leader units if available.
+            A dictionary of unit names to URLs from the HTTP endpoints of all leader units if
+            available.
         """
         relations = self.charm.model.relations[self.relation_name]
         if not relations:
             logger.debug('No %s relations found', self.relation_name)
-            return []
+            return {}
 
-        http_endpoints: list[str] = []
+        http_endpoints: dict[str, str] = {}
         for relation in relations:
             if relation.app not in relation.data and not relation.data.get(relation.app):
                 logger.warning('Relation data (%s) is not ready', self.relation_name)
                 continue
             try:
                 data = relation.load(_HttpEndpointDataModel, relation.app)
-                http_endpoints.append(str(data.url))
+                http_endpoints[relation.app.name] = str(data.url)
                 logger.info('Retrieved URL from relation %s: %s', relation.id, data)
             except ValidationError as e:
                 logger.error('Invalid URL endpoint data in relation %s: %s', relation.id, e)
