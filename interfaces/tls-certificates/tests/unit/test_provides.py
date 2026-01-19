@@ -492,6 +492,87 @@ class TestTLSCertificatesProvidesV4:
             "certificates": [{"certificate": certificate_1}, {"certificate": certificate_2}]
         }
 
+    def test_given_no_errors_when_get_provider_certificate_errors_then_no_errors_are_returned(
+        self,
+    ):
+        certificates_relation = scenario.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-requirer",
+        )
+        state_in = scenario.State(
+            relations={certificates_relation},
+            leader=True,
+        )
+
+        self.ctx.run(self.ctx.on.action("get-provider-certificate-errors"), state_in)
+
+        assert self.ctx.action_results == {"errors": []}
+
+    def test_given_errors_when_get_provider_certificate_errors_then_errors_are_returned(self):
+        requirer_private_key = generate_private_key()
+        csr_1 = generate_csr(
+            private_key=requirer_private_key,
+            common_name="example1.com",
+        )
+        csr_2 = generate_csr(
+            private_key=requirer_private_key,
+            common_name="example2.org",
+        )
+        certificates_relation = scenario.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-requirer",
+            local_app_data={
+                "request_errors": json.dumps([
+                    {
+                        "csr": csr_1,
+                        "error": {
+                            "code": 101,
+                            "name": "IP_NOT_ALLOWED",
+                            "message": "IP address not allowed in CSR",
+                            "reason": "192.168.1.1 is not in the allowed IP range",
+                            "provider": "test-provider",
+                            "endpoint": "certificates",
+                        },
+                    },
+                    {
+                        "csr": csr_2,
+                        "error": {
+                            "code": 102,
+                            "name": "DOMAIN_NOT_ALLOWED",
+                            "message": "Domain not allowed in CSR",
+                            "reason": "example2.org is not in the allowed domain list",
+                            "provider": "test-provider",
+                            "endpoint": "certificates",
+                        },
+                    },
+                ]),
+            },
+        )
+
+        state_in = scenario.State(
+            relations={certificates_relation},
+            leader=True,
+        )
+
+        self.ctx.run(self.ctx.on.action("get-provider-certificate-errors"), state_in)
+
+        assert self.ctx.action_results == {
+            "errors": [
+                {
+                    "csr": csr_1,
+                    "error_code": 101,
+                    "error_message": "IP address not allowed in CSR",
+                },
+                {
+                    "csr": csr_2,
+                    "error_code": 102,
+                    "error_message": "Domain not allowed in CSR",
+                },
+            ]
+        }
+
     def test_given_certificate_request_when_set_relation_certificate_then_certificate_added_to_relation_data(
         self,
     ):

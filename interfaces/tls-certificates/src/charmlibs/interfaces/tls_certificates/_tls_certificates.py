@@ -2678,6 +2678,34 @@ class TLSCertificatesProvidesV4(Object):
             ])
         return certificates
 
+    def get_provider_certificate_errors(
+        self, relation_id: int | None = None
+    ) -> list[ProviderCertificateError]:
+        """Return provider certificate errors for the given relations.
+
+        Args:
+            relation_id: Optional relation ID to filter errors by specific relation.
+                        If None, returns errors from all relations.
+
+        Returns:
+            List of ProviderCertificateError objects representing failed certificate requests.
+        """
+        errors: list[ProviderCertificateError] = []
+        relations = self._get_tls_relations(relation_id)
+        for relation in relations:
+            if not relation.app:
+                logger.warning("Relation %s does not have an application", relation.id)
+                continue
+            errors.extend([
+                ProviderCertificateError(
+                    relation_id=relation.id,
+                    certificate_signing_request=CertificateSigningRequest.from_string(entry.csr),
+                    error=entry.error,
+                )
+                for entry in self._load_provider_request_errors(relation)
+            ])
+        return errors
+
     def get_unsolicited_certificates(
         self, relation_id: int | None = None
     ) -> list[ProviderCertificate]:

@@ -21,6 +21,8 @@ actions:
     description: Get the outstanding certificate requests from the requirers
   get-issued-certificates:
     description: Get the issued certificates to the requirers
+  get-provider-certificate-errors:
+    description: Get the certificate errors from the provider
   set-certificate:
     description: Set the certificate to the requirer
     params:

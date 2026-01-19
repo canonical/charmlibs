@@ -65,6 +65,10 @@ class DummyTLSCertificatesProviderCharm(CharmBase):
             self.on.get_issued_certificates_action, self._on_get_issued_certificates_action
         )
         self.framework.observe(
+            self.on.get_provider_certificate_errors_action,
+            self._on_get_provider_certificate_errors_action,
+        )
+        self.framework.observe(
             self.on.set_certificate_action,
             self._on_set_certificate_action,
         )
@@ -122,6 +126,18 @@ class DummyTLSCertificatesProviderCharm(CharmBase):
             for issued_certificate in issued_certificates
         ]
         event.set_results(results={"certificates": certificates})
+
+    def _on_get_provider_certificate_errors_action(self, event: ActionEvent) -> None:
+        provider_errors = self.certificates.get_provider_certificate_errors()
+        errors = [
+            {
+                "csr": str(provider_error.certificate_signing_request),
+                "error_code": provider_error.error.code,
+                "error_message": provider_error.error.message,
+            }
+            for provider_error in provider_errors
+        ]
+        event.set_results(results={"errors": errors})
 
     def _on_set_certificate_action(self, event: ActionEvent) -> None:
         ca_chain_str = event.params.get("ca-chain")
