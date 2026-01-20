@@ -1,4 +1,4 @@
-# 1.4.0 - 19 January 2025
+# 1.4.0 - 20 January 2025
 
 Add a helper function in TLSCertificatesProvidesV4 to get the ProviderCertificateError objects from the relation data.
 
