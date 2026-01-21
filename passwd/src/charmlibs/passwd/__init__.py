@@ -1,4 +1,4 @@
-# Copyright 2025 Canonical Ltd.
+# Copyright 2026 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,9 +14,23 @@
 
 """The charmlibs.passwd package."""
 
+from ._passwd import (
+    add_group,
+    add_user,
+    add_user_to_group,
+    group_exists,
+    remove_group,
+    remove_user,
+    user_exists,
+)
 from ._version import __version__ as __version__
 
 __all__ = [
-    # only the names listed in __all__ are imported when executing:
-    # from charmlibs.passwd import *
+    'add_group',
+    'add_user',
+    'add_user_to_group',
+    'group_exists',
+    'remove_group',
+    'remove_user',
+    'user_exists',
 ]

@@ -1,4 +1,4 @@
-# Copyright 2021 Canonical Ltd.
+# Copyright 2026 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,8 +14,9 @@
 
 """Simple library for managing Linux users and groups.
 
-The `passwd` module provides convenience methods and abstractions around users and groups on a
-Linux system, in order to make adding and managing users and groups easy.
+The `passwd` module provides convenience methods and abstractions around users
+and groups on a Linux system, in order to make adding and managing users
+and groups easy.
 
 Example of adding a user named 'test':
 
@@ -33,74 +34,62 @@ import grp
 import logging
 import pwd
 from subprocess import STDOUT, check_output
-from typing import List, Optional, Union
 
 logger = logging.getLogger(__name__)
 
-# The unique Charmhub library identifier, never change it
-LIBID = "cf7655b2bf914d67ac963f72b930f6bb"
 
-# Increment this major API version when introducing breaking changes
-LIBAPI = 0
-
-# Increment this PATCH version before using `charmcraft publish-lib` or reset
-# to 0 if you are raising the major API version
-LIBPATCH = 4
-
-
-def user_exists(user: Union[str, int]) -> Optional[pwd.struct_passwd]:
+def user_exists(username: str | int) -> pwd.struct_passwd | None:
     """Check if a user exists.
 
     Args:
-        user: username or gid of user whose existence to check
+        username: username or gid of user whose existence to check
 
     Raises:
         TypeError: where neither a string or int is passed as the first argument
     """
     try:
-        if isinstance(user, int) and not isinstance(user, bool):
-            return pwd.getpwuid(user)
-        elif isinstance(user, str):
-            return pwd.getpwnam(user)
+        if isinstance(username, int) and not isinstance(username, bool):
+            return pwd.getpwuid(username)
+        elif isinstance(username, str):
+            return pwd.getpwnam(username)
         else:
-            raise TypeError("specified argument '%r' should be a string or int", user)
+            raise TypeError("specified argument '%r' should be a string or int", username)
     except KeyError:
-        logger.info("specified user '%s' doesn't exist", str(user))
+        logger.info("specified user '%s' doesn't exist", str(username))
         return None
 
 
-def group_exists(group: Union[str, int]) -> Optional[grp.struct_group]:
+def group_exists(group_name: str | int) -> grp.struct_group | None:
     """Check if a group exists.
 
     Args:
-        group: username or gid of user whose existence to check
-
+        group_name: username or gid of user whose existence to check
     Raises:
         TypeError: where neither a string or int is passed as the first argument
     """
     try:
-        if isinstance(group, int) and not isinstance(group, bool):
-            return grp.getgrgid(group)
-        elif isinstance(group, str):
-            return grp.getgrnam(group)
+        if isinstance(group_name, int) and not isinstance(group_name, bool):
+            return grp.getgrgid(group_name)
+        elif isinstance(group_name, str):
+            return grp.getgrnam(group_name)
         else:
-            raise TypeError("specified argument '%r' should be a string or int", group)
+            raise TypeError("specified argument '%r' should be a string or int", group_name)
     except KeyError:
-        logger.info("specified group '%s' doesn't exist", str(group))
+        logger.info("specified group '%s' doesn't exist", str(group_name))
         return None
 
 
 def add_user(
     username: str,
-    password: Optional[str] = None,
-    shell: str = "/bin/bash",
+    password: str | None = None,
+    shell: str = '/bin/bash',
     system_user: bool = False,
-    primary_group: str = None,
-    secondary_groups: List[str] = None,
-    uid: int = None,
-    home_dir: str = None,
+    primary_group: str | None = None,
+    secondary_groups: list[str] | None = None,
+    uid: int | None = None,
+    home_dir: str | None = None,
     create_home: bool = True,
-) -> str:
+) -> pwd.struct_passwd:
     """Add a user to the system.
 
     Will log but otherwise succeed if the user already exists.
@@ -130,18 +119,18 @@ def add_user(
     except KeyError:
         logger.info("creating user '%s'", username)
 
-    cmd = ["useradd", "--shell", shell]
+    cmd = ['useradd', '--shell', shell]
 
     if uid:
-        cmd.extend(["--uid", str(uid)])
+        cmd.extend(['--uid', str(uid)])
     if home_dir:
-        cmd.extend(["--home", str(home_dir)])
+        cmd.extend(['--home', str(home_dir)])
     if password:
-        cmd.extend(["--password", password])
+        cmd.extend(['--password', password])
     if create_home:
-        cmd.append("--create-home")
+        cmd.append('--create-home')
     if system_user or password is None:
-        cmd.append("--system")
+        cmd.append('--system')
 
     if not primary_group:
         try:
@@ -151,9 +140,9 @@ def add_user(
             pass
 
     if primary_group:
-        cmd.extend(["-g", primary_group])
+        cmd.extend(['-g', primary_group])
     if secondary_groups:
-        cmd.extend(["-G", ",".join(secondary_groups)])
+        cmd.extend(['-G', ','.join(secondary_groups)])
 
     cmd.append(username)
     check_output(cmd, stderr=STDOUT)
@@ -161,7 +150,7 @@ def add_user(
     return user_info
 
 
-def add_group(group_name: str, system_group: bool = False, gid: int = None):
+def add_group(group_name: str, system_group: bool = False, gid: int | None = None):
     """Add a group to the system.
 
     Will log but otherwise succeed if the group already exists.
@@ -182,54 +171,54 @@ def add_group(group_name: str, system_group: bool = False, gid: int = None):
             logger.info("group with gid '%d' already exists", gid)
     except KeyError:
         logger.info("creating group '%s'", group_name)
-        cmd = ["addgroup"]
+        cmd = ['addgroup']
         if gid:
-            cmd.extend(["--gid", str(gid)])
+            cmd.extend(['--gid', str(gid)])
         if system_group:
-            cmd.append("--system")
+            cmd.append('--system')
         else:
-            cmd.extend(["--group"])
+            cmd.extend(['--group'])
         cmd.append(group_name)
         check_output(cmd, stderr=STDOUT)
         group_info = grp.getgrnam(group_name)
     return group_info
 
 
-def add_user_to_group(username: str, group: str):
+def add_user_to_group(username: str, group_name: str):
     """Add a user to a group.
 
     Args:
         username: user to add to specified group
-        group: name of group to add user to
+        group_name: name of group to add user to
 
     Returns:
         The group's password database entry struct, as returned by `grp.getgrnam`
     """
     if not user_exists(username):
-        raise ValueError("user '{}' does not exist".format(username))
-    if not group_exists(group):
-        raise ValueError("group '{}' does not exist".format(group))
+        raise ValueError(f"user '{username}' does not exist")
+    if not group_exists(group_name):
+        raise ValueError(f"group '{group_name}' does not exist")
 
-    logger.info("adding user '%s' to group '%s'", username, group)
-    check_output(["gpasswd", "-a", username, group], stderr=STDOUT)
-    return grp.getgrnam(group)
+    logger.info("adding user '%s' to group '%s'", username, group_name)
+    check_output(['gpasswd', '-a', username, group_name], stderr=STDOUT)
+    return grp.getgrnam(group_name)
 
 
-def remove_user(user: Union[str, int], remove_home: bool = False) -> bool:
+def remove_user(username: str | int, remove_home: bool = False) -> bool:
     """Remove a user from the system.
 
     Args:
-        user: the username or uid of the user to remove
+        username: the username or uid of the user to remove
         remove_home: indicates whether the user's home directory should be removed
     """
-    u = user_exists(user)
+    u = user_exists(username)
     if not u:
         logger.info("user '%s' does not exist", str(u))
         return True
 
-    cmd = ["userdel"]
+    cmd = ['userdel']
     if remove_home:
-        cmd.append("-f")
+        cmd.append('-f')
     cmd.append(u.pw_name)
 
     logger.info("removing user '%s'", u.pw_name)
@@ -237,21 +226,21 @@ def remove_user(user: Union[str, int], remove_home: bool = False) -> bool:
     return True
 
 
-def remove_group(group: Union[str, int], force: bool = False) -> bool:
+def remove_group(group_name: str | int, force: bool = False) -> bool:
     """Remove a user from the system.
 
     Args:
-        group: the name or gid of the group to remove
+        group_name: the name or gid of the group to remove
         force: force group removal even if it's the primary group for a user
     """
-    g = group_exists(group)
+    g = group_exists(group_name)
     if not g:
         logger.info("group '%s' does not exist", str(g))
         return True
 
-    cmd = ["groupdel"]
+    cmd = ['groupdel']
     if force:
-        cmd.append("-f")
+        cmd.append('-f')
     cmd.append(g.gr_name)
 
     logger.info("removing group '%s'", g.gr_name)

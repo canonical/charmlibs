@@ -1,391 +1,474 @@
-# Copyright 2021 Canonical Ltd.
-# See LICENSE file for licensing details.
+# Copyright 2026 Canonical Ltd.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 from types import SimpleNamespace
-from unittest import TestCase
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
-from charms.operator_libs_linux.v0 import passwd
+import pytest
+
+from charmlibs import passwd
 
 
-class TestPasswd(TestCase):
-    @patch("charms.operator_libs_linux.v0.passwd.pwd.getpwnam")
-    def test_user_exists_true(self, getpwnam):
-        getpwnam.return_value = "pw info"
-        self.assertEqual("pw info", passwd.user_exists("bob"))
+@patch('charmlibs.passwd._passwd.pwd.getpwnam')
+def test_user_exists(getpwnam_mock: MagicMock) -> None:
+    mock_passwd = SimpleNamespace(pw_name='bob')
+    getpwnam_mock.return_value = mock_passwd
+    assert passwd.user_exists('bob') == mock_passwd
 
-    @patch("charms.operator_libs_linux.v0.passwd.pwd.getpwuid")
-    def test_user_exists_by_uid_true(self, getpwuid):
-        getpwuid.return_value = "pw info"
-        self.assertEqual("pw info", passwd.user_exists(1001))
 
-    def test_user_exists_invalid_input(self):
-        with self.assertRaises(TypeError):
-            passwd.user_exists(True)
+@patch('charmlibs.passwd._passwd.pwd.getpwuid')
+def test_user_exists_by_uid_true(getpwuid_mock: MagicMock) -> None:
+    mock_passwd = SimpleNamespace(pw_name='bob')
+    getpwuid_mock.return_value = mock_passwd
+    assert passwd.user_exists(1000) == mock_passwd
 
-    @patch("charms.operator_libs_linux.v0.passwd.pwd.getpwnam")
-    def test_user_exists_false(self, getpwnam):
-        getpwnam.side_effect = KeyError("user not found")
-        self.assertIsNone(passwd.user_exists("bob"))
 
-    @patch("charms.operator_libs_linux.v0.passwd.grp.getgrnam")
-    def test_group_exists_true(self, getgrnam):
-        getgrnam.return_value = "grp info"
-        self.assertEqual("grp info", passwd.group_exists("bob"))
+def test_user_exists_invalid_input() -> None:
+    with pytest.raises(TypeError):
+        passwd.user_exists(True)
 
-    @patch("charms.operator_libs_linux.v0.passwd.grp.getgrgid")
-    def test_group_exists_by_gid_true(self, getgrgid):
-        getgrgid.return_value = "grp info"
-        self.assertEqual("grp info", passwd.group_exists(1001))
 
-    def test_group_exists_invalid_input(self):
-        with self.assertRaises(TypeError):
-            passwd.group_exists(True)
+@patch('charmlibs.passwd._passwd.pwd.getpwnam')
+def test_user_exists_false(getpwnam_mock: MagicMock) -> None:
+    getpwnam_mock.side_effect = KeyError('user not found')
+    assert passwd.user_exists('alice') is None
 
-    @patch("charms.operator_libs_linux.v0.passwd.grp.getgrnam")
-    def test_group_exists_false(self, getgrnam):
-        getgrnam.side_effect = KeyError("group not found")
-        self.assertIsNone(passwd.group_exists("bob"))
 
-    @patch("charms.operator_libs_linux.v0.passwd.grp.getgrnam")
-    @patch("charms.operator_libs_linux.v0.passwd.pwd.getpwnam")
-    @patch("charms.operator_libs_linux.v0.passwd.check_output")
-    def test_adds_a_user_if_it_doesnt_exist(self, check_output, getpwnam, getgrnam):
-        username = "johndoe"
-        password = "eodnhoj"
-        shell = "/bin/bash"
-        existing_user_pwnam = KeyError("user not found")
-        new_user_pwnam = "some user pwnam"
+@patch('charmlibs.passwd._passwd.grp.getgrnam')
+def test_group_exists_true(getgrnam_mock: MagicMock) -> None:
+    mock_group = SimpleNamespace(gr_name='testgroup')
+    getgrnam_mock.return_value = mock_group
+    assert passwd.group_exists('testgroup') == mock_group
 
-        getpwnam.side_effect = [existing_user_pwnam, new_user_pwnam]
 
-        result = passwd.add_user(username, password=password)
+@patch('charmlibs.passwd._passwd.grp.getgrgid')
+def test_group_exists_by_gid_true(getgrgid_mock: MagicMock) -> None:
+    mock_group = SimpleNamespace(gr_name='testgroup')
+    getgrgid_mock.return_value = mock_group
+    assert passwd.group_exists(1000) == mock_group
 
-        self.assertEqual(result, new_user_pwnam)
-        check_output.assert_called_with(
-            [
-                "useradd",
-                "--shell",
-                shell,
-                "--password",
-                password,
-                "--create-home",
-                "-g",
-                username,
-                username,
-            ],
-            stderr=-2,
-        )
-        getpwnam.assert_called_with(username)
 
-    @patch("charms.operator_libs_linux.v0.passwd.pwd.getpwnam")
-    @patch("charms.operator_libs_linux.v0.passwd.check_output")
-    def test_doesnt_add_user_if_it_already_exists(self, check_output, getpwnam):
-        username = "johndoe"
-        password = "eodnhoj"
-        existing_user_pwnam = "some user pwnam"
+def test_group_exists_invalid_input() -> None:
+    with pytest.raises(TypeError):
+        passwd.group_exists(True)
 
-        getpwnam.return_value = existing_user_pwnam
 
-        result = passwd.add_user(username, password=password)
+@patch('charmlibs.passwd._passwd.grp.getgrnam')
+def test_group_exists_false(getgrnam_mock: MagicMock) -> None:
+    getgrnam_mock.side_effect = KeyError('group not found')
+    assert passwd.group_exists('testgroup') is None
 
-        self.assertEqual(result, existing_user_pwnam)
-        self.assertFalse(check_output.called)
-        getpwnam.assert_called_with(username)
 
-    @patch("charms.operator_libs_linux.v0.passwd.grp.getgrnam")
-    @patch("charms.operator_libs_linux.v0.passwd.pwd.getpwnam")
-    @patch("charms.operator_libs_linux.v0.passwd.check_output")
-    def test_adds_a_user_with_different_shell(self, check_output, getpwnam, getgrnam):
-        username = "johndoe"
-        password = "eodnhoj"
-        shell = "/bin/zsh"
-        existing_user_pwnam = KeyError("user not found")
-        new_user_pwnam = "some user pwnam"
+@patch('charmlibs.passwd._passwd.grp.getgrnam')
+@patch('charmlibs.passwd._passwd.pwd.getpwnam')
+@patch('charmlibs.passwd._passwd.check_output')
+def test_adds_a_user_if_it_doesnt_exist(
+    check_output_mock: MagicMock, getpwnam_mock: MagicMock, getgrnam_mock: MagicMock
+) -> None:
+    username = 'johndoe'
+    password = 'eodnhoj'
+    shell = '/bin/bash'
+    existing_user_pwnam = KeyError('user not found')
+    new_user_pwnam = SimpleNamespace(pw_name=username)
 
-        getpwnam.side_effect = [existing_user_pwnam, new_user_pwnam]
-        getgrnam.side_effect = KeyError("group not found")
+    getpwnam_mock.side_effect = [existing_user_pwnam, new_user_pwnam]
 
-        result = passwd.add_user(username, password=password, shell=shell)
+    result = passwd.add_user(username, password=password)
 
-        self.assertEqual(result, new_user_pwnam)
-        check_output.assert_called_with(
-            ["useradd", "--shell", "/bin/zsh", "--password", password, "--create-home", username],
-            stderr=-2,
-        )
-        getpwnam.assert_called_with(username)
-
-    @patch("charms.operator_libs_linux.v0.passwd.grp.getgrnam")
-    @patch("charms.operator_libs_linux.v0.passwd.pwd.getpwnam")
-    @patch("charms.operator_libs_linux.v0.passwd.check_output")
-    def test_add_user_with_groups(self, check_output, getpwnam, getgrnam):
-        username = "johndoe"
-        password = "eodnhoj"
-        shell = "/bin/bash"
-        existing_user_pwnam = KeyError("user not found")
-        new_user_pwnam = "some user pwnam"
-
-        getpwnam.side_effect = [existing_user_pwnam, new_user_pwnam]
-
-        result = passwd.add_user(
+    assert result == new_user_pwnam
+    check_output_mock.assert_called_with(
+        [
+            'useradd',
+            '--shell',
+            shell,
+            '--password',
+            password,
+            '--create-home',
+            '-g',
             username,
-            password=password,
-            primary_group="foo",
-            secondary_groups=[
-                "bar",
-                "qux",
-            ],
-        )
+            username,
+        ],
+        stderr=-2,
+    )
+    getpwnam_mock.assert_called_with(username)
 
-        self.assertEqual(result, new_user_pwnam)
-        check_output.assert_called_with(
-            [
-                "useradd",
-                "--shell",
-                shell,
-                "--password",
-                password,
-                "--create-home",
-                "-g",
-                "foo",
-                "-G",
-                "bar,qux",
-                username,
-            ],
-            stderr=-2,
-        )
-        getpwnam.assert_called_with(username)
-        assert not getgrnam.called
 
-    @patch("charms.operator_libs_linux.v0.passwd.pwd.getpwnam")
-    @patch("charms.operator_libs_linux.v0.passwd.check_output")
-    def test_adds_a_systemuser(self, check_output, getpwnam):
-        username = "johndoe"
-        existing_user_pwnam = KeyError("user not found")
-        new_user_pwnam = "some user pwnam"
+@patch('charmlibs.passwd._passwd.pwd.getpwnam')
+@patch('charmlibs.passwd._passwd.check_output')
+def test_doesnt_add_user_if_it_already_exists(
+    check_output_mock: MagicMock, getpwnam_mock: MagicMock
+) -> None:
+    username = 'johndoe'
+    password = 'eodnhoj'
+    existing_user_pwnam = SimpleNamespace(pw_name=username)
 
-        getpwnam.side_effect = [existing_user_pwnam, new_user_pwnam]
+    getpwnam_mock.return_value = existing_user_pwnam
 
-        result = passwd.add_user(username, system_user=True)
+    result = passwd.add_user(username, password=password)
 
-        self.assertEqual(result, new_user_pwnam)
-        check_output.assert_called_with(
-            ["useradd", "--shell", "/bin/bash", "--create-home", "--system", username], stderr=-2
-        )
-        getpwnam.assert_called_with(username)
+    assert result == existing_user_pwnam
+    check_output_mock.assert_not_called()
+    getpwnam_mock.assert_called_with(username)
 
-    @patch("charms.operator_libs_linux.v0.passwd.pwd.getpwnam")
-    @patch("charms.operator_libs_linux.v0.passwd.check_output")
-    def test_adds_a_systemuser_with_home_dir(self, check_output, getpwnam):
-        username = "johndoe"
-        existing_user_pwnam = KeyError("user not found")
-        new_user_pwnam = "some user pwnam"
 
-        getpwnam.side_effect = [existing_user_pwnam, new_user_pwnam]
+@patch('charmlibs.passwd._passwd.grp.getgrnam')
+@patch('charmlibs.passwd._passwd.pwd.getpwnam')
+@patch('charmlibs.passwd._passwd.check_output')
+def test_adds_a_user_with_different_shell(
+    check_output_mock: MagicMock, getpwnam_mock: MagicMock, getgrnam_mock: MagicMock
+) -> None:
+    username = 'johndoe'
+    password = 'eodnhoj'
+    shell = '/bin/zsh'
+    existing_user_pwnam = KeyError('user not found')
+    new_user_pwnam = SimpleNamespace(pw_name=username)
 
-        result = passwd.add_user(username, system_user=True, home_dir="/var/lib/johndoe")
+    getpwnam_mock.side_effect = [existing_user_pwnam, new_user_pwnam]
+    getgrnam_mock.side_effect = KeyError('group not found')
 
-        self.assertEqual(result, new_user_pwnam)
-        check_output.assert_called_with(
-            [
-                "useradd",
-                "--shell",
-                "/bin/bash",
-                "--home",
-                "/var/lib/johndoe",
-                "--create-home",
-                "--system",
-                username,
-            ],
-            stderr=-2,
-        )
-        getpwnam.assert_called_with(username)
+    result = passwd.add_user(username, password=password, shell=shell)
 
-    @patch("charms.operator_libs_linux.v0.passwd.pwd.getpwnam")
-    @patch("charms.operator_libs_linux.v0.passwd.pwd.getpwuid")
-    @patch("charms.operator_libs_linux.v0.passwd.grp.getgrnam")
-    @patch("charms.operator_libs_linux.v0.passwd.check_output")
-    def test_add_user_uid(self, check_output, getgrnam, getpwuid, getpwnam):
-        user_name = "james"
-        user_id = 1111
-        uid_key_error = KeyError("user not found")
-        getpwuid.side_effect = uid_key_error
-        passwd.add_user(user_name, uid=user_id)
+    assert result == new_user_pwnam
+    check_output_mock.assert_called_with(
+        ['useradd', '--shell', shell, '--password', password, '--create-home', username],
+        stderr=-2,
+    )
+    getpwnam_mock.assert_called_with(username)
 
-        check_output.assert_called_with(
-            [
-                "useradd",
-                "--shell",
-                "/bin/bash",
-                "--uid",
-                str(user_id),
-                "--create-home",
-                "--system",
-                "-g",
-                user_name,
-                user_name,
-            ],
-            stderr=-2,
-        )
-        getpwnam.assert_called_with(user_name)
-        getpwuid.assert_called_with(user_id)
 
-    @patch("charms.operator_libs_linux.v0.passwd.user_exists")
-    @patch("charms.operator_libs_linux.v0.passwd.check_output")
-    def test_remove_user_that_does_not_exist(self, check_output, user_exists):
-        user_exists.return_value = None
-        username = "bob"
-        result = passwd.remove_user(username)
+@patch('charmlibs.passwd._passwd.grp.getgrnam')
+@patch('charmlibs.passwd._passwd.pwd.getpwnam')
+@patch('charmlibs.passwd._passwd.check_output')
+def test_add_user_with_groups(
+    check_output_mock: MagicMock, getpwnam_mock: MagicMock, getgrnam_mock: MagicMock
+) -> None:
+    username = 'johndoe'
+    password = 'eodnhoj'
+    shell = '/bin/bash'
+    existing_user_pwnam = KeyError('user not found')
+    new_user_pwnam = SimpleNamespace(pw_name=username)
 
-        check_output.assert_not_called()
-        user_exists.assert_called_with(username)
-        self.assertTrue(result)
+    getpwnam_mock.side_effect = [existing_user_pwnam, new_user_pwnam]
 
-    @patch("charms.operator_libs_linux.v0.passwd.user_exists")
-    @patch("charms.operator_libs_linux.v0.passwd.check_output")
-    def test_remove_user_that_exists(self, check_output, user_exists):
-        user_exists.return_value = SimpleNamespace(pw_name="bob")
-        username = "bob"
-        result = passwd.remove_user(username)
+    result = passwd.add_user(
+        username,
+        password=password,
+        primary_group='foo',
+        secondary_groups=[
+            'bar',
+            'qux',
+        ],
+    )
 
-        check_output.assert_called_with(["userdel", username], stderr=-2)
-        user_exists.assert_called_with(username)
-        self.assertTrue(result)
+    assert result == new_user_pwnam
+    check_output_mock.assert_called_with(
+        [
+            'useradd',
+            '--shell',
+            shell,
+            '--password',
+            password,
+            '--create-home',
+            '-g',
+            'foo',
+            '-G',
+            'bar,qux',
+            username,
+        ],
+        stderr=-2,
+    )
+    getpwnam_mock.assert_called_with(username)
+    assert getgrnam_mock.call_count == 0
 
-    @patch("charms.operator_libs_linux.v0.passwd.user_exists")
-    @patch("charms.operator_libs_linux.v0.passwd.check_output")
-    def test_remove_user_that_exists_remove_homedir(self, check_output, user_exists):
-        user_exists.return_value = SimpleNamespace(pw_name="bob")
-        username = "bob"
-        result = passwd.remove_user(username, remove_home=True)
 
-        check_output.assert_called_with(["userdel", "-f", username], stderr=-2)
-        user_exists.assert_called_with(username)
-        self.assertTrue(result)
+@patch('charmlibs.passwd._passwd.pwd.getpwnam')
+@patch('charmlibs.passwd._passwd.check_output')
+def test_adds_a_systemuser(check_output_mock: MagicMock, getpwnam_mock: MagicMock) -> None:
+    username = 'johndoe'
+    shell = '/bin/bash'
+    existing_user_pwnam = KeyError('user not found')
+    new_user_pwnam = SimpleNamespace(pw_name=username)
 
-    @patch("charms.operator_libs_linux.v0.passwd.grp.getgrnam")
-    @patch("charms.operator_libs_linux.v0.passwd.grp.getgrgid")
-    @patch("charms.operator_libs_linux.v0.passwd.check_output")
-    def test_add_group_gid(self, check_output, getgrgid, getgrnam):
-        group_name = "darkhorse"
-        group_id = 1005
-        existing_group_gid = KeyError("group not found")
-        new_group_gid = 1006
-        getgrgid.side_effect = [existing_group_gid, new_group_gid]
+    getpwnam_mock.side_effect = [existing_user_pwnam, new_user_pwnam]
 
-        passwd.add_group(group_name, gid=group_id)
-        check_output.assert_called_with(
-            ["addgroup", "--gid", str(group_id), "--group", group_name], stderr=-2
-        )
-        getgrgid.assert_called_with(group_id)
-        getgrnam.assert_called_with(group_name)
+    result = passwd.add_user(username, system_user=True)
 
-    @patch("charms.operator_libs_linux.v0.passwd.grp.getgrnam")
-    @patch("charms.operator_libs_linux.v0.passwd.group_exists")
-    @patch("charms.operator_libs_linux.v0.passwd.user_exists")
-    @patch("charms.operator_libs_linux.v0.passwd.check_output")
-    def test_adds_a_user_to_a_group(self, check_output, user_exists, group_exists, getgrnam):
-        user_exists.return_value = True
-        group_exists.return_value = True
-        username = "foo"
-        group = "bar"
-        passwd.add_user_to_group(username, group)
-        check_output.assert_called_with(["gpasswd", "-a", username, group], stderr=-2)
+    assert result == new_user_pwnam
+    check_output_mock.assert_called_with(
+        ['useradd', '--shell', shell, '--create-home', '--system', username],
+        stderr=-2,
+    )
+    getpwnam_mock.assert_called_with(username)
 
-    @patch("charms.operator_libs_linux.v0.passwd.group_exists")
-    @patch("charms.operator_libs_linux.v0.passwd.user_exists")
-    @patch("charms.operator_libs_linux.v0.passwd.check_output")
-    def test_adds_a_user_to_a_group_user_missing(self, check_output, user_exists, group_exists):
-        user_exists.return_value = False
-        group_exists.return_value = True
-        username = "foo"
-        group = "bar"
-        with self.assertRaises(ValueError):
-            passwd.add_user_to_group(username, group)
-        check_output.assert_not_called()
 
-    @patch("charms.operator_libs_linux.v0.passwd.group_exists")
-    @patch("charms.operator_libs_linux.v0.passwd.user_exists")
-    @patch("charms.operator_libs_linux.v0.passwd.check_output")
-    def test_adds_a_user_to_a_group_group_missing(self, check_output, user_exists, group_exists):
-        user_exists.return_value = True
-        group_exists.return_value = False
-        username = "foo"
-        group = "bar"
-        with self.assertRaises(ValueError):
-            passwd.add_user_to_group(username, group)
-        check_output.assert_not_called()
+@patch('charmlibs.passwd._passwd.pwd.getpwnam')
+@patch('charmlibs.passwd._passwd.check_output')
+def test_adds_a_systemuser_with_home_dir(
+    check_output_mock: MagicMock, getpwnam_mock: MagicMock
+) -> None:
+    username = 'johndoe'
+    shell = '/bin/bash'
+    home_dir = '/var/lib/johndoe'
+    existing_user_pwnam = KeyError('user not found')
+    new_user_pwnam = SimpleNamespace(pw_name=username)
 
-    @patch("charms.operator_libs_linux.v0.passwd.grp.getgrnam")
-    @patch("charms.operator_libs_linux.v0.passwd.check_output")
-    def test_add_a_group_if_it_doesnt_exist(self, check_output, getgrnam):
-        group_name = "testgroup"
-        existing_group_grnam = KeyError("group not found")
-        new_group_grnam = "some group grnam"
+    getpwnam_mock.side_effect = [existing_user_pwnam, new_user_pwnam]
 
-        getgrnam.side_effect = [existing_group_grnam, new_group_grnam]
-        result = passwd.add_group(group_name)
+    result = passwd.add_user(username, system_user=True, home_dir=home_dir)
 
-        self.assertEqual(result, new_group_grnam)
-        check_output.assert_called_with(["addgroup", "--group", group_name], stderr=-2)
-        getgrnam.assert_called_with(group_name)
+    assert result == new_user_pwnam
+    check_output_mock.assert_called_with(
+        ['useradd', '--shell', shell, '--home', home_dir, '--create-home', '--system', username],
+        stderr=-2,
+    )
+    getpwnam_mock.assert_called_with(username)
 
-    @patch("charms.operator_libs_linux.v0.passwd.grp.getgrnam")
-    @patch("charms.operator_libs_linux.v0.passwd.check_output")
-    def test_doesnt_add_group_if_it_already_exists(self, check_output, getgrnam):
-        group_name = "testgroup"
-        existing_group_grnam = "some group grnam"
 
-        getgrnam.return_value = existing_group_grnam
-        result = passwd.add_group(group_name)
+@patch('charmlibs.passwd._passwd.pwd.getpwnam')
+@patch('charmlibs.passwd._passwd.pwd.getpwuid')
+@patch('charmlibs.passwd._passwd.grp.getgrnam')
+@patch('charmlibs.passwd._passwd.check_output')
+def test_add_user_uid(
+    check_output_mock: MagicMock,
+    getgrnam_mock: MagicMock,
+    getpwuid_mock: MagicMock,
+    getpwnam_mock: MagicMock,
+) -> None:
+    username = 'johndoe'
+    user_id = 1111
+    shell = '/bin/bash'
+    uuid_key_error = KeyError('user not found')
+    getpwuid_mock.side_effect = [uuid_key_error, uuid_key_error]
+    passwd.add_user(username, uid=user_id)
 
-        self.assertEqual(result, existing_group_grnam)
-        self.assertFalse(check_output.called)
-        getgrnam.assert_called_with(group_name)
+    check_output_mock.assert_called_with(
+        [
+            'useradd',
+            '--shell',
+            shell,
+            '--uid',
+            str(user_id),
+            '--create-home',
+            '--system',
+            '-g',
+            username,
+            username,
+        ],
+        stderr=-2,
+    )
 
-    @patch("charms.operator_libs_linux.v0.passwd.grp.getgrnam")
-    @patch("charms.operator_libs_linux.v0.passwd.check_output")
-    def test_add_a_system_group(self, check_output, getgrnam):
-        group_name = "testgroup"
-        existing_group_grnam = KeyError("group not found")
-        new_group_grnam = "some group grnam"
+    getpwnam_mock.assert_called_with(username)
+    getpwuid_mock.assert_called_with(user_id)
 
-        getgrnam.side_effect = [existing_group_grnam, new_group_grnam]
-        result = passwd.add_group(group_name, system_group=True)
 
-        self.assertEqual(result, new_group_grnam)
-        check_output.assert_called_with(["addgroup", "--system", group_name], stderr=-2)
-        getgrnam.assert_called_with(group_name)
+@patch('charmlibs.passwd._passwd.check_output')
+@patch('charmlibs.passwd._passwd.user_exists')
+def test_remove_user_that_does_not_exist(
+    user_exists_mock: MagicMock, check_output_mock: MagicMock
+) -> None:
+    user_exists_mock.return_value = None
+    result = passwd.remove_user('bob')
 
-    @patch("charms.operator_libs_linux.v0.passwd.group_exists")
-    @patch("charms.operator_libs_linux.v0.passwd.check_output")
-    def test_remove_group_that_does_not_exist(self, check_output, group_exists):
-        group_exists.return_value = None
-        groupname = "bob"
-        result = passwd.remove_group(groupname)
+    assert result is True
+    check_output_mock.assert_not_called()
 
-        check_output.assert_not_called()
-        group_exists.assert_called_with(groupname)
-        self.assertTrue(result)
 
-    @patch("charms.operator_libs_linux.v0.passwd.group_exists")
-    @patch("charms.operator_libs_linux.v0.passwd.check_output")
-    def test_remove_group_that_exists(self, check_output, group_exists):
-        group_exists.return_value = SimpleNamespace(gr_name="bob")
-        groupname = "bob"
-        result = passwd.remove_group(groupname)
+@patch('charmlibs.passwd._passwd.check_output')
+@patch('charmlibs.passwd._passwd.user_exists')
+def test_remove_user_that_exists(
+    user_exists_mock: MagicMock, check_output_mock: MagicMock
+) -> None:
+    username = 'bob'
+    user_exists_mock.return_value = SimpleNamespace(pw_name=username)
+    result = passwd.remove_user(username)
 
-        check_output.assert_called_with(["groupdel", groupname], stderr=-2)
-        group_exists.assert_called_with(groupname)
-        self.assertTrue(result)
+    assert result is True
+    check_output_mock.assert_called_with(['userdel', username], stderr=-2)
 
-    @patch("charms.operator_libs_linux.v0.passwd.group_exists")
-    @patch("charms.operator_libs_linux.v0.passwd.check_output")
-    def test_remove_group_that_exists_force(self, check_output, group_exists):
-        group_exists.return_value = SimpleNamespace(gr_name="bob")
-        groupname = "bob"
-        result = passwd.remove_group(groupname, force=True)
 
-        check_output.assert_called_with(["groupdel", "-f", groupname], stderr=-2)
-        group_exists.assert_called_with(groupname)
-        self.assertTrue(result)
+@patch('charmlibs.passwd._passwd.check_output')
+@patch('charmlibs.passwd._passwd.user_exists')
+def test_remove_user_that_exists_remove_homedir(
+    user_exists_mock: MagicMock, check_output_mock: MagicMock
+) -> None:
+    username = 'bob'
+    user_exists_mock.return_value = SimpleNamespace(pw_name=username)
+    result = passwd.remove_user(username, remove_home=True)
+
+    assert result is True
+    check_output_mock.assert_called_with(['userdel', '-f', username], stderr=-2)
+
+
+@patch('charmlibs.passwd._passwd.check_output')
+@patch('charmlibs.passwd._passwd.grp.getgrnam')
+def test_add_a_group_if_it_doesnt_exist(
+    getgrnam_mock: MagicMock, check_output_mock: MagicMock
+) -> None:
+    groupname = 'testgroup'
+    new_group = SimpleNamespace(gr_name=groupname)
+
+    getgrnam_mock.side_effect = [KeyError('group not found'), new_group]
+
+    result = passwd.add_group(groupname)
+
+    assert result == new_group
+    check_output_mock.assert_called_with(['addgroup', '--group', groupname], stderr=-2)
+
+
+@patch('charmlibs.passwd._passwd.check_output')
+@patch('charmlibs.passwd._passwd.grp.getgrnam')
+def test_doesnt_add_group_if_it_already_exists(
+    getgrnam_mock: MagicMock, check_output_mock: MagicMock
+) -> None:
+    groupname = 'testgroup'
+    existing_group = SimpleNamespace(gr_name=groupname)
+
+    getgrnam_mock.return_value = existing_group
+
+    result = passwd.add_group(groupname)
+
+    assert result == existing_group
+    check_output_mock.assert_not_called()
+
+
+@patch('charmlibs.passwd._passwd.check_output')
+@patch('charmlibs.passwd._passwd.grp.getgrnam')
+def test_add_a_system_group(getgrnam_mock: MagicMock, check_output_mock: MagicMock) -> None:
+    groupname = 'testgroup'
+    new_group = SimpleNamespace(gr_name=groupname)
+
+    getgrnam_mock.side_effect = [KeyError('group not found'), new_group]
+
+    result = passwd.add_group(groupname, system_group=True)
+
+    assert result == new_group
+    check_output_mock.assert_called_with(['addgroup', '--system', groupname], stderr=-2)
+
+
+@patch('charmlibs.passwd._passwd.check_output')
+@patch('charmlibs.passwd._passwd.grp.getgrgid')
+@patch('charmlibs.passwd._passwd.grp.getgrnam')
+def test_add_group_gid(
+    getgrnam_mock: MagicMock, getgrgid_mock: MagicMock, check_output_mock: MagicMock
+) -> None:
+    groupname = 'testgroup'
+    group_id = 1111
+    new_group = SimpleNamespace(gr_name=groupname)
+
+    getgrnam_mock.side_effect = [KeyError('group not found'), new_group]
+
+    result = passwd.add_group(groupname, gid=group_id)
+
+    assert result == new_group
+    check_output_mock.assert_called_with(
+        ['addgroup', '--gid', str(group_id), '--group', groupname], stderr=-2
+    )
+
+
+@patch('charmlibs.passwd._passwd.check_output')
+@patch('charmlibs.passwd._passwd.grp.getgrnam')
+@patch('charmlibs.passwd._passwd.group_exists')
+@patch('charmlibs.passwd._passwd.user_exists')
+def test_adds_a_user_to_a_group(
+    user_exists_mock: MagicMock,
+    group_exists_mock: MagicMock,
+    getgrnam_mock: MagicMock,
+    check_output_mock: MagicMock,
+) -> None:
+    username = 'bob'
+    groupname = 'testgroup'
+    mock_group = SimpleNamespace(gr_name=groupname)
+
+    user_exists_mock.return_value = True
+    group_exists_mock.return_value = True
+    getgrnam_mock.return_value = mock_group
+
+    result = passwd.add_user_to_group(username, groupname)
+
+    assert result == mock_group
+    check_output_mock.assert_called_with(['gpasswd', '-a', username, groupname], stderr=-2)
+
+
+@patch('charmlibs.passwd._passwd.check_output')
+@patch('charmlibs.passwd._passwd.group_exists')
+@patch('charmlibs.passwd._passwd.user_exists')
+def test_adds_a_user_to_a_group_user_missing(
+    user_exists_mock: MagicMock, group_exists_mock: MagicMock, check_output_mock: MagicMock
+) -> None:
+    username = 'bob'
+    groupname = 'testgroup'
+
+    user_exists_mock.return_value = None
+    group_exists_mock.return_value = True
+
+    with pytest.raises(ValueError, match=f"user '{username}' does not exist"):
+        passwd.add_user_to_group(username, groupname)
+
+    check_output_mock.assert_not_called()
+
+
+@patch('charmlibs.passwd._passwd.check_output')
+@patch('charmlibs.passwd._passwd.group_exists')
+@patch('charmlibs.passwd._passwd.user_exists')
+def test_adds_a_user_to_a_group_group_missing(
+    user_exists_mock: MagicMock, group_exists_mock: MagicMock, check_output_mock: MagicMock
+) -> None:
+    username = 'bob'
+    groupname = 'testgroup'
+
+    user_exists_mock.return_value = True
+    group_exists_mock.return_value = None
+
+    with pytest.raises(ValueError, match=f"group '{groupname}' does not exist"):
+        passwd.add_user_to_group(username, groupname)
+
+    check_output_mock.assert_not_called()
+
+
+@patch('charmlibs.passwd._passwd.check_output')
+@patch('charmlibs.passwd._passwd.group_exists')
+def test_remove_group_that_does_not_exist(
+    group_exists_mock: MagicMock, check_output_mock: MagicMock
+) -> None:
+    group_exists_mock.return_value = None
+    result = passwd.remove_group('testgroup')
+
+    assert result is True
+    check_output_mock.assert_not_called()
+
+
+@patch('charmlibs.passwd._passwd.check_output')
+@patch('charmlibs.passwd._passwd.group_exists')
+def test_remove_group_that_exists(
+    group_exists_mock: MagicMock, check_output_mock: MagicMock
+) -> None:
+    groupname = 'testgroup'
+    group_exists_mock.return_value = SimpleNamespace(gr_name=groupname)
+    result = passwd.remove_group(groupname)
+
+    assert result is True
+    check_output_mock.assert_called_with(['groupdel', groupname], stderr=-2)
+
+
+@patch('charmlibs.passwd._passwd.check_output')
+@patch('charmlibs.passwd._passwd.group_exists')
+def test_remove_group_that_exists_force(
+    group_exists_mock: MagicMock, check_output_mock: MagicMock
+) -> None:
+    groupname = 'testgroup'
+    group_exists_mock.return_value = SimpleNamespace(gr_name=groupname)
+    result = passwd.remove_group(groupname, force=True)
+
+    assert result is True
+    check_output_mock.assert_called_with(['groupdel', '-f', groupname], stderr=-2)
