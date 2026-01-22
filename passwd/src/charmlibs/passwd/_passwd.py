@@ -59,23 +59,23 @@ def user_exists(username: str | int) -> pwd.struct_passwd | None:
         return None
 
 
-def group_exists(group_name: str | int) -> grp.struct_group | None:
+def group_exists(group: str | int) -> grp.struct_group | None:
     """Check if a group exists.
 
     Args:
-        group_name: username or gid of user whose existence to check
+        group: username or gid of user whose existence to check
     Raises:
         TypeError: where neither a string or int is passed as the first argument
     """
     try:
-        if isinstance(group_name, int) and not isinstance(group_name, bool):
-            return grp.getgrgid(group_name)
-        elif isinstance(group_name, str):
-            return grp.getgrnam(group_name)
+        if isinstance(group, int) and not isinstance(group, bool):
+            return grp.getgrgid(group)
+        elif isinstance(group, str):
+            return grp.getgrnam(group)
         else:
-            raise TypeError("specified argument '%r' should be a string or int", group_name)
+            raise TypeError("specified argument '%r' should be a string or int", group)
     except KeyError:
-        logger.info("specified group '%s' doesn't exist", str(group_name))
+        logger.info("specified group '%s' doesn't exist", str(group))
         return None
 
 
@@ -184,34 +184,34 @@ def add_group(group_name: str, system_group: bool = False, gid: int | None = Non
     return group_info
 
 
-def add_user_to_group(username: str, group_name: str):
+def add_user_to_group(username: str, group: str):
     """Add a user to a group.
 
     Args:
         username: user to add to specified group
-        group_name: name of group to add user to
+        group: name of group to add user to
 
     Returns:
         The group's password database entry struct, as returned by `grp.getgrnam`
     """
     if not user_exists(username):
         raise ValueError(f"user '{username}' does not exist")
-    if not group_exists(group_name):
-        raise ValueError(f"group '{group_name}' does not exist")
+    if not group_exists(group):
+        raise ValueError(f"group '{group}' does not exist")
 
-    logger.info("adding user '%s' to group '%s'", username, group_name)
-    check_output(['gpasswd', '-a', username, group_name], stderr=STDOUT)
-    return grp.getgrnam(group_name)
+    logger.info("adding user '%s' to group '%s'", username, group)
+    check_output(['gpasswd', '-a', username, group], stderr=STDOUT)
+    return grp.getgrnam(group)
 
 
-def remove_user(username: str | int, remove_home: bool = False) -> bool:
+def remove_user(user: str | int, remove_home: bool = False) -> bool:
     """Remove a user from the system.
 
     Args:
-        username: the username or uid of the user to remove
+        user: the username or uid of the user to remove
         remove_home: indicates whether the user's home directory should be removed
     """
-    u = user_exists(username)
+    u = user_exists(user)
     if not u:
         logger.info("user '%s' does not exist", str(u))
         return True
@@ -226,14 +226,14 @@ def remove_user(username: str | int, remove_home: bool = False) -> bool:
     return True
 
 
-def remove_group(group_name: str | int, force: bool = False) -> bool:
+def remove_group(group: str | int, force: bool = False) -> bool:
     """Remove a user from the system.
 
     Args:
-        group_name: the name or gid of the group to remove
+        group: the name or gid of the group to remove
         force: force group removal even if it's the primary group for a user
     """
-    g = group_exists(group_name)
+    g = group_exists(group)
     if not g:
         logger.info("group '%s' does not exist", str(g))
         return True
