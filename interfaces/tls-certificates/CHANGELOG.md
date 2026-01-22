@@ -1,3 +1,7 @@
+# 1.5.0 - 22 January 2025
+
+Add a public helper function to get the ID of the lib generated private key secret.
+
 # 1.4.0 - 20 January 2025
 
 Add a helper function in TLSCertificatesProvidesV4 to get the ProviderCertificateError objects from the relation data.
