@@ -1712,14 +1712,16 @@ class TestTLSCertificatesRequiresV4:
             config={"common_name": "example.com"},
             secrets={private_key_secret},
         )
-        
+
         state_out = self.ctx.run(self.ctx.on.action("get-private-key-secret-id"), state_in)
-        
+
         result_secret_id = self.ctx.action_results["secret-id"]
         assert result_secret_id != ""
         assert result_secret_id.startswith("secret:")
-        
-        secret_in_state = next((s for s in state_out.secrets if s.label == private_key_secret.label), None)
+
+        secret_in_state = next(
+            (s for s in state_out.secrets if s.label == private_key_secret.label), None
+        )
         assert secret_in_state is not None
         assert result_secret_id == secret_in_state.id
 
@@ -1764,4 +1766,3 @@ class TestTLSCertificatesRequiresV4:
 
         self.ctx.run(self.ctx.on.action("get-private-key-secret-id"), state_in)
         assert self.ctx.action_results == {"secret-id": ""}
-
