@@ -52,6 +52,8 @@ config:
 actions:
   regenerate-private-key:
     description: Regenerate the private key
+  get-private-key-secret-id:
+    description: Get the private key secret id
   get-certificate:
     description: Get the certificate
   renew-certificates:

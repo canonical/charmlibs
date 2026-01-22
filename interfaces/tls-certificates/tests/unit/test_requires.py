@@ -1683,4 +1683,85 @@ class TestTLSCertificatesRequiresV4:
             ],
         )
 
-        self.ctx.run(self.ctx.on.relation_changed(certificates_relation), state_in)
+        state_out = self.ctx.run(self.ctx.on.relation_changed(certificates_relation), state_in)
+
+        self.ctx.run(self.ctx.on.action("get-request-errors"), state_out)
+        errors = self.ctx.action_results["errors"]
+        assert len(errors) == 2
+        assert errors[0]["code"] == 101
+        assert errors[0]["message"] == "IP address not allowed"
+        assert errors[1]["code"] == 102
+        assert errors[1]["message"] == "Domain not allowed"
+
+    def test_given_library_generated_private_key_when_get_private_key_secret_id_then_secret_id_is_returned(
+        self,
+    ):
+        private_key = generate_private_key()
+        certificates_relation = testing.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-provider",
+        )
+        private_key_secret = Secret(
+            {"private-key": str(private_key)},
+            label=f"{LIBID}-private-key-0-{certificates_relation.endpoint}",
+            owner="unit",
+        )
+        state_in = testing.State(
+            relations={certificates_relation},
+            config={"common_name": "example.com"},
+            secrets={private_key_secret},
+        )
+        
+        state_out = self.ctx.run(self.ctx.on.action("get-private-key-secret-id"), state_in)
+        
+        result_secret_id = self.ctx.action_results["secret-id"]
+        assert result_secret_id != ""
+        assert result_secret_id.startswith("secret:")
+        
+        secret_in_state = next((s for s in state_out.secrets if s.label == private_key_secret.label), None)
+        assert secret_in_state is not None
+        assert result_secret_id == secret_in_state.id
+
+    def test_given_no_private_key_generated_when_get_private_key_secret_id_then_none_is_returned(
+        self,
+    ):
+        certificates_relation = testing.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-provider",
+        )
+        state_in = testing.State(
+            relations={certificates_relation},
+            config={"common_name": "example.com"},
+        )
+
+        self.ctx.run(self.ctx.on.action("get-private-key-secret-id"), state_in)
+        assert self.ctx.action_results == {"secret-id": ""}
+
+    @patch(BASE_CHARM_DIR + "._app_or_unit")
+    def test_given_app_mode_non_leader_when_get_private_key_secret_id_then_none_is_returned(
+        self, mock_app_or_unit: MagicMock
+    ):
+        mock_app_or_unit.return_value = Mode.APP
+        private_key = generate_private_key()
+        certificates_relation = testing.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-provider",
+        )
+        private_key_secret = Secret(
+            {"private-key": str(private_key)},
+            label=f"{LIBID}-private-key-{certificates_relation.endpoint}",
+            owner="app",
+        )
+        state_in = testing.State(
+            relations={certificates_relation},
+            config={"common_name": "example.com"},
+            secrets={private_key_secret},
+            leader=False,
+        )
+
+        self.ctx.run(self.ctx.on.action("get-private-key-secret-id"), state_in)
+        assert self.ctx.action_results == {"secret-id": ""}
+

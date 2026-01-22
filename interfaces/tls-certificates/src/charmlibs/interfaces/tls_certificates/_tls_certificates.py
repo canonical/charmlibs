@@ -1907,6 +1907,51 @@ class TLSCertificatesRequiresV4(Object):
         private_key = secret.get_content(refresh=True)["private-key"]
         return PrivateKey.from_string(private_key)
 
+    def get_private_key_secret_id(self) -> str | None:
+        """Get the secret ID for the library-generated private key.
+
+        This method provides access to the Juju secret ID containing the private key.
+
+        Returns:
+            The secret ID as a string if a library-generated private key secret exists,
+            None otherwise.
+
+        Returns None in the following cases:
+            - The private key was provided via the `private_key` parameter (no secret exists)
+            - No private key has not been generated yet
+            - In APP mode, when called from a non-leader unit
+
+        Note:
+            The secret ID is an opaque identifier and does not reveal the private key material.
+            However, it should still be treated as sensitive metadata - avoid logging it or
+            placing it in public locations.
+
+            The returned ID is stable as long as the private key is not regenerated.
+            If regenerate_private_key() is called, a new secret may be created and this ID
+            may change.
+
+            The secret content or metadata must never be directly modified,
+            Any modifications may lead to unexpected behavior.
+        """
+        if self._private_key:
+            logger.debug("Private key was provided externally, no secret exists")
+            return None
+
+        if self.mode == Mode.APP and not self.model.unit.is_leader():
+            logger.warning("Only the leader can access the private key secret ID in APP mode")
+            return None
+
+        if not self._private_key_generated():
+            logger.debug("No private key secret has been generated yet")
+            return None
+
+        try:
+            secret = self.charm.model.get_secret(label=self._get_private_key_secret_label())
+            return secret.get_info().id
+        except SecretNotFoundError:
+            logger.warning("Private key secret not found")
+            return None
+
     def _ensure_private_key(self) -> None:
         """Make sure there is a private key to be used.
 

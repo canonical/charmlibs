@@ -46,6 +46,9 @@ class DummyTLSCertificatesRequirerCharm(CharmBase):
         self.framework.observe(
             self.on.get_request_errors_action, self._on_get_request_errors_action
         )
+        self.framework.observe(
+            self.on.get_private_key_secret_id_action, self._on_get_private_key_secret_id_action
+        )
 
     def get_private_key(self) -> PrivateKey | None:
         # By default, the private key is not provided by the charm
@@ -98,6 +101,10 @@ class DummyTLSCertificatesRequirerCharm(CharmBase):
             "ca": str(certificate.ca),
             "csr": str(certificate.certificate_signing_request),
         })
+
+    def _on_get_private_key_secret_id_action(self, event: ActionEvent) -> None:
+        secret_id = self.certificates.get_private_key_secret_id()
+        event.set_results({"secret-id": secret_id or ""})
 
     def _on_renew_certificates_action(self, event: ActionEvent) -> None:
         certificate, _ = self.certificates.get_assigned_certificate(
