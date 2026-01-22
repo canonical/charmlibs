@@ -1,0 +1,15 @@
+[project]
+name = "slo-test-requirer"
+version = "0.1.0"
+description = "Test charm for SLO requirer"
+dependencies = [
+    "ops>=2.9",
+    "pydantic>=2.0",
+]
+
+[project.optional-dependencies]
+dev = []
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
