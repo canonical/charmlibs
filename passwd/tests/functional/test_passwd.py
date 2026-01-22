@@ -32,7 +32,7 @@ def test_add_remove_group() -> None:
 def test_user_exists() -> None:
     """Verify we can check for user existence."""
     passwd.add_user(username='bob')
-    assert passwd.user_exists(username='bob') is not None
+    assert passwd.user_exists(user='bob') is not None
     passwd.remove_user(user='bob')
 
 
@@ -76,7 +76,7 @@ def test_remove_nonexistent_user() -> None:
 def test_add_user_with_shell() -> None:
     """Verify we can add a user with a specific shell."""
     assert passwd.add_user(username='bob', shell='/bin/sh')  # noqa: S604
-    user_info = passwd.user_exists(username='bob')
+    user_info = passwd.user_exists(user='bob')
     assert user_info is not None
     assert user_info.pw_shell == '/bin/sh'
     assert passwd.remove_user(user='bob')
@@ -84,7 +84,7 @@ def test_add_user_with_shell() -> None:
 
 def test_user_not_exists() -> None:
     """Verify user_exists returns None for non-existent user."""
-    assert passwd.user_exists(username='nonexistentuser') is None
+    assert passwd.user_exists(user='nonexistentuser') is None
 
 
 def test_group_not_exists() -> None:
@@ -95,5 +95,5 @@ def test_group_not_exists() -> None:
 def test_user_exist_by_uid() -> None:
     """Verify we can check for user existence by uid."""
     user = passwd.add_user(username='bob')
-    assert passwd.user_exists(username=user.pw_uid) is not None
+    assert passwd.user_exists(user=user.pw_uid) is not None
     passwd.remove_user(user='bob')

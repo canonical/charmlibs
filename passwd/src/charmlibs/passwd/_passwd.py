@@ -38,24 +38,24 @@ from subprocess import STDOUT, check_output
 logger = logging.getLogger(__name__)
 
 
-def user_exists(username: str | int) -> pwd.struct_passwd | None:
+def user_exists(user: str | int) -> pwd.struct_passwd | None:
     """Check if a user exists.
 
     Args:
-        username: username or gid of user whose existence to check
+        user: username or gid of user whose existence to check
 
     Raises:
         TypeError: where neither a string or int is passed as the first argument
     """
     try:
-        if isinstance(username, int) and not isinstance(username, bool):
-            return pwd.getpwuid(username)
-        elif isinstance(username, str):
-            return pwd.getpwnam(username)
+        if isinstance(user, int) and not isinstance(user, bool):
+            return pwd.getpwuid(user)
+        elif isinstance(user, str):
+            return pwd.getpwnam(user)
         else:
-            raise TypeError("specified argument '%r' should be a string or int", username)
+            raise TypeError("specified argument '%r' should be a string or int", user)
     except KeyError:
-        logger.info("specified user '%s' doesn't exist", str(username))
+        logger.info("specified user '%s' doesn't exist", str(user))
         return None
 
 
