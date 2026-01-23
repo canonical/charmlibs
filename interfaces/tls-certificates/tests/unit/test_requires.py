@@ -12,7 +12,6 @@ import scenario
 import yaml
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.x509.oid import NameOID
 from ops import testing
 from ops.testing import ActionFailed, Secret
 

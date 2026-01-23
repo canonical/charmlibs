@@ -2398,7 +2398,8 @@ class TLSCertificatesRequiresV4(Object):
 
             if now >= safety_renewal_time and now < validity_end:
                 logger.warning(
-                    "Certificate approaching expiry but not renewed - triggering renewal as safety net"
+                    "Certificate approaching expiry but not renewed - "
+                    "triggering renewal as safety net"
                 )
                 self._renew_certificate_request(provider_certificate.certificate_signing_request)
 
