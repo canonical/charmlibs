@@ -9,7 +9,7 @@ from typing import Any
 
 import ops
 
-from charmlibs.slo.slo import SLORequirer
+from charmlibs.interfaces.slo import SLORequirer
 
 logger = logging.getLogger(__name__)
 
@@ -50,13 +50,11 @@ class SLOTestRequirerCharm(ops.CharmBase):
         """Action to retrieve all SLOs."""
         try:
             slos = self.slo_requirer.get_slos()
-            event.set_results(
-                {
-                    'count': len(slos),
-                    'services': ', '.join(slo.get('service', 'unknown') for slo in slos),
-                    'slos': str(slos),
-                }
-            )
+            event.set_results({
+                'count': len(slos),
+                'services': ', '.join(slo.get('service', 'unknown') for slo in slos),
+                'slos': str(slos),
+            })
         except Exception as e:
             event.fail(f'Failed to get SLOs: {e}')
 

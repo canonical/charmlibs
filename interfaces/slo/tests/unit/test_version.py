@@ -3,7 +3,7 @@
 
 """Unit tests for library code, not involving charm code."""
 
-from charmlibs import slo
+from charmlibs.interfaces import slo
 
 
 def test_version():

@@ -14,7 +14,7 @@ recording and alerting rules.
 To provide SLO specifications to Sloth, use the `SLOProvider` class:
 
 ```python
-from charmlibs.slo.slo import SLOProvider
+from charmlibs.interfaces.slo import SLOProvider
 
 class MyCharm(ops.CharmBase):
     def __init__(self, *args):
@@ -66,7 +66,7 @@ The Sloth charm uses `SLORequirer` to collect SLO specifications.
 Validation is performed on the requirer side:
 
 ```python
-from charmlibs.slo.slo import SLORequirer
+from charmlibs.interfaces.slo import SLORequirer
 
 class SlothCharm(ops.CharmBase):
     def __init__(self, *args):
@@ -124,7 +124,7 @@ slo_spec: |
 
 import logging
 import re
-from typing import Any
+from typing import Any, Dict, List, Match
 
 import ops
 import yaml
@@ -141,7 +141,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_RELATION_NAME = 'slos'
 
 
-def inject_topology_labels(query: str, topology: dict[str, str]) -> str:
+def inject_topology_labels(query: str, topology: Dict[str, str]) -> str:
     """Inject Juju topology labels into a Prometheus query.
 
     This function adds Juju topology labels (juju_application, juju_model, etc.)
@@ -177,7 +177,7 @@ def inject_topology_labels(query: str, topology: dict[str, str]) -> str:
     topology_labels = ','.join([f'{k}="{v}"' for k, v in sorted(topology.items())])
 
     # First pass: inject into metrics with {labels}
-    def replace_labels(match: re.Match[str]) -> str:
+    def replace_labels(match: Match[str]) -> str:
         metric_name = match.group(1)
         labels_with_braces = match.group(2)
 
@@ -197,7 +197,7 @@ def inject_topology_labels(query: str, topology: dict[str, str]) -> str:
     query = re.sub(r'([a-zA-Z_:][a-zA-Z0-9_:]*)(\{[^}]*\})', replace_labels, query)
 
     # Second pass: inject into metrics with [time] but no labels yet
-    def replace_time(match: re.Match[str]) -> str:
+    def replace_time(match: Match[str]) -> str:
         metric_name = match.group(1)
         time_selector = match.group(2)
 
@@ -218,8 +218,8 @@ class SLOSpec(BaseModel):
 
     version: str = Field(description="Sloth spec version, e.g., 'prometheus/v1'")
     service: str = Field(description='Service name for the SLO')
-    labels: dict[str, str] = Field(default_factory=dict, description='Labels for the SLO')
-    slos: list[dict[str, Any]] = Field(description='List of SLO definitions')
+    labels: Dict[str, str] = Field(default_factory=dict, description='Labels for the SLO')
+    slos: List[Dict[str, Any]] = Field(description='List of SLO definitions')
 
     @field_validator('version')
     @classmethod
@@ -231,7 +231,7 @@ class SLOSpec(BaseModel):
 
     @field_validator('slos')
     @classmethod
-    def validate_slos(cls, v: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def validate_slos(cls, v: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Validate that at least one SLO is defined."""
         if not v:
             raise ValueError('At least one SLO must be defined')
@@ -262,7 +262,7 @@ class SLOProvider(ops.Object):
         self._relation_name = relation_name
         self._inject_topology = inject_topology
 
-    def _get_topology_labels(self) -> dict[str, str]:
+    def _get_topology_labels(self) -> Dict[str, str]:
         """Get Juju topology labels for this charm.
 
         Returns:
@@ -279,7 +279,7 @@ class SLOProvider(ops.Object):
             logger.warning('Failed to get full topology, using app name only: %s', e)
             return {'juju_application': self._charm.app.name}
 
-    def _inject_topology_into_slo(self, slo_spec: dict[str, Any]) -> dict[str, Any]:
+    def _inject_topology_into_slo(self, slo_spec: Dict[str, Any]) -> Dict[str, Any]:
         """Inject topology labels into SLO queries.
 
         Args:
@@ -399,7 +399,7 @@ class SLORequirer(ops.Object):
         self._charm = charm
         self._relation_name = relation_name
 
-    def get_slos(self) -> list[dict[str, Any]]:
+    def get_slos(self) -> List[Dict[str, Any]]:
         """Collect all SLO specifications from related charms.
 
         Returns:
@@ -407,7 +407,7 @@ class SLORequirer(ops.Object):
             Each unit may provide multiple SLO specs as a multi-document YAML.
             Only valid SLO specs are returned; invalid ones are logged and skipped.
         """
-        slos: list[dict[str, Any]] = []
+        slos: List[Dict[str, Any]] = []
         relations = self._charm.model.relations.get(self._relation_name, [])
 
         for relation in relations:

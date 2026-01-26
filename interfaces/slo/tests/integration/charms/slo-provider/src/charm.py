@@ -9,7 +9,7 @@ from typing import Any
 
 import ops
 
-from charmlibs.slo.slo import SLOProvider
+from charmlibs.interfaces.slo import SLOProvider
 
 logger = logging.getLogger(__name__)
 
