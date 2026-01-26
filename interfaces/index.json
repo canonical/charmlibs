@@ -6,7 +6,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/auth_proxy/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "draft"
   },
   {
     "name": "azure_service_principal",
@@ -15,7 +16,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/azure_service_principal/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "draft"
   },
   {
     "name": "azure_storage",
@@ -24,7 +26,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/azure_storage/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "draft"
   },
   {
     "name": "certificate_transfer",
@@ -33,7 +36,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/certificate_transfer/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "draft"
   },
   {
     "name": "cloudflared-route",
@@ -42,7 +46,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/cloudflared-route/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "draft"
   },
   {
     "name": "connect_client",
@@ -51,7 +56,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/connect_client/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "draft"
   },
   {
     "name": "cos_agent",
@@ -60,7 +66,8 @@
     "lib_url": "https://charmhub.io/grafana-agent/libraries/cos_agent",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/cos_agent/",
     "summary": "Machine-charm-specific interface for managing multiple observability-related data streams.",
-    "description": "The `cos_agent` interface allows machine charms to send telemetry \u2014 such as metrics, logs, dashboards, and alert rules \u2014 to Opentelemetry Colector or Grafana Agent charms.\n\nThis interface is designed specifically for machine charms, where the requirer is typically the [grafana-agent](https://charmhub.io/grafana-agent) and the [opentelemetry-collector](https://github.com/canonical/opentelemetry-collector-operator/) subordinate charms."
+    "description": "The `cos_agent` interface allows machine charms to send telemetry \u2014 such as metrics, logs, dashboards, and alert rules \u2014 to Opentelemetry Colector or Grafana Agent charms.\n\nThis interface is designed specifically for machine charms, where the requirer is typically the [grafana-agent](https://charmhub.io/grafana-agent) and the [opentelemetry-collector](https://github.com/canonical/opentelemetry-collector-operator/) subordinate charms.",
+    "status": "published"
   },
   {
     "name": "database_backup",
@@ -69,7 +76,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/database_backup/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "draft"
   },
   {
     "name": "dns_record",
@@ -78,7 +86,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/dns_record/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "draft"
   },
   {
     "name": "etcd_client",
@@ -87,7 +96,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/etcd_client/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "draft"
   },
   {
     "name": "filesystem_info",
@@ -96,7 +106,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/filesystem_info/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "draft"
   },
   {
     "name": "fiveg_core_gnb",
@@ -105,7 +116,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/fiveg_core_gnb/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "draft"
   },
   {
     "name": "fiveg_f1",
@@ -114,7 +126,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/fiveg_f1/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "draft"
   },
   {
     "name": "fiveg_gnb_identity",
@@ -123,7 +136,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/fiveg_gnb_identity/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "draft"
   },
   {
     "name": "fiveg_n2",
@@ -132,7 +146,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/fiveg_n2/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "draft"
   },
   {
     "name": "fiveg_n3",
@@ -141,7 +156,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/fiveg_n3/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "draft"
   },
   {
     "name": "fiveg_n4",
@@ -150,7 +166,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/fiveg_n4/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "draft"
   },
   {
     "name": "fiveg_nrf",
@@ -159,7 +176,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/fiveg_nrf/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "draft"
   },
   {
     "name": "fiveg_rfsim",
@@ -168,7 +186,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/fiveg_rfsim/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "draft"
   },
   {
     "name": "forward_auth",
@@ -177,7 +196,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/forward_auth/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "draft"
   },
   {
     "name": "grafana_auth",
@@ -186,7 +206,8 @@
     "lib_url": "https://charmhub.io/grafana-k8s/libraries/grafana_auth",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/grafana_auth/",
     "summary": "Provide authentication configuration for Grafana.",
-    "description": "The `grafana_auth` interface supports configuring Grafana authentication.\nThe provider sends the authentication mode and its configuration.\nThe requirer configures authentication with Grafana and replies with its publicly reachable URL."
+    "description": "The `grafana_auth` interface supports configuring Grafana authentication.\nThe provider sends the authentication mode and its configuration.\nThe requirer configures authentication with Grafana and replies with its publicly reachable URL.",
+    "status": "draft"
   },
   {
     "name": "grafana_datasource",
@@ -195,7 +216,8 @@
     "lib_url": "https://charmhub.io/grafana-k8s/libraries/grafana_source",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/grafana_datasource/",
     "summary": "Provide Grafana data source servers.",
-    "description": "The `grafana_source` interface supports exposing servers implementing the Grafana source HTTP API.\nThe provider publishes the endpoint URL for the servers, one per unit.\nThe requirer replies with unique IDs for the Grafana application and a mapping of unique IDs for the units."
+    "description": "The `grafana_source` interface supports exposing servers implementing the Grafana source HTTP API.\nThe provider publishes the endpoint URL for the servers, one per unit.\nThe requirer replies with unique IDs for the Grafana application and a mapping of unique IDs for the units.",
+    "status": "published"
   },
   {
     "name": "grafana_datasource_exchange",
@@ -204,7 +226,8 @@
     "lib_url": "https://pypi.org/project/cosl/",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/grafana_datasource_exchange/",
     "summary": "Share UIDs for Grafana datasources between charms.",
-    "description": "The `grafana_datasource_exchange` interface allows charms that generate telemetry and have a reference to the datasources where said telemetry is queriable, to share those references to other charms for correlation and cross-referencing purposes.\n\nThis is a symmetrical relation, where implementers broadcast the same information regardless of whether they are the provider or requirer.\nTo avoid constraints on integration topology, charms should implement both a requirer and provider endpoint for this interface."
+    "description": "The `grafana_datasource_exchange` interface allows charms that generate telemetry and have a reference to the datasources where said telemetry is queriable, to share those references to other charms for correlation and cross-referencing purposes.\n\nThis is a symmetrical relation, where implementers broadcast the same information regardless of whether they are the provider or requirer.\nTo avoid constraints on integration topology, charms should implement both a requirer and provider endpoint for this interface.",
+    "status": "draft"
   },
   {
     "name": "hydra_endpoints",
@@ -213,7 +236,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/hydra_endpoints/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "draft"
   },
   {
     "name": "ingress",
@@ -222,7 +246,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/ingress/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "published"
   },
   {
     "name": "ingress_per_unit",
@@ -231,7 +256,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/ingress_per_unit/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "published"
   },
   {
     "name": "ip_router",
@@ -240,7 +266,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/ip_router/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "draft"
   },
   {
     "name": "jwt",
@@ -249,7 +276,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/jwt/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "draft"
   },
   {
     "name": "k8s-service",
@@ -258,7 +286,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/k8s-service/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "published"
   },
   {
     "name": "kafka_client",
@@ -267,7 +296,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/kafka_client/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "draft"
   },
   {
     "name": "karapace_client",
@@ -276,7 +306,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/karapace_client/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "draft"
   },
   {
     "name": "kratos_external_idp",
@@ -285,7 +316,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/kratos_external_idp/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "draft"
   },
   {
     "name": "kratos_info",
@@ -294,7 +326,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/kratos_info/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "published"
   },
   {
     "name": "kubeflow_dashboard_links",
@@ -303,7 +336,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/kubeflow_dashboard_links/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "draft"
   },
   {
     "name": "ldap",
@@ -312,7 +346,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/ldap/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "draft"
   },
   {
     "name": "litmus_auth",
@@ -321,7 +356,8 @@
     "lib_url": "https://pypi.org/project/litmus-libs/",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/litmus_auth/",
     "summary": "Exchange gRPC server endpoints for communication between Litmus auth and backend charms.",
-    "description": "The `litmus_auth` interface enables communication between Litmus auth and Litmus backend charms.\nBoth the provider and requirer publish their respective gPRC server's endpoint."
+    "description": "The `litmus_auth` interface enables communication between Litmus auth and Litmus backend charms.\nBoth the provider and requirer publish their respective gPRC server's endpoint.",
+    "status": "draft"
   },
   {
     "name": "login_ui_endpoints",
@@ -330,7 +366,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/login_ui_endpoints/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "draft"
   },
   {
     "name": "milter",
@@ -339,7 +376,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/milter/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "published"
   },
   {
     "name": "mimir_cluster",
@@ -348,7 +386,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/mimir_cluster/",
     "summary": "Mimir coordinator and worker charm communication.",
-    "description": "The `mimir_cluster` interface supports communication between the [mimir-coordinator-k8s](https://charmhub.io/mimir-coordinator-k8s) and [mimir-worker-k8s](https://charmhub.io/mimir-worker-k8s) charms."
+    "description": "The `mimir_cluster` interface supports communication between the [mimir-coordinator-k8s](https://charmhub.io/mimir-coordinator-k8s) and [mimir-worker-k8s](https://charmhub.io/mimir-worker-k8s) charms.",
+    "status": "draft"
   },
   {
     "name": "mongodb_client",
@@ -357,7 +396,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/mongodb_client/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "draft"
   },
   {
     "name": "mysql_client",
@@ -366,7 +406,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/mysql_client/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "published"
   },
   {
     "name": "nfs_share",
@@ -375,7 +416,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/nfs_share/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "draft"
   },
   {
     "name": "nginx-route",
@@ -384,7 +426,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/nginx-route/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "draft"
   },
   {
     "name": "oauth",
@@ -393,7 +436,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/oauth/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "draft"
   },
   {
     "name": "opencti_connector",
@@ -402,7 +446,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/opencti_connector/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "published"
   },
   {
     "name": "openfga",
@@ -411,7 +456,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/openfga/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "published"
   },
   {
     "name": "opensearch_client",
@@ -420,7 +466,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/opensearch_client/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "draft"
   },
   {
     "name": "postgresql_client",
@@ -429,7 +476,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/postgresql_client/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "draft"
   },
   {
     "name": "profiling",
@@ -438,7 +486,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/profiling/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "draft"
   },
   {
     "name": "prometheus_remote_write",
@@ -447,7 +496,8 @@
     "lib_url": "https://charmhub.io/prometheus-k8s/libraries/prometheus_remote_write",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/prometheus_remote_write/",
     "summary": "Write Prometheus metrics to remote endpoint.",
-    "description": "The `prometheus_remote_write` endpoint supports writing Prometheus metrics to a remote endpoint.\nThe provider publishes one or more endpoints, and emits alerts per rule files.\nThe requirer pushes metrics to the provided endpoints, and sends rule files to the provider."
+    "description": "The `prometheus_remote_write` endpoint supports writing Prometheus metrics to a remote endpoint.\nThe provider publishes one or more endpoints, and emits alerts per rule files.\nThe requirer pushes metrics to the provided endpoints, and sends rule files to the provider.",
+    "status": "published"
   },
   {
     "name": "prometheus_scrape",
@@ -456,7 +506,8 @@
     "lib_url": "https://charmhub.io/prometheus-k8s/libraries/prometheus_scrape",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/prometheus_scrape/",
     "summary": "Configure Prometheus scraping jobs.",
-    "description": "The `prometheus_scrape` interface supports configuring Prometheus scrape jobs and recording and alerting rules.\nThe provider specifies one or more scrape compatible metrics endpoints, and rule files.\nThe requirer then scrapes the provider's metrics and emits alerts per rule files."
+    "description": "The `prometheus_scrape` interface supports configuring Prometheus scrape jobs and recording and alerting rules.\nThe provider specifies one or more scrape compatible metrics endpoints, and rule files.\nThe requirer then scrapes the provider's metrics and emits alerts per rule files.",
+    "status": "published"
   },
   {
     "name": "pyroscope_cluster",
@@ -465,7 +516,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/pyroscope_cluster/",
     "summary": "Pyroscope coordinator and worker charm communication.",
-    "description": "The `pyroscope_cluster` interface supports communication between the [pyroscope-coordinator-k8s](https://charmhub.io/pyroscope-coordinator-k8s) and [pyroscope-worker-k8s](https://charmhub.io/pyroscope-worker-k8s) charms."
+    "description": "The `pyroscope_cluster` interface supports communication between the [pyroscope-coordinator-k8s](https://charmhub.io/pyroscope-coordinator-k8s) and [pyroscope-worker-k8s](https://charmhub.io/pyroscope-worker-k8s) charms.",
+    "status": "draft"
   },
   {
     "name": "s3",
@@ -474,7 +526,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/s3/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "draft"
   },
   {
     "name": "saml",
@@ -483,7 +536,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/saml/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "published"
   },
   {
     "name": "sdcore_config",
@@ -492,7 +546,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/sdcore_config/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "draft"
   },
   {
     "name": "sdcore_management",
@@ -501,7 +556,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/sdcore_management/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "draft"
   },
   {
     "name": "smtp",
@@ -510,7 +566,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/smtp/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "published"
   },
   {
     "name": "spark_service_account",
@@ -519,7 +576,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/spark_service_account/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "draft"
   },
   {
     "name": "tempo_cluster",
@@ -528,7 +586,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/tempo_cluster/",
     "summary": "Tempo coordinator and worker charm communication.",
-    "description": "The `tempo_cluster` interface supports communication between the [tempo-coordinator-k8s](https://charmhub.io/tempo-coordinator-k8s) and [tempo-worker-k8s](https://charmhub.io/tempo-worker-k8s) charms."
+    "description": "The `tempo_cluster` interface supports communication between the [tempo-coordinator-k8s](https://charmhub.io/tempo-coordinator-k8s) and [tempo-worker-k8s](https://charmhub.io/tempo-worker-k8s) charms.",
+    "status": "published"
   },
   {
     "name": "tls-certificates",
@@ -537,7 +596,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/tls-certificates/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "published"
   },
   {
     "name": "tracing",
@@ -546,7 +606,8 @@
     "lib_url": "https://charmhub.io/tempo-coordinator-k8s/libraries/tracing",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/tracing/",
     "summary": "Request endpoints for pushing trace data.",
-    "description": "The `tracing` interface supports push-based tracing.\nThe requirer publishes the list of protocols it wants to use to send traces.\nThe provider replies with an API URL and an endpoint for each protocol, omitting those it does not support."
+    "description": "The `tracing` interface supports push-based tracing.\nThe requirer publishes the list of protocols it wants to use to send traces.\nThe provider replies with an API URL and an endpoint for each protocol, omitting those it does not support.",
+    "status": "published"
   },
   {
     "name": "vault-autounseal",
@@ -555,7 +616,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/vault-autounseal/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "draft"
   },
   {
     "name": "vault-kv",
@@ -564,7 +626,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/vault-kv/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "draft"
   },
   {
     "name": "velero_backup_config",
@@ -573,7 +636,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/velero_backup_config/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "draft"
   },
   {
     "name": "wazuh_api_client",
@@ -582,7 +646,8 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/wazuh_api_client/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "draft"
   },
   {
     "name": "zookeeper",
@@ -591,6 +656,7 @@
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/zookeeper/",
     "summary": "",
-    "description": ""
+    "description": "",
+    "status": "draft"
   }
 ]
