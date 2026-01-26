@@ -259,7 +259,7 @@ class SLOProvider(ops.Object):
     ):
         super().__init__(charm, relation_name)
         self._charm = charm
-        self._relation_name = relation_name
+        self.relation_name = relation_name
         self._inject_topology = inject_topology
 
     def _get_topology_labels(self) -> Dict[str, str]:
@@ -350,13 +350,13 @@ class SLOProvider(ops.Object):
             self.slo_provider.provide_slos(slo_config)
             ```
         """
-        relations = self._charm.model.relations.get(self._relation_name, [])
+        relations = self._charm.model.relations.get(self.relation_name, [])
         if not relations:
-            logger.warning('No %s relation found', self._relation_name)
+            logger.debug('No %s relation found', self.relation_name)
             return
 
         if not slo_config:
-            logger.warning('No SLO config provided')
+            logger.debug('No SLO config provided')
             return
 
         # Parse the YAML config - it can contain multiple SLO documents (separated by ---)
@@ -371,8 +371,8 @@ class SLOProvider(ops.Object):
         merged_yaml = '---\n'.join(slo_yaml_docs)
 
         for relation in relations:
-            # Each unit provides its SLO spec in its own databag
-            relation.data[self._charm.unit]['slo_spec'] = merged_yaml
+            # Write SLO spec to app databag so it's shared across all units
+            relation.data[self._charm.app]['slo_spec'] = merged_yaml
             logger.info(
                 'Provided SLO config to relation %s',
                 relation.id,
@@ -397,49 +397,53 @@ class SLORequirer(ops.Object):
     ):
         super().__init__(charm, relation_name)
         self._charm = charm
-        self._relation_name = relation_name
+        self.relation_name = relation_name
 
     def get_slos(self) -> List[Dict[str, Any]]:
         """Collect all SLO specifications from related charms.
 
         Returns:
-            List of SLO specification dictionaries from all related units.
-            Each unit may provide multiple SLO specs as a multi-document YAML.
+            List of SLO specification dictionaries from all related applications.
+            Each application may provide multiple SLO specs as a multi-document YAML.
             Only valid SLO specs are returned; invalid ones are logged and skipped.
         """
         slos: List[Dict[str, Any]] = []
-        relations = self._charm.model.relations.get(self._relation_name, [])
+        relations = self._charm.model.relations.get(self.relation_name, [])
 
         for relation in relations:
-            for unit in relation.units:
-                try:
-                    slo_yaml = relation.data[unit].get('slo_spec')
-                    if not slo_yaml:
+            # Read from remote app databag instead of unit databags
+            remote_app = relation.app
+            if not remote_app:
+                continue
+
+            try:
+                slo_yaml = relation.data[remote_app].get('slo_spec')
+                if not slo_yaml:
+                    continue
+
+                # Parse as multi-document YAML (supports both single and multiple docs)
+                slo_specs = list(yaml.safe_load_all(slo_yaml))
+
+                # Validate and collect each SLO spec
+                for slo_spec in slo_specs:
+                    if not slo_spec:  # Skip empty documents
                         continue
 
-                    # Parse as multi-document YAML (supports both single and multiple docs)
-                    slo_specs = list(yaml.safe_load_all(slo_yaml))
+                    try:
+                        SLOSpec(**slo_spec)
+                        slos.append(slo_spec)
+                        logger.debug(
+                            "Collected SLO spec for service '%s' from %s",
+                            slo_spec['service'],
+                            remote_app.name,
+                        )
+                    except ValidationError as e:
+                        logger.error('Invalid SLO spec from %s: %s', remote_app.name, e)
+                        continue
 
-                    # Validate and collect each SLO spec
-                    for slo_spec in slo_specs:
-                        if not slo_spec:  # Skip empty documents
-                            continue
-
-                        try:
-                            SLOSpec(**slo_spec)
-                            slos.append(slo_spec)
-                            logger.debug(
-                                "Collected SLO spec for service '%s' from %s",
-                                slo_spec['service'],
-                                unit.name,
-                            )
-                        except ValidationError as e:
-                            logger.error('Invalid SLO spec from %s: %s', unit.name, e)
-                            continue
-
-                except Exception as e:
-                    logger.error('Failed to parse SLO spec from %s: %s', unit.name, e)
-                    continue
+            except Exception as e:
+                logger.error('Failed to parse SLO spec from %s: %s', remote_app.name, e)
+                continue
 
         logger.info('Collected %d SLO specifications', len(slos))
         return slos

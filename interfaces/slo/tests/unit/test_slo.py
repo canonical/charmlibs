@@ -211,7 +211,7 @@ class TestSLOProvider:
             meta={'name': 'provider', 'requires': {'slos': {'interface': 'slo'}}},
         )
         slo_relation = Relation('slos')
-        state = State(relations=[slo_relation])
+        state = State(relations=[slo_relation], leader=True)  # Need leadership for app databag
 
         # Trigger start and provide SLO
         with context(context.on.start(), state) as mgr:
@@ -221,7 +221,7 @@ class TestSLOProvider:
 
         # Check that SLO was set in relation data
         relation_out = state_out.get_relation(slo_relation.id)
-        slo_yaml = relation_out.local_unit_data.get('slo_spec')
+        slo_yaml = relation_out.local_app_data.get('slo_spec')
         assert slo_yaml is not None
         slo_data = yaml.safe_load(slo_yaml)
         assert slo_data['service'] == 'test-service'
@@ -249,7 +249,7 @@ class TestSLOProvider:
         )
         slo_relation_1 = Relation('slos')
         slo_relation_2 = Relation('slos')
-        state = State(relations=[slo_relation_1, slo_relation_2])
+        state = State(relations=[slo_relation_1, slo_relation_2], leader=True)  # Need leadership
 
         with context(context.on.start(), state) as mgr:
             charm = mgr.charm
@@ -259,7 +259,7 @@ class TestSLOProvider:
         # Both relations should have the SLO spec
         for rel in [slo_relation_1, slo_relation_2]:
             relation_out = state_out.get_relation(rel.id)
-            slo_yaml = relation_out.local_unit_data.get('slo_spec')
+            slo_yaml = relation_out.local_app_data.get('slo_spec')
             assert slo_yaml is not None
             slo_data = yaml.safe_load(slo_yaml)
             assert slo_data['service'] == 'test-service'
@@ -271,7 +271,7 @@ class TestSLOProvider:
             meta={'name': 'provider', 'requires': {'slos': {'interface': 'slo'}}},
         )
         slo_relation = Relation('slos')
-        state = State(relations=[slo_relation])
+        state = State(relations=[slo_relation], leader=True)  # Need leadership
 
         with context(context.on.start(), state) as mgr:
             charm = mgr.charm
@@ -280,7 +280,7 @@ class TestSLOProvider:
 
         # Check that both SLOs were set in relation data as multi-document YAML
         relation_out = state_out.get_relation(slo_relation.id)
-        slo_yaml = relation_out.local_unit_data.get('slo_spec')
+        slo_yaml = relation_out.local_app_data.get('slo_spec')
         assert slo_yaml is not None
 
         # Parse multi-document YAML
@@ -307,7 +307,7 @@ class TestSLOProvider:
 
         # Relation data should be empty
         relation_out = state_out.get_relation(slo_relation.id)
-        slo_yaml = relation_out.local_unit_data.get('slo_spec')
+        slo_yaml = relation_out.local_app_data.get('slo_spec')
         assert slo_yaml is None
 
 
@@ -334,7 +334,7 @@ class TestSLORequirer:
         slo_relation = Relation(
             'slos',
             remote_app_name='provider',
-            remote_units_data={0: {'slo_spec': VALID_SLO_CONFIG}},
+            remote_app_data={'slo_spec': VALID_SLO_CONFIG},
         )
 
         context = Context(
@@ -353,21 +353,23 @@ class TestSLORequirer:
         assert slos[0]['version'] == 'prometheus/v1'
 
     def test_get_slos_from_multiple_units(self):
-        """Test getting SLOs from multiple units."""
-        slo_relation = Relation(
+        """Test getting SLOs from multiple applications."""
+        slo_relation_1 = Relation(
             'slos',
-            remote_app_name='provider',
-            remote_units_data={
-                0: {'slo_spec': VALID_SLO_CONFIG},
-                1: {'slo_spec': VALID_SLO_CONFIG_2},
-            },
+            remote_app_name='provider1',
+            remote_app_data={'slo_spec': VALID_SLO_CONFIG},
+        )
+        slo_relation_2 = Relation(
+            'slos',
+            remote_app_name='provider2',
+            remote_app_data={'slo_spec': VALID_SLO_CONFIG_2},
         )
 
         context = Context(
             RequirerCharm,
             meta={'name': 'requirer', 'provides': {'slos': {'interface': 'slo'}}},
         )
-        state = State(relations=[slo_relation])
+        state = State(relations=[slo_relation_1, slo_relation_2])
 
         with context(context.on.start(), state) as mgr:
             charm = mgr.charm
@@ -379,11 +381,11 @@ class TestSLORequirer:
         assert services == {'test-service', 'another-service'}
 
     def test_get_slos_from_unit_with_multi_document_yaml(self):
-        """Test getting multiple SLOs from a single unit (multi-document YAML)."""
+        """Test getting multiple SLOs from a single app (multi-document YAML)."""
         slo_relation = Relation(
             'slos',
             remote_app_name='provider',
-            remote_units_data={0: {'slo_spec': MULTI_SLO_CONFIG}},
+            remote_app_data={'slo_spec': MULTI_SLO_CONFIG},
         )
 
         context = Context(
@@ -397,7 +399,7 @@ class TestSLORequirer:
             slos = charm.slo_requirer.get_slos()
             _ = mgr.run()
 
-        # Should get both SLOs from the single unit
+        # Should get both SLOs from the single app
         assert len(slos) == 2
         services = {slo['service'] for slo in slos}
         assert services == {'test-service', 'another-service'}
@@ -407,12 +409,12 @@ class TestSLORequirer:
         slo_relation_1 = Relation(
             'slos',
             remote_app_name='provider1',
-            remote_units_data={0: {'slo_spec': VALID_SLO_CONFIG}},
+            remote_app_data={'slo_spec': VALID_SLO_CONFIG},
         )
         slo_relation_2 = Relation(
             'slos',
             remote_app_name='provider2',
-            remote_units_data={0: {'slo_spec': VALID_SLO_CONFIG_2}},
+            remote_app_data={'slo_spec': VALID_SLO_CONFIG_2},
         )
 
         context = Context(
@@ -433,20 +435,22 @@ class TestSLORequirer:
     def test_get_slos_validates_and_skips_invalid_data(self):
         """Test that invalid SLO specs are skipped with validation."""
         invalid_yaml = yaml.safe_dump(INVALID_SLO_SPEC_BAD_VERSION)
-        slo_relation = Relation(
+        slo_relation_1 = Relation(
             'slos',
-            remote_app_name='provider',
-            remote_units_data={
-                0: {'slo_spec': VALID_SLO_CONFIG},
-                1: {'slo_spec': invalid_yaml},
-            },
+            remote_app_name='provider1',
+            remote_app_data={'slo_spec': VALID_SLO_CONFIG},
+        )
+        slo_relation_2 = Relation(
+            'slos',
+            remote_app_name='provider2',
+            remote_app_data={'slo_spec': invalid_yaml},
         )
 
         context = Context(
             RequirerCharm,
             meta={'name': 'requirer', 'provides': {'slos': {'interface': 'slo'}}},
         )
-        state = State(relations=[slo_relation])
+        state = State(relations=[slo_relation_1, slo_relation_2])
 
         with context(context.on.start(), state) as mgr:
             charm = mgr.charm
@@ -459,20 +463,22 @@ class TestSLORequirer:
 
     def test_get_slos_skips_malformed_yaml(self):
         """Test that malformed YAML is skipped."""
-        slo_relation = Relation(
+        slo_relation_1 = Relation(
             'slos',
-            remote_app_name='provider',
-            remote_units_data={
-                0: {'slo_spec': VALID_SLO_CONFIG},
-                1: {'slo_spec': 'invalid: yaml: {{{'},
-            },
+            remote_app_name='provider1',
+            remote_app_data={'slo_spec': VALID_SLO_CONFIG},
+        )
+        slo_relation_2 = Relation(
+            'slos',
+            remote_app_name='provider2',
+            remote_app_data={'slo_spec': 'invalid: yaml: {{{'},
         )
 
         context = Context(
             RequirerCharm,
             meta={'name': 'requirer', 'provides': {'slos': {'interface': 'slo'}}},
         )
-        state = State(relations=[slo_relation])
+        state = State(relations=[slo_relation_1, slo_relation_2])
 
         with context(context.on.start(), state) as mgr:
             charm = mgr.charm
@@ -485,21 +491,27 @@ class TestSLORequirer:
 
     def test_get_slos_skips_empty_data(self):
         """Test that empty SLO data is skipped."""
-        slo_relation = Relation(
+        slo_relation_1 = Relation(
             'slos',
-            remote_app_name='provider',
-            remote_units_data={
-                0: {'slo_spec': VALID_SLO_CONFIG},
-                1: {},  # No slo_spec key
-                2: {'slo_spec': ''},  # Empty string
-            },
+            remote_app_name='provider1',
+            remote_app_data={'slo_spec': VALID_SLO_CONFIG},
+        )
+        slo_relation_2 = Relation(
+            'slos',
+            remote_app_name='provider2',
+            remote_app_data={},  # No slo_spec key
+        )
+        slo_relation_3 = Relation(
+            'slos',
+            remote_app_name='provider3',
+            remote_app_data={'slo_spec': ''},  # Empty string
         )
 
         context = Context(
             RequirerCharm,
             meta={'name': 'requirer', 'provides': {'slos': {'interface': 'slo'}}},
         )
-        state = State(relations=[slo_relation])
+        state = State(relations=[slo_relation_1, slo_relation_2, slo_relation_3])
 
         with context(context.on.start(), state) as mgr:
             charm = mgr.charm
@@ -522,7 +534,7 @@ class TestSLOIntegration:
             meta={'name': 'provider', 'requires': {'slos': {'interface': 'slo'}}},
         )
         provider_relation = Relation('slos')
-        provider_state = State(relations=[provider_relation])
+        provider_state = State(relations=[provider_relation], leader=True)  # Need leadership
 
         with provider_context(provider_context.on.start(), provider_state) as mgr:
             provider_charm = mgr.charm
@@ -531,7 +543,7 @@ class TestSLOIntegration:
 
         # Get the relation data from provider
         provider_relation_out = provider_state_out.get_relation(provider_relation.id)
-        slo_yaml = provider_relation_out.local_unit_data.get('slo_spec')
+        slo_yaml = provider_relation_out.local_app_data.get('slo_spec')
 
         # Requirer receives SLO
         requirer_context = Context(
@@ -541,7 +553,7 @@ class TestSLOIntegration:
         requirer_relation = Relation(
             'slos',
             remote_app_name='provider',
-            remote_units_data={0: {'slo_spec': slo_yaml or ''}},
+            remote_app_data={'slo_spec': slo_yaml or ''},
         )
         requirer_state = State(relations=[requirer_relation])
 
@@ -632,7 +644,7 @@ class TestTopologyInjection:
             meta={'name': 'provider', 'requires': {'slos': {'interface': 'slo'}}},
         )
         slo_relation = Relation('slos')
-        state = State(relations=[slo_relation])
+        state = State(relations=[slo_relation], leader=True)  # Need leadership
 
         # SLO config without topology labels in queries
         slo_config = """
@@ -655,7 +667,7 @@ slos:
 
         # Check that topology was injected
         relation_out = state_out.get_relation(slo_relation.id)
-        slo_yaml = relation_out.local_unit_data.get('slo_spec')
+        slo_yaml = relation_out.local_app_data.get('slo_spec')
         assert slo_yaml is not None
 
         # Parse and check
@@ -679,7 +691,7 @@ slos:
             meta={'name': 'provider', 'requires': {'slos': {'interface': 'slo'}}},
         )
         slo_relation = Relation('slos')
-        state = State(relations=[slo_relation])
+        state = State(relations=[slo_relation], leader=True)  # Need leadership
 
         slo_config = """
 version: prometheus/v1
@@ -701,7 +713,7 @@ slos:
 
         # Check that topology was NOT injected
         relation_out = state_out.get_relation(slo_relation.id)
-        slo_yaml = relation_out.local_unit_data.get('slo_spec')
+        slo_yaml = relation_out.local_app_data.get('slo_spec')
         assert slo_yaml is not None
 
         slo_data = yaml.safe_load(slo_yaml)
