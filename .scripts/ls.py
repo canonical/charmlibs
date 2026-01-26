@@ -65,6 +65,7 @@ class Info:
     docs_url: str = ''
     summary: str = ''
     description: str = ''
+    status: str = ''
 
     def to_dict(self, *fields: str) -> dict[str, str]:
         """Return dictionary containing only specified fields."""
@@ -171,6 +172,8 @@ def _ls(
                 info.lib_url = _lib_urls().get(_get_lib_name(category, root, path), '')
             if 'docs_url' in output:
                 info.docs_url = _get_docs_url(category, root, path)
+            if 'status' in output:
+                info.status = _get_status(category, root, path)
             infos.append(info)
         return infos
 
@@ -337,6 +340,13 @@ def _get_docs_url(category: str, root: pathlib.Path, path: pathlib.Path) -> str:
         return url.strip()
     assert category == 'interfaces'
     return f'https://documentation.ubuntu.com/charmlibs/reference/interfaces/{path.name}/'
+
+
+def _get_status(category: str, root: pathlib.Path, path: pathlib.Path) -> str:
+    if category == 'packages':
+        return ''
+    assert category == 'interfaces'
+    return _interface_yaml(path, root=root).get('status', '').strip()
 
 
 def _get_dist_name(package: pathlib.Path, root: pathlib.Path = _REPO_ROOT) -> str:
