@@ -5,7 +5,7 @@
 import ops
 import ops.testing
 
-from charmlibs import slo
+from charmlibs.interfaces import slo
 
 
 class Charm(ops.CharmBase):

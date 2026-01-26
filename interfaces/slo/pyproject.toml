@@ -1,8 +1,8 @@
 [project]
-name = "charmlibs-slo"
+name = "charmlibs-interfaces-slo"
 description = "SLO (Service Level Objective) management for Juju charms with Sloth integration."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.8"
 authors = [
     {name="The Observability team at Canonical Ltd."},
 ]
@@ -15,25 +15,25 @@ classifiers = [
 ]
 dynamic = ["version"]
 dependencies = [
-    "ops>=3,<4",
+    "ops",
     "pydantic>=2.0",
     "pyyaml",
 ]
 
 [dependency-groups]
-lint = [  # installed for `just lint slo` (unit, functional, and integration are also installed)
+lint = [  # installed for `just lint interfaces/slo` (unit, functional, and integration are also installed)
     "typing_extensions",
     "cosl>=0.0.10",
 ]
-unit = [  # installed for `just unit slo`
-    "ops[testing]>=3,<4",
+unit = [  # installed for `just unit interfaces/slo`
+    "ops[testing]",
     "pytest",
     "pytest-cov",
     "cosl>=0.0.10",
 ]
-functional = [  # installed for `just functional slo`
+functional = [  # installed for `just functional interfaces/slo`
 ]
-integration = [  # installed for `just integration slo`
+integration = [  # installed for `just integration interfaces/slo`
     "jubilant",
     "pytest-jubilant",
 ]
@@ -50,10 +50,10 @@ build-backend = "hatchling.build"
 packages = ["src/charmlibs"]
 
 [tool.hatch.version]
-path = "src/charmlibs/slo/_version.py"
+path = "src/charmlibs/interfaces/slo/_version.py"
 
 [tool.ruff]
-extend = "../pyproject.toml"
+extend = "../../pyproject.toml"
 src = ["src", "tests/unit", "tests/functional", "tests/integration"]  # correctly sort local imports in tests
 
 [tool.ruff.lint.extend-per-file-ignores]
@@ -63,9 +63,9 @@ src = ["src", "tests/unit", "tests/functional", "tests/integration"]  # correctl
 ]
 
 [tool.pyright]
-extends = "../pyproject.toml"
+extends = "../../pyproject.toml"
 include = ["src", "tests"]
-pythonVersion = "3.10"  # check no python > 3.10 features are used
+pythonVersion = "3.8"  # check no python > 3.8 features are used
 
 [tool.charmlibs.functional]
 ubuntu = []  # ubuntu versions to run functional tests with, e.g. "24.04" (defaults to just "latest")

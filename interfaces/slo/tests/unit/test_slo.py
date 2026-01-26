@@ -3,7 +3,7 @@
 
 """Unit tests for the SLO library."""
 
-from typing import Any
+from typing import Any, Dict
 
 import pytest
 import yaml
@@ -11,7 +11,7 @@ from ops.charm import CharmBase
 from ops.testing import Context, Relation, State
 from pydantic import ValidationError
 
-from charmlibs.slo.slo import (
+from charmlibs.interfaces.slo import (
     SLOProvider,
     SLORequirer,
     SLOSpec,
@@ -122,7 +122,7 @@ INVALID_SLO_SPEC_BAD_VERSION = {
     'slos': [{'name': 'test', 'objective': 99.9}],
 }
 
-INVALID_SLO_SPEC_EMPTY_SLOS: dict[str, Any] = {
+INVALID_SLO_SPEC_EMPTY_SLOS: Dict[str, Any] = {
     'version': 'prometheus/v1',
     'service': 'test-service',
     'slos': [],
@@ -163,14 +163,14 @@ class TestSLOSpec:
 
     def test_valid_slo_spec_without_labels(self):
         """Test that SLO spec without labels is accepted."""
-        spec_no_labels: dict[str, Any] = VALID_SLO_SPEC.copy()
+        spec_no_labels: Dict[str, Any] = VALID_SLO_SPEC.copy()
         spec_no_labels.pop('labels')
         spec = SLOSpec(**spec_no_labels)
         assert spec.labels == {}
 
     def test_invalid_version_format(self):
         """Test that invalid version format is rejected."""
-        invalid_spec: dict[str, Any] = {
+        invalid_spec: Dict[str, Any] = {
             'version': 'invalid',
             'service': 'test-service',
             'slos': [{'name': 'test', 'objective': 99.9}],
@@ -181,7 +181,7 @@ class TestSLOSpec:
 
     def test_missing_version(self):
         """Test that missing version is rejected."""
-        invalid_spec: dict[str, Any] = {
+        invalid_spec: Dict[str, Any] = {
             'service': 'test-service',
             'slos': [{'name': 'test', 'objective': 99.9}],
         }
@@ -196,7 +196,7 @@ class TestSLOSpec:
 
     def test_missing_required_fields(self):
         """Test that missing required fields are rejected."""
-        incomplete_spec: dict[str, Any] = {'version': 'prometheus/v1'}
+        incomplete_spec: Dict[str, Any] = {'version': 'prometheus/v1'}
         with pytest.raises(ValidationError):
             SLOSpec(**incomplete_spec)
 
@@ -561,10 +561,10 @@ class TestTopologyInjection:
 
     def test_inject_topology_simple_metric(self):
         """Test injecting topology into a simple metric query."""
-        from charmlibs.slo.slo import inject_topology_labels
+        from charmlibs.interfaces.slo import inject_topology_labels
 
         query = 'sum(rate(http_requests_total[5m]))'
-        topology: dict[str, str] = {'juju_application': 'my-app'}
+        topology: Dict[str, str] = {'juju_application': 'my-app'}
 
         result = inject_topology_labels(query, topology)
 
@@ -573,10 +573,10 @@ class TestTopologyInjection:
 
     def test_inject_topology_with_existing_labels(self):
         """Test injecting topology when labels already exist."""
-        from charmlibs.slo.slo import inject_topology_labels
+        from charmlibs.interfaces.slo import inject_topology_labels
 
         query = 'sum(rate(http_requests_total{status="5.."}[5m]))'
-        topology: dict[str, str] = {'juju_application': 'my-app'}
+        topology: Dict[str, str] = {'juju_application': 'my-app'}
 
         result = inject_topology_labels(query, topology)
 
@@ -587,10 +587,10 @@ class TestTopologyInjection:
 
     def test_inject_topology_multiple_metrics(self):
         """Test injecting topology into query with multiple metrics."""
-        from charmlibs.slo.slo import inject_topology_labels
+        from charmlibs.interfaces.slo import inject_topology_labels
 
         query = 'sum(rate(metric1[5m])) - sum(rate(metric2[5m]))'
-        topology: dict[str, str] = {'juju_application': 'my-app'}
+        topology: Dict[str, str] = {'juju_application': 'my-app'}
 
         result = inject_topology_labels(query, topology)
 
@@ -599,10 +599,10 @@ class TestTopologyInjection:
 
     def test_inject_topology_empty_topology(self):
         """Test that empty topology doesn't modify query."""
-        from charmlibs.slo.slo import inject_topology_labels
+        from charmlibs.interfaces.slo import inject_topology_labels
 
         query = 'sum(rate(http_requests_total[5m]))'
-        topology: dict[str, str] = {}
+        topology: Dict[str, str] = {}
 
         result = inject_topology_labels(query, topology)
 
@@ -610,10 +610,10 @@ class TestTopologyInjection:
 
     def test_inject_topology_multiple_labels(self):
         """Test injecting multiple topology labels."""
-        from charmlibs.slo.slo import inject_topology_labels
+        from charmlibs.interfaces.slo import inject_topology_labels
 
         query = 'sum(rate(metric[5m]))'
-        topology: dict[str, str] = {
+        topology: Dict[str, str] = {
             'juju_application': 'my-app',
             'juju_model': 'my-model',
             'juju_unit': 'my-app/0',
@@ -713,10 +713,10 @@ slos:
 
     def test_topology_injection_preserves_sloth_templates(self):
         """Test that topology injection preserves Sloth's {{.window}} template."""
-        from charmlibs.slo.slo import inject_topology_labels
+        from charmlibs.interfaces.slo import inject_topology_labels
 
         query = 'sum(rate(metric[{{.window}}]))'
-        topology: dict[str, str] = {'juju_application': 'my-app'}
+        topology: Dict[str, str] = {'juju_application': 'my-app'}
 
         result = inject_topology_labels(query, topology)
 

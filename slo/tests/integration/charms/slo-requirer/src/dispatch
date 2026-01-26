@@ -1,3 +1,0 @@
-#!/bin/sh
-# This is the dispatch file that Juju will execute to run the charm
-PYTHONPATH=lib:venv exec ./src/charm.py

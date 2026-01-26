@@ -1,11 +1,11 @@
-# charmlibs.slo
+# charmlibs.interfaces.slo
 
 SLO (Service Level Objective) management library for Juju charms, providing integration with the Sloth operator for generating Prometheus recording and alerting rules.
 
-To install, add `charmlibs-slo` to your Python dependencies. Then in your Python code, import as:
+To install, add `charmlibs-interfaces-slo` to your Python dependencies. Then in your Python code, import as:
 
 ```py
-from charmlibs.slo import SLOProvider, SLORequirer
+from charmlibs.interfaces.slo import SLOProvider, SLORequirer
 ```
 
 ## Features
@@ -20,7 +20,7 @@ from charmlibs.slo import SLOProvider, SLORequirer
 ### Provider Side
 
 ```python
-from charmlibs.slo import SLOProvider
+from charmlibs.interfaces.slo import SLOProvider
 
 class MyCharm(ops.CharmBase):
     def __init__(self, *args):
@@ -45,7 +45,7 @@ class MyCharm(ops.CharmBase):
 ### Requirer Side
 
 ```python
-from charmlibs.slo import SLORequirer
+from charmlibs.interfaces.slo import SLORequirer
 
 class SlothCharm(ops.CharmBase):
     def __init__(self, *args):
@@ -53,9 +53,15 @@ class SlothCharm(ops.CharmBase):
         self.slo_requirer = SLORequirer(self)
 
     def _on_config_changed(self, event):
-        # Validation happens here
+        # Get validated SLO specs from all related charms
         slos = self.slo_requirer.get_slos()
-        # Process validated SLOs
+        # Process SLOs and generate rules
 ```
 
-See the [reference documentation](https://documentation.ubuntu.com/charmlibs/reference/charmlibs/slo) for more.
+## Documentation
+
+For complete documentation, see the [charmlibs documentation](https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/slo).
+
+## Contributing
+
+See [CONTRIBUTING.md](../../CONTRIBUTING.md) in the repository root.
