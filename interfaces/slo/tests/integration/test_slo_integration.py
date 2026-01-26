@@ -176,15 +176,20 @@ def test_multiple_providers(juju: Juju, slo_provider_charm: str) -> None:
 
 def test_relation_removal(juju: Juju) -> None:
     """Test that removing relation stops SLO exchange."""
+    import time
+    
     # Remove the relation between provider and requirer
     juju.remove_relation(f'{PROVIDER}:slos', f'{REQUIRER}:slos')
 
     juju.wait(
         lambda status: (status.apps[PROVIDER].is_active and status.apps[REQUIRER].is_active),
         delay=10,
-        successes=1,
+        successes=2,  # Wait for 2 consecutive successes to ensure relation cleanup
         timeout=TIMEOUT,
     )
+    
+    # Give Juju time to fully clean up relation data after relation-broken completes
+    time.sleep(5)
 
     # Verify requirer no longer has SLOs from the first provider
     result = juju.run(f'{REQUIRER}/0', 'get-slos')
