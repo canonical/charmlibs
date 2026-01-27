@@ -1,3 +1,7 @@
+# 1.6.0 - 27 January 2025
+
+Add a safety net to ensure renewing expiring certificates.
+
 # 1.5.0 - 27 January 2025
 
 Add a public helper function to get the ID of the lib generated private key secret.

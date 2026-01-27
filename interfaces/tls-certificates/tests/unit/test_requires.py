@@ -10,7 +10,9 @@ from unittest.mock import MagicMock, patch
 import pytest
 import scenario
 import yaml
-from cryptography.hazmat.primitives import hashes
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.x509.oid import NameOID
 from ops import testing
 from ops.testing import ActionFailed, Secret
 
@@ -1766,3 +1768,159 @@ class TestTLSCertificatesRequiresV4:
 
         self.ctx.run(self.ctx.on.action("get-private-key-secret-id"), state_in)
         assert self.ctx.action_results == {"secret-id": ""}
+
+    def test_given_certificate_past_safety_threshold_when_configure_then_certificate_is_renewed(
+        self, mock_generate_csr: MagicMock
+    ):
+        validity_days = 365
+        days_elapsed = 362
+
+        private_key = generate_private_key()
+        csr = generate_csr(
+            private_key=private_key,
+            common_name="example.com",
+        )
+        provider_private_key = generate_private_key()
+        provider_ca_certificate = generate_ca(
+            private_key=provider_private_key,
+            common_name="example.com",
+            validity=datetime.timedelta(days=validity_days),
+        )
+
+        csr_object = x509.load_pem_x509_csr(csr.encode())
+        issuer = x509.load_pem_x509_certificate(provider_ca_certificate.encode()).issuer
+        ca_private_key_object = serialization.load_pem_private_key(
+            provider_private_key.encode(), password=None
+        )
+
+        now = datetime.datetime.now(datetime.timezone.utc)
+        not_valid_before = now - datetime.timedelta(days=days_elapsed)
+        not_valid_after = not_valid_before + datetime.timedelta(days=validity_days)
+
+        cert = (
+            x509.CertificateBuilder()
+            .subject_name(csr_object.subject)
+            .issuer_name(issuer)
+            .public_key(csr_object.public_key())
+            .serial_number(x509.random_serial_number())
+            .not_valid_before(not_valid_before)
+            .not_valid_after(not_valid_after)
+            .sign(ca_private_key_object, hashes.SHA256())  # type: ignore[arg-type]
+        )
+        certificate = cert.public_bytes(serialization.Encoding.PEM).decode().strip()
+
+        new_csr = generate_csr(
+            private_key=private_key,
+            common_name="example.com",
+        )
+        mock_generate_csr.return_value = new_csr
+
+        certificates_relation = testing.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-provider",
+            local_unit_data={
+                "certificate_signing_requests": json.dumps([
+                    {
+                        "certificate_signing_request": str(csr),
+                        "ca": False,
+                    }
+                ])
+            },
+            remote_app_data={
+                "certificates": json.dumps([
+                    {
+                        "certificate": str(certificate),
+                        "certificate_signing_request": str(csr),
+                        "ca": str(provider_ca_certificate),
+                        "chain": [str(certificate), str(provider_ca_certificate)],
+                    }
+                ]),
+            },
+        )
+
+        private_key_secret = Secret(
+            {"private-key": str(private_key)},
+            label=f"{LIBID}-private-key-0-{certificates_relation.endpoint}",
+            owner="unit",
+        )
+
+        state_in = testing.State(
+            config={"common_name": "example.com"},
+            relations={certificates_relation},
+            secrets={private_key_secret},
+        )
+
+        state_out = self.ctx.run(self.ctx.on.relation_changed(certificates_relation), state_in)
+
+        updated_relation = state_out.get_relation(certificates_relation.id)
+        csrs_data = json.loads(updated_relation.local_unit_data["certificate_signing_requests"])
+        assert len(csrs_data) == 1
+        assert csrs_data[0]["certificate_signing_request"] == str(new_csr)
+        assert csrs_data[0]["certificate_signing_request"] != str(csr)
+
+    @patch(LIB_DIR + ".CertificateRequestAttributes.generate_csr")
+    def test_given_certificate_before_safety_threshold_when_configure_then_certificate_is_not_renewed(
+        self, mock_generate_csr: MagicMock
+    ):
+        private_key = generate_private_key()
+        csr = generate_csr(
+            private_key=private_key,
+            common_name="example.com",
+        )
+        provider_private_key = generate_private_key()
+        provider_ca_certificate = generate_ca(
+            private_key=provider_private_key,
+            common_name="example.com",
+            validity=datetime.timedelta(days=365),
+        )
+        certificate = generate_certificate(
+            ca=provider_ca_certificate,
+            ca_key=provider_private_key,
+            csr=csr,
+            validity=datetime.timedelta(days=365),
+        )
+
+        certificates_relation = testing.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-provider",
+            local_unit_data={
+                "certificate_signing_requests": json.dumps([
+                    {
+                        "certificate_signing_request": str(csr),
+                        "ca": False,
+                    }
+                ])
+            },
+            remote_app_data={
+                "certificates": json.dumps([
+                    {
+                        "certificate": str(certificate),
+                        "certificate_signing_request": str(csr),
+                        "ca": str(provider_ca_certificate),
+                        "chain": [str(certificate), str(provider_ca_certificate)],
+                    }
+                ]),
+            },
+        )
+
+        private_key_secret = Secret(
+            {"private-key": str(private_key)},
+            label=f"{LIBID}-private-key-0-{certificates_relation.endpoint}",
+            owner="unit",
+        )
+
+        state_in = testing.State(
+            config={"common_name": "example.com"},
+            relations={certificates_relation},
+            secrets={private_key_secret},
+        )
+
+        state_out = self.ctx.run(self.ctx.on.relation_changed(certificates_relation), state_in)
+
+        updated_relation = state_out.get_relation(certificates_relation.id)
+        csrs_data = json.loads(updated_relation.local_unit_data["certificate_signing_requests"])
+        assert len(csrs_data) == 1
+        assert csrs_data[0]["certificate_signing_request"] == str(csr)
+        mock_generate_csr.assert_not_called()

@@ -1793,6 +1793,7 @@ class TLSCertificatesRequiresV4(Object):
         self._cleanup_certificate_requests()
         self._send_certificate_requests()
         self._find_available_certificates()
+        self._renew_expiring_certificates()
 
     def _mode_is_valid(self, mode: Mode) -> bool:
         return mode in [Mode.UNIT, Mode.APP]
@@ -2375,6 +2376,31 @@ class TLSCertificatesRequiresV4(Object):
                 logger.info(
                     "Removed CSR from relation data because it did not match the private key"
                 )
+
+    def _renew_expiring_certificates(self) -> None:
+        """Renew certificates approaching expiry that haven't been renewed yet.
+
+        This acts as a safety net for cases where secret_expired failed to trigger or complete.
+        Checks certificates at a threshold slightly after the configured renewal time but before
+        expiry to prevent downtime.
+        """
+        now = datetime.now(timezone.utc)
+        safety_threshold = min(0.99, self.renewal_relative_time + 0.05)
+
+        assigned_certificates, _ = self.get_assigned_certificates()
+
+        for provider_certificate in assigned_certificates:
+            cert = provider_certificate.certificate
+            validity_start = cert.validity_start_time
+            validity_end = cert.expiry_time
+            validity_period = validity_end - validity_start
+            safety_renewal_time = validity_start + (validity_period * safety_threshold)
+
+            if now >= safety_renewal_time and now < validity_end:
+                logger.warning(
+                    "Certificate approaching expiry but not renewed - triggering renewal as safety net"
+                )
+                self._renew_certificate_request(provider_certificate.certificate_signing_request)
 
     def _tls_relation_created(self) -> bool:
         relation = self.model.get_relation(self.relationship_name)
