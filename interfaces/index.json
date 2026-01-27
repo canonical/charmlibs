@@ -2,11 +2,11 @@
   {
     "name": "auth_proxy",
     "version": "0",
-    "lib": "",
-    "lib_url": "",
+    "lib": "charms.oathkeeper.auth_proxy",
+    "lib_url": "https://charmhub.io/oathkeeper/libraries/auth_proxy",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/auth_proxy/",
-    "summary": "",
-    "description": "",
+    "summary": "Configure an Identity and Access Proxy.",
+    "description": "The `auth_proxy` interface allows charms to configure an Identity and Access Proxy.\nThe requirer supplies the configuration, such as protected URLs, allowed endpoints, and headers.\nThe provider is responsible for transforming the configuration into access rules and forwarding relevant configuration to the proxy.",
     "status": "draft"
   },
   {
@@ -342,11 +342,11 @@
   {
     "name": "ldap",
     "version": "0",
-    "lib": "",
-    "lib_url": "",
+    "lib": "charms.glauth_k8s.ldap",
+    "lib_url": "https://charmhub.io/glauth-k8s/libraries/ldap",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/ldap/",
-    "summary": "",
-    "description": "",
+    "summary": "Configure and connect to a Lightweight Directory Access Protocol (LDAP) server.",
+    "description": "The `ldap` interface supports sharing configuration and connection information for a Lightweight Directory Access Protocol (LDAP) server.\nThe provider is responsible for sharing the LDAP URL and other information needed for the requirer to connect and perform LDAP operations.",
     "status": "draft"
   },
   {
@@ -432,31 +432,31 @@
   {
     "name": "oauth",
     "version": "0",
-    "lib": "",
-    "lib_url": "",
+    "lib": "charms.hydra.oauth",
+    "lib_url": "https://charmhub.io/hydra/libraries/oauth",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/oauth/",
-    "summary": "",
-    "description": "",
+    "summary": "Connect to an OAuth2/OIDC Provider.",
+    "description": "The `oauth` interface allows charms to interface with an OAuth2/OIDC Provider.\nThe requirer acts as an OAuth2 client.\nThe provider exposes an OAuth2/OIDC Provider.",
     "status": "draft"
   },
   {
     "name": "opencti_connector",
     "version": "0",
-    "lib": "",
-    "lib_url": "",
+    "lib": "charms.opencti.opencti_connector",
+    "lib_url": "https://charmhub.io/opencti/libraries/opencti_connector",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/opencti_connector/",
-    "summary": "",
-    "description": "",
+    "summary": "Connect a single OpenCTI provider to one or more OpenCTI connectors.",
+    "description": "The `opencti_connector` interface supports connecting an OpenCTI provider charm to one or more OpenCTI connectors.\nThe provider charm specifies the expected connector type for each connector relation.\nEach requirer charm shares its OpenCTI URL (and token) for the provider to connect to.",
     "status": "published"
   },
   {
     "name": "openfga",
     "version": "1",
-    "lib": "",
-    "lib_url": "",
+    "lib": "charms.openfga_k8s.openfga",
+    "lib_url": "https://charmhub.io/openfga-k8s/libraries/openfga",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/openfga/",
-    "summary": "",
-    "description": "",
+    "summary": "Set up and connect to an OpenFGA store.",
+    "description": "The `openfga` interface supports setting up an OpenFGA store and connecting to it.\nThe requirer specifies the store name, while the provider creates the store and shares the data needed to connect.",
     "status": "published"
   },
   {

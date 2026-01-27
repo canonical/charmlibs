@@ -1,6 +1,11 @@
 name: ldap
 version: 0
 status: draft
+lib: charms.glauth_k8s.ldap
+summary: Configure and connect to a Lightweight Directory Access Protocol (LDAP) server.
+description: |
+  The `ldap` interface supports sharing configuration and connection information for a Lightweight Directory Access Protocol (LDAP) server.
+  The provider is responsible for sharing the LDAP URL and other information needed for the requirer to connect and perform LDAP operations.
 
 providers:
   - name: glauth-k8s

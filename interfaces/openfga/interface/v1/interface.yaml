@@ -1,6 +1,11 @@
 name: openfga
 version: 1
 status: published
+lib: charms.openfga_k8s.openfga
+summary: Set up and connect to an OpenFGA store.
+description: |
+  The `openfga` interface supports setting up an OpenFGA store and connecting to it.
+  The requirer specifies the store name, while the provider creates the store and shares the data needed to connect.
 
 providers: []
 requirers: []

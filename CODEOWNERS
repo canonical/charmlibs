@@ -31,12 +31,22 @@
 /systemd/ @canonical/charmlibs-maintainers
 
 # charmlibs.interfaces packages (alphabetical)
+/interfaces/auth_proxy @canonical/identity
 /interfaces/cos_agent/ @canonical/observability
+/interfaces/forward_auth @canonical/identity
 /interfaces/grafana_auth/ @canonical/observability
 /interfaces/grafana_datasource/ @canonical/observability
 /interfaces/grafana_datasource_exchange/ @canonical/observability
+/interfaces/hydra_endpoints @canonical/identity
+/interfaces/kratos_external_idp @canonical/identity
+/interfaces/kratos_info @canonical/identity
+/interfaces/ldap @canonical/identity
 /interfaces/litmus_auth/ @canonical/tracing-and-profiling
+/interfaces/login_ui_endpoints @canonical/identity
 /interfaces/mimir_cluster/ @canonical/observability
+/interfaces/oauth @canonical/identity
+/interfaces/opencti_connector @canonical/identity
+/interfaces/openfga @canonical/identity
 /interfaces/profiling/ @canonical/tracing-and-profiling
 /interfaces/prometheus_remote_write/ @canonical/observability-core
 /interfaces/prometheus_scrape/ @canonical/observability-core

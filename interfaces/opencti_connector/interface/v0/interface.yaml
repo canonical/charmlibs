@@ -1,6 +1,12 @@
 name: opencti_connector
 version: 0
 status: published
+lib: charms.opencti.opencti_connector
+summary: Connect a single OpenCTI provider to one or more OpenCTI connectors.
+description: |
+  The `opencti_connector` interface supports connecting an OpenCTI provider charm to one or more OpenCTI connectors.
+  The provider charm specifies the expected connector type for each connector relation.
+  Each requirer charm shares its OpenCTI URL (and token) for the provider to connect to.
 
 providers:
   - name: abseipdb_ipblacklist
