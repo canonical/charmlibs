@@ -1,4 +1,8 @@
 name: milter
+summary: Provide or consume a mail filter.
+description: |
+  The `milter` interface allows charms to connect to a charm serving as a mail filter (milter).
+  The provider charm shares the information needed to connect.
 
 version: 0
 status: published

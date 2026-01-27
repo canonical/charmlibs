@@ -31,19 +31,26 @@
 /systemd/ @canonical/charmlibs-maintainers
 
 # charmlibs.interfaces packages (alphabetical)
+/interfaces/cloudflared-route/ @canonical/is-charms
 /interfaces/cos_agent/ @canonical/observability
+/interfaces/dns_record/ @canonical/is-charms
 /interfaces/grafana_auth/ @canonical/observability
 /interfaces/grafana_datasource/ @canonical/observability
 /interfaces/grafana_datasource_exchange/ @canonical/observability
 /interfaces/litmus_auth/ @canonical/tracing-and-profiling
+/interfaces/milter/ @canonical/is-charms
 /interfaces/mimir_cluster/ @canonical/observability
+/interfaces/nginx-route/ @canonical/is-charms
 /interfaces/profiling/ @canonical/tracing-and-profiling
 /interfaces/prometheus_remote_write/ @canonical/observability-core
 /interfaces/prometheus_scrape/ @canonical/observability-core
 /interfaces/pyroscope_cluster/ @canonical/tracing-and-profiling
+/interfaces/saml/ @canonical/is-charms
+/interfaces/smtp/ @canonical/is-charms
 /interfaces/tempo_cluster/ @canonical/tracing-and-profiling
 /interfaces/tls-certificates/ @canonical/tls
 /interfaces/tracing/ @canonical/tracing-and-profiling
+/interfaces/wazuh_api_client/ @canonical/is-charms
 
 # interfaces/index.json doesn't require CODEOWNERS review as its contents are validated in CI
 /interfaces/index.json

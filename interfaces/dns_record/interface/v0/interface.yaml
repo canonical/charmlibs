@@ -1,5 +1,9 @@
 name: dns_record
 internal: false
+summary: Create and manage DNS records.
+descriptions: |
+  The `dns_record` interface allows charms to request the creation of DNS records.
+  The requirer charm specifies the records, and the provider charm is responsible for creating and managing them.
 
 version: 0
 status: draft

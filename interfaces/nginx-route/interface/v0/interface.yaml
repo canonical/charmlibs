@@ -1,6 +1,12 @@
 name: nginx-route
 version: 0
 status: draft
+lib: charms.nginx_ingress_integrator.nginx_route
+summary: Create an Nginx ingress resource in a Kubernetes cluster.
+description: |
+  The `nginx_route` interface allows charms to request the creation of an Nginx ingress resource in the Kubernetes cluster.
+  The requirer charm supplies the configuration for the ingress resources.
+  The provider charm creates the resource as requested.
 
 providers:
   - name: nginx-route-integrator

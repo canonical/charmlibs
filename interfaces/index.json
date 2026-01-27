@@ -42,11 +42,11 @@
   {
     "name": "cloudflared-route",
     "version": "0",
-    "lib": "",
-    "lib_url": "",
+    "lib": "charms.cloudflare_configurator.cloudflared_route",
+    "lib_url": "https://charmhub.io/cloudflare-configurator/libraries/cloudflared_route",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/cloudflared-route/",
-    "summary": "",
-    "description": "",
+    "summary": "Configure a cloudflared tunnel.",
+    "description": "The `cloudflared_route` interface allows information to be exchanged between the cloudflared tunnel configurator charm and the cloudflared tunnel charm.",
     "status": "draft"
   },
   {
@@ -85,7 +85,7 @@
     "lib": "",
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/dns_record/",
-    "summary": "",
+    "summary": "Create and manage DNS records.",
     "description": "",
     "status": "draft"
   },
@@ -375,8 +375,8 @@
     "lib": "",
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/milter/",
-    "summary": "",
-    "description": "",
+    "summary": "Provide or consume a mail filter.",
+    "description": "The `milter` interface allows charms to connect to a charm serving as a mail filter (milter).\nThe provider charm shares the information needed to connect.",
     "status": "published"
   },
   {
@@ -422,11 +422,11 @@
   {
     "name": "nginx-route",
     "version": "0",
-    "lib": "",
-    "lib_url": "",
+    "lib": "charms.nginx_ingress_integrator.nginx_route",
+    "lib_url": "https://charmhub.io/nginx-ingress-integrator/libraries/nginx_route",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/nginx-route/",
-    "summary": "",
-    "description": "",
+    "summary": "Create an Nginx ingress resource in a Kubernetes cluster.",
+    "description": "The `nginx_route` interface allows charms to request the creation of an Nginx ingress resource in the Kubernetes cluster.\nThe requirer charm supplies the configuration for the ingress resources.\nThe provider charm creates the resource as requested.",
     "status": "draft"
   },
   {
@@ -532,11 +532,11 @@
   {
     "name": "saml",
     "version": "0",
-    "lib": "",
-    "lib_url": "",
+    "lib": "charms.saml_integrator.saml",
+    "lib_url": "https://charmhub.io/saml-integrator/libraries/saml",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/saml/",
-    "summary": "",
-    "description": "",
+    "summary": "Authenticate users with SAML.",
+    "description": "The `saml` interface allows charms to connect to a SAML Identity Provider for authenticating users.\nThe provider charm is the SAML Identity Provider, and shares the necessary data with requirer charms (SAML Service Providers).",
     "status": "published"
   },
   {
@@ -562,11 +562,11 @@
   {
     "name": "smtp",
     "version": "0",
-    "lib": "",
-    "lib_url": "",
+    "lib": "charms.smtp_integrator.smtp",
+    "lib_url": "https://charmhub.io/smtp-integrator/libraries/smtp",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/smtp/",
-    "summary": "",
-    "description": "",
+    "summary": "Connect to a SMTP server.",
+    "description": "The `smtp` interface allows charms to connect to a SMTP server.\nThe provider charm provides the SMTP details so that the requirer can connect.",
     "status": "published"
   },
   {
@@ -645,8 +645,8 @@
     "lib": "",
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/wazuh_api_client/",
-    "summary": "",
-    "description": "",
+    "summary": "The `wazuh_api_client` interface allows charms to connect to a Wazuh server.\nThe provider charm manages access to the server, securely providing credentials and endpoints to the requirer charms.",
+    "description": "Connect to a Wazuh server.",
     "status": "draft"
   },
   {

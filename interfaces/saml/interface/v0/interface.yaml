@@ -2,6 +2,11 @@ name: saml
 
 version: 0
 status: published
+lib: charms.saml_integrator.saml
+summary: Authenticate users with SAML.
+description: |
+  The `saml` interface allows charms to connect to a SAML Identity Provider for authenticating users.
+  The provider charm is the SAML Identity Provider, and shares the necessary data with requirer charms (SAML Service Providers).
 
 providers:
   - name: saml-integrator

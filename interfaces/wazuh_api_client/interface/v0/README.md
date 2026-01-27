@@ -2,7 +2,7 @@
 
 ## Usage
 
-This relation interface describes the expected behaviour of any charm interfacing with the Wazuh Sever charm, such as the [Wazuh Server Operator](https://github.com/canonical/wazuh-server-operator) using the `wazuh-api-client` relation.
+This relation interface describes the expected behaviour of any charm interfacing with the Wazuh Server charm, such as the [Wazuh Server Operator](https://github.com/canonical/wazuh-server-operator) using the `wazuh-api-client` relation.
 
 ## Direction
 

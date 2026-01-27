@@ -19,11 +19,11 @@ The following is the criteria that a Provider and Requirer need to adhere to be 
 
 ### Provider
 
-- Is expected to provide a list of dns_entries in the relation databag, each containing the domain, the status and optionally the description corresponding to the dns_entries requirested by the requirer.
+- Is expected to provide a list of `dns_entries` in the relation databag, each containing the domain, the status and optionally the description corresponding to the `dns_entries` requirested by the requirer.
 
 ### Requirer
 
-- Is expected to provide a list of dns_entries mains in the relation databag, containing at least the dns-domain, the host-label and record-data. The dns-domain must be present in the list of dns_domains for authentication.
+- Is expected to provide a list of `dns_entries` in the relation databag, containing at least the `dns-domain`, the `host-label` and `record-data`. The `dns-domain` must be present in the list of `dns_domains` for authentication.
 
 
 ## Relation Data

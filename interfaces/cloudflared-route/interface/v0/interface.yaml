@@ -1,5 +1,9 @@
 name: cloudflared-route
 internal: false
+lib: charms.cloudflare_configurator.cloudflared_route
+summary: Configure a cloudflared tunnel.
+description: |
+  The `cloudflared_route` interface allows information to be exchanged between the cloudflared tunnel configurator charm and the cloudflared tunnel charm.
 
 version: 0
 status: draft

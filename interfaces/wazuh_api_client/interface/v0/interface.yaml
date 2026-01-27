@@ -1,6 +1,10 @@
 name: wazuh_api_client
 version: 0
 status: draft
+description: Connect to a Wazuh server.
+summary: |
+  The `wazuh_api_client` interface allows charms to connect to a Wazuh server.
+  The provider charm manages access to the server, securely providing credentials and endpoints to the requirer charms.
 
 providers:
   - name: wazuh-server-operator
