@@ -1768,6 +1768,7 @@ class TestTLSCertificatesRequiresV4:
         self.ctx.run(self.ctx.on.action("get-private-key-secret-id"), state_in)
         assert self.ctx.action_results == {"secret-id": ""}
 
+    @patch(LIB_DIR + ".CertificateRequestAttributes.generate_csr")
     def test_given_certificate_past_safety_threshold_when_configure_then_certificate_is_renewed(
         self, mock_generate_csr: MagicMock
     ):
