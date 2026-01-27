@@ -1,4 +1,4 @@
-# 1.5.0 - 22 January 2025
+# 1.5.0 - 27 January 2025
 
 Add a public helper function to get the ID of the lib generated private key secret.
 
