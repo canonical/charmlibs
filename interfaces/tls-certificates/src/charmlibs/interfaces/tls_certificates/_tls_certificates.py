@@ -1162,6 +1162,24 @@ class CertificateRequestAttributes:
             and self.additional_critical_extensions == other.additional_critical_extensions
         )
 
+    def __hash__(self) -> int:
+        """Return hash of the CertificateRequestAttributes object."""
+        return hash((
+            self.common_name,
+            frozenset(self.sans_dns) if self.sans_dns else None,
+            frozenset(self.sans_ip) if self.sans_ip else None,
+            frozenset(self.sans_oid) if self.sans_oid else None,
+            self.email_address,
+            self.organization,
+            self.organizational_unit,
+            self.country_name,
+            self.state_or_province_name,
+            self.locality_name,
+            self.is_ca,
+            self.add_unique_id_to_subject_name,
+            tuple(self.additional_critical_extensions),
+        ))
+
     def is_valid(self) -> bool:
         """Validate the attributes of the certificate request.
 

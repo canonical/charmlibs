@@ -1,3 +1,7 @@
+# 1.7.0 - 29 January 2025
+
+Make `CertificateRequestAttributes` hashable to prevent unnecessary recreation of certificate requests in relation data.
+
 # 1.6.0 - 27 January 2025
 
 Add a safety net to ensure renewing expiring certificates.
