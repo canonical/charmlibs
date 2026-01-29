@@ -11,7 +11,8 @@ recording and alerting rules.
 
 ### Provider Side (Charms providing SLO specs)
 
-To provide SLO specifications to Sloth, use the `SLOProvider` class:
+To provide SLO specifications to Sloth, use the `SLOProvider` class.
+The recommended approach is to allow users to configure SLOs via `juju config`:
 
 ```python
 from charmlibs.interfaces.slo import SLOProvider
@@ -20,45 +21,39 @@ class MyCharm(ops.CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
         self.slo_provider = SLOProvider(self)
+        self.framework.observe(self.on.config_changed, self._on_config_changed)
 
-    def _provide_slos(self):
-        # Provide SLO specs as a raw YAML string
-        slo_config = '''
-        version: prometheus/v1
-        service: my-service
-        labels:
-          team: my-team
-        slos:
-          - name: requests-availability
-            objective: 99.9
-            description: "99.9% of requests should succeed"
-            sli:
-              events:
-                error_query: 'sum(rate(http_requests_total{status=~"5.."}[{{.window}}]))'
-                total_query: 'sum(rate(http_requests_total[{{.window}}]))'
-            alerting:
-              name: MyServiceHighErrorRate
-              labels:
-                severity: critical
-        '''
-        self.slo_provider.provide_slos(slo_config)
-
-        # Multiple SLO specs (separated by YAML document separators)
-        multi_slo_config = '''
-        version: prometheus/v1
-        service: my-service
-        slos:
-          - name: availability
-            objective: 99.9
-        ---
-        version: prometheus/v1
-        service: my-other-service
-        slos:
-          - name: latency
-            objective: 99.5
-        '''
-        self.slo_provider.provide_slos(multi_slo_config)
+    def _on_config_changed(self, event):
+        # Read SLO configuration from juju config
+        slo_config = self.config.get('slo_config', '')
+        if slo_config:
+            self.slo_provider.provide_slos(slo_config)
 ```
+
+Users can then configure SLOs using `juju config`:
+
+```bash
+juju config my-app slo_config='
+version: prometheus/v1
+service: my-service
+labels:
+  team: my-team
+slos:
+  - name: requests-availability
+    objective: 99.9
+    description: "99.9% of requests should succeed"
+    sli:
+      events:
+        error_query: '\''sum(rate(http_requests_total{status=~"5.."}[{{.window}}]))'\''
+        total_query: '\''sum(rate(http_requests_total[{{.window}}]))'\''
+    alerting:
+      name: MyServiceHighErrorRate
+      labels:
+        severity: critical
+'
+```
+
+To specify multiple SLOs for different services, separate them with YAML document separators (`---`).
 
 ### Requirer Side (Sloth charm)
 
@@ -373,7 +368,7 @@ class SLOProvider(ops.Object):
         for relation in relations:
             # Write SLO spec to app databag so it's shared across all units
             relation.data[self._charm.app]['slo_spec'] = merged_yaml
-            logger.info(
+            logger.debug(
                 'Provided SLO config to relation %s',
                 relation.id,
             )
@@ -438,11 +433,11 @@ class SLORequirer(ops.Object):
                             remote_app.name,
                         )
                     except ValidationError as e:
-                        logger.error('Invalid SLO spec from %s: %s', remote_app.name, e)
+                        logger.warning('Invalid SLO spec from %s: %s', remote_app.name, e)
                         continue
 
             except Exception as e:
-                logger.error('Failed to parse SLO spec from %s: %s', remote_app.name, e)
+                logger.warning('Failed to parse SLO spec from %s: %s', remote_app.name, e)
                 continue
 
         logger.info('Collected %d SLO specifications', len(slos))
