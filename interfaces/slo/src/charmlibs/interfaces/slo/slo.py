@@ -335,19 +335,19 @@ class SLOProvider(ops.Object):
         """Provide SLO specifications to Sloth as a raw YAML string.
 
         This method accepts a raw YAML string containing one or more SLO specifications.
-        Multiple specs should be separated by YAML document separators (---).
+        Multiple specs should be separated by YAML document separators (three dashes).
         The YAML is validated for parseability but full validation happens on the
         requirer side.
 
         Args:
             slo_config: Raw YAML string containing SLO specification(s) in Sloth format.
-                Can contain multiple documents separated by ---.
+                Can contain multiple documents separated by three dashes.
 
         Raises:
             SLOValidationError: If the YAML cannot be parsed or is invalid.
 
-        Example:
-            ```python
+        Example::
+
             slo_config = '''
             version: prometheus/v1
             service: my-service
@@ -358,17 +358,10 @@ class SLOProvider(ops.Object):
                 objective: 99.9
                 sli:
                   events:
-                    error_query: 'sum(rate(http_requests_total{status=~"5.."}[{{.window}}]))'
-                    total_query: 'sum(rate(http_requests_total[{{.window}}]))'
-            ---
-            version: prometheus/v1
-            service: my-other-service
-            slos:
-              - name: latency
-                objective: 99.5
+                    error_query: 'sum(rate(http_requests_total[5m]))'
+                    total_query: 'sum(rate(http_requests_total[5m]))'
             '''
             self.slo_provider.provide_slos(slo_config)
-            ```
         """
         relations = self._charm.model.relations.get(self.relation_name, [])
         if not relations:
