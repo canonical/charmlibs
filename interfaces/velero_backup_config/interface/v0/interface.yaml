@@ -1,6 +1,10 @@
 name: velero_backup_config
 version: 0
 status: draft
+summary: Configure Kubernetes backup requirements for Velero.
+description: |
+  The `velero_backup_config` interface allows client charms to specify Kubernetes backup requirements to a Velero Operator charm.
+  The requirer charm (client) provides backup specifications including namespaces, resource types, and retention policies, while the provider charm (Velero Operator) receives these specifications and uses them to execute backup operations.
 
 requirers:
   - name: velero-operator

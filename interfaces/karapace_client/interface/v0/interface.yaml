@@ -1,6 +1,10 @@
 name: karapace_client
 version: 0
 status: draft
+summary: Access Karapace schema registry services.
+description: |
+  The `karapace_client` interface allows charms to access Karapace schema registry services with user-specific credentials.
+  The provider charm manages Karapace users and subject access controls, while the requirer charm requests access to specific subjects with desired role permissions.
 
 providers:
   - name: karapace-operator

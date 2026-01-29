@@ -12,11 +12,11 @@
   {
     "name": "azure_service_principal",
     "version": "0",
-    "lib": "",
-    "lib_url": "",
+    "lib": "charms.data_platform_libs.data_interfaces",
+    "lib_url": "https://charmhub.io/data-platform-libs/libraries/data_interfaces",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/azure_service_principal/",
-    "summary": "",
-    "description": "",
+    "summary": "Interact with Microsoft Entra ID using service principal credentials.",
+    "description": "The `azure_service_principal` interface allows charms to receive the service principal credential needed to access Entra ID objects such as Azure storage.\nRequirer charms can specify which fields should be transferred as Juju secrets, and the provider charm will deliver the credentials as requested.",
     "status": "draft"
   },
   {
@@ -25,8 +25,8 @@
     "lib": "",
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/azure_storage/",
-    "summary": "",
-    "description": "",
+    "summary": "Access Azure Blob Storage and Data Lake Storage (Gen 2).",
+    "description": "The `azure_storage` interface allows charms to access Azure Blob Storage and Data Lake Storage (Gen 2) with appropriate credentials and connection details.\nThe provider charm supplies storage account credentials and configuration, while the requirer charm specifies the container to access.",
     "status": "draft"
   },
   {
@@ -52,11 +52,11 @@
   {
     "name": "connect_client",
     "version": "0",
-    "lib": "",
-    "lib_url": "",
+    "lib": "charms.data_platform_libs.data_interfaces",
+    "lib_url": "https://charmhub.io/data-platform-libs/libraries/data_interfaces",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/connect_client/",
-    "summary": "",
-    "description": "",
+    "summary": "Interact with Kafka Connect clusters.",
+    "description": "The `connect_client` interface allows charms to interact with Kafka Connect clusters for connector plugin and task management.\nThe provider charm manages the Kafka Connect cluster and deploys connector plugins from URLs supplied by the requirer, while the requirer charm manages its connectors and tasks using the provider's REST endpoints.",
     "status": "draft"
   },
   {
@@ -75,8 +75,8 @@
     "lib": "",
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/database_backup/",
-    "summary": "",
-    "description": "",
+    "summary": "Manage database backup and restore operations.",
+    "description": "The `database_backup` interface allows a database backup manager charm to coordinate backup and restore operations with database charms.\nThe provider charm (database) executes backup and restore jobs based on requirer requests and reports their status, while the requirer charm (backup manager) requests jobs, manages storage configuration, and stores backup artifacts.",
     "status": "draft"
   },
   {
@@ -92,11 +92,11 @@
   {
     "name": "etcd_client",
     "version": "0",
-    "lib": "",
-    "lib_url": "",
+    "lib": "charms.data_platform_libs.data_interfaces",
+    "lib_url": "https://charmhub.io/data-platform-libs/libraries/data_interfaces",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/etcd_client/",
-    "summary": "",
-    "description": "",
+    "summary": "Access etcd clusters with credentials and TLS configuration.",
+    "description": "The `etcd_client` interface allows charms to access etcd clusters with user-specific credentials and TLS configuration.\nThe provider charm creates etcd users and roles based on requirer requests, while the requirer charm shares certificate information and key access prefixes.",
     "status": "draft"
   },
   {
@@ -275,8 +275,8 @@
     "lib": "",
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/jwt/",
-    "summary": "",
-    "description": "",
+    "summary": "Provide and consume JSON Web Token configuration.",
+    "description": "The `jwt` interface allows charms to provide or require JSON Web Token configuration for secure token validation.\nThe provider charm supplies signing keys and optional validation parameters, while the requirer charm applies these settings to validate incoming JWTs in its workload.",
     "status": "draft"
   },
   {
@@ -292,11 +292,11 @@
   {
     "name": "kafka_client",
     "version": "0",
-    "lib": "",
-    "lib_url": "",
+    "lib": "charms.data_platform_libs.data_interfaces",
+    "lib_url": "https://charmhub.io/data-platform-libs/libraries/data_interfaces",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/kafka_client/",
-    "summary": "",
-    "description": "",
+    "summary": "Interact with Kafka clusters as a client.",
+    "description": "The `kafka_client` interface allows charms to interact with Kafka clusters as producers, consumers, or admin clients.\nThe provider charm creates Kafka users with appropriate ACLs and permissions based on requested roles, while the requirer charm specifies its desired topic and role.",
     "status": "draft"
   },
   {
@@ -305,8 +305,8 @@
     "lib": "",
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/karapace_client/",
-    "summary": "",
-    "description": "",
+    "summary": "Access Karapace schema registry services.",
+    "description": "The `karapace_client` interface allows charms to access Karapace schema registry services with user-specific credentials.\nThe provider charm manages Karapace users and subject access controls, while the requirer charm requests access to specific subjects with desired role permissions.",
     "status": "draft"
   },
   {
@@ -392,21 +392,21 @@
   {
     "name": "mongodb_client",
     "version": "0",
-    "lib": "",
-    "lib_url": "",
+    "lib": "charms.data_platform_libs.data_interfaces",
+    "lib_url": "https://charmhub.io/data-platform-libs/libraries/data_interfaces",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/mongodb_client/",
-    "summary": "",
-    "description": "",
+    "summary": "Access MongoDB databases with unique credentials.",
+    "description": "The `mongodb_client` interface allows charms to access MongoDB databases with unique, relation-specific credentials transmitted via Juju Secrets.\nThe provider charm creates database users and provides connection details, while the requirer charm requests a database name and optional custom entities with specific role permissions.",
     "status": "draft"
   },
   {
     "name": "mysql_client",
     "version": "0",
-    "lib": "",
-    "lib_url": "",
+    "lib": "charms.data_platform_libs.data_interfaces",
+    "lib_url": "https://charmhub.io/data-platform-libs/libraries/data_interfaces",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/mysql_client/",
-    "summary": "",
-    "description": "",
+    "summary": "Access MySQL databases with unique credentials.",
+    "description": "The `mysql_client` interface allows charms to access MySQL databases with unique, relation-specific credentials transmitted via Juju Secrets.\nThe provider charm creates database users and provides connection details, while the requirer charm requests a database name and optional custom entities with specific role permissions.",
     "status": "published"
   },
   {
@@ -462,21 +462,21 @@
   {
     "name": "opensearch_client",
     "version": "0",
-    "lib": "",
-    "lib_url": "",
+    "lib": "charms.data_platform_libs.data_interfaces",
+    "lib_url": "https://charmhub.io/data-platform-libs/libraries/data_interfaces",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/opensearch_client/",
-    "summary": "",
-    "description": "",
+    "summary": "Access OpenSearch and ElasticSearch clusters.",
+    "description": "The `opensearch_client` interface allows charms to access OpenSearch and ElasticSearch clusters with user-specific credentials and index permissions transmitted via Juju Secrets.\nThe provider charm creates users and manages index access controls, while the requirer charm requests access to specific indices with optional role permissions.",
     "status": "draft"
   },
   {
     "name": "postgresql_client",
     "version": "0",
-    "lib": "",
-    "lib_url": "",
+    "lib": "charms.data_platform_libs.data_interfaces",
+    "lib_url": "https://charmhub.io/data-platform-libs/libraries/data_interfaces",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/postgresql_client/",
-    "summary": "",
-    "description": "",
+    "summary": "Access PostgreSQL databases with unique credentials.",
+    "description": "The `postgresql_client` interface allows charms to access PostgreSQL databases with unique, relation-specific credentials.\nThe provider charm creates database users and provides connection details, while the requirer charm requests a database name and optional custom entities with specific role permissions. Supports subordinate charms that provide external connectivity.",
     "status": "draft"
   },
   {
@@ -635,8 +635,8 @@
     "lib": "",
     "lib_url": "",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/velero_backup_config/",
-    "summary": "",
-    "description": "",
+    "summary": "Configure Kubernetes backup requirements for Velero.",
+    "description": "The `velero_backup_config` interface allows client charms to specify Kubernetes backup requirements to a Velero Operator charm.\nThe requirer charm (client) provides backup specifications including namespaces, resource types, and retention policies, while the provider charm (Velero Operator) receives these specifications and uses them to execute backup operations.",
     "status": "draft"
   },
   {

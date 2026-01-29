@@ -1,6 +1,10 @@
 name: s3
 version: 0
 status: draft
+summary: Access S3-compatible object storage providers.
+description: |
+  The `s3` interface allows charms to access S3-compatible object storage providers with bucket-specific credentials and connection details.
+  The provider charm shares storage credentials and configuration for a bucket, while the requirer charm specifies the bucket name or allows the provider to assign one.
 
 providers:
   - name: s3-integrator

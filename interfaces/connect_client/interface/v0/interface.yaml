@@ -1,8 +1,11 @@
 name: connect_client
-
 version: 0
-
 status: draft
+lib: charms.data_platform_libs.data_interfaces
+summary: Interact with Kafka Connect clusters.
+description: |
+  The `connect_client` interface allows charms to interact with Kafka Connect clusters for connector plugin and task management.
+  The provider charm manages the Kafka Connect cluster and deploys connector plugins from URLs supplied by the requirer, while the requirer charm manages its connectors and tasks using the provider's REST endpoints.
 
 providers:
   - name: kafka-connect-operator

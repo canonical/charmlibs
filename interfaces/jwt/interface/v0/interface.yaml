@@ -1,6 +1,10 @@
 name: jwt
 version: 0
 status: draft
+summary: Provide and consume JSON Web Token configuration.
+description: |
+  The `jwt` interface allows charms to provide or require JSON Web Token configuration for secure token validation.
+  The provider charm supplies signing keys and optional validation parameters, while the requirer charm applies these settings to validate incoming JWTs in its workload.
 
 providers:
   - name: jwt-integrator

@@ -1,6 +1,11 @@
 name: azure_service_principal
 version: 0
 status: draft
+lib: charms.data_platform_libs.data_interfaces
+summary: Interact with Microsoft Entra ID using service principal credentials.
+description: |
+  The `azure_service_principal` interface allows charms to receive the service principal credential needed to access Entra ID objects such as Azure storage.
+  Requirer charms can specify which fields should be transferred as Juju secrets, and the provider charm will deliver the credentials as requested.
 
 providers:
   - name: azure-auth-integrator

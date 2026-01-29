@@ -1,6 +1,11 @@
 name: opensearch_client
 version: 0
 status: draft
+lib: charms.data_platform_libs.data_interfaces
+summary: Access OpenSearch and ElasticSearch clusters.
+description: |
+  The `opensearch_client` interface allows charms to access OpenSearch and ElasticSearch clusters with user-specific credentials and index permissions transmitted via Juju Secrets.
+  The provider charm creates users and manages index access controls, while the requirer charm requests access to specific indices with optional role permissions.
 
 providers:
   - name: opensearch-operator

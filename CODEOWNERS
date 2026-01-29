@@ -31,20 +31,34 @@
 /systemd/ @canonical/charmlibs-maintainers
 
 # charmlibs.interfaces packages (alphabetical)
+/interfaces/azure_service_principal/ @canonical/data-platform
+/interfaces/azure_storage/ @canonical/data-platform
 /interfaces/certificate_transfer/ @canonical/tls
+/interfaces/connect_client/ @canonical/data-platform-bigdata
 /interfaces/cos_agent/ @canonical/observability
+/interfaces/database_backup/ @canonical/data-platform
+/interfaces/etcd_client/ @canonical/data-platform-nosql
 /interfaces/grafana_auth/ @canonical/observability
 /interfaces/grafana_datasource/ @canonical/observability
 /interfaces/grafana_datasource_exchange/ @canonical/observability
+/interfaces/jwt/ @canonical/data-platform
+/interfaces/kafka_client/ @canonical/data-platform-bigdata
+/interfaces/karapace_client/ @canonical/data-platform-bigdata
 /interfaces/litmus_auth/ @canonical/tracing-and-profiling
 /interfaces/mimir_cluster/ @canonical/observability
+/interfaces/mongodb_client/ @canonical/data-platform-nosql
+/interfaces/mysql_client/ @canonical/data-platform-mysql
+/interfaces/opensearch_client/ @canonical/data-platform-nosql
+/interfaces/postgresql_client/ @canonical/data-platform-postgresql
 /interfaces/profiling/ @canonical/tracing-and-profiling
 /interfaces/prometheus_remote_write/ @canonical/observability-core
 /interfaces/prometheus_scrape/ @canonical/observability-core
 /interfaces/pyroscope_cluster/ @canonical/tracing-and-profiling
+/interfaces/s3/ @canonical/data-platform
 /interfaces/tempo_cluster/ @canonical/tracing-and-profiling
 /interfaces/tls-certificates/ @canonical/tls
 /interfaces/tracing/ @canonical/tracing-and-profiling
+/interfaces/velero_backup_config/ @canonical/data-platform
 
 # interfaces/index.json doesn't require CODEOWNERS review as its contents are validated in CI
 /interfaces/index.json

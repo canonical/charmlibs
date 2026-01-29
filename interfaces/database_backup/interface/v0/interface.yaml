@@ -1,6 +1,10 @@
 name: database_backup
 version: 0
 status: draft
+summary: Manage database backup and restore operations.
+description: |
+  The `database_backup` interface allows a database backup manager charm to coordinate backup and restore operations with database charms.
+  The provider charm (database) executes backup and restore jobs based on requirer requests and reports their status, while the requirer charm (backup manager) requests jobs, manages storage configuration, and stores backup artifacts.
 
 providers: []
 requirers: []

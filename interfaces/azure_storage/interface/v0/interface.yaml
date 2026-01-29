@@ -2,6 +2,11 @@ name: azure_storage
 version: 0
 status: draft
 
+summary: Access Azure Blob Storage and Data Lake Storage (Gen 2).
+description: |
+  The `azure_storage` interface allows charms to access Azure Blob Storage and Data Lake Storage (Gen 2) with appropriate credentials and connection details.
+  The provider charm supplies storage account credentials and configuration, while the requirer charm specifies the container to access.
+
 providers:
   - name: azure-storage-integrator
     url: https://github.com/canonical/object-storage-integrators

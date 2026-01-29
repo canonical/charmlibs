@@ -1,6 +1,11 @@
 name: mysql_client
 version: 0
 status: published
+lib: charms.data_platform_libs.data_interfaces
+summary: Access MySQL databases with unique credentials.
+description: |
+  The `mysql_client` interface allows charms to access MySQL databases with unique, relation-specific credentials transmitted via Juju Secrets.
+  The provider charm creates database users and provides connection details, while the requirer charm requests a database name and optional custom entities with specific role permissions.
 
 providers:
   - name: mysql-operator

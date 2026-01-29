@@ -1,6 +1,11 @@
 name: kafka_client
 version: 0
 status: draft
+lib: charms.data_platform_libs.data_interfaces
+summary: Interact with Kafka clusters as a client.
+description: |
+  The `kafka_client` interface allows charms to interact with Kafka clusters as producers, consumers, or admin clients.
+  The provider charm creates Kafka users with appropriate ACLs and permissions based on requested roles, while the requirer charm specifies its desired topic and role.
 
 providers:
   - name: kafka-operator
