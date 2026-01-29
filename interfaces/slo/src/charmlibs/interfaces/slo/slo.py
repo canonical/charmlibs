@@ -1,7 +1,7 @@
 # Copyright 2026 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-"""SLO Provider and Requirer Library.
+r"""SLO Provider and Requirer Library.
 
 This library provides a way for charms to share SLO (Service Level Objective)
 specifications with the Sloth charm, which will convert them into Prometheus
@@ -53,7 +53,8 @@ slos:
 '
 ```
 
-To specify multiple SLOs for different services, separate them with YAML document separators (`---`).
+To specify multiple SLOs for different services, separate them with YAML document
+separators (`---`).
 
 ### Requirer Side (Sloth charm)
 
@@ -117,6 +118,7 @@ slo_spec: |
 ```
 """
 
+import copy
 import logging
 import re
 from typing import Any, Dict, List, Match
@@ -134,6 +136,18 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 DEFAULT_RELATION_NAME = 'slos'
+
+# Pre-compiled regex patterns for topology injection
+_METRIC_WITH_LABELS = re.compile(r'([a-zA-Z_:][a-zA-Z0-9_:]*)(\{[^}]*\})')
+_METRIC_WITH_TIME = re.compile(r'([a-zA-Z_:][a-zA-Z0-9_:]*)(\[[^\]]*\])')
+
+
+class SLOError(Exception):
+    """Base exception for SLO library errors."""
+
+
+class SLOValidationError(SLOError):
+    """Validation error for SLO specifications."""
 
 
 def inject_topology_labels(query: str, topology: Dict[str, str]) -> str:
@@ -189,7 +203,7 @@ def inject_topology_labels(query: str, topology: Dict[str, str]) -> str:
         return f'{metric_name}{new_labels}'
 
     # Match metric_name{labels} - greedy match captures all content including {{.window}}
-    query = re.sub(r'([a-zA-Z_:][a-zA-Z0-9_:]*)(\{[^}]*\})', replace_labels, query)
+    query = _METRIC_WITH_LABELS.sub(replace_labels, query)
 
     # Second pass: inject into metrics with [time] but no labels yet
     def replace_time(match: Match[str]) -> str:
@@ -203,7 +217,7 @@ def inject_topology_labels(query: str, topology: Dict[str, str]) -> str:
         return match.group(0)
 
     # Match metric_name[time]
-    query = re.sub(r'([a-zA-Z_:][a-zA-Z0-9_:]*)(\[[^\]]*\])', replace_time, query)
+    query = _METRIC_WITH_TIME.sub(replace_time, query)
 
     return query
 
@@ -277,11 +291,15 @@ class SLOProvider(ops.Object):
     def _inject_topology_into_slo(self, slo_spec: Dict[str, Any]) -> Dict[str, Any]:
         """Inject topology labels into SLO queries.
 
+        This method performs a deep copy of the input SLO specification and
+        injects Juju topology labels into all Prometheus queries found in the
+        SLO definitions.
+
         Args:
             slo_spec: SLO specification dictionary
 
         Returns:
-            SLO specification with topology labels injected into queries
+            New SLO specification with topology labels injected into queries
         """
         if not self._inject_topology:
             return slo_spec
@@ -289,24 +307,27 @@ class SLOProvider(ops.Object):
         topology_labels = self._get_topology_labels()
 
         # Deep copy to avoid modifying the original
-        import copy
-
         slo_spec = copy.deepcopy(slo_spec)
 
         # Inject topology into each SLO's queries
         for slo in slo_spec.get('slos', []):
-            if 'sli' in slo and 'events' in slo['sli']:
-                events = slo['sli']['events']
+            sli = slo.get('sli')
+            if not sli:
+                continue
 
-                if 'error_query' in events:
-                    events['error_query'] = inject_topology_labels(
-                        events['error_query'], topology_labels
-                    )
+            events = sli.get('events')
+            if not events:
+                continue
 
-                if 'total_query' in events:
-                    events['total_query'] = inject_topology_labels(
-                        events['total_query'], topology_labels
-                    )
+            if 'error_query' in events:
+                events['error_query'] = inject_topology_labels(
+                    events['error_query'], topology_labels
+                )
+
+            if 'total_query' in events:
+                events['total_query'] = inject_topology_labels(
+                    events['total_query'], topology_labels
+                )
 
         return slo_spec
 
@@ -315,11 +336,15 @@ class SLOProvider(ops.Object):
 
         This method accepts a raw YAML string containing one or more SLO specifications.
         Multiple specs should be separated by YAML document separators (---).
-        Validation is performed on the Sloth (requirer) side.
+        The YAML is validated for parseability but full validation happens on the
+        requirer side.
 
         Args:
             slo_config: Raw YAML string containing SLO specification(s) in Sloth format.
                 Can contain multiple documents separated by ---.
+
+        Raises:
+            SLOValidationError: If the YAML cannot be parsed or is invalid.
 
         Example:
             ```python
@@ -355,7 +380,11 @@ class SLOProvider(ops.Object):
             return
 
         # Parse the YAML config - it can contain multiple SLO documents (separated by ---)
-        slo_specs = list(yaml.safe_load_all(slo_config))
+        try:
+            slo_specs = list(yaml.safe_load_all(slo_config))
+        except yaml.YAMLError as e:
+            logger.warning('Failed to parse SLO config as YAML: %s', e)
+            raise SLOValidationError(f'Invalid YAML in slo_config: {e}') from e
 
         # Inject topology labels into queries if enabled
         if self._inject_topology:

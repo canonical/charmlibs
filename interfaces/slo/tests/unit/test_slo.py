@@ -15,6 +15,7 @@ from charmlibs.interfaces.slo import (
     SLOProvider,
     SLORequirer,
     SLOSpec,
+    SLOValidationError,
 )
 
 # Test SLO specifications as YAML strings
@@ -309,6 +310,24 @@ class TestSLOProvider:
         relation_out = state_out.get_relation(slo_relation.id)
         slo_yaml = relation_out.local_app_data.get('slo_spec')
         assert slo_yaml is None
+
+    def test_provide_slos_with_invalid_yaml(self):
+        """Test that providing invalid YAML raises SLOValidationError."""
+        context = Context(
+            ProviderCharm,
+            meta={'name': 'provider', 'requires': {'slos': {'interface': 'slo'}}},
+        )
+        slo_relation = Relation('slos')
+        state = State(relations=[slo_relation], leader=True)
+
+        invalid_yaml = 'invalid: yaml: {{{['
+
+        with context(context.on.start(), state) as mgr:
+            charm = mgr.charm
+            with pytest.raises(SLOValidationError) as exc_info:
+                charm.slo_provider.provide_slos(invalid_yaml)
+            assert 'Invalid YAML' in str(exc_info.value)
+            _ = mgr.run()
 
 
 class TestSLORequirer:
