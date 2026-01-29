@@ -1,4 +1,4 @@
-# Copyright 2026 Canonical
+# Copyright 2026 Canonical Ltd.
 # See LICENSE file for licensing details.
 
 """Unit tests for the SLO library."""
