@@ -21,15 +21,19 @@ and alerting rules.
 
 from ._version import __version__ as __version__
 from .slo import (
+    SLOError,
     SLOProvider,
     SLORequirer,
     SLOSpec,
+    SLOValidationError,
     inject_topology_labels,
 )
 
 __all__ = [
+    'SLOError',
     'SLOProvider',
     'SLORequirer',
     'SLOSpec',
+    'SLOValidationError',
     'inject_topology_labels',
 ]
