@@ -56,6 +56,7 @@
 /interfaces/prometheus_scrape/ @canonical/observability-core
 /interfaces/pyroscope_cluster/ @canonical/tracing-and-profiling
 /interfaces/s3/ @canonical/data-platform
+/interfaces/slo/ @canonical/tracing-and-profiling
 /interfaces/tempo_cluster/ @canonical/tracing-and-profiling
 /interfaces/tls-certificates/ @canonical/tls
 /interfaces/tracing/ @canonical/tracing-and-profiling
