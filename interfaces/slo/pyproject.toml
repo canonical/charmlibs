@@ -55,6 +55,9 @@ path = "src/charmlibs/interfaces/slo/_version.py"
 [tool.ruff]
 extend = "../../pyproject.toml"
 src = ["src", "tests/unit", "tests/functional", "tests/integration"]  # correctly sort local imports in tests
+exclude = [
+    "tests/integration/charms/*/library",
+]
 
 [tool.ruff.lint.extend-per-file-ignores]
 # add additional per-file-ignores here to avoid overriding repo-level config
