@@ -2,14 +2,11 @@
 name = "slo-test-requirer"
 version = "0.1.0"
 description = "Test charm for SLO requirer"
+requires-python = ">=3.10"
 dependencies = [
     "ops>=2.9",
-    "pydantic>=2.0",
+    "charmlibs-interfaces-slo",
 ]
 
-[project.optional-dependencies]
-dev = []
-
-[build-system]
-requires = ["setuptools"]
-build-backend = "setuptools.build_meta"
+[tool.uv.sources]
+charmlibs-interfaces-slo = { path = "library", editable = true }
