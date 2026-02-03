@@ -18,115 +18,111 @@ This library provides a way for charms to share SLO (Service Level Objective)
 specifications with the Sloth charm, which will convert them into Prometheus
 recording and alerting rules.
 
-## Getting Started
+Getting Started
+===============
 
-### Provider Side (Charms providing SLO specs)
+Provider Side (Charms providing SLO specs)
+-------------------------------------------
 
-To provide SLO specifications to Sloth, use the `SLOProvider` class.
-The recommended approach is to allow users to configure SLOs via `juju config`:
+To provide SLO specifications to Sloth, use the ``SLOProvider`` class.
+The recommended approach is to allow users to configure SLOs via ``juju config``::
 
-```python
-from charmlibs.interfaces.slo import SLOProvider
+    from charmlibs.interfaces.slo import SLOProvider
 
-class MyCharm(ops.CharmBase):
-    def __init__(self, *args):
-        super().__init__(*args)
-        self.slo_provider = SLOProvider(self)
-        self.framework.observe(self.on.config_changed, self._on_config_changed)
+    class MyCharm(ops.CharmBase):
+        def __init__(self, *args):
+            super().__init__(*args)
+            self.slo_provider = SLOProvider(self)
+            self.framework.observe(self.on.config_changed, self._on_config_changed)
 
-    def _on_config_changed(self, event):
-        # Read SLO configuration from juju config
-        slo_config = self.config.get('slo_config', '')
-        if slo_config:
-            self.slo_provider.provide_slos(slo_config)
-```
+        def _on_config_changed(self, event):
+            # Read SLO configuration from juju config
+            slo_config = self.config.get('slo_config', '')
+            if slo_config:
+                self.slo_provider.provide_slos(slo_config)
 
-Users can then configure SLOs using `juju config`:
+Users can then configure SLOs using ``juju config``::
 
-```bash
-juju config my-app slo_config='
-version: prometheus/v1
-service: my-service
-labels:
-  team: my-team
-slos:
-  - name: requests-availability
-    objective: 99.9
-    description: "99.9% of requests should succeed"
-    sli:
-      events:
-        error_query: '\''sum(rate(http_requests_total{status=~"5.."}[{{.window}}]))'\''
-        total_query: '\''sum(rate(http_requests_total[{{.window}}]))'\''
-    alerting:
-      name: MyServiceHighErrorRate
-      labels:
-        severity: critical
-'
-```
+    juju config my-app slo_config='
+    version: prometheus/v1
+    service: my-service
+    labels:
+      team: my-team
+    slos:
+      - name: requests-availability
+        objective: 99.9
+        description: "99.9% of requests should succeed"
+        sli:
+          events:
+            error_query: '\''sum(rate(http_requests_total{status=~"5.."}[{{.window}}]))'\''
+            total_query: '\''sum(rate(http_requests_total[{{.window}}]))'\''
+        alerting:
+          name: MyServiceHighErrorRate
+          labels:
+            severity: critical
+    '
 
 To specify multiple SLOs for different services, separate them with YAML document
-separators (`---`).
+separators (``---``).
 
-### Requirer Side (Sloth charm)
+Requirer Side (Sloth charm)
+----------------------------
 
-The Sloth charm uses `SLORequirer` to collect SLO specifications.
-Validation is performed on the requirer side:
+The Sloth charm uses ``SLORequirer`` to collect SLO specifications.
+Validation is performed on the requirer side::
 
-```python
-from charmlibs.interfaces.slo import SLORequirer
+    from charmlibs.interfaces.slo import SLORequirer
 
-class SlothCharm(ops.CharmBase):
-    def __init__(self, *args):
-        super().__init__(*args)
-        self.slo_requirer = SLORequirer(self)
+    class SlothCharm(ops.CharmBase):
+        def __init__(self, *args):
+            super().__init__(*args)
+            self.slo_requirer = SLORequirer(self)
 
-    def _on_config_changed(self, event):
-        # Get validated SLO specs from all related charms
-        slos = self.slo_requirer.get_slos()
-        # Process SLOs and generate rules
-```
+        def _on_config_changed(self, event):
+            # Get validated SLO specs from all related charms
+            slos = self.slo_requirer.get_slos()
+            # Process SLOs and generate rules
 
-## Relation Data Format
+Relation Data Format
+====================
 
 SLO specifications are stored in the relation databag as YAML strings under the
-`slo_spec` key. Each provider unit can provide one or more SLO specifications.
+``slo_spec`` key. Each provider unit can provide one or more SLO specifications.
 
-For a single service:
-```yaml
-slo_spec: |
-  version: prometheus/v1
-  service: my-service
-  labels:
-    team: my-team
-  slos:
-    - name: requests-availability
-      objective: 99.9
-      description: "99.9% of requests should succeed"
-      sli:
-        events:
-          error_query: 'sum(rate(http_requests_total{status=~"5.."}[{{.window}}]))'
-          total_query: 'sum(rate(http_requests_total[{{.window}}]))'
-      alerting:
-        name: MyServiceHighErrorRate
-        labels:
-          severity: critical
-```
+For a single service::
 
-For multiple services (separated by YAML document separators):
-```yaml
-slo_spec: |
-  version: prometheus/v1
-  service: my-service
-  slos:
-    - name: requests-availability
-      objective: 99.9
-  ---
-  version: prometheus/v1
-  service: my-other-service
-  slos:
-    - name: requests-latency
-      objective: 99.5
-```
+    slo_spec: |
+      version: prometheus/v1
+      service: my-service
+      labels:
+        team: my-team
+      slos:
+        - name: requests-availability
+          objective: 99.9
+          description: "99.9% of requests should succeed"
+          sli:
+            events:
+              error_query: 'sum(rate(http_requests_total{status=~"5.."}[{{.window}}]))'
+              total_query: 'sum(rate(http_requests_total[{{.window}}]))'
+          alerting:
+            name: MyServiceHighErrorRate
+            labels:
+              severity: critical
+
+For multiple services (separated by YAML document separators)::
+
+    slo_spec: |
+      version: prometheus/v1
+      service: my-service
+      slos:
+        - name: requests-availability
+          objective: 99.9
+      ---
+      version: prometheus/v1
+      service: my-other-service
+      slos:
+        - name: requests-latency
+          objective: 99.5
 """
 
 from ._slo import (
