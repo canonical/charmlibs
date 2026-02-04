@@ -77,6 +77,7 @@ lint package *pyright_args:
     just --justfile='{{justfile()}}' python='{{python}}' fast-lint || ((FAILURES+=$?))
     just --justfile='{{justfile()}}' python='{{python}}' static '{{package}}' "${@}" || ((FAILURES+=1))
     : "$FAILURES command(s) failed."
+    exit $FAILURES
 
 [doc('Run package specific static analysis only, e.g. `just python=3.10 static pathops`.')]
 [positional-arguments]  # pass recipe args to recipe script positionally (so we can get correct quoting)

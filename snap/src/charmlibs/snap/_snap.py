@@ -48,10 +48,9 @@ import opentelemetry.trace
 
 if typing.TYPE_CHECKING:
     # avoid typing_extensions import at runtime
-    from collections.abc import Callable, Iterable, Sequence
-    from typing import TypeAlias
+    from typing import Callable, Iterable, Sequence
 
-    from typing_extensions import NotRequired, ParamSpec, Required, Self, Unpack
+    from typing_extensions import NotRequired, ParamSpec, Required, Self, TypeAlias, Unpack
 
     _P = ParamSpec('_P')
     _T = TypeVar('_T')
