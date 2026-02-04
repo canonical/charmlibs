@@ -1,0 +1,12 @@
+[project]
+name = "sloth-test-requirer"
+version = "0.1.0"
+description = "Test charm for Sloth requirer"
+requires-python = ">=3.10"
+dependencies = [
+    "ops>=2.9",
+    "charmlibs-interfaces-sloth",
+]
+
+[tool.uv.sources]
+charmlibs-interfaces-sloth = { path = "library", editable = true }
