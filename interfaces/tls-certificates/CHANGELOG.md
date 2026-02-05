@@ -1,4 +1,4 @@
-# 1.7.0 - 29 January 2025
+# 1.6.1 - 05 February 2025
 
 Make `CertificateRequestAttributes` hashable to prevent unnecessary recreation of certificate requests in relation data.
 
