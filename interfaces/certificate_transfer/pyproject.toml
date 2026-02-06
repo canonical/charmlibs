@@ -24,6 +24,7 @@ lint = [  # installed for `just lint interfaces/certificate_transfer` (unit, fun
 ]
 unit = [  # installed for `just unit interfaces/certificate_transfer`
     "ops[testing]",
+    "pytest"
 ]
 functional = [  # installed for `just functional interfaces/certificate_transfer`
 ]
