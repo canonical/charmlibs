@@ -42,7 +42,7 @@ class DummyCertificateTransferRequirerCharm(ops.CharmBase):
         is_ready = self.certificate_transfer.is_ready(relation)
         event.set_results({"is-ready": is_ready})
 
-    def _on_update_status(self, _):
+    def _on_update_status(self, _: Any):
         if self.certificate_transfer.get_all_certificates():
             self.unit.status = ops.ActiveStatus()
         else:

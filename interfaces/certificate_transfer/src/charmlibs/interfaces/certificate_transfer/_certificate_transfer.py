@@ -17,6 +17,7 @@
 import json
 import logging
 from collections.abc import MutableMapping
+from typing import Any
 
 import pydantic
 from ops import (
@@ -76,7 +77,7 @@ class DatabagModel(pydantic.BaseModel):
     """Pydantic config."""
 
     @classmethod
-    def load(cls, databag: MutableMapping):
+    def load(cls, databag: MutableMapping[str, Any]):
         """Load this model from a Juju databag."""
         if IS_PYDANTIC_V1:
             return cls._load_v1(databag)
@@ -104,17 +105,17 @@ class DatabagModel(pydantic.BaseModel):
             raise DataValidationError(msg) from e
 
     @classmethod
-    def _load_v1(cls, databag: MutableMapping):
+    def _load_v1(cls, databag: MutableMapping[str, Any]):
         """Load implementation for pydantic v1."""
         if cls._NEST_UNDER:
-            return cls.parse_obj(json.loads(databag[cls._NEST_UNDER]))
+            return cls.parse_obj(json.loads(databag[cls._NEST_UNDER]))  # type: ignore
 
         try:
             data = {
                 k: json.loads(v)
                 for k, v in databag.items()
                 # Don't attempt to parse model-external values
-                if k in {f.alias for f in cls.__fields__.values()}
+                if k in {f.alias for f in cls.__fields__.values()}  # type: ignore
             }
         except json.JSONDecodeError as e:
             msg = f"invalid databag contents: expecting json. {databag}"
@@ -122,13 +123,13 @@ class DatabagModel(pydantic.BaseModel):
             raise DataValidationError(msg) from e
 
         try:
-            return cls.parse_raw(json.dumps(data))
+            return cls.parse_raw(json.dumps(data))  # type: ignore
         except pydantic.ValidationError as e:
             msg = f"failed to validate databag: {databag}"
             logger.debug(msg, exc_info=True)
             raise DataValidationError(msg) from e
 
-    def dump(self, databag: MutableMapping | None = None, clear: bool = True):
+    def dump(self, databag: MutableMapping[str, Any] | None = None, clear: bool = True):
         """Write the contents of this model to Juju databag.
 
         Args:
@@ -158,7 +159,7 @@ class DatabagModel(pydantic.BaseModel):
         databag.update({k: json.dumps(v) for k, v in dct.items()})
         return databag
 
-    def _dump_v1(self, databag: MutableMapping | None = None, clear: bool = True):
+    def _dump_v1(self, databag: MutableMapping[str, Any] | None = None, clear: bool = True):
         """Dump implementation for pydantic v1."""
         if clear and databag:
             databag.clear()
@@ -167,10 +168,10 @@ class DatabagModel(pydantic.BaseModel):
             databag = {}
 
         if self._NEST_UNDER:
-            databag[self._NEST_UNDER] = self.json(by_alias=True, exclude_defaults=False)
+            databag[self._NEST_UNDER] = self.json(by_alias=True, exclude_defaults=False)  # type: ignore
             return databag
 
-        dct = json.loads(self.json(by_alias=True, exclude_defaults=False))
+        dct = json.loads(self.json(by_alias=True, exclude_defaults=False))  # type: ignore
         databag.update({k: json.dumps(v) for k, v in dct.items()})
 
         return databag
@@ -416,14 +417,14 @@ class CertificatesAvailableEvent(EventBase):
         self.certificates = certificates
         self.relation_id = relation_id
 
-    def snapshot(self) -> dict:
+    def snapshot(self) -> dict[str, set[str] | int]:
         """Return snapshot."""
         return {
             "certificates": self.certificates,
             "relation_id": self.relation_id,
         }
 
-    def restore(self, snapshot: dict):
+    def restore(self, snapshot: dict[str, set[str] | int]):
         """Restores snapshot."""
         self.certificates = snapshot["certificates"]
         self.relation_id = snapshot["relation_id"]
@@ -436,11 +437,11 @@ class CertificatesRemovedEvent(EventBase):
         super().__init__(handle)
         self.relation_id = relation_id
 
-    def snapshot(self) -> dict:
+    def snapshot(self) -> dict[str, int]:
         """Return snapshot."""
         return {"relation_id": self.relation_id}
 
-    def restore(self, snapshot: dict):
+    def restore(self, snapshot: dict[str, int]):
         """Restores snapshot."""
         self.relation_id = snapshot["relation_id"]
 
@@ -532,7 +533,7 @@ class CertificateTransferRequires(Object):
             relation_id: The id of the relation to get the certificates from.
         """
         relations = self._get_active_relations(relation_id)
-        result = set()
+        result: set[str] = set()
         for relation in relations:
             data = self._get_relation_data(relation)
             result = result.union(data)
