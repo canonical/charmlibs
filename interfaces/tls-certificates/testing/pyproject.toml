@@ -1,0 +1,65 @@
+[project]
+name = "charmlibs-interfaces-tls-certificates-testing"
+description = "The charmlibs.interfaces.tls_certificates_testing package."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    {name="The TLS team at Canonical"},
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+    "Intended Audience :: Developers",
+    "Operating System :: POSIX :: Linux",
+    "Development Status :: 5 - Production/Stable",
+]
+dynamic = ["version"]
+dependencies = [
+    "charmlibs-interfaces-tls-certificates==1.6.0",
+    "ops[testing]",
+]
+
+[dependency-groups]
+lint = [  # installed for `just lint interfaces/tls_certificates/testing` (alongside unit, functional, and integration)
+]
+unit = [  # installed for `just unit interfaces/tls_certificates/testing`
+]
+functional = [  # installed for `just functional interfaces/tls_certificates/testing`
+]
+integration = [  # installed for `just integration interfaces/tls_certificates/testing`
+]
+
+
+[project.urls]
+"Repository" = "https://github.com/canonical/charmlibs"
+"Issues" = "https://github.com/canonical/charmlibs/issues"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/charmlibs"]
+
+[tool.hatch.version]
+path = "src/charmlibs/interfaces/tls_certificates_testing/_version.py"
+
+[tool.ruff]
+extend = "../pyproject.toml"
+src = ["src", "tests/unit"]  # correctly sort local imports in tests
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.ruff.lint.extend-per-file-ignores]
+"tests/*" = [
+    "E501",  # line too long
+]
+
+[tool.pyright]
+extends = "../pyproject.toml"
+include = ["src", "tests"]
+pythonVersion = "3.10"  # check no python > 3.10 features are used
+
+[tool.uv.sources]
+charmlibs-interfaces-tls-certificates = { path = "../", editable = true }
