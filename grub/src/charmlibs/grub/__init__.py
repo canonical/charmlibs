@@ -15,20 +15,20 @@
 """The charmlibs.grub package."""
 
 from ._grub import (
-    ValidationError,
-    IsContainerError,
     ApplyError,
+    Config,
+    IsContainerError,
+    ValidationError,
     check_update_grub,
     is_container,
-    Config,
 )
 from ._version import __version__ as __version__
 
 __all__ = [
-    'ValidationError',
-    'IsContainerError',
     'ApplyError',
+    'Config',
+    'IsContainerError',
+    'ValidationError',
     'check_update_grub',
     'is_container',
-    'Config',
 ]
