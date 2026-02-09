@@ -13,15 +13,10 @@ from typing import Any, Dict, List
 
 import ops
 import yaml
+from cosl import JujuTopology
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
 from ._topology import inject_topology_labels
-
-try:
-    from cosl import JujuTopology
-except ImportError:
-    # Fallback if cosl is not available
-    JujuTopology = None
 
 logger = logging.getLogger(__name__)
 
@@ -91,16 +86,8 @@ class SLOProvider(ops.Object):
         Returns:
             Dictionary of topology labels (juju_application, juju_model, etc.)
         """
-        if JujuTopology is None:
-            # Fallback to basic topology if cosl is not available
-            return {'juju_application': self._charm.app.name}
-
-        try:
-            topology = JujuTopology.from_charm(self._charm)
-            return topology.label_matcher_dict
-        except Exception as e:
-            logger.warning('Failed to get full topology, using app name only: %s', e)
-            return {'juju_application': self._charm.app.name}
+        topology = JujuTopology.from_charm(self._charm)
+        return topology.label_matcher_dict
 
     def _inject_topology_into_slo(self, slo_spec: Dict[str, Any]) -> Dict[str, Any]:
         """Inject topology labels into SLO queries.

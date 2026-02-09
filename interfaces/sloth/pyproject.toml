@@ -18,6 +18,7 @@ dependencies = [
     "ops",
     "pydantic>=2.0",
     "pyyaml",
+    "cosl>=0.0.10",
 ]
 
 [dependency-groups]
