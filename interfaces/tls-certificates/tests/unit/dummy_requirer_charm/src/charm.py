@@ -169,5 +169,22 @@ class DummyTLSCertificatesRequirerCharm(CharmBase):
         event.set_results({"errors": errors})
 
 
+class DummyTLSCertificatesRequirerCharmAppAndUnit(CharmBase):
+    def __init__(self, *args: Any):
+        super().__init__(*args)
+        app_request = CertificateRequestAttributes(common_name="app.example.com")
+        unit_request = CertificateRequestAttributes(common_name="unit.example.com")
+        self.certificates = TLSCertificatesRequiresV4(
+            charm=self,
+            relationship_name="certificates",
+            certificate_requests_by_mode={
+                Mode.APP: [app_request],
+                Mode.UNIT: [unit_request],
+            },
+            mode=Mode.APP_AND_UNIT,
+            refresh_events=[self.on.config_changed],
+        )
+
+
 if __name__ == "__main__":
     main(DummyTLSCertificatesRequirerCharm)
