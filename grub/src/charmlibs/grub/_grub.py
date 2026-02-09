@@ -126,7 +126,7 @@ def _split_config_line(line: str) -> tuple[str, str]:
 
 def _parse_config(stream: io.TextIOWrapper) -> dict[str, str]:
     """Parse config file lines."""
-    config = {}
+    config: dict[str, str] = {}
     for line in stream:
         line = line.strip()
         if not line or line.startswith('#'):
@@ -282,7 +282,7 @@ class Config(Mapping[str, str]):
     def _update(self, config: dict[str, str]) -> set[str]:
         """Update data in object."""
         logger.debug('[%s] updating current config', self.charm_name)
-        changed_keys = set()
+        changed_keys: set[str] = set()
         blocked_keys = self.blocked_keys
         for key, value in config.items():
             changed = self._set_value(key, value, blocked_keys)
@@ -294,7 +294,7 @@ class Config(Mapping[str, str]):
     @property
     def applied_configs(self) -> dict[Path, dict[str, str]]:
         """Return list of charms configs which registered config in LIB_CONFIG_DIRECTORY."""
-        configs = {}
+        configs: dict[Path, dict[str, str]] = {}
         for path in sorted(GRUB_DIRECTORY.glob(f'{CHARM_CONFIG_PREFIX}-*')):
             configs[path] = _load_config(path)
             logger.debug('load config file %s', path)
@@ -347,7 +347,7 @@ class Config(Mapping[str, str]):
 
         self.path.unlink()
         logger.info('[%s] charm config file %s was removed', self.charm_name, self.path)
-        config = {}
+        config: dict[str, str] = {}
         for _config in self.applied_configs.values():
             config.update(_config)
 
