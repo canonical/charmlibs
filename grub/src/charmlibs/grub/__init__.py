@@ -14,9 +14,21 @@
 
 """The charmlibs.grub package."""
 
+from ._grub import (
+    ValidationError,
+    IsContainerError,
+    ApplyError,
+    check_update_grub,
+    is_container,
+    Config,
+)
 from ._version import __version__ as __version__
 
 __all__ = [
-    # only the names listed in __all__ are imported when executing:
-    # from charmlibs.grub import *
+    'ValidationError',
+    'IsContainerError',
+    'ApplyError',
+    'check_update_grub',
+    'is_container',
+    'Config',
 ]
