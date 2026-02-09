@@ -17,6 +17,7 @@ from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import (
     TYPE_CHECKING,
+    Literal,
     TypeAlias,
 )
 
@@ -321,10 +322,14 @@ class Mode(Enum):
     APP: Request a certificate for the application.
         Only the leader unit will manage the private key, certificate signing request
         and certificate.
+    APP_AND_UNIT: Request certificates for the application and the unit.
+        Each unit will have its own private key and certificate, but the application
+        will have a shared private key and certificate.
     """
 
     UNIT = 1
     APP = 2
+    APP_AND_UNIT = 3
 
 
 class PrivateKey:
@@ -1729,7 +1734,11 @@ class TLSCertificatesRequiresV4(Object):
         self,
         charm: CharmBase,
         relationship_name: str,
-        certificate_requests: list[CertificateRequestAttributes],
+        certificate_requests: list[CertificateRequestAttributes] | None = None,
+        certificate_requests_by_mode: dict[
+            Literal[Mode.APP, Mode.UNIT], list[CertificateRequestAttributes]
+        ]
+        | None = None,
         mode: Mode = Mode.UNIT,
         refresh_events: list[BoundEvent] | None = None,
         private_key: PrivateKey | None = None,
@@ -1742,7 +1751,14 @@ class TLSCertificatesRequiresV4(Object):
             relationship_name (str): The name of the relation that provides the certificates.
             certificate_requests (List[CertificateRequestAttributes]):
                 A list with the attributes of the certificate requests.
-            mode (Mode): Whether to use unit or app certificates mode. Default is Mode.UNIT.
+                This should be used when a single mode is in use. Mode.UNIT or Mode.APP.
+            certificate_requests_by_mode
+                (Dict[Literal[Mode.APP, Mode.UNIT], List[CertificateRequestAttributes]]):
+                A dictionary with the modes (APP and UNIT) as keys and lists of certificate
+                request attributes as values.
+                This should be used when APP_AND_UNIT mode is in use.
+            mode (Mode): Whether to use unit, app or unit_app certificates mode. Default is
+                Mode.UNIT.
                 In UNIT mode the requirer will place the csr in the unit relation data.
                 Each unit will manage its private key,
                 certificate signing request and certificate.
@@ -1752,6 +1768,10 @@ class TLSCertificatesRequiresV4(Object):
                 APP mode is for use cases where the underlying application needs the certificate
                 for example using it as an intermediate CA to sign other certificates.
                 The certificate can only be accessed by the leader unit.
+                APP_AND_UNIT mode is a hybrid mode where the leader unit places the csr in the
+                app relation databag and all units place the csr in the unit relation databag.
+                This mode allows to share one integration for the certificates that are similar
+                in nature but vary in scope.
             refresh_events (List[BoundEvent]): A list of events to trigger a refresh of
               the certificates.
             private_key (Optional[PrivateKey]): The private key to use for the certificates.
@@ -1768,17 +1788,26 @@ class TLSCertificatesRequiresV4(Object):
         """
         if refresh_events is None:
             refresh_events = []
+        if certificate_requests is None:
+            certificate_requests = []
         super().__init__(charm, relationship_name)
         if not JujuVersion.from_environ().has_secrets:
             logger.warning("This version of the TLS library requires Juju secrets (Juju >= 3.0)")
         if not self._mode_is_valid(mode):
-            raise TLSCertificatesError("Invalid mode. Must be Mode.UNIT or Mode.APP")
-        for certificate_request in certificate_requests:
-            if not certificate_request.is_valid():
-                raise TLSCertificatesError("Invalid certificate request")
+            raise TLSCertificatesError(
+                "Invalid mode. Must be Mode.UNIT, Mode.APP, or Mode.APP_AND_UNIT"
+            )
+        if mode == Mode.APP_AND_UNIT and private_key:
+            raise TLSCertificatesError(
+                "Invalid private key configuration. The private_key parameter can't be used in "
+                "APP_AND_UNIT mode."
+            )
         self.charm = charm
         self.relationship_name = relationship_name
-        self.certificate_requests = certificate_requests
+        self._certificate_requests_by_mode = certificate_requests_by_mode
+        self.certificate_requests = self._validate_certificate_requests(
+            mode, certificate_requests_by_mode, certificate_requests
+        )
         self.mode = mode
         if private_key and not private_key.is_valid():
             raise TLSCertificatesError("Invalid private key")
@@ -1795,6 +1824,49 @@ class TLSCertificatesRequiresV4(Object):
         for event in refresh_events:
             self.framework.observe(event, self._configure)
         self._security_logger = _OWASPLogger(application=f"tls-certificates-{charm.app.name}")
+
+    def _validate_certificate_requests(
+        self,
+        mode: Mode,
+        multi_mode_certificate_requests: dict[
+            Literal[Mode.APP, Mode.UNIT], list[CertificateRequestAttributes]
+        ]
+        | None,
+        certificate_requests: list[CertificateRequestAttributes],
+    ) -> list[CertificateRequestAttributes]:
+        csrs: list[CertificateRequestAttributes] = []
+        if mode == Mode.APP_AND_UNIT:
+            if not multi_mode_certificate_requests:
+                raise TLSCertificatesError("Multi mode certificate requests must be provided")
+            if certificate_requests:
+                raise TLSCertificatesError(
+                    "Certificate requests must be provided in certificate_requests_by_mode "
+                    "when the mode is APP_AND_UNIT"
+                )
+            invalid_keys = {
+                key for key in multi_mode_certificate_requests if key not in (Mode.APP, Mode.UNIT)
+            }
+            if invalid_keys:
+                raise TLSCertificatesError(
+                    "Invalid certificate_requests_by_mode keys. Only Mode.APP and Mode.UNIT are "
+                    "supported in APP_AND_UNIT mode."
+                )
+            for mode_csrs in multi_mode_certificate_requests.values():
+                for csr in mode_csrs:
+                    if not csr.is_valid():
+                        raise TLSCertificatesError("Invalid certificate request")
+                    csrs.append(csr)
+        else:
+            if multi_mode_certificate_requests:
+                raise TLSCertificatesError(
+                    "certificate_requests_by_mode must be None when the mode is UNIT or APP"
+                )
+            for certificate_request in certificate_requests:
+                if not certificate_request.is_valid():
+                    raise TLSCertificatesError("Invalid certificate request")
+                csrs.append(certificate_request)
+
+        return csrs
 
     def _configure(self, _: EventBase | None = None):
         """Handle TLS Certificates Relation Data.
@@ -1814,7 +1886,76 @@ class TLSCertificatesRequiresV4(Object):
         self._renew_expiring_certificates()
 
     def _mode_is_valid(self, mode: Mode) -> bool:
-        return mode in [Mode.UNIT, Mode.APP]
+        return mode in [Mode.UNIT, Mode.APP, Mode.APP_AND_UNIT]
+
+    def _flatten_modes(self) -> list[Literal[Mode.APP, Mode.UNIT]]:
+        if self.mode == Mode.APP_AND_UNIT:
+            return [Mode.APP, Mode.UNIT]
+        return [self.mode]
+
+    def _get_app_or_unit_for_mode(self, mode: Literal[Mode.APP, Mode.UNIT]) -> Application | Unit:
+        return self.model.app if mode == Mode.APP else self.model.unit
+
+    def _get_mode_for_certificate_request(
+        self, certificate_request: CertificateRequestAttributes
+    ) -> Literal[Mode.APP, Mode.UNIT]:
+        """Resolve the mode for a request based on provided attributes.
+
+        In APP_AND_UNIT mode, this uses the original request objects from
+        certificate_requests_by_mode.
+        """
+        if self.mode != Mode.APP_AND_UNIT:
+            return self.mode
+        if not self._certificate_requests_by_mode:
+            raise TLSCertificatesError(
+                "certificate_requests_by_mode must be provided in APP_AND_UNIT mode"
+            )
+        for mode, certificate_requests in self._certificate_requests_by_mode.items():
+            if certificate_request in certificate_requests:
+                return mode
+        raise TLSCertificatesError(
+            "Certificate request not found in certificate_requests_by_mode for APP_AND_UNIT mode"
+        )
+
+    def _get_mode_for_csr(
+        self, csr: CertificateSigningRequest, is_ca: bool
+    ) -> Literal[Mode.APP, Mode.UNIT]:
+        """Resolve the mode for a CSR by reconstructing its request attributes."""
+        if self.mode != Mode.APP_AND_UNIT:
+            return self.mode
+        certificate_request = CertificateRequestAttributes.from_csr(csr, is_ca)
+        return self._get_mode_for_certificate_request(certificate_request)
+
+    def _private_key_generated_for_mode(self, mode: Literal[Mode.APP, Mode.UNIT]) -> bool:
+        try:
+            secret = self.charm.model.get_secret(label=self._get_private_key_secret_label(mode))
+            secret.get_content(refresh=True)
+            return True
+        except SecretNotFoundError:
+            return False
+
+    def _get_private_key_for_mode(self, mode: Literal[Mode.APP, Mode.UNIT]) -> PrivateKey | None:
+        if self._private_key:
+            return self._private_key
+        if mode == Mode.APP and not self.model.unit.is_leader():
+            logger.warning("Only the leader can access the private key in APP mode")
+            return None
+        if not self._private_key_generated_for_mode(mode):
+            return None
+        secret = self.charm.model.get_secret(label=self._get_private_key_secret_label(mode))
+        private_key = secret.get_content(refresh=True)["private-key"]
+        return PrivateKey.from_string(private_key)
+
+    def _ensure_private_key_for_mode(self, mode: Literal[Mode.APP, Mode.UNIT]) -> None:
+        if self._private_key:
+            return
+        if self._private_key_generated_for_mode(mode):
+            logger.debug("Private key already generated for mode %s", mode)
+            return
+        if mode == Mode.APP and not self.model.unit.is_leader():
+            logger.debug("Not leader, skipping private key generation in APP mode")
+            return
+        self._generate_private_key(mode)
 
     def _validate_secret_exists(self, secret: Secret) -> None:
         secret.get_info()  # Will raise `SecretNotFoundError` if the secret does not exist
@@ -1862,7 +2003,8 @@ class TLSCertificatesRequiresV4(Object):
     def renew_certificate(self, certificate: ProviderCertificate) -> None:
         """Request the renewal of the provided certificate."""
         certificate_signing_request = certificate.certificate_signing_request
-        secret_label = self._get_csr_secret_label(certificate_signing_request)
+        mode = self._get_mode_for_csr(certificate_signing_request, certificate.certificate.is_ca)
+        secret_label = self._get_csr_secret_label(certificate_signing_request, mode)
         try:
             secret = self.model.get_secret(label=secret_label)
         except SecretNotFoundError:
@@ -1889,44 +2031,47 @@ class TLSCertificatesRequiresV4(Object):
         if not self.get_csrs_from_requirer_relation_data():
             logger.info("No CSRs in relation data - Doing nothing")
             return
-        app_or_unit = self._get_app_or_unit()
-        try:
-            requirer_relation_data = _RequirerData.load(relation.data[app_or_unit])
-        except DataValidationError:
-            logger.warning("Invalid relation data - Skipping removal of CSR")
-            return
-        new_relation_data = copy.deepcopy(requirer_relation_data.certificate_signing_requests)
-        for requirer_csr in new_relation_data:
-            if requirer_csr.certificate_signing_request.strip() == str(csr).strip():
-                new_relation_data.remove(requirer_csr)
-        try:
-            _RequirerData(certificate_signing_requests=new_relation_data).dump(
-                relation.data[app_or_unit]
-            )
-            logger.info("Removed CSR from relation data")
-        except ModelError:
-            logger.warning("Failed to update relation data")
+        for mode in self._flatten_modes():
+            if mode == Mode.APP and not self.model.unit.is_leader():
+                continue
+            app_or_unit = self._get_app_or_unit_for_mode(mode)
+            try:
+                requirer_relation_data = _RequirerData.load(relation.data[app_or_unit])
+            except DataValidationError:
+                logger.warning("Invalid relation data - Skipping removal of CSR")
+                continue
+            new_relation_data = copy.deepcopy(requirer_relation_data.certificate_signing_requests)
+            new_relation_data = [
+                requirer_csr
+                for requirer_csr in new_relation_data
+                if requirer_csr.certificate_signing_request.strip() != str(csr).strip()
+            ]
+            try:
+                _RequirerData(certificate_signing_requests=new_relation_data).dump(
+                    relation.data[app_or_unit]
+                )
+                logger.info("Removed CSR from relation data")
+            except ModelError:
+                logger.warning("Failed to update relation data")
 
     def _get_app_or_unit(self) -> Application | Unit:
         """Return the unit or app object based on the mode."""
-        if self.mode == Mode.UNIT:
-            return self.model.unit
-        elif self.mode == Mode.APP:
-            return self.model.app
-        raise TLSCertificatesError("Invalid mode")
+        if self.mode == Mode.APP_AND_UNIT:
+            raise TLSCertificatesError("APP_AND_UNIT mode requires an explicit mode context")
+        return self._get_app_or_unit_for_mode(self.mode)
 
     @property
     def private_key(self) -> PrivateKey | None:
         """Return the private key."""
-        if self._private_key:
-            return self._private_key
-        if not self._private_key_generated():
+        if self.mode == Mode.APP_AND_UNIT:
+            logger.debug(
+                "APP_AND_UNIT mode has multiple private keys. Use get_assigned_certificate() "
+                "or get_private_key_secret_id(mode=...) to retrieve the appropriate key."
+            )
             return None
-        secret = self.charm.model.get_secret(label=self._get_private_key_secret_label())
-        private_key = secret.get_content(refresh=True)["private-key"]
-        return PrivateKey.from_string(private_key)
+        return self._get_private_key_for_mode(self.mode)
 
-    def get_private_key_secret_id(self) -> str | None:
+    def get_private_key_secret_id(self, mode: Mode | None = None) -> str | None:
         """Get the secret ID for the library-generated private key.
 
         This method provides access to the Juju secret ID containing the private key.
@@ -1939,6 +2084,7 @@ class TLSCertificatesRequiresV4(Object):
             - The private key was provided via the `private_key` parameter (no secret exists)
             - No private key has not been generated yet
             - In APP mode, when called from a non-leader unit
+            - In APP_AND_UNIT mode, when mode is not provided
 
         Note:
             The secret ID is an opaque identifier and does not reveal the private key material.
@@ -1956,16 +2102,28 @@ class TLSCertificatesRequiresV4(Object):
             logger.debug("Private key was provided externally, no secret exists")
             return None
 
-        if self.mode == Mode.APP and not self.model.unit.is_leader():
+        if mode is None:
+            if self.mode == Mode.APP_AND_UNIT:
+                logger.warning(
+                    "Mode must be provided when calling "
+                    "get_private_key_secret_id in APP_AND_UNIT mode"
+                )
+                return None
+            mode = self.mode
+        if mode == Mode.APP_AND_UNIT:
+            logger.warning("Mode must be APP or UNIT")
+            return None
+
+        if mode == Mode.APP and not self.model.unit.is_leader():
             logger.warning("Only the leader can access the private key secret ID in APP mode")
             return None
 
-        if not self._private_key_generated():
+        if not self._private_key_generated_for_mode(mode):
             logger.debug("No private key secret has been generated yet")
             return None
 
         try:
-            secret = self.charm.model.get_secret(label=self._get_private_key_secret_label())
+            secret = self.charm.model.get_secret(label=self._get_private_key_secret_label(mode))
             return secret.get_info().id
         except SecretNotFoundError:
             logger.warning("Private key secret not found")
@@ -1980,15 +2138,11 @@ class TLSCertificatesRequiresV4(Object):
         # Remove the generated private key
         # if one has been passed by the charm using the private_key parameter
         if self._private_key:
-            self._remove_private_key_secret()
+            for mode in self._flatten_modes():
+                self._remove_private_key_secret(mode)
             return
-        if self._private_key_generated():
-            logger.debug("Private key already generated")
-            return
-        if self.mode == Mode.APP and not self.model.unit.is_leader():
-            logger.debug("Not leader, skipping private key generation in APP mode")
-            return
-        self._generate_private_key()
+        for mode in self._flatten_modes():
+            self._ensure_private_key_for_mode(mode)
 
     def regenerate_private_key(self) -> None:
         """Regenerate the private key.
@@ -2004,58 +2158,51 @@ class TLSCertificatesRequiresV4(Object):
                 "Private key is passed by the charm through the private_key parameter, "
                 "this function can't be used"
             )
+        if self.mode == Mode.APP_AND_UNIT:
+            raise TLSCertificatesError(
+                "Regenerating private keys in APP_AND_UNIT mode is not supported. "
+                "Regenerate per-mode keys by switching to Mode.APP or Mode.UNIT."
+            )
         if self.mode == Mode.APP and not self.model.unit.is_leader():
             logger.warning("Only the leader can regenerate the private key in APP mode")
             return
-        if not self._private_key_generated():
+        if not self._private_key_generated_for_mode(self.mode):
             logger.warning("No private key to regenerate")
             return
-        self._generate_private_key()
+        self._generate_private_key(self.mode)
         self._cleanup_certificate_requests()
         self._send_certificate_requests()
 
-    def _generate_private_key(self) -> None:
+    def _generate_private_key(self, mode: Literal[Mode.UNIT, Mode.APP]) -> None:
         """Generate a new private key and store it in a secret.
 
         This is the case when the private key used is generated by the library.
             and not passed by the charm using the private_key parameter.
         """
-        self._store_private_key_in_secret(generate_private_key())
+        self._store_private_key_in_secret(generate_private_key(), mode)
         logger.info("Private key generated")
 
-    def _private_key_generated(self) -> bool:
-        """Check if a private key is stored in a secret.
-
-        This is the case when the private key used is generated by the library.
-        This should not exist when the private key used
-            is passed by the charm using the private_key parameter.
-        """
+    def _store_private_key_in_secret(
+        self, private_key: PrivateKey, mode: Literal[Mode.UNIT, Mode.APP]
+    ) -> None:
+        app_or_unit = self._get_app_or_unit_for_mode(mode)
         try:
-            secret = self.charm.model.get_secret(label=self._get_private_key_secret_label())
-            secret.get_content(refresh=True)
-            return True
-        except SecretNotFoundError:
-            return False
-
-    def _store_private_key_in_secret(self, private_key: PrivateKey) -> None:
-        try:
-            secret = self.charm.model.get_secret(label=self._get_private_key_secret_label())
+            secret = self.charm.model.get_secret(label=self._get_private_key_secret_label(mode))
             secret.set_content({"private-key": str(private_key)})
             secret.get_content(refresh=True)
         except SecretNotFoundError:
-            app_or_unit = self._get_app_or_unit()
             app_or_unit.add_secret(
                 content={"private-key": str(private_key)},
-                label=self._get_private_key_secret_label(),
+                label=self._get_private_key_secret_label(mode),
             )
 
-    def _remove_private_key_secret(self) -> None:
+    def _remove_private_key_secret(self, mode: Literal[Mode.UNIT, Mode.APP]) -> None:
         """Remove the private key secret."""
-        if self.mode == Mode.APP and not self.model.unit.is_leader():
+        if mode == Mode.APP and not self.model.unit.is_leader():
             logger.debug("Not leader, cannot remove app owned private key secret")
             return
         try:
-            secret = self.charm.model.get_secret(label=self._get_private_key_secret_label())
+            secret = self.charm.model.get_secret(label=self._get_private_key_secret_label(mode))
             secret.remove_all_revisions()
         except SecretNotFoundError:
             logger.warning("Private key secret not found, nothing to remove")
@@ -2072,12 +2219,14 @@ class TLSCertificatesRequiresV4(Object):
         return False
 
     def _certificate_requested(self, certificate_request: CertificateRequestAttributes) -> bool:
-        if not self.private_key:
+        mode = self._get_mode_for_certificate_request(certificate_request)
+        private_key = self._get_private_key_for_mode(mode)
+        if not private_key:
             return False
         csr = self._certificate_requested_for_attributes(certificate_request)
         if not csr:
             return False
-        if not csr.certificate_signing_request.matches_private_key(key=self.private_key):
+        if not csr.certificate_signing_request.matches_private_key(key=private_key):
             return False
         return True
 
@@ -2102,12 +2251,7 @@ class TLSCertificatesRequiresV4(Object):
         if not relation:
             logger.debug("No relation: %s", self.relationship_name)
             return []
-        app_or_unit = self._get_app_or_unit()
-        try:
-            requirer_relation_data = _RequirerData.load(relation.data[app_or_unit])
-        except DataValidationError:
-            logger.warning("Invalid relation data")
-            return []
+        certificate_signing_requests = self._load_requirer_relation_data(relation)
         return [
             RequirerCertificateRequest(
                 relation_id=relation.id,
@@ -2116,7 +2260,7 @@ class TLSCertificatesRequiresV4(Object):
                 ),
                 is_ca=csr.ca if csr.ca else False,
             )
-            for csr in requirer_relation_data.certificate_signing_requests
+            for csr in certificate_signing_requests
         ]
 
     def get_provider_certificates(self) -> list[ProviderCertificate]:
@@ -2163,6 +2307,31 @@ class TLSCertificatesRequiresV4(Object):
             for certificate in provider_relation_data.certificates
         ]
 
+    def _load_requirer_relation_data(self, relation: Relation) -> list[_CertificateSigningRequest]:
+        if self.mode == Mode.APP:
+            if not self.model.unit.is_leader():
+                logger.debug("Not a leader unit - Skipping")
+                return []
+            return _RequirerData.load(relation.data[self.model.app]).certificate_signing_requests
+        if self.mode == Mode.APP_AND_UNIT:
+            unit_certificate_signing_requests: list[_CertificateSigningRequest] = []
+            app_certificate_signing_requests: list[_CertificateSigningRequest] = []
+            try:
+                unit_certificate_signing_requests = _RequirerData.load(
+                    relation.data[self.model.unit]
+                ).certificate_signing_requests
+            except DataValidationError:
+                logger.warning("Invalid relation data for unit - Skipping")
+            if self.model.unit.is_leader():
+                try:
+                    app_certificate_signing_requests = _RequirerData.load(
+                        relation.data[self.model.app]
+                    ).certificate_signing_requests
+                except DataValidationError:
+                    logger.warning("Invalid relation data for app - Skipping")
+            return app_certificate_signing_requests + unit_certificate_signing_requests
+        return _RequirerData.load(relation.data[self.model.unit]).certificate_signing_requests
+
     def _load_provider_certificate_errors(self) -> list[ProviderCertificateError]:
         """Load provider certificate errors."""
         relation = self.model.get_relation(self.relationship_name)
@@ -2194,9 +2363,11 @@ class TLSCertificatesRequiresV4(Object):
                 continue
         return errors
 
-    def _request_certificate(self, csr: CertificateSigningRequest, is_ca: bool) -> None:
+    def _request_certificate(
+        self, csr: CertificateSigningRequest, is_ca: bool, mode: Literal[Mode.APP, Mode.UNIT]
+    ) -> None:
         """Add CSR to relation data."""
-        if self.mode == Mode.APP and not self.model.unit.is_leader():
+        if mode == Mode.APP and not self.model.unit.is_leader():
             logger.debug("Not a leader unit - Skipping")
             return
         relation = self.model.get_relation(self.relationship_name)
@@ -2206,7 +2377,7 @@ class TLSCertificatesRequiresV4(Object):
         new_csr = _CertificateSigningRequest(
             certificate_signing_request=str(csr).strip(), ca=is_ca
         )
-        app_or_unit = self._get_app_or_unit()
+        app_or_unit = self._get_app_or_unit_for_mode(mode)
         try:
             requirer_relation_data = _RequirerData.load(relation.data[app_or_unit])
         except DataValidationError:
@@ -2224,29 +2395,34 @@ class TLSCertificatesRequiresV4(Object):
             logger.warning("Failed to update relation data")
 
     def _send_certificate_requests(self):
-        if not self.private_key:
-            logger.debug("Private key not generated yet.")
-            return
         for certificate_request in self.certificate_requests:
             if not self._certificate_requested(certificate_request):
+                mode = self._get_mode_for_certificate_request(certificate_request)
+                private_key = self._get_private_key_for_mode(mode)
+                if not private_key:
+                    logger.debug("Private key not generated yet for mode %s", mode)
+                    continue
                 csr = certificate_request.generate_csr(
-                    private_key=self.private_key,
+                    private_key=private_key,
                 )
                 if not csr:
                     logger.warning("Failed to generate CSR")
                     continue
-                self._request_certificate(csr=csr, is_ca=certificate_request.is_ca)
+                self._request_certificate(csr=csr, is_ca=certificate_request.is_ca, mode=mode)
 
     def get_assigned_certificate(
         self, certificate_request: CertificateRequestAttributes
     ) -> tuple[ProviderCertificate | None, PrivateKey | None]:
         """Get the certificate that was assigned to the given certificate request."""
+        mode = self._get_mode_for_certificate_request(certificate_request)
+        private_key = self._get_private_key_for_mode(mode)
         for requirer_csr in self.get_csrs_from_requirer_relation_data():
             if certificate_request == CertificateRequestAttributes.from_csr(
                 requirer_csr.certificate_signing_request,
                 requirer_csr.is_ca,
             ):
-                return self._find_certificate_in_relation_data(requirer_csr), self.private_key
+                certificate = self._find_certificate_in_relation_data(requirer_csr)
+                return certificate, private_key if certificate else None
         return None, None
 
     def get_assigned_certificates(
@@ -2258,13 +2434,17 @@ class TLSCertificatesRequiresV4(Object):
             for requirer_csr in self.get_csrs_from_requirer_relation_data()
             if (cert := self._find_certificate_in_relation_data(requirer_csr))
         ]
+        if self.mode == Mode.APP_AND_UNIT:
+            return assigned_certificates, None
         return assigned_certificates, self.private_key
 
     def _find_certificate_in_relation_data(
         self, csr: RequirerCertificateRequest
     ) -> ProviderCertificate | None:
         """Return the certificate that matches the given CSR, validated against the private key."""
-        if not self.private_key:
+        mode = self._get_mode_for_csr(csr.certificate_signing_request, csr.is_ca)
+        private_key = self._get_private_key_for_mode(mode)
+        if not private_key:
             return None
         for provider_certificate in self.get_provider_certificates():
             if provider_certificate.certificate_signing_request == csr.certificate_signing_request:
@@ -2274,7 +2454,7 @@ class TLSCertificatesRequiresV4(Object):
                 elif not provider_certificate.certificate.is_ca and csr.is_ca:
                     logger.warning("CA certificate requested, got a non CA certificate, ignoring")
                     continue
-                if not provider_certificate.certificate.matches_private_key(self.private_key):
+                if not provider_certificate.certificate.matches_private_key(private_key):
                     logger.warning(
                         "Certificate does not match the private key. Ignoring invalid certificate."
                     )
@@ -2294,8 +2474,13 @@ class TLSCertificatesRequiresV4(Object):
         provider_certificates = self.get_provider_certificates()
         for provider_certificate in provider_certificates:
             if provider_certificate.certificate_signing_request in csrs:
+                mode = self._get_mode_for_csr(
+                    provider_certificate.certificate_signing_request,
+                    provider_certificate.certificate.is_ca,
+                )
                 secret_label = self._get_csr_secret_label(
-                    provider_certificate.certificate_signing_request
+                    provider_certificate.certificate_signing_request,
+                    mode,
                 )
                 if provider_certificate.revoked:
                     with suppress(SecretNotFoundError):
@@ -2427,22 +2612,20 @@ class TLSCertificatesRequiresV4(Object):
             return False
         return True
 
-    def _get_private_key_secret_label(self) -> str:
-        if self.mode == Mode.UNIT:
+    def _get_private_key_secret_label(self, mode: Literal[Mode.UNIT, Mode.APP]) -> str:
+        if mode == Mode.UNIT:
             return f"{LIBID}-private-key-{self._get_unit_number()}-{self.relationship_name}"
-        elif self.mode == Mode.APP:
+        elif mode == Mode.APP:
             return f"{LIBID}-private-key-{self.relationship_name}"
-        else:
-            raise TLSCertificatesError("Invalid mode. Must be Mode.UNIT or Mode.APP.")
 
-    def _get_csr_secret_label(self, csr: CertificateSigningRequest) -> str:
+    def _get_csr_secret_label(
+        self, csr: CertificateSigningRequest, mode: Literal[Mode.UNIT, Mode.APP]
+    ) -> str:
         csr_in_sha256_hex = csr.get_sha256_hex()
-        if self.mode == Mode.UNIT:
+        if mode == Mode.UNIT:
             return f"{LIBID}-certificate-{self._get_unit_number()}-{csr_in_sha256_hex}"
-        elif self.mode == Mode.APP:
+        elif mode == Mode.APP:
             return f"{LIBID}-certificate-{csr_in_sha256_hex}"
-        else:
-            raise TLSCertificatesError("Invalid mode. Must be Mode.UNIT or Mode.APP.")
 
     def _get_unit_number(self) -> str:
         return self.model.unit.name.split("/")[1]
