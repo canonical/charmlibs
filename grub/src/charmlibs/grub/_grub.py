@@ -181,7 +181,7 @@ def _update_config(path: Path, config: dict[str, str], header: str = CONFIG_HEAD
 def check_update_grub() -> bool:
     """Report whether an update to /boot/grub/grub.cfg is available."""
     main_grub_cfg = Path('/boot/grub/grub.cfg')
-    tmp_path = Path('/tmp/tmp_grub.cfg')
+    tmp_path = Path('/tmp/tmp_grub.cfg')  # noqa: S108
     try:
         subprocess.check_call(
             ['/usr/sbin/grub-mkconfig', '-o', f'{tmp_path}'], stderr=subprocess.STDOUT
