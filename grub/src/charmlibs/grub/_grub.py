@@ -218,7 +218,7 @@ class Config(Mapping[str, str]):
         """Initialize the GRUB config."""
         self._charm_name = charm_name
 
-    def __contains__(self, key: str) -> bool:
+    def __contains__(self, key: object) -> bool:
         """Check if key is in config."""
         return key in self._data
 
