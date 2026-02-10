@@ -24,6 +24,7 @@ lint = [  # installed for `just lint grub` (unit, functional, and integration ar
 ]
 unit = [  # installed for `just unit grub`
     "ops[testing]",
+    "pytest",
 ]
 functional = [  # installed for `just functional grub`
 ]
