@@ -205,10 +205,12 @@ class TestUtils(BaseTest):
         """Test check update function."""
         grub.check_update_grub()
         self.check_call.assert_called_once_with(
-            ['/usr/sbin/grub-mkconfig', '-o', '/tmp/tmp_grub.cfg'], stderr=subprocess.STDOUT
+            ['/usr/sbin/grub-mkconfig', '-o', '/tmp/tmp_grub.cfg'],  # noqa: S108
+            stderr=subprocess.STDOUT,
         )
         mock_filecmp.assert_called_once_with(
-            Path('/boot/grub/grub.cfg'), Path('/tmp/tmp_grub.cfg')
+            Path('/boot/grub/grub.cfg'),
+            Path('/tmp/tmp_grub.cfg'),  # noqa: S108
         )
 
     @mock.patch('filecmp.cmp')
@@ -566,11 +568,12 @@ class TestFullConfig(BaseTest):
             },
         )
         self.filecmp.cmp.assert_called_once_with(
-            Path('/boot/grub/grub.cfg'), Path('/tmp/tmp_grub.cfg')
+            Path('/boot/grub/grub.cfg'),
+            Path('/tmp/tmp_grub.cfg'),  # noqa: S108
         )
         self.check_call.assert_has_calls([
             mock.call(
-                ['/usr/sbin/grub-mkconfig', '-o', '/tmp/tmp_grub.cfg'],
+                ['/usr/sbin/grub-mkconfig', '-o', '/tmp/tmp_grub.cfg'],  # noqa: S108
                 stderr=subprocess.STDOUT,
             ),
             mock.call(['/usr/sbin/update-grub'], stderr=subprocess.STDOUT),
@@ -610,11 +613,12 @@ class TestFullConfig(BaseTest):
         self.assertDictEqual(_grub._load_config(_grub.GRUB_CONFIG), exp_config)
         self.assertDictEqual(_grub._load_config(config.path), exp_charm_config)
         self.filecmp.cmp.assert_called_once_with(
-            Path('/boot/grub/grub.cfg'), Path('/tmp/tmp_grub.cfg')
+            Path('/boot/grub/grub.cfg'),
+            Path('/tmp/tmp_grub.cfg'),  # noqa: S108
         )
         self.check_call.assert_has_calls([
             mock.call(
-                ['/usr/sbin/grub-mkconfig', '-o', '/tmp/tmp_grub.cfg'],
+                ['/usr/sbin/grub-mkconfig', '-o', '/tmp/tmp_grub.cfg'],  # noqa: S108
                 stderr=subprocess.STDOUT,
             ),
             mock.call(['/usr/sbin/update-grub'], stderr=subprocess.STDOUT),
