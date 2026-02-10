@@ -34,15 +34,17 @@ Example of use::
             log.debug("found keys %s in GRUB config file", self.grub.keys())
 
         def _on_install(self, _):
+            new_value = "$GRUB_CMDLINE_LINUX_DEFAULT hugepagesz=1G"
             try:
-                self.grub.update(
-                    {"GRUB_CMDLINE_LINUX_DEFAULT": "$GRUB_CMDLINE_LINUX_DEFAULT hugepagesz=1G"}
-                )
+                self.grub.update({"GRUB_CMDLINE_LINUX_DEFAULT": new_value})
             except grub.ValidationError as error:
                 self.unit.status = BlockedStatus(f"[{error.key}] {error.message}")
 
         def _on_update_status(self, _):
-            if self.grub["GRUB_CMDLINE_LINUX_DEFAULT"] != "$GRUB_CMDLINE_LINUX_DEFAULT hugepagesz=1G":
+            if (
+                self.grub["GRUB_CMDLINE_LINUX_DEFAULT"]
+                != "$GRUB_CMDLINE_LINUX_DEFAULT hugepagesz=1G"
+            ):
                 self.unit.status = BlockedStatus("wrong GRUB configuration")
 
         def _on_remove(self, _):
