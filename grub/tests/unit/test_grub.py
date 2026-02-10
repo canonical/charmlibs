@@ -146,7 +146,7 @@ class TestUtils(BaseTest):
         with mock.patch.object(_grub, "open", mock.mock_open()) as mock_open:
             _grub._load_config(path)
 
-        mock_open.assert_called_once_with(path, "r", encoding="UTF-8")
+        mock_open.assert_called_once_with(path, encoding="UTF-8")
         mock_parse_config.assert_called_once_with(mock_open.return_value)
 
     def test_save_config(self):
