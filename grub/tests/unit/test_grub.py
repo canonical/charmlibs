@@ -10,6 +10,7 @@ from unittest import mock
 import pytest
 
 from charmlibs import grub
+from charmlibs.grub import _grub
 
 GRUB_CONFIG_EXAMPLE_BODY = """
 GRUB_RECORDFAIL_TIMEOUT=0
@@ -18,8 +19,8 @@ GRUB_TERMINAL=console
 GRUB_CMDLINE_LINUX_DEFAULT="$GRUB_CMDLINE_LINUX_DEFAULT hugepagesz=1G"
 """
 GRUB_CONFIG_EXAMPLE = f"""
-{grub.CONFIG_HEADER}
-{grub.CONFIG_DESCRIPTION.format(configs="#  /tmp/test-path")}
+{_grub.CONFIG_HEADER}
+{_grub.CONFIG_DESCRIPTION.format(configs="#  /tmp/test-path")}
 # test commented line
 {GRUB_CONFIG_EXAMPLE_BODY}
 """
@@ -67,19 +68,19 @@ class BaseTest(unittest.TestCase):
         self.addCleanup(tmp_dir.cleanup)
 
         # configured paths
-        grub.GRUB_DIRECTORY = self.tmp_dir
-        grub.GRUB_CONFIG = self.tmp_dir / "95-juju-charm.cfg"
-        with open(grub.GRUB_CONFIG, "w") as file:
+        _grub.GRUB_DIRECTORY = self.tmp_dir
+        _grub.GRUB_CONFIG = self.tmp_dir / "95-juju-charm.cfg"
+        with open(_grub.GRUB_CONFIG, "w") as file:
             file.write(GRUB_CONFIG_EXAMPLE)
 
         # is_container
-        mocker_is_container = mock.patch.object(grub, "is_container")
+        mocker_is_container = mock.patch.object(_grub, "is_container")
         self.is_container = mocker_is_container.start()
         self.is_container.return_value = False
         self.addCleanup(mocker_is_container.stop)
 
         # subprocess
-        mocker_check_call = mock.patch.object(grub.subprocess, "check_call")
+        mocker_check_call = mock.patch.object(_grub.subprocess, "check_call")
         self.check_call = mocker_check_call.start()
         self.addCleanup(mocker_check_call.stop)
 
@@ -89,25 +90,25 @@ class TestUtils(BaseTest):
         super().setUp()
 
         # change logger
-        mocked_logger = mock.patch.object(grub, "logger")
+        mocked_logger = mock.patch.object(_grub, "logger")
         self.logger = mocked_logger.start()
         self.addCleanup(mocked_logger.stop)
 
     def test_split_config_line(self):
         """Test splitting single line."""
-        key, value = grub._split_config_line('test="1234"')
+        key, value = _grub._split_config_line('test="1234"')
         assert key == "test"
         assert value == "1234"
 
     def test_split_config_line_failed(self):
         """Test splitting single line."""
         with self.assertRaises(ValueError):
-            grub._split_config_line('test="1234" "5678"')
+            _grub._split_config_line('test="1234" "5678"')
 
     def test_parse_config(self):
         """Test parsing example GRUB config with skipping duplicated key."""
         stream = io.StringIO(GRUB_CONFIG_EXAMPLE)
-        result = grub._parse_config(stream)
+        result = _grub._parse_config(stream)
 
         self.assertEqual(result, EXP_GRUB_CONFIG)
 
@@ -117,7 +118,7 @@ class TestUtils(BaseTest):
             GRUB_CONFIG_EXAMPLE + 'GRUB_CMDLINE_LINUX_DEFAULT="$GRUB_CMDLINE_LINUX_DEFAULT pti=on"'
         )
         stream = io.StringIO(raw_config)
-        result = grub._parse_config(stream)
+        result = _grub._parse_config(stream)
 
         self.logger.warning.assert_called_once_with(
             "key %s is duplicated in config", "GRUB_CMDLINE_LINUX_DEFAULT"
@@ -132,9 +133,9 @@ class TestUtils(BaseTest):
         path = self.tmp_dir / "test_load_config"
 
         with pytest.raises(FileNotFoundError):
-            grub._load_config(path)
+            _grub._load_config(path)
 
-    @mock.patch.object(grub, "_parse_config")
+    @mock.patch.object(_grub, "_parse_config")
     def test_load_config(self, mock_parse_config):
         """Test load config from file."""
         exp_config = {"test": "valid"}
@@ -142,8 +143,8 @@ class TestUtils(BaseTest):
         path = self.tmp_dir / "test_load_config"
         path.touch()  # create file
 
-        with mock.patch.object(grub, "open", mock.mock_open()) as mock_open:
-            grub._load_config(path)
+        with mock.patch.object(_grub, "open", mock.mock_open()) as mock_open:
+            _grub._load_config(path)
 
         mock_open.assert_called_once_with(path, "r", encoding="UTF-8")
         mock_parse_config.assert_called_once_with(mock_open.return_value)
@@ -152,12 +153,12 @@ class TestUtils(BaseTest):
         """Test to save GRUB config file."""
         path = self.tmp_dir / "test-config"
 
-        with mock.patch.object(grub, "open", mock.mock_open()) as mock_open:
-            grub._save_config(path, {"test": '"1234"'})
+        with mock.patch.object(_grub, "open", mock.mock_open()) as mock_open:
+            _grub._save_config(path, {"test": '"1234"'})
 
         mock_open.assert_called_once_with(path, "w", encoding="UTF-8")
         mock_open.return_value.write.assert_has_calls([
-            mock.call(grub.CONFIG_HEADER),
+            mock.call(_grub.CONFIG_HEADER),
             mock.call("test='\"1234\"'\n"),
         ])
 
@@ -166,38 +167,38 @@ class TestUtils(BaseTest):
         path = self.tmp_dir / "test-config"
         path.touch()
 
-        with mock.patch.object(grub, "open", mock.mock_open()):
-            grub._save_config(path, {"test": '"1234"'})
+        with mock.patch.object(_grub, "open", mock.mock_open()):
+            _grub._save_config(path, {"test": '"1234"'})
 
         self.logger.debug.assert_called_once_with(
             "GRUB config %s already exist and it will overwritten", path
         )
 
-    @mock.patch.object(grub, "_load_config")
-    @mock.patch.object(grub, "_save_config")
+    @mock.patch.object(_grub, "_load_config")
+    @mock.patch.object(_grub, "_save_config")
     def test_update_config(self, mock_save, mock_load):
         """Test update existing config file."""
         mock_load.return_value = {"test1": "1", "test2": "2"}
         path = self.tmp_dir / "test-config"
         path.touch()
 
-        grub._update_config(path, {"test2": "22", "test3": "3"})
+        _grub._update_config(path, {"test2": "22", "test3": "3"})
 
         mock_load.assert_called_once_with(path)
         mock_save.assert_called_once_with(
-            path, {"test1": "1", "test2": "22", "test3": "3"}, grub.CONFIG_HEADER
+            path, {"test1": "1", "test2": "22", "test3": "3"}, _grub.CONFIG_HEADER
         )
 
-    @mock.patch.object(grub, "_load_config")
-    @mock.patch.object(grub, "_save_config")
+    @mock.patch.object(_grub, "_load_config")
+    @mock.patch.object(_grub, "_save_config")
     def test_update_not_existing_config(self, mock_save, mock_load):
         """Test update not existing config file."""
         path = self.tmp_dir / "test-config"
 
-        grub._update_config(path, {"test2": "22", "test3": "3"})
+        _grub._update_config(path, {"test2": "22", "test3": "3"})
 
         mock_load.assert_not_called()
-        mock_save.assert_called_once_with(path, {"test2": "22", "test3": "3"}, grub.CONFIG_HEADER)
+        mock_save.assert_called_once_with(path, {"test2": "22", "test3": "3"}, _grub.CONFIG_HEADER)
 
     @mock.patch("filecmp.cmp")
     def test_check_update_grub(self, mock_filecmp):
@@ -225,15 +226,15 @@ class TestSmokeConfig(BaseTest):
     def setUp(self) -> None:
         super().setUp()
         # load config
-        mocker_load_config = mock.patch.object(grub, "_load_config")
+        mocker_load_config = mock.patch.object(_grub, "_load_config")
         self.load_config = mocker_load_config.start()
         self.addCleanup(mocker_load_config.stop)
         # save config
-        mocker_save_config = mock.patch.object(grub, "_save_config")
+        mocker_save_config = mock.patch.object(_grub, "_save_config")
         self.save_config = mocker_save_config.start()
         self.addCleanup(mocker_save_config.stop)
         # check_update_grub
-        mocker_check_update_grub = mock.patch.object(grub, "check_update_grub")
+        mocker_check_update_grub = mock.patch.object(_grub, "check_update_grub")
         self.check_update_grub = mocker_check_update_grub.start()
         self.check_update_grub.return_value = True
         self.addCleanup(mocker_check_update_grub.stop)
@@ -269,7 +270,7 @@ class TestSmokeConfig(BaseTest):
         self.config._lazy_data = None
         assert "test" not in self.config  # this will call config._data once
 
-        self.load_config.assert_called_once_with(grub.GRUB_CONFIG)
+        self.load_config.assert_called_once_with(_grub.GRUB_CONFIG)
         self.assertDictEqual(self.config._data, EXP_GRUB_CONFIG)
 
     def test_data_no_file(self):
@@ -278,7 +279,7 @@ class TestSmokeConfig(BaseTest):
         self.load_config.side_effect = FileNotFoundError()
         assert "test" not in self.config  # this will call config._data once
 
-        self.load_config.assert_called_once_with(grub.GRUB_CONFIG)
+        self.load_config.assert_called_once_with(_grub.GRUB_CONFIG)
         self.assertDictEqual(self.config._data, {})
 
     def test_save_grub_config(self):
@@ -290,7 +291,7 @@ class TestSmokeConfig(BaseTest):
         self.config._lazy_data = exp_data
         self.config._save_grub_configuration()
 
-        self.save_config.assert_called_once_with(grub.GRUB_CONFIG, exp_data, mock.ANY)
+        self.save_config.assert_called_once_with(_grub.GRUB_CONFIG, exp_data, mock.ANY)
         _, _, header = self.save_config.call_args[0]
         self.assertIn(str(self.config.path), header)
         for exp_config_path in exp_configs:
@@ -419,7 +420,7 @@ class TestSmokeConfig(BaseTest):
 
     @mock.patch.object(grub.Config, "apply")
     @mock.patch.object(grub.Config, "_save_grub_configuration")
-    @mock.patch.object(grub, "_update_config")
+    @mock.patch.object(_grub, "_update_config")
     def test_update_on_container(self, mock_update, mock_save, mock_apply):
         """Test update current GRUB config on container."""
         self.is_container.return_value = True
@@ -435,7 +436,7 @@ class TestSmokeConfig(BaseTest):
     @mock.patch.object(grub.Config, "apply")
     @mock.patch.object(grub.Config, "_save_grub_configuration")
     @mock.patch.object(grub.Config, "_update")
-    @mock.patch.object(grub, "_update_config")
+    @mock.patch.object(_grub, "_update_config")
     def test_update_validation_failure(
         self, mock_update_config, mock_update, mock_save, mock_apply
     ):
@@ -453,7 +454,7 @@ class TestSmokeConfig(BaseTest):
 
     @mock.patch.object(grub.Config, "apply")
     @mock.patch.object(grub.Config, "_save_grub_configuration")
-    @mock.patch.object(grub, "_update_config")
+    @mock.patch.object(_grub, "_update_config")
     def test_update_apply_failure(self, mock_update, mock_save, mock_apply):
         """Test update current GRUB config with applied failure."""
         mock_apply.side_effect = grub.ApplyError()
@@ -468,7 +469,7 @@ class TestSmokeConfig(BaseTest):
 
     @mock.patch.object(grub.Config, "apply")
     @mock.patch.object(grub.Config, "_save_grub_configuration")
-    @mock.patch.object(grub, "_update_config")
+    @mock.patch.object(_grub, "_update_config")
     def test_update_without_changes(self, mock_update, mock_save, mock_apply):
         """Test update current GRUB config without any changes."""
         # running with same key and value from example above
@@ -482,7 +483,7 @@ class TestSmokeConfig(BaseTest):
 
     @mock.patch.object(grub.Config, "apply")
     @mock.patch.object(grub.Config, "_save_grub_configuration")
-    @mock.patch.object(grub, "_update_config")
+    @mock.patch.object(_grub, "_update_config")
     def test_update_current_configuration(self, mock_update, mock_save, mock_apply):
         """Test update current GRUB config with different values.
 
@@ -500,7 +501,7 @@ class TestSmokeConfig(BaseTest):
 
     @mock.patch.object(grub.Config, "apply")
     @mock.patch.object(grub.Config, "_save_grub_configuration")
-    @mock.patch.object(grub, "_update_config")
+    @mock.patch.object(_grub, "_update_config")
     def test_update_without_apply(self, mock_update, mock_save, mock_apply):
         """Test update current GRUB config with different values.
 
@@ -524,7 +525,7 @@ class TestFullConfig(BaseTest):
         super().setUp()
 
         # filecmp
-        mocker_filecmp = mock.patch.object(grub, "filecmp")
+        mocker_filecmp = mock.patch.object(_grub, "filecmp")
         self.filecmp = mocker_filecmp.start()
         self.filecmp.cmp.return_value = False  # check_update_grub -> True
         self.addCleanup(mocker_filecmp.stop)
@@ -543,7 +544,7 @@ class TestFullConfig(BaseTest):
             },
         }
         for name, conf in self.configs.items():
-            grub._save_config(self.tmp_dir / f"{grub.CHARM_CONFIG_PREFIX}-{name}", conf)
+            _grub._save_config(self.tmp_dir / f"{_grub.CHARM_CONFIG_PREFIX}-{name}", conf)
 
     def test_remove(self):
         """Test removing config for current charm."""
@@ -588,8 +589,8 @@ class TestFullConfig(BaseTest):
             config.update(new_config)
 
         self.assertDictEqual(config._data, exp_config)
-        self.assertDictEqual(grub._load_config(grub.GRUB_CONFIG), exp_config)
-        self.assertDictEqual(grub._load_config(config.path), exp_charm_config)
+        self.assertDictEqual(_grub._load_config(_grub.GRUB_CONFIG), exp_config)
+        self.assertDictEqual(_grub._load_config(config.path), exp_charm_config)
         self.filecmp.cmp.assert_not_called()
         self.check_call.assert_not_called()
 
@@ -606,8 +607,8 @@ class TestFullConfig(BaseTest):
 
         self.assertSetEqual(changed_keys, set(new_config.keys()))
         self.assertDictEqual(config._data, exp_config)
-        self.assertDictEqual(grub._load_config(grub.GRUB_CONFIG), exp_config)
-        self.assertDictEqual(grub._load_config(config.path), exp_charm_config)
+        self.assertDictEqual(_grub._load_config(_grub.GRUB_CONFIG), exp_config)
+        self.assertDictEqual(_grub._load_config(config.path), exp_charm_config)
         self.filecmp.cmp.assert_called_once_with(
             Path("/boot/grub/grub.cfg"), Path("/tmp/tmp_grub.cfg")
         )
