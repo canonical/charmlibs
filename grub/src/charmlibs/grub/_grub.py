@@ -59,23 +59,15 @@ import subprocess
 from collections.abc import Mapping
 from pathlib import Path
 
+from ._version import __version__
+
 logger = logging.getLogger(__name__)
-
-# The unique Charmhub library identifier, never change it
-LIBID = '1f73a0e0c78349bc88850022e02b33c7'
-
-# Increment this major API version when introducing breaking changes
-LIBAPI = 0
-
-# Increment this PATCH version before using `charmcraft publish-lib` or reset
-# to 0 if you are raising the major API version
-LIBPATCH = 3
 
 GRUB_DIRECTORY = Path('/etc/default/grub.d/')
 CHARM_CONFIG_PREFIX = '90-juju'
 GRUB_CONFIG = GRUB_DIRECTORY / '95-juju-charm.cfg'
-CONFIG_HEADER = f"""# This config file was produced by GRUB lib v{LIBAPI}.{LIBPATCH}.
-# https://charmhub.io/operator-libs-linux/libraries/grub
+CONFIG_HEADER = f"""# This config file was produced by GRUB lib v{__version__}.
+# https://documentation.ubuntu.com/charmlibs/reference/charmlibs/grub/
 """
 FILE_LINE_IN_DESCRIPTION = '#   {path}'
 CONFIG_DESCRIPTION = """
