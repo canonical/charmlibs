@@ -32,7 +32,7 @@ def clean_configs():
         {'GRUB_TIMEOUT': '0'},
     ],
 )
-def test_single_charm_valid_update(config):
+def test_single_charm_valid_update(config: dict[str, str]):
     """Test single charm update GRUB configuration."""
     grub_conf = grub.Config('test-charm')
     grub_conf.update(config)
@@ -44,7 +44,7 @@ def test_single_charm_valid_update(config):
 
 
 @pytest.mark.parametrize('config', [{'TEST_WRONG_KEY:test': '1'}])
-def test_single_charm_update_apply_failure(config):
+def test_single_charm_update_apply_failure(config: dict[str, str]):
     """Test single charm update GRUB configuration with ApplyError."""
     # create empty grub config
     _grub.GRUB_CONFIG.touch()
@@ -113,7 +113,7 @@ def test_single_charm_multiple_update():
         ),
     ],
 )
-def test_two_charms_no_conflict(config_1, config_2):
+def test_two_charms_no_conflict(config_1: dict[str, str], config_2: dict[str, str]):
     """Test two charms update GRUB configuration without any conflict."""
     for name, config in [('test-charm-1', config_1), ('test-charm-2', config_2)]:
         grub_conf = grub.Config(name)
@@ -137,7 +137,7 @@ def test_two_charms_no_conflict(config_1, config_2):
         ),
     ],
 )
-def test_two_charms_with_conflict(config_1, config_2):
+def test_two_charms_with_conflict(config_1: dict[str, str], config_2: dict[str, str]):
     """Test two charms update GRUB configuration with conflict."""
     # configure charm 1
     grub_conf_1 = grub.Config('test-charm-1')
@@ -188,7 +188,9 @@ def test_charm_remove_configuration():
         ),
     ],
 )
-def test_charm_remove_configuration_without_changing_others(config_1, config_2):
+def test_charm_remove_configuration_without_changing_others(
+    config_1: dict[str, str], config_2: dict[str, str]
+):
     """Test removing charm configuration and do not touch other."""
     grub_conf_1 = grub.Config('test-charm-1')
     grub_conf_1.update(config_1)
