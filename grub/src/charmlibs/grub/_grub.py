@@ -12,43 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Simple library for managing Linux kernel configuration via GRUB.
+"""Source code of operator_libs_linux.v0.grub.
 
-This library is only used for setting additional parameters that will be stored in the
-"/etc/default/grub.d/95-juju-charm.cfg" config file and not for editing other
-configuration files. It's intended to be used in charms to help configure the machine.
-
-Configurations for individual charms will be stored in "/etc/default/grub.d/90-juju-<charm>",
-but these configurations will only have informational value as all configurations will be merged
-to "/etc/default/grub.d/95-juju-charm.cfg".
-
-Example of use:
-
-```python
-class UbuntuCharm(CharmBase):
-    def __init__(self, *args):
-        ...
-        self.framework.observe(self.on.install, self._on_install)
-        self.framework.observe(self.on.update_status, self._on_update_status)
-        self.framework.observe(self.on.remove, self._on_remove)
-        self.grub = grub.GrubConfig(self.meta.name)
-        log.debug("found keys %s in GRUB config file", self.grub.keys())
-
-    def _on_install(self, _):
-        try:
-            self.grub.update(
-                {"GRUB_CMDLINE_LINUX_DEFAULT": "$GRUB_CMDLINE_LINUX_DEFAULT hugepagesz=1G"}
-            )
-        except grub.ValidationError as error:
-            self.unit.status = BlockedStatus(f"[{error.key}] {error.message}")
-
-    def _on_update_status(self, _):
-        if self.grub["GRUB_CMDLINE_LINUX_DEFAULT"] != "$GRUB_CMDLINE_LINUX_DEFAULT hugepagesz=1G":
-            self.unit.status = BlockedStatus("wrong GRUB configuration")
-
-    def _on_remove(self, _):
-        self.grub.remove()
-```
+Snapshot of version 0.3. Charmhub-hosted lib specific metadata has been removed, and the docstring
+has been moved to the package docstring.
 """
 
 import filecmp
