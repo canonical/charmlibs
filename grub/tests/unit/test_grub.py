@@ -52,7 +52,7 @@ def test_validation_error():
         (mock.MagicMock(side_effect=subprocess.CalledProcessError(1, [])), False),
     ],
 )
-def test_is_container(output, exp_result):
+def test_is_container(output: mock.MagicMock, exp_result: bool):
     """Test helper function to validate if machine is container."""
     with mock.patch('subprocess.check_output', new=output) as mock_check_output:
         assert grub.is_container() == exp_result
@@ -136,7 +136,7 @@ class TestUtils(BaseTest):
             _grub._load_config(path)
 
     @mock.patch.object(_grub, '_parse_config')
-    def test_load_config(self, mock_parse_config):
+    def test_load_config(self, mock_parse_config: mock.MagicMock):
         """Test load config from file."""
         exp_config = {'test': 'valid'}
         mock_parse_config.return_value = exp_config
@@ -176,7 +176,7 @@ class TestUtils(BaseTest):
 
     @mock.patch.object(_grub, '_load_config')
     @mock.patch.object(_grub, '_save_config')
-    def test_update_config(self, mock_save, mock_load):
+    def test_update_config(self, mock_save: mock.MagicMock, mock_load: mock.MagicMock):
         """Test update existing config file."""
         mock_load.return_value = {'test1': '1', 'test2': '2'}
         path = self.tmp_dir / 'test-config'
@@ -191,7 +191,9 @@ class TestUtils(BaseTest):
 
     @mock.patch.object(_grub, '_load_config')
     @mock.patch.object(_grub, '_save_config')
-    def test_update_not_existing_config(self, mock_save, mock_load):
+    def test_update_not_existing_config(
+        self, mock_save: mock.MagicMock, mock_load: mock.MagicMock
+    ):
         """Test update not existing config file."""
         path = self.tmp_dir / 'test-config'
 
@@ -201,7 +203,7 @@ class TestUtils(BaseTest):
         mock_save.assert_called_once_with(path, {'test2': '22', 'test3': '3'}, _grub.CONFIG_HEADER)
 
     @mock.patch('filecmp.cmp')
-    def test_check_update_grub(self, mock_filecmp):
+    def test_check_update_grub(self, mock_filecmp: mock.MagicMock):
         """Test check update function."""
         grub.check_update_grub()
         self.check_call.assert_called_once_with(
@@ -214,7 +216,7 @@ class TestUtils(BaseTest):
         )
 
     @mock.patch('filecmp.cmp')
-    def test_check_update_grub_failure(self, mock_filecmp):
+    def test_check_update_grub_failure(self, mock_filecmp: mock.MagicMock):
         """Test check update function."""
         self.check_call.side_effect = subprocess.CalledProcessError(1, [])
 
@@ -382,7 +384,7 @@ class TestSmokeConfig(BaseTest):
 
     @mock.patch.object(grub.Config, 'apply')
     @mock.patch.object(grub.Config, '_save_grub_configuration')
-    def test_remove_no_config(self, mock_save, mock_apply):
+    def test_remove_no_config(self, mock_save: mock.MagicMock, mock_apply: mock.MagicMock):
         """Test removing when there is no charm config."""
         self.config.path.unlink(missing_ok=True)  # remove charm config file
         changed_keys = self.config.remove()
@@ -393,7 +395,7 @@ class TestSmokeConfig(BaseTest):
 
     @mock.patch.object(grub.Config, 'apply')
     @mock.patch.object(grub.Config, '_save_grub_configuration')
-    def test_remove_no_apply(self, mock_save, mock_apply):
+    def test_remove_no_apply(self, mock_save: mock.MagicMock, mock_apply: mock.MagicMock):
         """Test removing without applying."""
         self.config.path.touch()  # created charm file
         changed_keys = self.config.remove(apply=False)
@@ -406,7 +408,12 @@ class TestSmokeConfig(BaseTest):
     @mock.patch.object(grub.Config, 'apply')
     @mock.patch.object(grub.Config, 'applied_configs', call=mock.PropertyMock)
     @mock.patch.object(grub.Config, '_save_grub_configuration')
-    def test_remove(self, mock_save, mock_applied_configs, mock_apply):
+    def test_remove(
+        self,
+        mock_save: mock.MagicMock,
+        mock_applied_configs: mock.MagicMock,
+        mock_apply: mock.MagicMock,
+    ):
         """Test removing with applying."""
         self.config.path.touch()  # created charm file
         mock_applied_configs.values.return_value = [
@@ -423,7 +430,9 @@ class TestSmokeConfig(BaseTest):
     @mock.patch.object(grub.Config, 'apply')
     @mock.patch.object(grub.Config, '_save_grub_configuration')
     @mock.patch.object(_grub, '_update_config')
-    def test_update_on_container(self, mock_update, mock_save, mock_apply):
+    def test_update_on_container(
+        self, mock_update: mock.MagicMock, mock_save: mock.MagicMock, mock_apply: mock.MagicMock
+    ):
         """Test update current GRUB config on container."""
         self.is_container.return_value = True
 
@@ -440,7 +449,11 @@ class TestSmokeConfig(BaseTest):
     @mock.patch.object(grub.Config, '_update')
     @mock.patch.object(_grub, '_update_config')
     def test_update_validation_failure(
-        self, mock_update_config, mock_update, mock_save, mock_apply
+        self,
+        mock_update_config: mock.MagicMock,
+        mock_update: mock.MagicMock,
+        mock_save: mock.MagicMock,
+        mock_apply: mock.MagicMock,
     ):
         """Test update current GRUB config with validation failure."""
         mock_update.side_effect = grub.ValidationError('GRUB_TIMEOUT', 'failed')
@@ -457,7 +470,9 @@ class TestSmokeConfig(BaseTest):
     @mock.patch.object(grub.Config, 'apply')
     @mock.patch.object(grub.Config, '_save_grub_configuration')
     @mock.patch.object(_grub, '_update_config')
-    def test_update_apply_failure(self, mock_update, mock_save, mock_apply):
+    def test_update_apply_failure(
+        self, mock_update: mock.MagicMock, mock_save: mock.MagicMock, mock_apply: mock.MagicMock
+    ):
         """Test update current GRUB config with applied failure."""
         mock_apply.side_effect = grub.ApplyError()
 
@@ -472,7 +487,9 @@ class TestSmokeConfig(BaseTest):
     @mock.patch.object(grub.Config, 'apply')
     @mock.patch.object(grub.Config, '_save_grub_configuration')
     @mock.patch.object(_grub, '_update_config')
-    def test_update_without_changes(self, mock_update, mock_save, mock_apply):
+    def test_update_without_changes(
+        self, mock_update: mock.MagicMock, mock_save: mock.MagicMock, mock_apply: mock.MagicMock
+    ):
         """Test update current GRUB config without any changes."""
         # running with same key and value from example above
         config = {'GRUB_TIMEOUT': '0'}
@@ -486,7 +503,9 @@ class TestSmokeConfig(BaseTest):
     @mock.patch.object(grub.Config, 'apply')
     @mock.patch.object(grub.Config, '_save_grub_configuration')
     @mock.patch.object(_grub, '_update_config')
-    def test_update_current_configuration(self, mock_update, mock_save, mock_apply):
+    def test_update_current_configuration(
+        self, mock_update: mock.MagicMock, mock_save: mock.MagicMock, mock_apply: mock.MagicMock
+    ):
         """Test update current GRUB config with different values.
 
         This test is simulating the scenario, when same charm want to change it's own
@@ -504,7 +523,9 @@ class TestSmokeConfig(BaseTest):
     @mock.patch.object(grub.Config, 'apply')
     @mock.patch.object(grub.Config, '_save_grub_configuration')
     @mock.patch.object(_grub, '_update_config')
-    def test_update_without_apply(self, mock_update, mock_save, mock_apply):
+    def test_update_without_apply(
+        self, mock_update: mock.MagicMock, mock_save: mock.MagicMock, mock_apply: mock.MagicMock
+    ):
         """Test update current GRUB config with different values.
 
         This test is simulating the scenario, when same charm want to change it's own
