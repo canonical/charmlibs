@@ -27,6 +27,7 @@ unit = [  # installed for `just unit grub`
     "pytest",
 ]
 functional = [  # installed for `just functional grub`
+    "pytest",
 ]
 integration = [  # installed for `just integration grub`
     "jubilant",

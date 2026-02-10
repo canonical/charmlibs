@@ -7,6 +7,9 @@ name = "charmlibs-grub"
 source = { editable = "." }
 
 [package.dev-dependencies]
+functional = [
+    { name = "pytest" },
+]
 integration = [
     { name = "jubilant" },
 ]
@@ -18,7 +21,7 @@ unit = [
 [package.metadata]
 
 [package.metadata.requires-dev]
-functional = []
+functional = [{ name = "pytest" }]
 integration = [{ name = "jubilant" }]
 lint = []
 unit = [
