@@ -7,6 +7,7 @@ import logging
 import pytest
 
 from charmlibs import grub
+from charmlibs.grub import _grub
 
 logger = logging.getLogger(__name__)
 
@@ -15,8 +16,8 @@ logger = logging.getLogger(__name__)
 def clean_configs():
     """Clean main and charms configs after each test."""
     yield  # run test
-    grub.GRUB_CONFIG.unlink(missing_ok=True)
-    for charm_config in grub.GRUB_DIRECTORY.glob(f'{grub.CHARM_CONFIG_PREFIX}-*'):
+    _grub.GRUB_CONFIG.unlink(missing_ok=True)
+    for charm_config in _grub.GRUB_DIRECTORY.glob(f'{_grub.CHARM_CONFIG_PREFIX}-*'):
         charm_config.unlink(missing_ok=True)
 
 
@@ -37,16 +38,16 @@ def test_single_charm_valid_update(config):
     grub_conf.update(config)
     # check that config was set for charm config file
     assert config == grub_conf
-    assert config == grub._load_config(grub_conf.path)
+    assert config == _grub._load_config(grub_conf.path)
     # check the main config
-    assert config == grub._load_config(grub.GRUB_CONFIG)
+    assert config == _grub._load_config(_grub.GRUB_CONFIG)
 
 
 @pytest.mark.parametrize('config', [{'TEST_WRONG_KEY:test': '1'}])
 def test_single_charm_update_apply_failure(config):
     """Test single charm update GRUB configuration with ApplyError."""
     # create empty grub config
-    grub.GRUB_CONFIG.touch()
+    _grub.GRUB_CONFIG.touch()
     grub_conf = grub.Config('test-charm')
 
     with pytest.raises(grub.ApplyError):
@@ -55,7 +56,7 @@ def test_single_charm_update_apply_failure(config):
     # check that charm file was not configured
     assert not grub_conf.path.exists()
     # check the main config
-    main_config = grub._load_config(grub.GRUB_CONFIG)
+    main_config = _grub._load_config(_grub.GRUB_CONFIG)
     for key in config:
         assert key not in main_config
 
@@ -92,10 +93,10 @@ def test_single_charm_multiple_update():
     for config, exp_conf in zip(configs, exp_charms_configs, strict=False):
         grub_conf.update(config)
         assert exp_conf == grub_conf
-        assert exp_conf == grub._load_config(grub_conf.path)
+        assert exp_conf == _grub._load_config(grub_conf.path)
 
     # check the main config
-    assert exp_main_config == grub._load_config(grub.GRUB_CONFIG)
+    assert exp_main_config == _grub._load_config(_grub.GRUB_CONFIG)
 
 
 @pytest.mark.parametrize(
@@ -117,10 +118,10 @@ def test_two_charms_no_conflict(config_1, config_2):
     for name, config in [('test-charm-1', config_1), ('test-charm-2', config_2)]:
         grub_conf = grub.Config(name)
         grub_conf.update(config)
-        assert config == grub._load_config(grub_conf.path)
+        assert config == _grub._load_config(grub_conf.path)
 
     # check the main config
-    assert {**config_1, **config_2} == grub._load_config(grub.GRUB_CONFIG)
+    assert {**config_1, **config_2} == _grub._load_config(_grub.GRUB_CONFIG)
 
 
 @pytest.mark.parametrize(
@@ -141,7 +142,7 @@ def test_two_charms_with_conflict(config_1, config_2):
     # configure charm 1
     grub_conf_1 = grub.Config('test-charm-1')
     grub_conf_1.update(config_1)
-    assert config_1 == grub._load_config(grub_conf_1.path)
+    assert config_1 == _grub._load_config(grub_conf_1.path)
 
     # configure charm 2
     grub_conf_2 = grub.Config('test-charm-2')
@@ -150,7 +151,7 @@ def test_two_charms_with_conflict(config_1, config_2):
 
     assert not grub_conf_2.path.exists()
     # check the main config
-    assert config_1 == grub._load_config(grub.GRUB_CONFIG)
+    assert config_1 == _grub._load_config(_grub.GRUB_CONFIG)
 
 
 def test_charm_remove_configuration():
@@ -160,12 +161,12 @@ def test_charm_remove_configuration():
     grub_conf.update(config)
 
     assert grub_conf.path.exists(), 'Config file is missing, check test_single_charm_valid_update'
-    assert config == grub._load_config(grub_conf.path)
-    assert config == grub._load_config(grub.GRUB_CONFIG)
+    assert config == _grub._load_config(grub_conf.path)
+    assert config == _grub._load_config(_grub.GRUB_CONFIG)
 
     grub_conf.remove()
     assert not grub_conf.path.exists()
-    assert grub._load_config(grub.GRUB_CONFIG) == {}
+    assert _grub._load_config(_grub.GRUB_CONFIG) == {}
 
 
 @pytest.mark.parametrize(
@@ -199,4 +200,4 @@ def test_charm_remove_configuration_without_changing_others(config_1, config_2):
 
     grub_conf_1.remove()
     assert not grub_conf_1.path.exists()
-    assert config_2 == grub._load_config(grub.GRUB_CONFIG)
+    assert config_2 == _grub._load_config(_grub.GRUB_CONFIG)
