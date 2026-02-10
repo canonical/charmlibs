@@ -107,7 +107,9 @@ class TestUtils(BaseTest):
 
     def test_parse_config(self):
         """Test parsing example GRUB config with skipping duplicated key."""
-        stream = io.StringIO(GRUB_CONFIG_EXAMPLE)
+        stream = io.TextIOWrapper(
+            io.BytesIO(GRUB_CONFIG_EXAMPLE.encode('UTF-8')), encoding='UTF-8'
+        )
         result = _grub._parse_config(stream)
 
         self.assertEqual(result, EXP_GRUB_CONFIG)
@@ -117,7 +119,7 @@ class TestUtils(BaseTest):
         raw_config = (
             GRUB_CONFIG_EXAMPLE + 'GRUB_CMDLINE_LINUX_DEFAULT="$GRUB_CMDLINE_LINUX_DEFAULT pti=on"'
         )
-        stream = io.StringIO(raw_config)
+        stream = io.TextIOWrapper(io.BytesIO(raw_config.encode('UTF-8')), encoding='UTF-8')
         result = _grub._parse_config(stream)
 
         self.logger.warning.assert_called_once_with(
