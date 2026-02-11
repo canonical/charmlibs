@@ -65,7 +65,7 @@ pythonVersion = "3.10"  # check no python > 3.10 features are used
 [tool.charmlibs.functional]
 ubuntu = []  # ubuntu versions to run functional tests with, e.g. "24.04" (defaults to just "latest")
 pebble = []  # pebble versions to run functional tests with, e.g. "v1.0.0", "master" (defaults to no pebble versions)
-sudo = false  # whether to run functional tests with sudo (defaults to false)
+sudo = true  # whether to run functional tests with sudo (defaults to false)
 
 [tool.charmlibs.integration]
 # tags to run integration tests with (defaults to running once with no tag, i.e. tags = [''])
