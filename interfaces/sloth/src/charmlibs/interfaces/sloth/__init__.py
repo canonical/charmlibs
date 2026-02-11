@@ -128,6 +128,7 @@ For multiple services (separated by YAML document separators)::
 from ._sloth import (
     SLOError,
     SLOProvider,
+    SLORelationData,
     SLORequirer,
     SLOSpec,
     SLOValidationError,
@@ -138,6 +139,7 @@ from ._version import __version__ as __version__
 __all__ = [
     'SLOError',
     'SLOProvider',
+    'SLORelationData',
     'SLORequirer',
     'SLOSpec',
     'SLOValidationError',

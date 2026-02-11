@@ -1,4 +1,5 @@
 # Copyright 2026 Canonical Ltd.
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownArgumentType=false, reportArgumentType=false
 # See LICENSE file for licensing details.
 
 """Unit tests for the SLO library."""
@@ -66,6 +67,13 @@ slos:
   - name: latency
     objective: 95.0
 """
+
+
+def slo_to_relation_data(slo_yaml: str) -> str:
+    """Convert SLO YAML config to relation data format (list of specs)."""
+    specs = list(yaml.safe_load_all(slo_yaml))
+    return yaml.safe_dump(specs, default_flow_style=False)
+
 
 # Test SLO specifications as dicts (for validation testing)
 VALID_SLO_SPEC = {
@@ -152,10 +160,10 @@ class TestSLOSpec:
     def test_valid_slo_spec(self):
         """Test that a valid SLO spec is accepted."""
         spec = SLOSpec(
-            version=VALID_SLO_SPEC['version'],  # type: ignore[arg-type]
-            service=VALID_SLO_SPEC['service'],  # type: ignore[arg-type]
-            labels=VALID_SLO_SPEC.get('labels', {}),  # type: ignore[arg-type]
-            slos=VALID_SLO_SPEC['slos'],  # type: ignore[arg-type]
+            version=VALID_SLO_SPEC['version'],
+            service=VALID_SLO_SPEC['service'],
+            labels=VALID_SLO_SPEC.get('labels', {}),
+            slos=VALID_SLO_SPEC['slos'],
         )
         assert spec.version == 'prometheus/v1'
         assert spec.service == 'test-service'
@@ -202,6 +210,54 @@ class TestSLOSpec:
             SLOSpec(**incomplete_spec)
 
 
+class TestSLORelationData:
+    """Tests for the SLORelationData model."""
+
+    def test_valid_relation_data(self):
+        """Test creating valid SLORelationData."""
+        from charmlibs.interfaces.sloth import SLORelationData
+
+        spec = SLOSpec(**VALID_SLO_SPEC)
+        relation_data = SLORelationData(slos=[spec])
+        assert len(relation_data.slos) == 1
+        assert relation_data.slos[0].service == 'test-service'
+
+    def test_empty_relation_data(self):
+        """Test creating empty SLORelationData."""
+        from charmlibs.interfaces.sloth import SLORelationData
+
+        relation_data = SLORelationData()
+        assert relation_data.slos == []
+
+    def test_multiple_specs_in_relation_data(self):
+        """Test creating SLORelationData with multiple specs."""
+        from charmlibs.interfaces.sloth import SLORelationData
+
+        spec1 = SLOSpec(**VALID_SLO_SPEC)
+        spec2_dict = {
+            'version': 'prometheus/v1',
+            'service': 'another-service',
+            'slos': [{'name': 'test2', 'objective': 95.0}],
+        }
+        spec2 = SLOSpec(**spec2_dict)
+        relation_data = SLORelationData(slos=[spec1, spec2])
+        assert len(relation_data.slos) == 2
+        assert relation_data.slos[0].service == 'test-service'
+        assert relation_data.slos[1].service == 'another-service'
+
+    def test_relation_data_model_dump(self):
+        """Test that SLORelationData correctly dumps to dict."""
+        from charmlibs.interfaces.sloth import SLORelationData
+
+        spec = SLOSpec(**VALID_SLO_SPEC)
+        relation_data = SLORelationData(slos=[spec])
+        dumped = relation_data.model_dump()
+        assert 'slos' in dumped
+        assert isinstance(dumped['slos'], list)
+        assert len(dumped['slos']) == 1
+        assert dumped['slos'][0]['service'] == 'test-service'
+
+
 class TestSLOProvider:
     """Tests for the SLOProvider class."""
 
@@ -222,9 +278,12 @@ class TestSLOProvider:
 
         # Check that SLO was set in relation data
         relation_out = state_out.get_relation(slo_relation.id)
-        slo_yaml = relation_out.local_app_data.get('slo_spec')
+        slo_yaml = relation_out.local_app_data.get('slos')
         assert slo_yaml is not None
-        slo_data = yaml.safe_load(slo_yaml)
+        slo_list = yaml.safe_load(slo_yaml)
+        assert isinstance(slo_list, list)
+        assert len(slo_list) == 1
+        slo_data = slo_list[0]
         assert slo_data['service'] == 'test-service'
         assert slo_data['version'] == 'prometheus/v1'
 
@@ -262,9 +321,11 @@ class TestSLOProvider:
         # Both relations should have the SLO spec
         for rel in [sloth_relation_1, sloth_relation_2]:
             relation_out = state_out.get_relation(rel.id)
-            slo_yaml = relation_out.local_app_data.get('slo_spec')
+            slo_yaml = relation_out.local_app_data.get('slos')
             assert slo_yaml is not None
-            slo_data = yaml.safe_load(slo_yaml)
+            slo_list = yaml.safe_load(slo_yaml)
+            assert isinstance(slo_list, list)
+            slo_data = slo_list[0]
             assert slo_data['service'] == 'test-service'
 
     def test_provide_slos_with_multi_document_yaml(self):
@@ -281,16 +342,17 @@ class TestSLOProvider:
             charm.slo_provider.provide_slos(MULTI_SLO_CONFIG)
             state_out = mgr.run()
 
-        # Check that both SLOs were set in relation data as multi-document YAML
+        # Check that both SLOs were set in relation data as a list
         relation_out = state_out.get_relation(slo_relation.id)
-        slo_yaml = relation_out.local_app_data.get('slo_spec')
+        slo_yaml = relation_out.local_app_data.get('slos')
         assert slo_yaml is not None
 
-        # Parse multi-document YAML
-        slo_docs = list(yaml.safe_load_all(slo_yaml))
-        assert len(slo_docs) == 2
+        # Parse the list of SLO specs
+        slo_list = yaml.safe_load(slo_yaml)
+        assert isinstance(slo_list, list)
+        assert len(slo_list) == 2
 
-        services = {doc['service'] for doc in slo_docs}
+        services = {doc['service'] for doc in slo_list}
         assert services == {'test-service', 'another-service'}
 
     def test_provide_slos_with_empty_string(self):
@@ -310,7 +372,7 @@ class TestSLOProvider:
 
         # Relation data should be empty
         relation_out = state_out.get_relation(slo_relation.id)
-        slo_yaml = relation_out.local_app_data.get('slo_spec')
+        slo_yaml = relation_out.local_app_data.get('slos')
         assert slo_yaml is None
 
     def test_provide_slos_with_invalid_yaml(self):
@@ -329,6 +391,82 @@ class TestSLOProvider:
             with pytest.raises(SLOValidationError) as exc_info:
                 charm.slo_provider.provide_slos(invalid_yaml)
             assert 'Invalid YAML' in str(exc_info.value)
+            _ = mgr.run()
+
+    def test_provide_slos_with_missing_required_fields(self):
+        """Test that provider validates SLO spec structure and rejects missing fields."""
+        context = Context(
+            ProviderCharm,
+            meta={'name': 'provider', 'requires': {'sloth': {'interface': 'sloth'}}},
+        )
+        slo_relation = Relation('sloth')
+        state = State(relations=[slo_relation], leader=True)
+
+        # SLO spec missing 'service' field
+        invalid_slo = """
+version: prometheus/v1
+labels:
+  team: test
+slos:
+  - name: test
+    objective: 99.9
+"""
+
+        with context(context.on.start(), state) as mgr:
+            charm = mgr.charm
+            with pytest.raises(SLOValidationError) as exc_info:
+                charm.slo_provider.provide_slos(invalid_slo)
+            assert 'Invalid SLO specification' in str(exc_info.value)
+            _ = mgr.run()
+
+    def test_provide_slos_with_invalid_version_format(self):
+        """Test that provider validates version format."""
+        context = Context(
+            ProviderCharm,
+            meta={'name': 'provider', 'requires': {'sloth': {'interface': 'sloth'}}},
+        )
+        slo_relation = Relation('sloth')
+        state = State(relations=[slo_relation], leader=True)
+
+        # Invalid version format (missing '/')
+        invalid_slo = """
+version: invalid-version
+service: test-service
+slos:
+  - name: test
+    objective: 99.9
+"""
+
+        with context(context.on.start(), state) as mgr:
+            charm = mgr.charm
+            with pytest.raises(SLOValidationError) as exc_info:
+                charm.slo_provider.provide_slos(invalid_slo)
+            assert 'Invalid SLO specification' in str(exc_info.value)
+            assert 'prometheus/v1' in str(exc_info.value)
+            _ = mgr.run()
+
+    def test_provide_slos_with_empty_slos_list(self):
+        """Test that provider validates that at least one SLO is defined."""
+        context = Context(
+            ProviderCharm,
+            meta={'name': 'provider', 'requires': {'sloth': {'interface': 'sloth'}}},
+        )
+        slo_relation = Relation('sloth')
+        state = State(relations=[slo_relation], leader=True)
+
+        # Empty slos list
+        invalid_slo = """
+version: prometheus/v1
+service: test-service
+slos: []
+"""
+
+        with context(context.on.start(), state) as mgr:
+            charm = mgr.charm
+            with pytest.raises(SLOValidationError) as exc_info:
+                charm.slo_provider.provide_slos(invalid_slo)
+            assert 'Invalid SLO specification' in str(exc_info.value)
+            assert 'At least one SLO must be defined' in str(exc_info.value)
             _ = mgr.run()
 
 
@@ -355,7 +493,7 @@ class TestSLORequirer:
         slo_relation = Relation(
             'sloth',
             remote_app_name='provider',
-            remote_app_data={'slo_spec': VALID_SLO_CONFIG},
+            remote_app_data={'slos': slo_to_relation_data(VALID_SLO_CONFIG)},
         )
 
         context = Context(
@@ -378,12 +516,12 @@ class TestSLORequirer:
         sloth_relation_1 = Relation(
             'sloth',
             remote_app_name='provider1',
-            remote_app_data={'slo_spec': VALID_SLO_CONFIG},
+            remote_app_data={'slos': slo_to_relation_data(VALID_SLO_CONFIG)},
         )
         sloth_relation_2 = Relation(
             'sloth',
             remote_app_name='provider2',
-            remote_app_data={'slo_spec': VALID_SLO_CONFIG_2},
+            remote_app_data={'slos': slo_to_relation_data(VALID_SLO_CONFIG_2)},
         )
 
         context = Context(
@@ -406,7 +544,7 @@ class TestSLORequirer:
         slo_relation = Relation(
             'sloth',
             remote_app_name='provider',
-            remote_app_data={'slo_spec': MULTI_SLO_CONFIG},
+            remote_app_data={'slos': slo_to_relation_data(MULTI_SLO_CONFIG)},
         )
 
         context = Context(
@@ -430,12 +568,12 @@ class TestSLORequirer:
         sloth_relation_1 = Relation(
             'sloth',
             remote_app_name='provider1',
-            remote_app_data={'slo_spec': VALID_SLO_CONFIG},
+            remote_app_data={'slos': slo_to_relation_data(VALID_SLO_CONFIG)},
         )
         sloth_relation_2 = Relation(
             'sloth',
             remote_app_name='provider2',
-            remote_app_data={'slo_spec': VALID_SLO_CONFIG_2},
+            remote_app_data={'slos': slo_to_relation_data(VALID_SLO_CONFIG_2)},
         )
 
         context = Context(
@@ -459,12 +597,12 @@ class TestSLORequirer:
         sloth_relation_1 = Relation(
             'sloth',
             remote_app_name='provider1',
-            remote_app_data={'slo_spec': VALID_SLO_CONFIG},
+            remote_app_data={'slos': slo_to_relation_data(VALID_SLO_CONFIG)},
         )
         sloth_relation_2 = Relation(
             'sloth',
             remote_app_name='provider2',
-            remote_app_data={'slo_spec': invalid_yaml},
+            remote_app_data={'slos': slo_to_relation_data(invalid_yaml)},
         )
 
         context = Context(
@@ -487,12 +625,12 @@ class TestSLORequirer:
         sloth_relation_1 = Relation(
             'sloth',
             remote_app_name='provider1',
-            remote_app_data={'slo_spec': VALID_SLO_CONFIG},
+            remote_app_data={'slos': slo_to_relation_data(VALID_SLO_CONFIG)},
         )
         sloth_relation_2 = Relation(
             'sloth',
             remote_app_name='provider2',
-            remote_app_data={'slo_spec': 'invalid: yaml: {{{'},
+            remote_app_data={'slos': 'invalid: yaml: {{{'},
         )
 
         context = Context(
@@ -515,7 +653,7 @@ class TestSLORequirer:
         sloth_relation_1 = Relation(
             'sloth',
             remote_app_name='provider1',
-            remote_app_data={'slo_spec': VALID_SLO_CONFIG},
+            remote_app_data={'slos': slo_to_relation_data(VALID_SLO_CONFIG)},
         )
         sloth_relation_2 = Relation(
             'sloth',
@@ -525,7 +663,7 @@ class TestSLORequirer:
         sloth_relation_3 = Relation(
             'sloth',
             remote_app_name='provider3',
-            remote_app_data={'slo_spec': ''},  # Empty string
+            remote_app_data={'slos': slo_to_relation_data('')},  # Empty string
         )
 
         context = Context(
@@ -564,7 +702,7 @@ class TestSLOIntegration:
 
         # Get the relation data from provider
         provider_relation_out = provider_state_out.get_relation(provider_relation.id)
-        slo_yaml = provider_relation_out.local_app_data.get('slo_spec')
+        slo_yaml = provider_relation_out.local_app_data.get('slos')
 
         # Requirer receives SLO
         requirer_context = Context(
@@ -574,7 +712,7 @@ class TestSLOIntegration:
         requirer_relation = Relation(
             'sloth',
             remote_app_name='provider',
-            remote_app_data={'slo_spec': slo_yaml or ''},
+            remote_app_data={'slos': slo_yaml or ''},
         )
         requirer_state = State(relations=[requirer_relation])
 
@@ -688,11 +826,13 @@ slos:
 
         # Check that topology was injected
         relation_out = state_out.get_relation(slo_relation.id)
-        slo_yaml = relation_out.local_app_data.get('slo_spec')
+        slo_yaml = relation_out.local_app_data.get('slos')
         assert slo_yaml is not None
 
-        # Parse and check
-        slo_data = yaml.safe_load(slo_yaml)
+        # Parse and check - it's now a list
+        slo_list = yaml.safe_load(slo_yaml)
+        assert isinstance(slo_list, list)
+        slo_data = slo_list[0]
         error_query = slo_data['slos'][0]['sli']['events']['error_query']
 
         # Should have juju_application injected
@@ -734,10 +874,12 @@ slos:
 
         # Check that topology was NOT injected
         relation_out = state_out.get_relation(slo_relation.id)
-        slo_yaml = relation_out.local_app_data.get('slo_spec')
+        slo_yaml = relation_out.local_app_data.get('slos')
         assert slo_yaml is not None
 
-        slo_data = yaml.safe_load(slo_yaml)
+        slo_list = yaml.safe_load(slo_yaml)
+        assert isinstance(slo_list, list)
+        slo_data = slo_list[0]
         error_query = slo_data['slos'][0]['sli']['events']['error_query']
 
         # Should NOT have juju_application
