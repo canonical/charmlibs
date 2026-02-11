@@ -186,5 +186,46 @@ class DummyTLSCertificatesRequirerCharmAppAndUnit(CharmBase):
         )
 
 
+class DummyTLSCertificatesRequirerCharmAppAndUnitWithPrivateKey(CharmBase):
+    def __init__(self, *args: Any):
+        super().__init__(*args)
+        app_request = CertificateRequestAttributes(common_name="app.example.com")
+        unit_request = CertificateRequestAttributes(common_name="unit.example.com")
+        self.certificates = TLSCertificatesRequiresV4(
+            charm=self,
+            relationship_name="certificates",
+            certificate_requests_by_mode={
+                Mode.APP: [app_request],
+                Mode.UNIT: [unit_request],
+            },
+            mode=Mode.APP_AND_UNIT,
+            refresh_events=[self.on.config_changed],
+            private_key=self._get_private_key(),
+        )
+
+    def _get_private_key(self) -> PrivateKey | None:
+        pk_from_config = cast("str | None", self.model.config.get("private_key"))
+        if pk_from_config:
+            return PrivateKey.from_string(pk_from_config)
+        return None
+
+
+class DummyTLSCertificatesRequirerCharmAppAndUnitDuplicate(CharmBase):
+    def __init__(self, *args: Any):
+        super().__init__(*args)
+        app_request = CertificateRequestAttributes(common_name="duplicate.example.com")
+        unit_request = CertificateRequestAttributes(common_name="duplicate.example.com")
+        self.certificates = TLSCertificatesRequiresV4(
+            charm=self,
+            relationship_name="certificates",
+            certificate_requests_by_mode={
+                Mode.APP: [app_request],
+                Mode.UNIT: [unit_request],
+            },
+            mode=Mode.APP_AND_UNIT,
+            refresh_events=[self.on.config_changed],
+        )
+
+
 if __name__ == "__main__":
     main(DummyTLSCertificatesRequirerCharm)
