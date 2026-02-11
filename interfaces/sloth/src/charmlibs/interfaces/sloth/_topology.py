@@ -8,7 +8,7 @@ Prometheus queries, supporting the Sloth SLO specification format.
 """
 
 import re
-from typing import Dict, Match
+from re import Match
 
 # Pre-compiled regex patterns for topology injection
 _METRIC_WITH_LABELS = re.compile(r'([a-zA-Z_:][a-zA-Z0-9_:]*)(\{[^}]*\})')
@@ -61,7 +61,7 @@ def _replace_time(match: Match[str], topology_labels: str) -> str:
     return match.group(0)
 
 
-def inject_topology_labels(query: str, topology: Dict[str, str]) -> str:
+def inject_topology_labels(query: str, topology: dict[str, str]) -> str:
     """Inject Juju topology labels into a Prometheus query.
 
     This function adds Juju topology labels (juju_application, juju_model, etc.)

@@ -9,7 +9,7 @@ For user-facing documentation, see the package-level docstring in __init__.py.
 
 import copy
 import logging
-from typing import Any, Dict, List
+from typing import Any
 
 import ops
 import yaml
@@ -36,8 +36,8 @@ class SLOSpec(BaseModel):
 
     version: str = Field(description="Sloth spec version, e.g., 'prometheus/v1'")
     service: str = Field(description='Service name for the SLO')
-    labels: Dict[str, str] = Field(default_factory=dict, description='Labels for the SLO')
-    slos: List[Dict[str, Any]] = Field(description='List of SLO definitions')
+    labels: dict[str, str] = Field(default_factory=dict, description='Labels for the SLO')
+    slos: list[dict[str, Any]] = Field(description='List of SLO definitions')
 
     @field_validator('version')
     @classmethod
@@ -49,7 +49,7 @@ class SLOSpec(BaseModel):
 
     @field_validator('slos')
     @classmethod
-    def validate_slos(cls, v: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def validate_slos(cls, v: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Validate that at least one SLO is defined."""
         if not v:
             raise ValueError('At least one SLO must be defined')
@@ -80,7 +80,7 @@ class SLOProvider(ops.Object):
         self.relation_name = relation_name
         self._inject_topology = inject_topology
 
-    def _get_topology_labels(self) -> Dict[str, str]:
+    def _get_topology_labels(self) -> dict[str, str]:
         """Get Juju topology labels for this charm.
 
         Returns:
@@ -89,7 +89,7 @@ class SLOProvider(ops.Object):
         topology = JujuTopology.from_charm(self._charm)
         return topology.label_matcher_dict
 
-    def _inject_topology_into_slo(self, slo_spec: Dict[str, Any]) -> Dict[str, Any]:
+    def _inject_topology_into_slo(self, slo_spec: dict[str, Any]) -> dict[str, Any]:
         """Inject topology labels into SLO queries.
 
         This method performs a deep copy of the input SLO specification and
@@ -216,7 +216,7 @@ class SLORequirer(ops.Object):
         self._charm = charm
         self.relation_name = relation_name
 
-    def get_slos(self) -> List[Dict[str, Any]]:
+    def get_slos(self) -> list[dict[str, Any]]:
         """Collect all SLO specifications from related charms.
 
         Returns:
@@ -224,7 +224,7 @@ class SLORequirer(ops.Object):
             Each application may provide multiple SLO specs as a multi-document YAML.
             Only valid SLO specs are returned; invalid ones are logged and skipped.
         """
-        slos: List[Dict[str, Any]] = []
+        slos: list[dict[str, Any]] = []
         relations = self._charm.model.relations.get(self.relation_name, [])
 
         for relation in relations:
