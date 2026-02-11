@@ -52,6 +52,12 @@ Example of use::
 """
 
 from ._grub import (
+    CHARM_CONFIG_PREFIX,
+    CONFIG_DESCRIPTION,
+    CONFIG_HEADER,
+    FILE_LINE_IN_DESCRIPTION,
+    GRUB_CONFIG,
+    GRUB_DIRECTORY,
     ApplyError,
     Config,
     IsContainerError,
@@ -62,6 +68,12 @@ from ._grub import (
 from ._version import __version__ as __version__
 
 __all__ = [
+    'CHARM_CONFIG_PREFIX',
+    'CONFIG_DESCRIPTION',
+    'CONFIG_HEADER',
+    'FILE_LINE_IN_DESCRIPTION',
+    'GRUB_CONFIG',
+    'GRUB_DIRECTORY',
     'ApplyError',
     'Config',
     'IsContainerError',
