@@ -65,7 +65,7 @@ class SLORelationData(BaseModel):
 
     slos: list[SLOSpec] = Field(
         description='List of SLO specifications',
-        default_factory=list,
+        default_factory=lambda: [],
     )
 
 
