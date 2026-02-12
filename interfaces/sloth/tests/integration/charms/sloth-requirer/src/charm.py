@@ -9,7 +9,7 @@ from typing import Any
 
 import ops
 
-from charmlibs.interfaces.sloth import SLORequirer
+from charmlibs.interfaces.sloth import SlothRequirer
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +20,7 @@ class SLOTestRequirerCharm(ops.CharmBase):
     def __init__(self, framework: ops.Framework, *args: Any) -> None:
         super().__init__(framework, *args)
 
-        self.slo_requirer = SLORequirer(self, relation_name='sloth')
+        self.sloth_requirer = SlothRequirer(self, relation_name='sloth')
 
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
@@ -49,7 +49,7 @@ class SLOTestRequirerCharm(ops.CharmBase):
     def _on_get_slos_action(self, event: ops.ActionEvent):
         """Action to retrieve all SLOs."""
         try:
-            slos = self.slo_requirer.get_slos()
+            slos = self.sloth_requirer.get_slos()
             event.set_results({
                 'count': len(slos),
                 'services': ', '.join(slo.get('service', 'unknown') for slo in slos),
@@ -61,7 +61,7 @@ class SLOTestRequirerCharm(ops.CharmBase):
     def _update_status(self):
         """Update charm status based on received SLOs."""
         try:
-            slos = self.slo_requirer.get_slos()
+            slos = self.sloth_requirer.get_slos()
             if slos:
                 services = [slo.get('service', 'unknown') for slo in slos]
                 service_list = ', '.join(services)

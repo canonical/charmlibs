@@ -69,8 +69,8 @@ class SLORelationData(BaseModel):
     )
 
 
-class SLOProvider(ops.Object):
-    """Provider side of the SLO relation.
+class SlothProvider(ops.Object):
+    """Provider side of the Sloth relation.
 
     Charms should use this class to provide SLO specifications to Sloth.
 
@@ -202,6 +202,11 @@ class SLOProvider(ops.Object):
             logger.warning('Invalid SLO specification: %s', e)
             raise SLOValidationError(f'Invalid SLO specification: {e}') from e
 
+        # Only the leader can write to the application databag
+        if not self._charm.unit.is_leader():
+            logger.debug('Not leader, skipping saving SLOs to relation')
+            return
+
         for relation in relations:
             # Write SLO specs to app databag using typed relation API
             relation_data = SLORelationData(slos=slo_specs)
@@ -221,8 +226,8 @@ class SLOProvider(ops.Object):
             )
 
 
-class SLORequirer(ops.Object):
-    """Requirer side of the SLO relation.
+class SlothRequirer(ops.Object):
+    """Requirer side of the Sloth relation.
 
     The Sloth charm uses this class to collect SLO specifications from
     related charms. Validation of SLO specs is performed on this side.

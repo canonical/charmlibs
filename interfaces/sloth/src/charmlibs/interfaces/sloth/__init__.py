@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-r"""SLO Provider and Requirer Library.
+r"""Sloth Provider and Requirer Library.
 
 This library provides a way for charms to share SLO (Service Level Objective)
 specifications with the Sloth charm, which will convert them into Prometheus
@@ -24,22 +24,22 @@ Getting Started
 Provider Side (Charms providing SLO specs)
 -------------------------------------------
 
-To provide SLO specifications to Sloth, use the ``SLOProvider`` class.
+To provide SLO specifications to Sloth, use the ``SlothProvider`` class.
 The recommended approach is to allow users to configure SLOs via ``juju config``::
 
-    from charmlibs.interfaces.sloth import SLOProvider
+    from charmlibs.interfaces.sloth import SlothProvider
 
     class MyCharm(ops.CharmBase):
         def __init__(self, *args):
             super().__init__(*args)
-            self.slo_provider = SLOProvider(self)
+            self.sloth_provider = SlothProvider(self)
             self.framework.observe(self.on.config_changed, self._on_config_changed)
 
         def _on_config_changed(self, event):
             # Read SLO configuration from juju config
             slo_config = self.config.get('slo_config', '')
             if slo_config:
-                self.slo_provider.provide_slos(slo_config)
+                self.sloth_provider.provide_slos(slo_config)
 
 Users can then configure SLOs using ``juju config``::
 
@@ -68,19 +68,19 @@ separators (``---``).
 Requirer Side (Sloth charm)
 ----------------------------
 
-The Sloth charm uses ``SLORequirer`` to collect SLO specifications.
+The Sloth charm uses ``SlothRequirer`` to collect SLO specifications.
 Validation is performed on the requirer side::
 
-    from charmlibs.interfaces.sloth import SLORequirer
+    from charmlibs.interfaces.sloth import SlothRequirer
 
     class SlothCharm(ops.CharmBase):
         def __init__(self, *args):
             super().__init__(*args)
-            self.slo_requirer = SLORequirer(self)
+            self.sloth_requirer = SlothRequirer(self)
 
         def _on_config_changed(self, event):
             # Get validated SLO specs from all related charms
-            slos = self.slo_requirer.get_slos()
+            slos = self.sloth_requirer.get_slos()
             # Process SLOs and generate rules
 
 Relation Data Format
@@ -127,10 +127,10 @@ For multiple services (separated by YAML document separators)::
 
 from ._sloth import (
     SLOError,
-    SLOProvider,
     SLORelationData,
-    SLORequirer,
     SLOSpec,
+    SlothProvider,
+    SlothRequirer,
     SLOValidationError,
 )
 from ._topology import inject_topology_labels
@@ -138,10 +138,10 @@ from ._version import __version__ as __version__
 
 __all__ = [
     'SLOError',
-    'SLOProvider',
     'SLORelationData',
-    'SLORequirer',
     'SLOSpec',
     'SLOValidationError',
+    'SlothProvider',
+    'SlothRequirer',
     'inject_topology_labels',
 ]

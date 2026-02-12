@@ -13,9 +13,9 @@ from ops.testing import Context, Relation, State
 from pydantic import ValidationError
 
 from charmlibs.interfaces.sloth import (
-    SLOProvider,
-    SLORequirer,
     SLOSpec,
+    SlothProvider,
+    SlothRequirer,
     SLOValidationError,
 )
 
@@ -143,7 +143,7 @@ class ProviderCharm(CharmBase):
 
     def __init__(self, *args: Any):
         super().__init__(*args)
-        self.slo_provider = SLOProvider(self, relation_name='sloth')
+        self.sloth_provider = SlothProvider(self, relation_name='sloth')
 
 
 class RequirerCharm(CharmBase):
@@ -151,7 +151,7 @@ class RequirerCharm(CharmBase):
 
     def __init__(self, *args: Any):
         super().__init__(*args)
-        self.slo_requirer = SLORequirer(self, relation_name='sloth')
+        self.sloth_requirer = SlothRequirer(self, relation_name='sloth')
 
 
 class TestSLOSpec:
@@ -258,8 +258,8 @@ class TestSLORelationData:
         assert dumped['slos'][0]['service'] == 'test-service'
 
 
-class TestSLOProvider:
-    """Tests for the SLOProvider class."""
+class TestSlothProvider:
+    """Tests for the SlothProvider class."""
 
     def test_provide_slos_with_relation(self):
         """Test providing SLO YAML when relation exists."""
@@ -273,7 +273,7 @@ class TestSLOProvider:
         # Trigger start and provide SLO
         with context(context.on.start(), state) as mgr:
             charm = mgr.charm
-            charm.slo_provider.provide_slos(VALID_SLO_CONFIG)
+            charm.sloth_provider.provide_slos(VALID_SLO_CONFIG)
             state_out = mgr.run()
 
         # Check that SLO was set in relation data
@@ -298,7 +298,7 @@ class TestSLOProvider:
         # Should not raise error, just log warning
         with context(context.on.start(), state) as mgr:
             charm = mgr.charm
-            charm.slo_provider.provide_slos(VALID_SLO_CONFIG)
+            charm.sloth_provider.provide_slos(VALID_SLO_CONFIG)
             _ = mgr.run()
 
     def test_provide_slos_to_multiple_relations(self):
@@ -315,7 +315,7 @@ class TestSLOProvider:
 
         with context(context.on.start(), state) as mgr:
             charm = mgr.charm
-            charm.slo_provider.provide_slos(VALID_SLO_CONFIG)
+            charm.sloth_provider.provide_slos(VALID_SLO_CONFIG)
             state_out = mgr.run()
 
         # Both relations should have the SLO spec
@@ -339,7 +339,7 @@ class TestSLOProvider:
 
         with context(context.on.start(), state) as mgr:
             charm = mgr.charm
-            charm.slo_provider.provide_slos(MULTI_SLO_CONFIG)
+            charm.sloth_provider.provide_slos(MULTI_SLO_CONFIG)
             state_out = mgr.run()
 
         # Check that both SLOs were set in relation data as a list
@@ -367,7 +367,7 @@ class TestSLOProvider:
         # Should not raise error, just log warning
         with context(context.on.start(), state) as mgr:
             charm = mgr.charm
-            charm.slo_provider.provide_slos('')
+            charm.sloth_provider.provide_slos('')
             state_out = mgr.run()
 
         # Relation data should be empty
@@ -389,7 +389,7 @@ class TestSLOProvider:
         with context(context.on.start(), state) as mgr:
             charm = mgr.charm
             with pytest.raises(SLOValidationError) as exc_info:
-                charm.slo_provider.provide_slos(invalid_yaml)
+                charm.sloth_provider.provide_slos(invalid_yaml)
             assert 'Invalid YAML' in str(exc_info.value)
             _ = mgr.run()
 
@@ -415,7 +415,7 @@ slos:
         with context(context.on.start(), state) as mgr:
             charm = mgr.charm
             with pytest.raises(SLOValidationError) as exc_info:
-                charm.slo_provider.provide_slos(invalid_slo)
+                charm.sloth_provider.provide_slos(invalid_slo)
             assert 'Invalid SLO specification' in str(exc_info.value)
             _ = mgr.run()
 
@@ -440,7 +440,7 @@ slos:
         with context(context.on.start(), state) as mgr:
             charm = mgr.charm
             with pytest.raises(SLOValidationError) as exc_info:
-                charm.slo_provider.provide_slos(invalid_slo)
+                charm.sloth_provider.provide_slos(invalid_slo)
             assert 'Invalid SLO specification' in str(exc_info.value)
             assert 'prometheus/v1' in str(exc_info.value)
             _ = mgr.run()
@@ -464,14 +464,14 @@ slos: []
         with context(context.on.start(), state) as mgr:
             charm = mgr.charm
             with pytest.raises(SLOValidationError) as exc_info:
-                charm.slo_provider.provide_slos(invalid_slo)
+                charm.sloth_provider.provide_slos(invalid_slo)
             assert 'Invalid SLO specification' in str(exc_info.value)
             assert 'At least one SLO must be defined' in str(exc_info.value)
             _ = mgr.run()
 
 
-class TestSLORequirer:
-    """Tests for the SLORequirer class."""
+class TestSlothRequirer:
+    """Tests for the SlothRequirer class."""
 
     def test_get_slos_no_relations(self):
         """Test getting SLOs when no relations exist."""
@@ -483,7 +483,7 @@ class TestSLORequirer:
 
         with context(context.on.start(), state) as mgr:
             charm = mgr.charm
-            slos = charm.slo_requirer.get_slos()
+            slos = charm.sloth_requirer.get_slos()
             _ = mgr.run()
 
         assert slos == []
@@ -504,7 +504,7 @@ class TestSLORequirer:
 
         with context(context.on.start(), state) as mgr:
             charm = mgr.charm
-            slos = charm.slo_requirer.get_slos()
+            slos = charm.sloth_requirer.get_slos()
             _ = mgr.run()
 
         assert len(slos) == 1
@@ -532,7 +532,7 @@ class TestSLORequirer:
 
         with context(context.on.start(), state) as mgr:
             charm = mgr.charm
-            slos = charm.slo_requirer.get_slos()
+            slos = charm.sloth_requirer.get_slos()
             _ = mgr.run()
 
         assert len(slos) == 2
@@ -555,7 +555,7 @@ class TestSLORequirer:
 
         with context(context.on.start(), state) as mgr:
             charm = mgr.charm
-            slos = charm.slo_requirer.get_slos()
+            slos = charm.sloth_requirer.get_slos()
             _ = mgr.run()
 
         # Should get both SLOs from the single app
@@ -584,7 +584,7 @@ class TestSLORequirer:
 
         with context(context.on.start(), state) as mgr:
             charm = mgr.charm
-            slos = charm.slo_requirer.get_slos()
+            slos = charm.sloth_requirer.get_slos()
             _ = mgr.run()
 
         assert len(slos) == 2
@@ -613,7 +613,7 @@ class TestSLORequirer:
 
         with context(context.on.start(), state) as mgr:
             charm = mgr.charm
-            slos = charm.slo_requirer.get_slos()
+            slos = charm.sloth_requirer.get_slos()
             _ = mgr.run()
 
         # Only valid SLO should be returned
@@ -641,7 +641,7 @@ class TestSLORequirer:
 
         with context(context.on.start(), state) as mgr:
             charm = mgr.charm
-            slos = charm.slo_requirer.get_slos()
+            slos = charm.sloth_requirer.get_slos()
             _ = mgr.run()
 
         # Only valid SLO should be returned
@@ -674,7 +674,7 @@ class TestSLORequirer:
 
         with context(context.on.start(), state) as mgr:
             charm = mgr.charm
-            slos = charm.slo_requirer.get_slos()
+            slos = charm.sloth_requirer.get_slos()
             _ = mgr.run()
 
         # Only valid SLO should be returned
@@ -697,7 +697,7 @@ class TestSLOIntegration:
 
         with provider_context(provider_context.on.start(), provider_state) as mgr:
             provider_charm = mgr.charm
-            provider_charm.slo_provider.provide_slos(VALID_SLO_CONFIG)
+            provider_charm.sloth_provider.provide_slos(VALID_SLO_CONFIG)
             provider_state_out = mgr.run()
 
         # Get the relation data from provider
@@ -718,7 +718,7 @@ class TestSLOIntegration:
 
         with requirer_context(requirer_context.on.start(), requirer_state) as mgr:
             requirer_charm = mgr.charm
-            slos = requirer_charm.slo_requirer.get_slos()
+            slos = requirer_charm.sloth_requirer.get_slos()
             _ = mgr.run()
 
         # Verify the SLO was successfully transmitted
@@ -797,7 +797,7 @@ class TestTopologyInjection:
         assert 'juju_unit="my-app/0"' in result
 
     def test_provider_injects_topology_by_default(self):
-        """Test that SLOProvider injects topology by default."""
+        """Test that SlothProvider injects topology by default."""
         context = Context(
             ProviderCharm,
             meta={'name': 'provider', 'requires': {'sloth': {'interface': 'sloth'}}},
@@ -821,7 +821,7 @@ slos:
 
         with context(context.on.start(), state) as mgr:
             charm = mgr.charm
-            charm.slo_provider.provide_slos(slo_config)
+            charm.sloth_provider.provide_slos(slo_config)
             state_out = mgr.run()
 
         # Check that topology was injected
@@ -845,7 +845,9 @@ slos:
         class NoTopologyProviderCharm(CharmBase):
             def __init__(self, *args: Any):
                 super().__init__(*args)
-                self.slo_provider = SLOProvider(self, relation_name='sloth', inject_topology=False)
+                self.sloth_provider = SlothProvider(
+                    self, relation_name='sloth', inject_topology=False
+                )
 
         context = Context(
             NoTopologyProviderCharm,
@@ -869,7 +871,7 @@ slos:
 
         with context(context.on.start(), state) as mgr:
             charm = mgr.charm
-            charm.slo_provider.provide_slos(slo_config)
+            charm.sloth_provider.provide_slos(slo_config)
             state_out = mgr.run()
 
         # Check that topology was NOT injected

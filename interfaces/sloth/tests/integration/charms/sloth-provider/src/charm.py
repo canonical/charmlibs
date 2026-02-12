@@ -9,7 +9,7 @@ from typing import Any
 
 import ops
 
-from charmlibs.interfaces.sloth import SLOProvider
+from charmlibs.interfaces.sloth import SlothProvider
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +20,7 @@ class SLOTestProviderCharm(ops.CharmBase):
     def __init__(self, framework: ops.Framework, *args: Any) -> None:
         super().__init__(framework, *args)
 
-        self.slo_provider = SLOProvider(self, relation_name='sloth')
+        self.sloth_provider = SlothProvider(self, relation_name='sloth')
 
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
@@ -75,7 +75,7 @@ slos:
 """
 
         try:
-            self.slo_provider.provide_slos(slo_spec)
+            self.sloth_provider.provide_slos(slo_spec)
             logger.info(
                 "Provided SLO for service '%s' with %s%% objective", service_name, objective
             )

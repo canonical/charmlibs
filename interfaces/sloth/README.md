@@ -5,7 +5,7 @@ Sloth integration library for Juju charms, providing SLO (Service Level Objectiv
 To install, add `charmlibs-interfaces-sloth` to your Python dependencies. Then in your Python code, import as:
 
 ```py
-from charmlibs.interfaces.sloth import SLOProvider, SLORequirer
+from charmlibs.interfaces.sloth import SlothProvider, SlothRequirer
 ```
 
 ## Features
@@ -20,12 +20,12 @@ from charmlibs.interfaces.sloth import SLOProvider, SLORequirer
 ### Provider Side
 
 ```python
-from charmlibs.interfaces.sloth import SLOProvider
+from charmlibs.interfaces.sloth import SlothProvider
 
 class MyCharm(ops.CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
-        self.slo_provider = SLOProvider(self)
+        self.sloth_provider = SlothProvider(self)
 
     def _provide_slos(self):
         slo_config = '''
@@ -39,22 +39,22 @@ class MyCharm(ops.CharmBase):
                 error_query: 'sum(rate(http_requests_total{status=~"5.."}[{{.window}}]))'
                 total_query: 'sum(rate(http_requests_total[{{.window}}]))'
         '''
-        self.slo_provider.provide_slos(slo_config)
+        self.sloth_provider.provide_slos(slo_config)
 ```
 
 ### Requirer Side
 
 ```python
-from charmlibs.interfaces.sloth import SLORequirer
+from charmlibs.interfaces.sloth import SlothRequirer
 
 class SlothCharm(ops.CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
-        self.slo_requirer = SLORequirer(self)
+        self.sloth_requirer = SlothRequirer(self)
 
     def _on_config_changed(self, event):
         # Get validated SLO specs from all related charms
-        slos = self.slo_requirer.get_slos()
+        slos = self.sloth_requirer.get_slos()
         # Process SLOs and generate rules
 ```
 
@@ -64,4 +64,4 @@ For complete documentation, see the [charmlibs documentation](https://documentat
 
 ## Contributing
 
-See [CONTRIBUTING.md](../../CONTRIBUTING.md) in the repository root.
+See [CONTRIBUTING.md](https://github.com/canonical/charmlibs/blob/main/CONTRIBUTING.md) in the repository root.
