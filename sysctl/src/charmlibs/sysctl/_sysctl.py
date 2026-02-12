@@ -173,9 +173,7 @@ class Config(dict[str, str]):
         """Apply values to machine."""
         cmd = [f'{key}={value}' for key, value in self._desired_config.items()]
         result = self._sysctl(cmd)
-        failed_values = [
-            self._apply_re.match(line) for line in result if self._apply_re.match(line)
-        ]
+        failed_values = [m for line in result if (m := self._apply_re.match(line))]
         logger.debug('Failed values: %s', failed_values)
 
         if failed_values:
