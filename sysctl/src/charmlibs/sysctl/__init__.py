@@ -25,7 +25,7 @@ are setting values. The following files can be created:
 
 - ``/etc/sysctl.d/95-juju-sysctl.conf``
 
-  Merged file resulting from all other `90-juju-*` application files.
+  Merged file resulting from all other ``90-juju-*`` application files.
 
 A charm using the sysctl lib will need a data structure like the following::
 
