@@ -92,10 +92,7 @@ class Config(dict):
         """Configure sysctl options with a desired set of params.
 
         Args:
-            config: dictionary with keys to configure:
-        ```
-        {"vm.swappiness": "10", ...}
-        ```
+            config: dictionary with keys to configure: ``{"vm.swappiness": "10", ...}``
         """
         self._parse_config(config)
 
