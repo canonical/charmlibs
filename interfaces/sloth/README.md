@@ -2,12 +2,6 @@
 
 Sloth integration library for Juju charms, providing SLO (Service Level Objective) management with the Sloth operator for generating Prometheus recording and alerting rules.
 
-To install, add `charmlibs-interfaces-sloth` to your Python dependencies. Then in your Python code, import as:
-
-```py
-from charmlibs.interfaces.sloth import SlothProvider, SlothRequirer
-```
-
 ## Features
 
 - **Provider/Requirer pattern**: Enables charms to share SLO specifications with Sloth
@@ -15,7 +9,13 @@ from charmlibs.interfaces.sloth import SlothProvider, SlothRequirer
 - **Automatic topology injection**: Optionally inject Juju topology labels into Prometheus queries
 - **Multi-service support**: Provide SLO specs for multiple services in a single YAML document
 
-## Usage
+## Getting started
+
+To install, add `charmlibs-interfaces-sloth` to your Python dependencies. Then in your Python code, import as:
+
+```py
+from charmlibs.interfaces.sloth import SlothProvider, SlothRequirer
+```
 
 ### Provider Side
 
