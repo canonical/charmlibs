@@ -58,7 +58,7 @@ class ValidationError(Error):
     """Exception representing value validation error."""
 
 
-class Config(dict):
+class Config(dict[str, str]):
     """Represents the state of the config that a charm wants to enforce."""
 
     _apply_re = re.compile(r'sysctl: permission denied on key \"([a-z_\.]+)\", ignoring$')
@@ -67,7 +67,7 @@ class Config(dict):
         self.name = name
         self._data = self._load_data()
 
-    def __contains__(self, key: str) -> bool:
+    def __contains__(self, key: object) -> bool:
         """Check if key is in config."""
         return key in self._data
 
@@ -128,7 +128,7 @@ class Config(dict):
     def _validate(self) -> list[str]:
         """Validate the desired config params against merged ones."""
         common_keys = set(self._data.keys()) & set(self._desired_config.keys())
-        conflict_keys = []
+        conflict_keys: list[str] = []
         for key in common_keys:
             if self._data[key] != self._desired_config[key]:
                 logger.warning(
@@ -148,7 +148,7 @@ class Config(dict):
             for key, value in self._desired_config.items():
                 f.write(f'{key}={value}\n')
 
-    def _merge(self, add_own_charm=True) -> None:
+    def _merge(self, add_own_charm: bool = True) -> None:
         """Create the merged sysctl file.
 
         Args:
@@ -211,7 +211,7 @@ class Config(dict):
 
     def _load_data(self) -> dict[str, str]:
         """Get merged config."""
-        config = {}
+        config: dict[str, str] = {}
         if not SYSCTL_FILENAME.exists():
             return config
 

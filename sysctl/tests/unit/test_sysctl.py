@@ -5,7 +5,8 @@ import tempfile
 import unittest
 from pathlib import Path
 from subprocess import CalledProcessError
-from unittest.mock import patch
+from typing import Any
+from unittest.mock import MagicMock, patch
 
 from charmlibs import sysctl
 from charmlibs.sysctl import _sysctl
@@ -44,7 +45,7 @@ vm.max_map_count=25500
 """
 
 
-def check_output_side_effects(*args, **kwargs):
+def check_output_side_effects(*args: Any, **kwargs: Any):
     if args[0] == ['sysctl', '-n', 'vm.swappiness']:
         return '1'
     if args[0] == ['sysctl', '-n', 'vm.swappiness', 'other_value'] or args[0] == [
@@ -80,7 +81,7 @@ class TestSysctlConfig(unittest.TestCase):
         self.loaded_values = {'vm.swappiness': '60', 'vm.max_map_count': '25500'}
 
     @patch.object(_sysctl, 'check_output')
-    def test_update_new_values(self, mock_output):
+    def test_update_new_values(self, mock_output: MagicMock):
         mock_output.side_effect = check_output_side_effects
         config = sysctl.Config('test')
 
@@ -91,7 +92,7 @@ class TestSysctlConfig(unittest.TestCase):
             assert f.read() == TEST_UPDATE_MERGED_FILE
 
     @patch.object(_sysctl.Config, '_load_data')
-    def test_update_with_validation_error(self, mock_load):
+    def test_update_with_validation_error(self, mock_load: MagicMock):
         mock_load.return_value = self.loaded_values
         config = sysctl.Config('test')
 
@@ -111,7 +112,7 @@ class TestSysctlConfig(unittest.TestCase):
     @patch('pathlib.Path.unlink')
     @patch.object(_sysctl.Config, '_merge')
     @patch.object(_sysctl.Config, '_load_data')
-    def test_remove(self, mock_load, mock_merge, mock_unlink):
+    def test_remove(self, mock_load: MagicMock, mock_merge: MagicMock, mock_unlink: MagicMock):
         mock_load.return_value = self.loaded_values
         config = sysctl.Config('test')
 
@@ -134,7 +135,7 @@ class TestSysctlConfig(unittest.TestCase):
         assert len(config) == 0
 
     @patch.object(_sysctl.Config, '_load_data')
-    def test_merge(self, mock_load):
+    def test_merge(self, mock_load: MagicMock):
         mock_load.return_value = self.loaded_values
         config = sysctl.Config('test')
         with open(self.tmp_dir / '90-juju-othercharm', 'w') as f:
@@ -147,7 +148,7 @@ class TestSysctlConfig(unittest.TestCase):
             assert f.read() == TEST_OTHER_CHARM_MERGED
 
     @patch.object(_sysctl.Config, '_load_data')
-    def test_merge_without_own_file(self, mock_load):
+    def test_merge_without_own_file(self, mock_load: MagicMock):
         mock_load.return_value = self.loaded_values
         config = sysctl.Config('test')
 
@@ -163,7 +164,7 @@ class TestSysctlConfig(unittest.TestCase):
             assert f.read() == TEST_OTHER_CHARM_MERGED
 
     @patch.object(_sysctl.Config, '_load_data')
-    def test_validate_different_keys(self, mock_load):
+    def test_validate_different_keys(self, mock_load: MagicMock):
         mock_load.return_value = self.loaded_values
         config = sysctl.Config('test')
 
@@ -173,7 +174,7 @@ class TestSysctlConfig(unittest.TestCase):
         assert result == []
 
     @patch.object(_sysctl.Config, '_load_data')
-    def test_validate_same_keys_and_values(self, mock_load):
+    def test_validate_same_keys_and_values(self, mock_load: MagicMock):
         mock_load.return_value = self.loaded_values
         config = sysctl.Config('test')
 
@@ -183,7 +184,7 @@ class TestSysctlConfig(unittest.TestCase):
         assert result == []
 
     @patch.object(_sysctl.Config, '_load_data')
-    def test_validate_same_keys_different_values(self, mock_load):
+    def test_validate_same_keys_different_values(self, mock_load: MagicMock):
         mock_load.return_value = self.loaded_values
         config = sysctl.Config('test')
 
@@ -203,7 +204,7 @@ class TestSysctlConfig(unittest.TestCase):
 
     @patch.object(_sysctl, 'check_output')
     @patch.object(_sysctl.Config, '_load_data')
-    def test_create_snapshot(self, mock_load, mock_output):
+    def test_create_snapshot(self, mock_load: MagicMock, mock_output: MagicMock):
         mock_load.return_value = self.loaded_values
         mock_output.side_effect = check_output_side_effects
         config = sysctl.Config('test')
@@ -218,7 +219,7 @@ class TestSysctlConfig(unittest.TestCase):
 
     @patch.object(_sysctl, 'check_output')
     @patch.object(_sysctl.Config, '_load_data')
-    def test_restore_snapshot(self, mock_load, mock_output):
+    def test_restore_snapshot(self, mock_load: MagicMock, mock_output: MagicMock):
         mock_load.return_value = self.loaded_values
         mock_output.side_effect = check_output_side_effects
         config = sysctl.Config('test')
@@ -232,7 +233,7 @@ class TestSysctlConfig(unittest.TestCase):
 
     @patch.object(_sysctl, 'check_output')
     @patch.object(_sysctl.Config, '_load_data')
-    def test_syctl(self, mock_load, mock_output):
+    def test_syctl(self, mock_load: MagicMock, mock_output: MagicMock):
         mock_load.return_value = self.loaded_values
         mock_output.side_effect = check_output_side_effects
         config = sysctl.Config('test')
@@ -246,7 +247,7 @@ class TestSysctlConfig(unittest.TestCase):
 
     @patch.object(_sysctl, 'check_output')
     @patch.object(_sysctl.Config, '_load_data')
-    def test_syctl_error(self, mock_load, mock_output):
+    def test_syctl_error(self, mock_load: MagicMock, mock_output: MagicMock):
         mock_load.return_value = self.loaded_values
         mock_output.side_effect = check_output_side_effects
         config = sysctl.Config('test')
@@ -261,7 +262,7 @@ class TestSysctlConfig(unittest.TestCase):
 
     @patch.object(_sysctl.Config, '_sysctl')
     @patch.object(_sysctl.Config, '_load_data')
-    def test_apply_without_failed_values(self, mock_load, mock_sysctl):
+    def test_apply_without_failed_values(self, mock_load: MagicMock, mock_sysctl: MagicMock):
         mock_load.return_value = self.loaded_values
         mock_sysctl.return_value = ['vm.swappiness = 0']
         config = sysctl.Config('test')
@@ -273,7 +274,7 @@ class TestSysctlConfig(unittest.TestCase):
 
     @patch.object(_sysctl.Config, '_sysctl')
     @patch.object(_sysctl.Config, '_load_data')
-    def test_apply_with_failed_values(self, mock_load, mock_sysctl):
+    def test_apply_with_failed_values(self, mock_load: MagicMock, mock_sysctl: MagicMock):
         mock_load.return_value = self.loaded_values
         mock_sysctl.return_value = [permission_failure_output]
         config = sysctl.Config('test')
@@ -287,7 +288,7 @@ class TestSysctlConfig(unittest.TestCase):
 
     @patch.object(_sysctl.Config, '_sysctl')
     @patch.object(_sysctl.Config, '_load_data')
-    def test_apply_with_partial_failed_values(self, mock_load, mock_sysctl):
+    def test_apply_with_partial_failed_values(self, mock_load: MagicMock, mock_sysctl: MagicMock):
         mock_load.return_value = self.loaded_values
         mock_sysctl.return_value = [permission_failure_output]
         config = sysctl.Config('test')
@@ -308,7 +309,7 @@ class TestSysctlConfig(unittest.TestCase):
         self.assertEqual(config._desired_config, {'key1': '10', 'key2': '20'})
 
     @patch.object(_sysctl.Config, '_load_data')
-    def test_class_methods(self, mock_load):
+    def test_class_methods(self, mock_load: MagicMock):
         mock_load.return_value = self.loaded_values
         config = sysctl.Config('test')
 
