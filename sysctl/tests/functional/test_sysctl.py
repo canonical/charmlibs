@@ -6,7 +6,7 @@
 from pathlib import Path
 from subprocess import check_output
 
-from charms.operator_libs_linux.v0 import sysctl
+from charmlibs import sysctl
 
 
 def test_configure():
