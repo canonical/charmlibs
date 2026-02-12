@@ -7,7 +7,8 @@ from pathlib import Path
 from subprocess import CalledProcessError
 from unittest.mock import patch
 
-from charms.operator_libs_linux.v0 import sysctl
+from charmlibs import sysctl
+from charmlibs.sysctl import _sysctl
 
 permission_failure_output = """sysctl: permission denied on key "vm.swappiness", ignoring"""
 partial_permission_failure_output = """sysctl: permission denied on key "vm.swappiness", ignoring
@@ -18,7 +19,7 @@ TEST_OTHER_CHARM_FILE = """# othercharm
 vm.swappiness=60
 net.ipv4.tcp_max_syn_backlog=4096
 """
-TEST_OTHER_CHARM_MERGED = f"""# This config file was produced by sysctl lib v{sysctl.LIBAPI}.{sysctl.LIBPATCH}
+TEST_OTHER_CHARM_MERGED = f"""# This config file was produced by sysctl lib v{_sysctl.LIBAPI}.{_sysctl.LIBPATCH}
 #
 # This file represents the output of the sysctl lib, which can combine multiple
 # configurations into a single file like.
@@ -26,7 +27,7 @@ TEST_OTHER_CHARM_MERGED = f"""# This config file was produced by sysctl lib v{sy
 vm.swappiness=60
 net.ipv4.tcp_max_syn_backlog=4096
 """
-TEST_MERGED_FILE = f"""# This config file was produced by sysctl lib v{sysctl.LIBAPI}.{sysctl.LIBPATCH}
+TEST_MERGED_FILE = f"""# This config file was produced by sysctl lib v{_sysctl.LIBAPI}.{_sysctl.LIBPATCH}
 #
 # This file represents the output of the sysctl lib, which can combine multiple
 # configurations into a single file like.
@@ -34,7 +35,7 @@ vm.max_map_count = 262144
 vm.swappiness=0
 
 """
-TEST_UPDATE_MERGED_FILE = f"""# This config file was produced by sysctl lib v{sysctl.LIBAPI}.{sysctl.LIBPATCH}
+TEST_UPDATE_MERGED_FILE = f"""# This config file was produced by sysctl lib v{_sysctl.LIBAPI}.{_sysctl.LIBPATCH}
 #
 # This file represents the output of the sysctl lib, which can combine multiple
 # configurations into a single file like.
@@ -46,7 +47,11 @@ vm.max_map_count=25500
 def check_output_side_effects(*args, **kwargs):
     if args[0] == ['sysctl', '-n', 'vm.swappiness']:
         return '1'
-    if args[0] == ['sysctl', '-n', 'vm.swappiness', 'other_value'] or args[0] == ['sysctl', 'vm.swappiness=1', 'other_value=5']:
+    if args[0] == ['sysctl', '-n', 'vm.swappiness', 'other_value'] or args[0] == [
+        'sysctl',
+        'vm.swappiness=1',
+        'other_value=5',
+    ]:
         return '1\n5'
     elif args[0] == ['sysctl', 'vm.swappiness=0']:
         return permission_failure_output
@@ -69,12 +74,12 @@ class TestSysctlConfig(unittest.TestCase):
         self.addCleanup(tmp_dir.cleanup)
 
         # configured paths
-        sysctl.SYSCTL_DIRECTORY = self.tmp_dir
-        sysctl.SYSCTL_FILENAME = self.tmp_dir / '95-juju-sysctl.conf'
+        _sysctl.SYSCTL_DIRECTORY = self.tmp_dir
+        _sysctl.SYSCTL_FILENAME = self.tmp_dir / '95-juju-sysctl.conf'
 
         self.loaded_values = {'vm.swappiness': '60', 'vm.max_map_count': '25500'}
 
-    @patch('charms.operator_libs_linux.v0.sysctl.check_output')
+    @patch.object(_sysctl, 'check_output')
     def test_update_new_values(self, mock_output):
         mock_output.side_effect = check_output_side_effects
         config = sysctl.Config('test')
@@ -85,7 +90,7 @@ class TestSysctlConfig(unittest.TestCase):
         with open(self.tmp_dir / '95-juju-sysctl.conf') as f:
             assert f.read() == TEST_UPDATE_MERGED_FILE
 
-    @patch('charms.operator_libs_linux.v0.sysctl.Config._load_data')
+    @patch.object(_sysctl.Config, '_load_data')
     def test_update_with_validation_error(self, mock_load):
         mock_load.return_value = self.loaded_values
         config = sysctl.Config('test')
@@ -104,8 +109,8 @@ class TestSysctlConfig(unittest.TestCase):
         self.assertEqual(e.exception.message, "Unable to set params: ['vm.swappiness']")
 
     @patch('pathlib.Path.unlink')
-    @patch('charms.operator_libs_linux.v0.sysctl.Config._merge')
-    @patch('charms.operator_libs_linux.v0.sysctl.Config._load_data')
+    @patch.object(_sysctl.Config, '_merge')
+    @patch.object(_sysctl.Config, '_load_data')
     def test_remove(self, mock_load, mock_merge, mock_unlink):
         mock_load.return_value = self.loaded_values
         config = sysctl.Config('test')
@@ -128,7 +133,7 @@ class TestSysctlConfig(unittest.TestCase):
 
         assert len(config) == 0
 
-    @patch('charms.operator_libs_linux.v0.sysctl.Config._load_data')
+    @patch.object(_sysctl.Config, '_load_data')
     def test_merge(self, mock_load):
         mock_load.return_value = self.loaded_values
         config = sysctl.Config('test')
@@ -141,7 +146,7 @@ class TestSysctlConfig(unittest.TestCase):
         with open(self.tmp_dir / '95-juju-sysctl.conf') as f:
             assert f.read() == TEST_OTHER_CHARM_MERGED
 
-    @patch('charms.operator_libs_linux.v0.sysctl.Config._load_data')
+    @patch.object(_sysctl.Config, '_load_data')
     def test_merge_without_own_file(self, mock_load):
         mock_load.return_value = self.loaded_values
         config = sysctl.Config('test')
@@ -157,7 +162,7 @@ class TestSysctlConfig(unittest.TestCase):
         with open(self.tmp_dir / '95-juju-sysctl.conf') as f:
             assert f.read() == TEST_OTHER_CHARM_MERGED
 
-    @patch('charms.operator_libs_linux.v0.sysctl.Config._load_data')
+    @patch.object(_sysctl.Config, '_load_data')
     def test_validate_different_keys(self, mock_load):
         mock_load.return_value = self.loaded_values
         config = sysctl.Config('test')
@@ -167,7 +172,7 @@ class TestSysctlConfig(unittest.TestCase):
 
         assert result == []
 
-    @patch('charms.operator_libs_linux.v0.sysctl.Config._load_data')
+    @patch.object(_sysctl.Config, '_load_data')
     def test_validate_same_keys_and_values(self, mock_load):
         mock_load.return_value = self.loaded_values
         config = sysctl.Config('test')
@@ -177,7 +182,7 @@ class TestSysctlConfig(unittest.TestCase):
 
         assert result == []
 
-    @patch('charms.operator_libs_linux.v0.sysctl.Config._load_data')
+    @patch.object(_sysctl.Config, '_load_data')
     def test_validate_same_keys_different_values(self, mock_load):
         mock_load.return_value = self.loaded_values
         config = sysctl.Config('test')
@@ -196,8 +201,8 @@ class TestSysctlConfig(unittest.TestCase):
         with open(self.tmp_dir / '90-juju-test') as f:
             assert f.read() == '# test\nvm.swappiness=0\nother_value=10\n'
 
-    @patch('charms.operator_libs_linux.v0.sysctl.check_output')
-    @patch('charms.operator_libs_linux.v0.sysctl.Config._load_data')
+    @patch.object(_sysctl, 'check_output')
+    @patch.object(_sysctl.Config, '_load_data')
     def test_create_snapshot(self, mock_load, mock_output):
         mock_load.return_value = self.loaded_values
         mock_output.side_effect = check_output_side_effects
@@ -211,8 +216,8 @@ class TestSysctlConfig(unittest.TestCase):
         )
         assert snapshot == {'vm.swappiness': '1', 'other_value': '5'}
 
-    @patch('charms.operator_libs_linux.v0.sysctl.check_output')
-    @patch('charms.operator_libs_linux.v0.sysctl.Config._load_data')
+    @patch.object(_sysctl, 'check_output')
+    @patch.object(_sysctl.Config, '_load_data')
     def test_restore_snapshot(self, mock_load, mock_output):
         mock_load.return_value = self.loaded_values
         mock_output.side_effect = check_output_side_effects
@@ -225,8 +230,8 @@ class TestSysctlConfig(unittest.TestCase):
             ['sysctl', 'vm.swappiness=1', 'other_value=5'], stderr=-2, universal_newlines=True
         )
 
-    @patch('charms.operator_libs_linux.v0.sysctl.check_output')
-    @patch('charms.operator_libs_linux.v0.sysctl.Config._load_data')
+    @patch.object(_sysctl, 'check_output')
+    @patch.object(_sysctl.Config, '_load_data')
     def test_syctl(self, mock_load, mock_output):
         mock_load.return_value = self.loaded_values
         mock_output.side_effect = check_output_side_effects
@@ -239,8 +244,8 @@ class TestSysctlConfig(unittest.TestCase):
         )
         assert result == ['1']
 
-    @patch('charms.operator_libs_linux.v0.sysctl.check_output')
-    @patch('charms.operator_libs_linux.v0.sysctl.Config._load_data')
+    @patch.object(_sysctl, 'check_output')
+    @patch.object(_sysctl.Config, '_load_data')
     def test_syctl_error(self, mock_load, mock_output):
         mock_load.return_value = self.loaded_values
         mock_output.side_effect = check_output_side_effects
@@ -254,8 +259,8 @@ class TestSysctlConfig(unittest.TestCase):
         )
         assert e.exception.message == "Error executing '['sysctl', 'exception']': error on command"
 
-    @patch('charms.operator_libs_linux.v0.sysctl.Config._sysctl')
-    @patch('charms.operator_libs_linux.v0.sysctl.Config._load_data')
+    @patch.object(_sysctl.Config, '_sysctl')
+    @patch.object(_sysctl.Config, '_load_data')
     def test_apply_without_failed_values(self, mock_load, mock_sysctl):
         mock_load.return_value = self.loaded_values
         mock_sysctl.return_value = ['vm.swappiness = 0']
@@ -266,8 +271,8 @@ class TestSysctlConfig(unittest.TestCase):
 
         mock_sysctl.assert_called_with(['vm.swappiness=0'])
 
-    @patch('charms.operator_libs_linux.v0.sysctl.Config._sysctl')
-    @patch('charms.operator_libs_linux.v0.sysctl.Config._load_data')
+    @patch.object(_sysctl.Config, '_sysctl')
+    @patch.object(_sysctl.Config, '_load_data')
     def test_apply_with_failed_values(self, mock_load, mock_sysctl):
         mock_load.return_value = self.loaded_values
         mock_sysctl.return_value = [permission_failure_output]
@@ -280,8 +285,8 @@ class TestSysctlConfig(unittest.TestCase):
         mock_sysctl.assert_called_with(['vm.swappiness=0'])
         self.assertEqual(e.exception.message, "Unable to set params: ['vm.swappiness']")
 
-    @patch('charms.operator_libs_linux.v0.sysctl.Config._sysctl')
-    @patch('charms.operator_libs_linux.v0.sysctl.Config._load_data')
+    @patch.object(_sysctl.Config, '_sysctl')
+    @patch.object(_sysctl.Config, '_load_data')
     def test_apply_with_partial_failed_values(self, mock_load, mock_sysctl):
         mock_load.return_value = self.loaded_values
         mock_sysctl.return_value = [permission_failure_output]
@@ -294,7 +299,7 @@ class TestSysctlConfig(unittest.TestCase):
         mock_sysctl.assert_called_with(['vm.swappiness=0', 'net.ipv4.tcp_max_syn_backlog=4096'])
         self.assertEqual(e.exception.message, "Unable to set params: ['vm.swappiness']")
 
-    @patch('charms.operator_libs_linux.v0.sysctl.Config._load_data')
+    @patch.object(_sysctl.Config, '_load_data')
     def test_parse_config(self, _):
         config = sysctl.Config('test')
 
@@ -302,7 +307,7 @@ class TestSysctlConfig(unittest.TestCase):
 
         self.assertEqual(config._desired_config, {'key1': '10', 'key2': '20'})
 
-    @patch('charms.operator_libs_linux.v0.sysctl.Config._load_data')
+    @patch.object(_sysctl.Config, '_load_data')
     def test_class_methods(self, mock_load):
         mock_load.return_value = self.loaded_values
         config = sysctl.Config('test')
