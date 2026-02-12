@@ -28,6 +28,7 @@
 /passwd/ @canonical/charmlibs-maintainers
 /pathops/ @canonical/charmlibs-maintainers
 /snap/ @canonical/charmlibs-maintainers
+/sysctl/ @canonical/charmlibs-maintainers
 /systemd/ @canonical/charmlibs-maintainers
 
 # charmlibs.interfaces packages (alphabetical)
