@@ -24,6 +24,7 @@ lint = [  # installed for `just lint interfaces/certificate_transfer` (unit, fun
 ]
 unit = [  # installed for `just unit interfaces/certificate_transfer`
     "ops[testing]",
+    "pytest"
 ]
 functional = [  # installed for `just functional interfaces/certificate_transfer`
 ]
@@ -46,7 +47,7 @@ path = "src/charmlibs/interfaces/certificate_transfer/_version.py"
 
 [tool.ruff]
 extend = "../../pyproject.toml"
-src = ["src", "tests/unit", "tests/functional", "tests/integration"]  # correctly sort local imports in tests
+src = ["src", "tests/unit", "tests/functional", "tests/integration"]
 
 [tool.ruff.format]
 quote-style = "preserve"
@@ -57,24 +58,14 @@ quote-style = "preserve"
     "D",  # docs
     "E501",  # line too long
 ]
-# add additional per-file-ignores here to avoid overriding repo-level config
 "tests/**/*" = [
-    "E501",  # line too long
+    "E501",
 ]
 
 [tool.pyright]
 extends = "../../pyproject.toml"
 include = ["src", "tests"]
-pythonVersion = "3.10"  # check no python > 3.10 features are used
-
-# TODO: These are previously uncaught errors when moving the library over.
-# They should be removed eventually.
-reportUnknownParameterType = "none"
-reportUnknownMemberType = "none"
-reportUnknownVariableType = "none"
-reportUnknownArgumentType = "none"
-reportMissingTypeArgument = "none"
-reportDeprecated = "none"
+pythonVersion = "3.10"
 
 [tool.charmlibs.functional]
 ubuntu = []  # ubuntu versions to run functional tests with, e.g. "24.04" (defaults to just "latest")
