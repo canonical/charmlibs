@@ -19,7 +19,7 @@ TEST_OTHER_CHARM_FILE = """# othercharm
 vm.swappiness=60
 net.ipv4.tcp_max_syn_backlog=4096
 """
-TEST_OTHER_CHARM_MERGED = f"""# This config file was produced by sysctl lib v{_sysctl.LIBAPI}.{_sysctl.LIBPATCH}
+TEST_OTHER_CHARM_MERGED = f"""# This config file was produced by sysctl lib v{sysctl.__version__}
 #
 # This file represents the output of the sysctl lib, which can combine multiple
 # configurations into a single file like.
@@ -27,7 +27,7 @@ TEST_OTHER_CHARM_MERGED = f"""# This config file was produced by sysctl lib v{_s
 vm.swappiness=60
 net.ipv4.tcp_max_syn_backlog=4096
 """
-TEST_MERGED_FILE = f"""# This config file was produced by sysctl lib v{_sysctl.LIBAPI}.{_sysctl.LIBPATCH}
+TEST_MERGED_FILE = f"""# This config file was produced by sysctl lib v{sysctl.__version__}
 #
 # This file represents the output of the sysctl lib, which can combine multiple
 # configurations into a single file like.
@@ -35,7 +35,7 @@ vm.max_map_count = 262144
 vm.swappiness=0
 
 """
-TEST_UPDATE_MERGED_FILE = f"""# This config file was produced by sysctl lib v{_sysctl.LIBAPI}.{_sysctl.LIBPATCH}
+TEST_UPDATE_MERGED_FILE = f"""# This config file was produced by sysctl lib v{sysctl.__version__}
 #
 # This file represents the output of the sysctl lib, which can combine multiple
 # configurations into a single file like.

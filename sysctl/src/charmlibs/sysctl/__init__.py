@@ -12,7 +12,59 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""The charmlibs.sysctl package."""
+"""Handler for the sysctl config.
+
+This library allows your charm to create and configure sysctl options to the machine.
+
+Validation and merge capabilities are added, for situations where more than one application
+are setting values. The following files can be created:
+
+- ``/etc/sysctl.d/90-juju-<app-name>``
+
+  Requirements from one application requesting to configure the values.
+
+- ``/etc/sysctl.d/95-juju-sysctl.conf``
+
+  Merged file resulting from all other `90-juju-*` application files.
+
+A charm using the sysctl lib will need a data structure like the following::
+
+    {
+        "vm.swappiness": "1",
+        "vm.max_map_count": "262144",
+        "vm.dirty_ratio": "80",
+        "vm.dirty_background_ratio": "5",
+        "net.ipv4.tcp_max_syn_backlog": "4096",
+    }
+
+Now, it can use that template within the charm, or just declare the values directly::
+
+    from charmlibs import sysctl
+
+    class MyCharm(CharmBase):
+
+        def __init__(self, *args):
+            ...
+            self.sysctl = sysctl.Config(self.meta.name)
+
+            self.framework.observe(self.on.install, self._on_install)
+            self.framework.observe(self.on.remove, self._on_remove)
+
+        def _on_install(self, _):
+            # Alternatively, read the values from a template
+            sysctl_data = {"net.ipv4.tcp_max_syn_backlog": "4096"}}
+
+            try:
+                self.sysctl.configure(config=sysctl_data)
+            except (sysctl.ApplyError, sysctl.ValidationError) as e:
+                logger.error(f"Error setting values on sysctl: {e.message}")
+                self.unit.status = BlockedStatus("Sysctl config not possible")
+            except sysctl.CommandError:
+                logger.error("Error on sysctl")
+
+        def _on_remove(self, _):
+            self.sysctl.remove()
+"""
 
 from ._sysctl import (
     CHARM_FILENAME_PREFIX,

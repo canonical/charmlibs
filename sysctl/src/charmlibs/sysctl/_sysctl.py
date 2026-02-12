@@ -12,60 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Handler for the sysctl config.
+"""Source code of operator_libs_linux.v0.sysctl.
 
-This library allows your charm to create and configure sysctl options to the machine.
-
-Validation and merge capabilities are added, for situations where more than one application
-are setting values. The following files can be created:
-
-- /etc/sysctl.d/90-juju-<app-name>
-    Requirements from one application requesting to configure the values.
-
-- /etc/sysctl.d/95-juju-sysctl.conf
-    Merged file resulting from all other `90-juju-*` application files.
-
-
-A charm using the sysctl lib will need a data structure like the following:
-```
-{
-"vm.swappiness": "1",
-"vm.max_map_count": "262144",
-"vm.dirty_ratio": "80",
-"vm.dirty_background_ratio": "5",
-"net.ipv4.tcp_max_syn_backlog": "4096",
-}
-```
-
-Now, it can use that template within the charm, or just declare the values directly:
-
-```python
-from charms.operator_libs_linux.v0 import sysctl
-
-class MyCharm(CharmBase):
-
-    def __init__(self, *args):
-        ...
-        self.sysctl = sysctl.Config(self.meta.name)
-
-        self.framework.observe(self.on.install, self._on_install)
-        self.framework.observe(self.on.remove, self._on_remove)
-
-    def _on_install(self, _):
-        # Alternatively, read the values from a template
-        sysctl_data = {"net.ipv4.tcp_max_syn_backlog": "4096"}}
-
-        try:
-            self.sysctl.configure(config=sysctl_data)
-        except (sysctl.ApplyError, sysctl.ValidationError) as e:
-            logger.error(f"Error setting values on sysctl: {e.message}")
-            self.unit.status = BlockedStatus("Sysctl config not possible")
-        except sysctl.CommandError:
-            logger.error("Error on sysctl")
-
-    def _on_remove(self, _):
-        self.sysctl.remove()
-```
+Snapshot of version 0.4. Charmhub-hosted lib specific metadata has been removed, and the docstring
+has been moved to the package docstring.
 """
 
 import logging
@@ -73,22 +23,14 @@ import re
 from pathlib import Path
 from subprocess import STDOUT, CalledProcessError, check_output
 
+from ._version import __version__
+
 logger = logging.getLogger(__name__)
-
-# The unique Charmhub library identifier, never change it
-LIBID = '17a6cd4d80104d15b10f9c2420ab3266'
-
-# Increment this major API version when introducing breaking changes
-LIBAPI = 0
-
-# Increment this PATCH version before using `charmcraft publish-lib` or reset
-# to 0 if you are raising the major API version
-LIBPATCH = 4
 
 CHARM_FILENAME_PREFIX = '90-juju-'
 SYSCTL_DIRECTORY = Path('/etc/sysctl.d')
 SYSCTL_FILENAME = SYSCTL_DIRECTORY / '95-juju-sysctl.conf'
-SYSCTL_HEADER = f"""# This config file was produced by sysctl lib v{LIBAPI}.{LIBPATCH}
+SYSCTL_HEADER = f"""# This config file was produced by sysctl lib v{__version__}
 #
 # This file represents the output of the sysctl lib, which can combine multiple
 # configurations into a single file like.
