@@ -14,9 +14,28 @@
 
 """The charmlibs.sysctl package."""
 
+from ._sysctl import (
+    CHARM_FILENAME_PREFIX,
+    SYSCTL_DIRECTORY,
+    SYSCTL_FILENAME,
+    SYSCTL_HEADER,
+    Error,
+    CommandError,
+    ApplyError,
+    ValidationError,
+    Config,
+)
+
 from ._version import __version__ as __version__
 
 __all__ = [
-    # only the names listed in __all__ are imported when executing:
-    # from charmlibs.sysctl import *
+    'CHARM_FILENAME_PREFIX',
+    'SYSCTL_DIRECTORY',
+    'SYSCTL_FILENAME',
+    'SYSCTL_HEADER',
+    'Error',
+    'CommandError',
+    'ApplyError',
+    'ValidationError',
+    'Config',
 ]
