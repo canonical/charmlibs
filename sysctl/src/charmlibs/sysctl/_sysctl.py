@@ -203,7 +203,7 @@ class Config(dict):
         except CalledProcessError as e:
             msg = f"Error executing '{cmd}': {e.stdout}"
             logger.error(msg)
-            raise CommandError(msg)
+            raise CommandError(msg) from e
 
     def _parse_config(self, config: dict[str, str]) -> None:
         """Parse a config passed to the lib."""
