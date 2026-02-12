@@ -185,7 +185,7 @@ class Config(dict):
 
     def _create_snapshot(self) -> dict[str, str]:
         """Create a snapshot of config options that are going to be set."""
-        cmd = ['-n'] + list(self._desired_config.keys())
+        cmd = ['-n', *list(self._desired_config.keys())]
         values = self._sysctl(cmd)
         return dict(zip(list(self._desired_config.keys()), values, strict=False))
 
@@ -196,7 +196,7 @@ class Config(dict):
 
     def _sysctl(self, cmd: list[str]) -> list[str]:
         """Execute a sysctl command."""
-        cmd = ['sysctl'] + cmd
+        cmd = ['sysctl', *cmd]
         logger.debug('Executing sysctl command: %s', cmd)
         try:
             return check_output(cmd, stderr=STDOUT, universal_newlines=True).splitlines()
