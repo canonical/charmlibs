@@ -19,13 +19,12 @@ from ._sysctl import (
     SYSCTL_DIRECTORY,
     SYSCTL_FILENAME,
     SYSCTL_HEADER,
-    Error,
-    CommandError,
     ApplyError,
-    ValidationError,
+    CommandError,
     Config,
+    Error,
+    ValidationError,
 )
-
 from ._version import __version__ as __version__
 
 __all__ = [
@@ -33,9 +32,9 @@ __all__ = [
     'SYSCTL_DIRECTORY',
     'SYSCTL_FILENAME',
     'SYSCTL_HEADER',
-    'Error',
-    'CommandError',
     'ApplyError',
-    'ValidationError',
+    'CommandError',
     'Config',
+    'Error',
+    'ValidationError',
 ]
