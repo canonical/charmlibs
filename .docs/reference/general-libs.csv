@@ -37,7 +37,7 @@ charms.data_platform_libs.data_secrets,legacy,https://charmhub.io/data-platform-
 data-platform-helpers,team,https://pypi.org/project/data-platform-helpers/,,https://github.com/canonical/data-platform-helpers,PyPI,y,y,Used internally by the Data Charm Engineering team.
 charms.operator_libs_linux.dnf,legacy,https://charmhub.io/operator-libs-linux/libraries/dnf,,https://github.com/canonical/operator-libs-linux,Charmhub,y,,"Use ``dnf`` to install and manage packages – modern charms all run on Ubuntu, so this shouldn't be needed."
 charms.harness_extensions.evt_sequences,legacy,https://charmhub.io/harness-extensions/libraries/evt_sequences,,https://github.com/PietroPasotti/harness-extensions,Charmhub,y,y,Helper for legacy harness tests. New charms should write state-transition tests with ``ops[testing]`` instead.
-charms.operator_libs_linux.grub,recommended,https://charmhub.io/operator-libs-linux/libraries/grub,,https://github.com/canonical/operator-libs-linux,Charmhub,y,,Use GRUB to manage kernel configuration.
+charms.operator_libs_linux.grub,legacy,https://charmhub.io/operator-libs-linux/libraries/grub,,https://github.com/canonical/operator-libs-linux,Charmhub,y,,Use GRUB to manage kernel configuration.
 charms.opensearch.helper_cos,team,https://charmhub.io/opensearch/libraries/helper_cos,,https://github.com/canonical/opensearch-operator,Charmhub,,,Relies on ``data_platform_helpers``.
 hpc-libs,team,https://github.com/charmed-hpc/hpc-libs,,,git,y,y,Used internally by HPC charms.
 charms.operator_libs_linux.juju_systemd_notices,recommended,https://charmhub.io/operator-libs-linux/libraries/juju_systemd_notices,,https://github.com/canonical/operator-libs-linux,Charmhub,y,,Use ``systemd`` to observe and emit notices when services change state.
