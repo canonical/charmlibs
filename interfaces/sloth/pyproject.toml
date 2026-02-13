@@ -24,13 +24,10 @@ dependencies = [
 [dependency-groups]
 lint = [  # installed for `just lint interfaces/sloth` (unit, functional, and integration are also installed)
     "typing_extensions",
-    "cosl>=0.0.10",
 ]
 unit = [  # installed for `just unit interfaces/sloth`
     "ops[testing]",
     "pytest",
-    "pytest-cov",
-    "cosl>=0.0.10",
 ]
 functional = [  # installed for `just functional interfaces/sloth`
 ]
