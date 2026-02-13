@@ -31,6 +31,9 @@ from charmlibs.interfaces.tls_certificates import (
 )
 from requirer_charm import (
     DummyTLSCertificatesRequirerCharm,
+    DummyTLSCertificatesRequirerCharmAppAndUnit,
+    DummyTLSCertificatesRequirerCharmAppAndUnitDuplicate,
+    DummyTLSCertificatesRequirerCharmAppAndUnitWithPrivateKey,
 )
 
 BASE_CHARM_DIR = "requirer_charm.DummyTLSCertificatesRequirerCharm"
@@ -279,6 +282,208 @@ class TestTLSCertificatesRequiresV4:
                 },
             ),
         })
+
+    def test_given_app_and_unit_mode_when_relation_created_and_leader_then_private_keys_are_generated(
+        self,
+    ):
+        ctx = testing.Context(
+            charm_type=DummyTLSCertificatesRequirerCharmAppAndUnit,
+            meta=METADATA,
+            config=METADATA["config"],
+            actions=METADATA["actions"],
+        )
+        certificates_relation = testing.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-requirer",
+        )
+        state_in = testing.State(
+            relations={certificates_relation},
+            leader=True,
+        )
+
+        state_out = ctx.run(ctx.on.relation_created(certificates_relation), state_in)
+
+        assert self.private_key_secret_exists(
+            state_out.secrets, f"{LIBID}-private-key-0-{certificates_relation.endpoint}"
+        )
+        assert self.private_key_secret_exists(
+            state_out.secrets, f"{LIBID}-private-key-{certificates_relation.endpoint}"
+        )
+
+    def test_given_app_and_unit_mode_when_relation_created_and_not_leader_then_only_unit_private_key_is_generated(
+        self,
+    ):
+        ctx = testing.Context(
+            charm_type=DummyTLSCertificatesRequirerCharmAppAndUnit,
+            meta=METADATA,
+            config=METADATA["config"],
+            actions=METADATA["actions"],
+        )
+        certificates_relation = testing.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-requirer",
+        )
+        state_in = testing.State(
+            relations={certificates_relation},
+            leader=False,
+        )
+
+        state_out = ctx.run(ctx.on.relation_created(certificates_relation), state_in)
+
+        assert self.private_key_secret_exists(
+            state_out.secrets, f"{LIBID}-private-key-0-{certificates_relation.endpoint}"
+        )
+        assert not self.private_key_secret_exists(
+            state_out.secrets, f"{LIBID}-private-key-{certificates_relation.endpoint}"
+        )
+
+    def test_given_app_and_unit_mode_with_private_key_when_relation_created_then_no_private_key_secrets_are_created(
+        self,
+    ):
+        ctx = testing.Context(
+            charm_type=DummyTLSCertificatesRequirerCharmAppAndUnitWithPrivateKey,
+            meta=METADATA,
+            config=METADATA["config"],
+            actions=METADATA["actions"],
+        )
+        certificates_relation = testing.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-requirer",
+        )
+        state_in = testing.State(
+            relations={certificates_relation},
+            leader=True,
+            config={
+                "private_key": get_private_string_key_from_file(),
+            },
+        )
+
+        state_out = ctx.run(ctx.on.relation_created(certificates_relation), state_in)
+
+        assert not self.private_key_secret_exists(
+            state_out.secrets, f"{LIBID}-private-key-0-{certificates_relation.endpoint}"
+        )
+        assert not self.private_key_secret_exists(
+            state_out.secrets, f"{LIBID}-private-key-{certificates_relation.endpoint}"
+        )
+
+    @patch(LIB_DIR + ".CertificateRequestAttributes.generate_csr")
+    def test_given_app_and_unit_mode_when_relation_changed_and_leader_then_requests_added_to_app_and_unit_databags(
+        self, mock_generate_csr: MagicMock
+    ):
+        ctx = testing.Context(
+            charm_type=DummyTLSCertificatesRequirerCharmAppAndUnit,
+            meta=METADATA,
+            config=METADATA["config"],
+            actions=METADATA["actions"],
+        )
+        csr_app = generate_csr(private_key=generate_private_key(), common_name="app.example.com")
+        csr_unit = generate_csr(private_key=generate_private_key(), common_name="unit.example.com")
+        mock_generate_csr.side_effect = [csr_app, csr_unit]
+        certificates_relation = scenario.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-requirer",
+        )
+        state_in = scenario.State(
+            leader=True,
+            relations={certificates_relation},
+        )
+
+        state_out = ctx.run(ctx.on.relation_changed(certificates_relation), state_in)
+
+        assert state_out.relations == frozenset({
+            scenario.Relation(
+                id=certificates_relation.id,
+                endpoint="certificates",
+                interface="tls-certificates",
+                remote_app_name="certificate-requirer",
+                local_app_data={
+                    "certificate_signing_requests": json.dumps([
+                        {
+                            "certificate_signing_request": str(csr_app),
+                            "ca": False,
+                        }
+                    ])
+                },
+                local_unit_data={
+                    "certificate_signing_requests": json.dumps([
+                        {
+                            "certificate_signing_request": str(csr_unit),
+                            "ca": False,
+                        }
+                    ])
+                },
+            ),
+        })
+
+    @patch(LIB_DIR + ".CertificateRequestAttributes.generate_csr")
+    def test_given_app_and_unit_mode_when_relation_changed_and_not_leader_then_only_unit_request_is_added(
+        self, mock_generate_csr: MagicMock
+    ):
+        ctx = testing.Context(
+            charm_type=DummyTLSCertificatesRequirerCharmAppAndUnit,
+            meta=METADATA,
+            config=METADATA["config"],
+            actions=METADATA["actions"],
+        )
+        csr_unit = generate_csr(private_key=generate_private_key(), common_name="unit.example.com")
+        mock_generate_csr.return_value = csr_unit
+        certificates_relation = scenario.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-requirer",
+        )
+        state_in = scenario.State(
+            leader=False,
+            relations={certificates_relation},
+        )
+
+        state_out = ctx.run(ctx.on.relation_changed(certificates_relation), state_in)
+
+        assert mock_generate_csr.call_count == 1
+        assert state_out.relations == frozenset({
+            scenario.Relation(
+                id=certificates_relation.id,
+                endpoint="certificates",
+                interface="tls-certificates",
+                remote_app_name="certificate-requirer",
+                local_unit_data={
+                    "certificate_signing_requests": json.dumps([
+                        {
+                            "certificate_signing_request": str(csr_unit),
+                            "ca": False,
+                        }
+                    ])
+                },
+            ),
+        })
+
+    def test_given_app_and_unit_mode_with_duplicate_requests_then_error_is_raised(self):
+        ctx = testing.Context(
+            charm_type=DummyTLSCertificatesRequirerCharmAppAndUnitDuplicate,
+            meta=METADATA,
+            config=METADATA["config"],
+            actions=METADATA["actions"],
+        )
+        certificates_relation = testing.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-requirer",
+        )
+        state_in = testing.State(
+            relations={certificates_relation},
+            leader=True,
+        )
+
+        with pytest.raises(
+            testing.errors.UncaughtCharmError,
+            match="Duplicate certificate request found in both APP and UNIT modes",
+        ):
+            ctx.run(ctx.on.relation_created(certificates_relation), state_in)
 
     @patch(LIB_DIR + ".CertificateRequestAttributes.generate_csr")
     def test_given_ca_certificate_requested_when_relation_joined_then_certificate_request_is_added_to_databag(
