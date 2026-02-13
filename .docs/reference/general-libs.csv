@@ -40,7 +40,7 @@ charms.harness_extensions.evt_sequences,legacy,https://charmhub.io/harness-exten
 charms.operator_libs_linux.grub,legacy,https://charmhub.io/operator-libs-linux/libraries/grub,,https://github.com/canonical/operator-libs-linux,Charmhub,y,,Use GRUB to manage kernel configuration.
 charms.opensearch.helper_cos,team,https://charmhub.io/opensearch/libraries/helper_cos,,https://github.com/canonical/opensearch-operator,Charmhub,,,Relies on ``data_platform_helpers``.
 hpc-libs,team,https://github.com/charmed-hpc/hpc-libs,,,git,y,y,Used internally by HPC charms.
-charms.operator_libs_linux.juju_systemd_notices,recommended,https://charmhub.io/operator-libs-linux/libraries/juju_systemd_notices,,https://github.com/canonical/operator-libs-linux,Charmhub,y,,Use ``systemd`` to observe and emit notices when services change state.
+charms.operator_libs_linux.juju_systemd_notices,legacy,https://charmhub.io/operator-libs-linux/libraries/juju_systemd_notices,,https://github.com/canonical/operator-libs-linux,Charmhub,y,,Use ``systemd`` to observe and emit notices when services change state.
 charms.observability_libs.juju_topology,legacy,https://charmhub.io/observability-libs/libraries/juju_topology,,https://github.com/canonical/observability-libs,Charmhub,y,y,Deprecated in favour of ``cosl.juju_topology.JujuTopology``.
 jujubigdata,legacy,https://pypi.org/project/jujubigdata/,http://pythonhosted.org/jujubigdata/,https://github.com/juju-solutions/jujubigdata,PyPI,,,Legacy library for developing Big Data charms.
 jujuresources,legacy,https://pypi.org/project/jujuresources/,http://pythonhosted.org/jujuresources/,https://github.com/juju-solutions/jujuresources,PyPI,y,y,Legacy library for loading binary resources. New charms should use ``ops.Model.resources``.
