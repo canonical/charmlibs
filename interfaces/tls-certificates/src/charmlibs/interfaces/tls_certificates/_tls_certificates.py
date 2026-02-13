@@ -1749,7 +1749,9 @@ class TLSCertificatesRequiresV4(Object):
             relationship_name (str): The name of the relation that provides the certificates.
             certificate_requests (List[CertificateRequestAttributes]):
                 A list with the attributes of the certificate requests.
-                This should be used when a single mode is in use. Mode.UNIT or Mode.APP.
+                - Use this when mode is Mode.UNIT or Mode.APP (single mode).
+                - Must be None or empty when using mode=Mode.APP_AND_UNIT.
+                - Mutually exclusive with certificate_requests_by_mode.
             mode (Mode): Whether to use UNIT, APP or APP_AND_UNIT certificates mode. Default is
                 Mode.UNIT.
                 In UNIT mode the requirer will place the csr in the unit relation data.
@@ -1781,9 +1783,17 @@ class TLSCertificatesRequiresV4(Object):
                 If an invalid value is provided, an exception will be raised.
             certificate_requests_by_mode
                 (Dict[Literal[Mode.APP, Mode.UNIT], List[CertificateRequestAttributes]]):
-                A dictionary with the modes (APP and UNIT) as keys and lists of certificate
-                request attributes as values.
-                This should be used when APP_AND_UNIT mode is in use.
+                A dictionary mapping modes to their certificate request lists.
+                - Required when mode=Mode.APP_AND_UNIT.
+                - Must be None when mode is Mode.UNIT or Mode.APP.
+                - Keys must be Mode.APP and/or Mode.UNIT (not Mode.APP_AND_UNIT).
+                - Mutually exclusive with certificate_requests.
+
+        Example:
+                    certificate_requests_by_mode={
+                        Mode.APP: [CertificateRequestAttributes(common_name="app.example.com")],
+                        Mode.UNIT: [CertificateRequestAttributes(common_name="unit.example.com")],
+                    }
         """
         if refresh_events is None:
             refresh_events = []
@@ -1820,6 +1830,45 @@ class TLSCertificatesRequiresV4(Object):
             self.framework.observe(event, self._configure)
         self._security_logger = _OWASPLogger(application=f"tls-certificates-{charm.app.name}")
 
+    def _validate_app_and_unit_mode_requests(
+        self,
+        multi_mode_certificate_requests: dict[
+            Literal[Mode.APP, Mode.UNIT], list[CertificateRequestAttributes]
+        ],
+    ) -> None:
+        """Validate certificate requests for APP_AND_UNIT mode.
+
+        Args:
+            multi_mode_certificate_requests: Dictionary mapping modes to certificate requests.
+
+        Raises:
+            TLSCertificatesError: If validation fails.
+        """
+        invalid_keys = {
+            key for key in multi_mode_certificate_requests if key not in (Mode.APP, Mode.UNIT)
+        }
+        if invalid_keys:
+            raise TLSCertificatesError(
+                "Invalid certificate_requests_by_mode keys. Only Mode.APP and Mode.UNIT are "
+                "supported in APP_AND_UNIT mode."
+            )
+
+        app_csrs = multi_mode_certificate_requests.get(Mode.APP, [])
+        unit_csrs = multi_mode_certificate_requests.get(Mode.UNIT, [])
+        for app_csr in app_csrs:
+            if app_csr in unit_csrs:
+                raise TLSCertificatesError(
+                    f"Duplicate certificate request found in both APP and UNIT modes. "
+                    f"Common name: '{app_csr.common_name}'. "
+                    "Provide distinct requests per mode, or use Mode.UNIT if the same "
+                    "request is needed for all units."
+                )
+
+        for mode_csrs in multi_mode_certificate_requests.values():
+            for csr in mode_csrs:
+                if not csr.is_valid():
+                    raise TLSCertificatesError("Invalid certificate request")
+
     def _validate_and_map_certificate_requests(
         self,
         mode: Mode,
@@ -1843,28 +1892,16 @@ class TLSCertificatesRequiresV4(Object):
                     "Certificate requests must be provided in certificate_requests_by_mode "
                     "when the mode is APP_AND_UNIT"
                 )
-            invalid_keys = {
-                key for key in multi_mode_certificate_requests if key not in (Mode.APP, Mode.UNIT)
-            }
-            if invalid_keys:
-                raise TLSCertificatesError(
-                    "Invalid certificate_requests_by_mode keys. Only Mode.APP and Mode.UNIT are "
-                    "supported in APP_AND_UNIT mode."
-                )
-            app_csrs = multi_mode_certificate_requests.get(Mode.APP, [])
-            unit_csrs = multi_mode_certificate_requests.get(Mode.UNIT, [])
-            for app_csr in app_csrs:
-                if app_csr in unit_csrs:
-                    raise TLSCertificatesError(
-                        f"Duplicate certificate request found in both APP and UNIT modes. "
-                        f"Common name: '{app_csr.common_name}'. "
-                        "Provide distinct requests per mode, or use Mode.UNIT if the same "
-                        "request is needed for all units."
-                    )
+
+            self._validate_app_and_unit_mode_requests(multi_mode_certificate_requests)
+
+            if not multi_mode_certificate_requests.get(
+                Mode.APP
+            ) and not multi_mode_certificate_requests.get(Mode.UNIT):
+                logger.warning("APP_AND_UNIT mode enabled but no certificate requests provided")
+
             for m, mode_csrs in multi_mode_certificate_requests.items():
                 for csr in mode_csrs:
-                    if not csr.is_valid():
-                        raise TLSCertificatesError("Invalid certificate request")
                     csrs.append(csr)
                     mode_map[csr] = m
         else:
@@ -2538,7 +2575,6 @@ class TLSCertificatesRequiresV4(Object):
                     "Mode must be Mode.APP or Mode.UNIT, not Mode.APP_AND_UNIT"
                 )
 
-            # Filter certificates by checking which databag they came from
             mode_certificates: list[ProviderCertificate] = []
             for requirer_csr in self.get_csrs_from_requirer_relation_data():
                 csr_mode = self._get_mode_for_csr(
