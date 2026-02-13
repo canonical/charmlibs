@@ -183,7 +183,7 @@ class Config(dict[str, str]):
 
     def _create_snapshot(self) -> dict[str, str]:
         """Create a snapshot of config options that are going to be set."""
-        cmd = ['-n', *list(self._desired_config.keys())]
+        cmd = ['-n', *self._desired_config.keys()]
         values = self._sysctl(cmd)
         return dict(zip(list(self._desired_config.keys()), values, strict=False))
 
