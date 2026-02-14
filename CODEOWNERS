@@ -46,6 +46,8 @@
 /interfaces/jwt/ @canonical/data-platform
 /interfaces/kafka_client/ @canonical/data-platform-bigdata
 /interfaces/karapace_client/ @canonical/data-platform-bigdata
+/interfaces/k8s-service/ @canonical/mlops
+/interfaces/kubeflow_dashboard_links/ @canonical/mlops
 /interfaces/litmus_auth/ @canonical/tracing-and-profiling
 /interfaces/mimir_cluster/ @canonical/observability
 /interfaces/mongodb_client/ @canonical/data-platform-nosql

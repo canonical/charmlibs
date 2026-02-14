@@ -9,4 +9,4 @@ providers:
     url: https://github.com/canonical/kubeflow-dashboard-operator
 requirers: []
 
-maintainer: kubeflow
+maintainer: mlops
