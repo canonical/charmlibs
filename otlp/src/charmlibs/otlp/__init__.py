@@ -1,4 +1,4 @@
-# Copyright 2025 Canonical Ltd.
+# Copyright 2026 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,9 +14,19 @@
 
 """The charmlibs.otlp package."""
 
+from ._otlp import (
+    OtlpConsumer,
+    OtlpEndpoint,
+    OtlpProvider,
+    OtlpProviderAppData,
+)
 from ._version import __version__ as __version__
 
 __all__ = [
     # only the names listed in __all__ are imported when executing:
     # from charmlibs.otlp import *
+    'OtlpConsumer',
+    'OtlpEndpoint',
+    'OtlpProvider',
+    'OtlpProviderAppData',
 ]
