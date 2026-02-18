@@ -4,9 +4,12 @@
 """Feature: OTLP endpoint handling."""
 
 import json
+from typing import Any, cast
 from unittest.mock import patch
 
+import ops
 import pytest
+from ops import testing
 from ops.testing import Relation, State
 from pydantic import ValidationError
 
@@ -42,7 +45,9 @@ ALL_TELEMETRIES = ['logs', 'metrics', 'traces']
         ),
     ],
 )
-def test_provider_app_data_raises_validation_error_lib(data, error_match):
+def test_provider_app_data_raises_validation_error_lib(
+    data: dict[str, Any], error_match: str
+) -> None:
     """Test that OtlpProviderAppData validates protocols and telemetries."""
     with pytest.raises(ValidationError, match=error_match):
         OtlpProviderAppData(endpoints=[OtlpEndpoint(**data)])
@@ -91,7 +96,11 @@ def test_provider_app_data_raises_validation_error_lib(data, error_match):
         ),
     ),
 )
-def test_send_otlp_invalid_lib(otlp_consumer_ctx, provides, otlp_endpoint):
+def test_send_otlp_invalid_lib(
+    otlp_consumer_ctx: testing.Context[ops.CharmBase],
+    provides: dict[str, Any],
+    otlp_endpoint: OtlpEndpoint,
+) -> None:
     # GIVEN a remote app provides an invalid OtlpEndpoint
     # WHEN they are related over the "send-otlp" endpoint
     provider = Relation(
@@ -108,10 +117,15 @@ def test_send_otlp_invalid_lib(otlp_consumer_ctx, provides, otlp_endpoint):
         mgr.run()
         # AND WHEN the consumer supports all telemetries
         with (
-            patch.object(mgr.charm.otlp_consumer, '_protocols', new=ALL_PROTOCOLS),
-            patch.object(mgr.charm.otlp_consumer, '_telemetries', new=ALL_TELEMETRIES),
+            patch.object(cast('Any', mgr.charm).otlp_consumer, '_protocols', new=ALL_PROTOCOLS),
+            patch.object(
+                cast('Any', mgr.charm).otlp_consumer, '_telemetries', new=ALL_TELEMETRIES
+            ),
         ):
-            result = mgr.charm.otlp_consumer.get_remote_otlp_endpoints()[123]
+            result = cast(
+                'OtlpEndpoint',
+                cast('Any', mgr.charm).otlp_consumer.get_remote_otlp_endpoints()[123],
+            )
 
     # THEN the returned endpoint does not include invalid protocols or telemetries
     assert result.model_dump() == otlp_endpoint.model_dump()
@@ -167,8 +181,11 @@ def test_send_otlp_invalid_lib(otlp_consumer_ctx, provides, otlp_endpoint):
     ],
 )
 def test_send_otlp_with_varying_consumer_support_lib(
-    otlp_consumer_ctx, protocols, telemetries, expected
-):
+    otlp_consumer_ctx: testing.Context[ops.CharmBase],
+    protocols: list[str],
+    telemetries: list[str],
+    expected: dict[int, OtlpEndpoint],
+) -> None:
     # GIVEN a remote app provides multiple OtlpEndpoints
     remote_app_data_1 = {
         OtlpProviderAppData.KEY: json.dumps(
@@ -221,10 +238,13 @@ def test_send_otlp_with_varying_consumer_support_lib(
     # AND WHEN the consumer has varying support for OTLP protocols and telemetries
     with otlp_consumer_ctx(otlp_consumer_ctx.on.update_status(), state=state) as mgr:
         with (
-            patch.object(mgr.charm.otlp_consumer, '_protocols', new=protocols),
-            patch.object(mgr.charm.otlp_consumer, '_telemetries', new=telemetries),
+            patch.object(cast('Any', mgr.charm).otlp_consumer, '_protocols', new=protocols),
+            patch.object(cast('Any', mgr.charm).otlp_consumer, '_telemetries', new=telemetries),
         ):
-            remote_endpoints = mgr.charm.otlp_consumer.get_remote_otlp_endpoints()
+            remote_endpoints = cast(
+                'dict[int, OtlpEndpoint]',
+                cast('Any', mgr.charm).otlp_consumer.get_remote_otlp_endpoints(),
+            )
 
     # THEN the returned endpoints are filtered accordingly
     assert {k: v.model_dump() for k, v in remote_endpoints.items()} == {
