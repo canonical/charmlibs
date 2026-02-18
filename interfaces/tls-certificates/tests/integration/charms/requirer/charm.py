@@ -18,26 +18,34 @@ from charmlibs.interfaces.tls_certificates import (
 class DummyTLSCertificatesRequirerCharm(CharmBase):
     def __init__(self, *args: Any):
         super().__init__(*args)
+        self._certificate_request = None
+        self._app_request = None
+        self._unit_request = None
+
         mode = self._get_mode()
-        if mode == Mode.APP_AND_UNIT:
-            app_request = self._get_app_certificate_request()
-            unit_request = self._get_unit_certificate_request()
+        if hasattr(Mode, "APP_AND_UNIT") and mode == Mode.APP_AND_UNIT:
+            self._app_request = self._get_app_certificate_request()
+            self._unit_request = self._get_unit_certificate_request()
             self.certificates = TLSCertificatesRequiresV4(
                 charm=self,
                 relationship_name="certificates",
                 certificate_requests_by_mode={
-                    Mode.APP: [app_request],
-                    Mode.UNIT: [unit_request],
+                    Mode.APP: [self._app_request],
+                    Mode.UNIT: [self._unit_request],
                 },
                 mode=mode,
-                refresh_events=[self.on.config_changed],
+                refresh_events=[
+                    self.on.config_changed,
+                    self.on.leader_elected,
+                    self.on.certificates_relation_joined,
+                ],
             )
         else:
-            certificate_request = self._get_certificate_request()
+            self._certificate_request = self._get_certificate_request()
             self.certificates = TLSCertificatesRequiresV4(
                 charm=self,
                 relationship_name="certificates",
-                certificate_requests=[certificate_request],
+                certificate_requests=[self._certificate_request],
                 mode=mode,
                 refresh_events=[self.on.config_changed],
             )
@@ -52,9 +60,12 @@ class DummyTLSCertificatesRequirerCharm(CharmBase):
         self.framework.observe(self.on.renew_certificate_action, self._on_renew_certificate_action)
 
     def _on_renew_certificate_action(self, event: ActionEvent) -> None:
-        cert, _private_key = self.certificates.get_assigned_certificate(
-            self._get_certificate_request()
-        )
+        if self._certificate_request is None:
+            event.fail(
+                "This action is not supported in APP_AND_UNIT mode. Use get-app-certificate or get-unit-certificate instead."
+            )
+            return
+        cert, _private_key = self.certificates.get_assigned_certificate(self._certificate_request)
         if not cert:
             event.fail("Certificate not available")
             return
@@ -64,20 +75,23 @@ class DummyTLSCertificatesRequirerCharm(CharmBase):
         if not self._relation_created("certificates"):
             event.add_status(BlockedStatus("Missing relation to certificates provider"))
             return
-        mode = self._get_mode()
-        if mode == Mode.APP_AND_UNIT:
+        mode = self.certificates.mode
+        if hasattr(Mode, "APP_AND_UNIT") and mode == Mode.APP_AND_UNIT:
+            assert self._app_request is not None
+            assert self._unit_request is not None
             app_cert, _ = self.certificates.get_assigned_certificate(
-                certificate_request=self._get_app_certificate_request()
+                certificate_request=self._app_request
             )
             unit_cert, _ = self.certificates.get_assigned_certificate(
-                certificate_request=self._get_unit_certificate_request()
+                certificate_request=self._unit_request
             )
             if not app_cert or not unit_cert:
                 event.add_status(WaitingStatus("Waiting for certificates"))
                 return
         else:
+            assert self._certificate_request is not None
             cert, _ = self.certificates.get_assigned_certificate(
-                certificate_request=self._get_certificate_request()
+                certificate_request=self._certificate_request
             )
             if not cert:
                 event.add_status(WaitingStatus("Waiting for certificate"))
@@ -85,8 +99,13 @@ class DummyTLSCertificatesRequirerCharm(CharmBase):
         event.add_status(ActiveStatus())
 
     def _on_get_certificate_action(self, event: ActionEvent) -> None:
+        if self._certificate_request is None:
+            event.fail(
+                "This action is not supported in APP_AND_UNIT mode. Use get-app-certificate or get-unit-certificate instead."
+            )
+            return
         certificate, _ = self.certificates.get_assigned_certificate(
-            certificate_request=self._get_certificate_request()
+            certificate_request=self._certificate_request
         )
         if not certificate:
             event.fail("Certificate not available")
@@ -98,8 +117,9 @@ class DummyTLSCertificatesRequirerCharm(CharmBase):
         })
 
     def _on_get_app_certificate_action(self, event: ActionEvent) -> None:
+        assert self._app_request is not None
         certificate, _ = self.certificates.get_assigned_certificate(
-            certificate_request=self._get_app_certificate_request()
+            certificate_request=self._app_request
         )
         if not certificate:
             event.fail("App certificate not available")
@@ -111,8 +131,9 @@ class DummyTLSCertificatesRequirerCharm(CharmBase):
         })
 
     def _on_get_unit_certificate_action(self, event: ActionEvent) -> None:
+        assert self._unit_request is not None
         certificate, _ = self.certificates.get_assigned_certificate(
-            certificate_request=self._get_unit_certificate_request()
+            certificate_request=self._unit_request
         )
         if not certificate:
             event.fail("Unit certificate not available")
@@ -136,7 +157,10 @@ class DummyTLSCertificatesRequirerCharm(CharmBase):
         if mode_config == "app":
             return Mode.APP
         elif mode_config == "app_and_unit":
-            return Mode.APP_AND_UNIT
+            if hasattr(Mode, "APP_AND_UNIT"):
+                return Mode.APP_AND_UNIT
+            else:
+                return Mode.UNIT
         return Mode.UNIT
 
     def _get_certificate_request(self) -> CertificateRequestAttributes:
@@ -176,7 +200,8 @@ class DummyTLSCertificatesRequirerCharm(CharmBase):
         )
 
     def _get_config_common_name(self) -> str:
-        return cast("str", self.model.config.get("common_name"))
+        common_name = self.model.config.get("common_name")
+        return str(common_name) if common_name is not None else "default"
 
     def _get_config_sans_dns(self) -> frozenset[str]:
         config_sans_dns = cast("str", self.model.config.get("sans_dns", ""))

@@ -2438,7 +2438,9 @@ class TLSCertificatesRequiresV4(Object):
             except DataValidationError:
                 logger.warning("Invalid relation data for unit - Skipping")
 
-        if self.mode in (Mode.APP, Mode.APP_AND_UNIT) and self.model.unit.is_leader():
+        if self.mode == Mode.APP_AND_UNIT or (
+            self.mode == Mode.APP and self.model.unit.is_leader()
+        ):
             try:
                 app_data = _RequirerData.load(relation.data[self.model.app])
                 csrs.extend(app_data.certificate_signing_requests)

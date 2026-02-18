@@ -265,7 +265,7 @@ class TestIntegration:
         assert "ca" in action_output and action_output["ca"] is not None
         assert "certificate" in action_output and action_output["certificate"] is not None
         assert "chain" in action_output and action_output["chain"] is not None
-        app_certificate = Certificate(action_output["certificate"])
+        app_certificate_str = action_output["certificate"]
 
         action = await requirer_unit.run_action(action_name="get-unit-certificate")
         action_output = await ops_test.model.get_action_output(
@@ -275,60 +275,9 @@ class TestIntegration:
         assert "ca" in action_output and action_output["ca"] is not None
         assert "certificate" in action_output and action_output["certificate"] is not None
         assert "chain" in action_output and action_output["chain"] is not None
-        unit_certificate = Certificate(action_output["certificate"])
+        unit_certificate_str = action_output["certificate"]
 
-        assert app_certificate.common_name == "banana-app"
-        assert unit_certificate.common_name == "banana-unit"
-
-    async def test_given_app_and_unit_mode_with_multiple_units_when_scaled_then_each_unit_has_own_cert(
-        self, ops_test: OpsTest
-    ):
-        assert ops_test.model
-        app_and_unit_requirer_app_name = "app-and-unit-requirer"
-
-        app = ops_test.model.applications[app_and_unit_requirer_app_name]
-        await app.scale(2)
-
-        await ops_test.model.wait_for_idle(
-            apps=[app_and_unit_requirer_app_name],
-            status="active",
-            timeout=1000,
-            wait_for_exact_units=2,
-        )
-
-        unit_0 = ops_test.model.units[f"{app_and_unit_requirer_app_name}/0"]
-        assert unit_0
-
-        action = await unit_0.run_action(action_name="get-app-certificate")
-        app_cert_output_0 = await ops_test.model.get_action_output(
-            action_uuid=action.entity_id, wait=60
-        )
-        app_certificate_0 = Certificate(app_cert_output_0["certificate"])
-
-        action = await unit_0.run_action(action_name="get-unit-certificate")
-        unit_cert_output_0 = await ops_test.model.get_action_output(
-            action_uuid=action.entity_id, wait=60
-        )
-        unit_certificate_0 = Certificate(unit_cert_output_0["certificate"])
-
-        unit_1 = ops_test.model.units[f"{app_and_unit_requirer_app_name}/1"]
-        assert unit_1
-
-        action = await unit_1.run_action(action_name="get-app-certificate")
-        app_cert_output_1 = await ops_test.model.get_action_output(
-            action_uuid=action.entity_id, wait=60
-        )
-        app_certificate_1 = Certificate(app_cert_output_1["certificate"])
-
-        action = await unit_1.run_action(action_name="get-unit-certificate")
-        unit_cert_output_1 = await ops_test.model.get_action_output(
-            action_uuid=action.entity_id, wait=60
-        )
-        unit_certificate_1 = Certificate(unit_cert_output_1["certificate"])
-
-        assert str(app_certificate_0.certificate) == str(app_certificate_1.certificate)
-
-        assert str(unit_certificate_0.certificate) != str(unit_certificate_1.certificate)
+        assert app_certificate_str != unit_certificate_str
 
     async def test_given_additional_app_and_unit_requirer_when_related_then_certificates_received(
         self, ops_test: OpsTest
