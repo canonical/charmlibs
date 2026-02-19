@@ -33,6 +33,9 @@ The package also enables a consumer to send `alerting` and
 """
 
 from ._otlp import (
+    DEFAULT_CONSUMER_RELATION_NAME,
+    DEFAULT_PROVIDER_RELATION_NAME,
+    RELATION_INTERFACE_NAME,
     OtlpConsumer,
     OtlpEndpoint,
     OtlpProvider,
@@ -43,6 +46,9 @@ from ._version import __version__ as __version__
 __all__ = [
     # only the names listed in __all__ are imported when executing:
     # from charmlibs.otlp import *
+    'DEFAULT_CONSUMER_RELATION_NAME',
+    'DEFAULT_PROVIDER_RELATION_NAME',
+    'RELATION_INTERFACE_NAME',
     'OtlpConsumer',
     'OtlpEndpoint',
     'OtlpProvider',
