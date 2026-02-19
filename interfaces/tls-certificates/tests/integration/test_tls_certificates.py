@@ -229,3 +229,97 @@ class TestIntegration:
         renewed_certificate = Certificate(action_output["certificate"])
 
         assert initial_certificate.expiry != renewed_certificate.expiry
+
+    async def test_given_app_and_unit_mode_when_relate_then_both_certificates_received(
+        self, ops_test: OpsTest
+    ):
+        assert ops_test.model
+        app_and_unit_requirer_app_name = "app-and-unit-requirer"
+        await ops_test.model.deploy(
+            REQUIRER_LOCAL,
+            application_name=app_and_unit_requirer_app_name,
+            series="jammy",
+            config={"mode": "app_and_unit"},
+        )
+        await ops_test.model.add_relation(
+            relation1=app_and_unit_requirer_app_name,
+            relation2=TLS_CERTIFICATES_PROVIDER_APP_NAME,
+        )
+        await ops_test.model.wait_for_idle(
+            apps=[
+                TLS_CERTIFICATES_PROVIDER_APP_NAME,
+                app_and_unit_requirer_app_name,
+            ],
+            status="active",
+            timeout=1000,
+        )
+
+        requirer_unit = ops_test.model.units[f"{app_and_unit_requirer_app_name}/0"]
+        assert requirer_unit
+
+        action = await requirer_unit.run_action(action_name="get-app-certificate")
+        action_output = await ops_test.model.get_action_output(
+            action_uuid=action.entity_id, wait=60
+        )
+        assert action_output["return-code"] == 0
+        assert "ca" in action_output and action_output["ca"] is not None
+        assert "certificate" in action_output and action_output["certificate"] is not None
+        assert "chain" in action_output and action_output["chain"] is not None
+        app_certificate_str = action_output["certificate"]
+
+        action = await requirer_unit.run_action(action_name="get-unit-certificate")
+        action_output = await ops_test.model.get_action_output(
+            action_uuid=action.entity_id, wait=60
+        )
+        assert action_output["return-code"] == 0
+        assert "ca" in action_output and action_output["ca"] is not None
+        assert "certificate" in action_output and action_output["certificate"] is not None
+        assert "chain" in action_output and action_output["chain"] is not None
+        unit_certificate_str = action_output["certificate"]
+
+        assert app_certificate_str != unit_certificate_str
+
+    async def test_given_additional_app_and_unit_requirer_when_related_then_certificates_received(
+        self, ops_test: OpsTest
+    ):
+        assert ops_test.model
+        new_app_and_unit_requirer_app_name = "new-app-and-unit-requirer"
+        await ops_test.model.deploy(
+            REQUIRER_LOCAL,
+            application_name=new_app_and_unit_requirer_app_name,
+            series="jammy",
+            config={"mode": "app_and_unit"},
+        )
+        await ops_test.model.add_relation(
+            relation1=new_app_and_unit_requirer_app_name,
+            relation2=TLS_CERTIFICATES_PROVIDER_APP_NAME,
+        )
+        await ops_test.model.wait_for_idle(
+            apps=[
+                TLS_CERTIFICATES_PROVIDER_APP_NAME,
+                new_app_and_unit_requirer_app_name,
+            ],
+            status="active",
+            timeout=1000,
+        )
+
+        requirer_unit = ops_test.model.units[f"{new_app_and_unit_requirer_app_name}/0"]
+        assert requirer_unit
+
+        action = await requirer_unit.run_action(action_name="get-app-certificate")
+        action_output = await ops_test.model.get_action_output(
+            action_uuid=action.entity_id, wait=60
+        )
+        assert action_output["return-code"] == 0
+        assert "ca" in action_output and action_output["ca"] is not None
+        assert "certificate" in action_output and action_output["certificate"] is not None
+        assert "chain" in action_output and action_output["chain"] is not None
+
+        action = await requirer_unit.run_action(action_name="get-unit-certificate")
+        action_output = await ops_test.model.get_action_output(
+            action_uuid=action.entity_id, wait=60
+        )
+        assert action_output["return-code"] == 0
+        assert "ca" in action_output and action_output["ca"] is not None
+        assert "certificate" in action_output and action_output["certificate"] is not None
+        assert "chain" in action_output and action_output["chain"] is not None

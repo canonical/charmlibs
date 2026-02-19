@@ -1,3 +1,7 @@
+# 1.7.0 - 18 February 2025
+
+Introduce the APP_AND_UNIT mode so requirers can request both APP and UNIT certificates using one integration.
+
 # 1.6.1 - 05 February 2025
 
 Make `CertificateRequestAttributes` hashable to prevent unnecessary recreation of certificate requests in relation data.

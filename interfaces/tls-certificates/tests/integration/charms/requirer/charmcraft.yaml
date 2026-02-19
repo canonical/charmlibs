@@ -26,6 +26,10 @@ parts:
 
 config:
   options:
+    mode:
+      type: string
+      description: Certificate request mode (unit, app, or app_and_unit)
+      default: "unit"
     common_name:
       type: string
       description: Certificate common name
@@ -58,6 +62,12 @@ config:
 actions:
   get-certificate:
     description: Returns the TLS Certificate.
+
+  get-app-certificate:
+    description: Returns the app TLS Certificate (for APP_AND_UNIT mode).
+
+  get-unit-certificate:
+    description: Returns the unit TLS Certificate (for APP_AND_UNIT mode).
 
   renew-certificate:
     description: Renews the TLS Certificate.
