@@ -66,6 +66,11 @@ Get started by running `just init`, and provide the requested information intera
 - The minimum Python version you'll support (e.g. `3.10` or `3.12`) -- the default of `3.10` is perfectly fine here.
 - The author information to display on PyPI (e.g. `The <YOUR TEAM NAME> team at Canonical`).
 
+````{tip}
+If you're working on an interface library, run `just interface init` instead.
+This will create the library directory under the `interfaces/` directory and set it up to use the `charmlibs.interfaces` namespace.
+````
+
 This creates a new directory for your library, named accordingly.
 The library itself just sets `__version__` to `0.0.0.dev0`, and the tests just check the version.
 
@@ -230,6 +235,11 @@ def _on_start(self, event: ops.StartEvent):
 
 Now run `just unit uptime` to verify that both tests pass.
 
+````{tip}
+If you're working on a real library you intend to open a PR for, you should remove `test_version.py` and `test_version_in_charm.py` once you have some working unit tests of your own.
+You should also feel free to split your tests across as many files as needed to keep them organised nicely.
+````
+
 For more on `ops.testing`, see:
 - [ops.testing reference docs for custom events](ops.testing.CharmEvents.custom)
 - [ops.testing how-to for testing that a custom event is emitted](https://documentation.ubuntu.com/ops/latest/howto/manage-libraries/#test-that-the-custom-event-is-emitted)
@@ -242,6 +252,11 @@ In contrast to unit tests, which typically mock out external concerns, functiona
 However, they do not interact with a real Juju environment, which is reserved for tests under the `integration/` directory.
 
 > Read more: {ref}`how-to-customize-functional-tests`
+
+````{tip}
+If you're working on an interface library, functional tests probably aren't a good fit, since the main thing the library interacts with is Juju.
+In this case, consider dropping functional tests entirely, and focusing on a combination of unit and Juju integration tests.
+````
 
 Functional tests for our `uptime` package look similar to the unit tests, but we won't mock anything out.
 
@@ -285,6 +300,14 @@ There's also a directory named `library/`, which contains symlinks to your libra
 Under `src/`, you'll see a unique `charm.py` file, and a symlink to `common.py`.
 
 Our `uptime` function should work just as well in a K8s charm as in a machine charm, so we'll test on both substrates, meaning that we don't need to change anything so far.
+
+````{tip}
+If you're working on an integration library, the K8s / machine distinction may or may not be important, depending on what information your library needs to populate the databags with.
+As long as your library is intended to work on both substrates, it's a good idea to test on both.
+
+However, whether you test on both substrates or just one, you'll definitely want to be packing both a requirer and provider charm.
+Consider adding `provider` and `requirer` directories under `tests/integration/charms`, duplicating the existing charm structure in each, updating `pack.sh` to pack both `requirer` and `provider` charms, and deploying both in `conftest.py`.
+````
 
 For testing purposes, we'll communicate with the library in our packed charm via a Juju action.
 Open `tests/integration/charms/actions.yaml` and add a new action:
