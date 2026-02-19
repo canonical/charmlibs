@@ -14,11 +14,9 @@
 
 """Internal implementation of the OTLP Provider and Requirer library.
 
-This document explains how to integrate with the Opentelemetry-collector charm
-for the purpose of providing OTLP telemetry to Opentelemetry-collector. This document is the
-authoritative reference on the structure of relation data that is
-shared between Opentelemetry-collector charms and any other charm that intends to
-provide OTLP telemetry for Opentelemetry-collector.
+This document explains how to integrate with charms that can send/receive OTLP data.
+This document is the authoritative reference on the structure of relation data that is
+shared between charms that intend to provide or consume OTLP telemetry.
 For user-facing documentation, see the package-level docstring in __init__.py.
 """
 
