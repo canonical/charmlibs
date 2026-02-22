@@ -2241,12 +2241,51 @@ class TLSCertificatesRequiresV4(Object):
         Generate a new private key, remove old certificate requests and send new ones.
 
         Args:
-            mode: Optional mode to regenerate in APP_AND_UNIT. If None, regenerates
-                UNIT and (if leader) APP keys.
+            mode: Optional mode when using APP_AND_UNIT. If None, regenerates both.
 
         Raises:
             TLSCertificatesError: If the private key is passed by the charm using the
                 private_key parameter.
+        """
+        self._perform_key_rotation(private_key=None, mode=mode)
+
+    def import_private_key(self, private_key: PrivateKey, mode: Mode | None = None) -> None:
+        """Import an external.
+
+        Generate a new private key, remove old certificate requests and send new ones.
+        Replace library-managed keys with the provided external private key.
+        This will store the key in secrets, clean up old certificate requests,
+        and generate new CSRs with the imported key.
+
+        Args:
+            private_key: The private key to import. Must be a valid RSA key.
+            mode: Optional mode when using APP_AND_UNIT. If None both will be rotated.
+
+        Raises:
+            TLSCertificatesError: If private_key was provided during initialization,
+                or if the provided key is invalid.
+
+        Note:
+            After importing a key, the library will manage it like a library generated key.
+        """
+        if not private_key.is_valid():
+            raise TLSCertificatesError(
+                "Invalid private key provided. Must be a valid RSA key with at least 2048 bits."
+            )
+        self._perform_key_rotation(private_key=private_key, mode=mode)
+
+    def _perform_key_rotation(
+        self, private_key: PrivateKey | None, mode: Mode | None = None
+    ) -> None:
+        """Perform key rotation by generating or importing a key.
+
+        Internal method that handles the common logic for both regenerating and importing keys.
+
+        Args:
+            private_key: The private key to use. If None, generates a new key.
+                If provided, imports the external key.
+            mode: Optional mode to rotate in APP_AND_UNIT. If None, rotates
+                UNIT and (if leader) APP keys.
         """
         if self._private_key:
             raise TLSCertificatesError(
@@ -2272,7 +2311,11 @@ class TLSCertificatesRequiresV4(Object):
                 if regen_mode == Mode.APP and not self.model.unit.is_leader():
                     logger.warning("Only the leader can regenerate the private key in APP mode")
                     continue
-                self._generate_private_key(regen_mode)
+                if private_key:
+                    self._store_private_key_in_secret(private_key, regen_mode)
+                    logger.info("Imported external private key for mode %s", regen_mode)
+                else:
+                    self._generate_private_key(regen_mode)
                 regenerated = True
             if not regenerated:
                 return
@@ -2285,7 +2328,11 @@ class TLSCertificatesRequiresV4(Object):
             if not self._private_key_generated_for_mode(self.mode):
                 logger.warning("No private key to regenerate")
                 return
-            self._generate_private_key(self.mode)
+            if private_key:
+                self._store_private_key_in_secret(private_key, self.mode)
+                logger.info("Imported external private key")
+            else:
+                self._generate_private_key(self.mode)
         self._cleanup_certificate_requests()
         self._send_certificate_requests()
 
