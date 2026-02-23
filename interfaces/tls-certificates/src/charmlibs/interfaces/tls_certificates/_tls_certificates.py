@@ -2279,13 +2279,10 @@ class TLSCertificatesRequiresV4(Object):
     ) -> None:
         """Perform key rotation by generating or importing a key.
 
-        Internal method that handles the common logic for both regenerating and importing keys.
-
         Args:
             private_key: The private key to use. If None, generates a new key.
                 If provided, imports the external key.
-            mode: Optional mode to rotate in APP_AND_UNIT. If None, rotates
-                UNIT and (if leader) APP keys.
+            mode: Optional mode when using APP_AND_UNIT. If None, rotates both.
         """
         if self._private_key:
             raise TLSCertificatesError(
