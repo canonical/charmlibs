@@ -39,6 +39,9 @@ class DummyTLSCertificatesRequirerCharm(CharmBase):
         self.framework.observe(
             self.on.regenerate_private_key_action, self._on_regenerate_private_key_action
         )
+        self.framework.observe(
+            self.on.import_private_key_action, self._on_import_private_key_action
+        )
         self.framework.observe(self.on.get_certificate_action, self._on_get_certificate_action)
         self.framework.observe(
             self.on.renew_certificates_action, self._on_renew_certificates_action
@@ -88,6 +91,19 @@ class DummyTLSCertificatesRequirerCharm(CharmBase):
             self.certificates.regenerate_private_key()
         except TLSCertificatesError:
             event.fail("Can't regenerate private key")
+
+    def _on_import_private_key_action(self, event: ActionEvent) -> None:
+        try:
+            private_key_str = event.params.get("private-key")
+            if not private_key_str:
+                event.fail("private-key parameter is required")
+                return
+
+            private_key = PrivateKey.from_string(private_key_str)
+            self.certificates.import_private_key(private_key)
+            event.set_results({"status": "imported"})
+        except TLSCertificatesError as e:
+            event.fail(f"Can't import private key: {e}")
 
     def _on_get_certificate_action(self, event: ActionEvent) -> None:
         certificate, _ = self.certificates.get_assigned_certificate(

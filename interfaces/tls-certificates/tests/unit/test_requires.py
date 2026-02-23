@@ -1023,6 +1023,96 @@ class TestTLSCertificatesRequiresV4:
                 charm: DummyTLSCertificatesRequirerCharm = manager.charm
                 charm.certificates.regenerate_private_key()
 
+    def test_given_library_generated_key_when_import_valid_private_key_then_key_is_imported(
+        self,
+    ):
+        initial_private_key = "initial library generated key"
+        external_private_key = generate_private_key()
+
+        certificates_relation = testing.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-provider",
+        )
+
+        state_in = testing.State(
+            relations={certificates_relation},
+            config={"common_name": "example.com"},
+            secrets={
+                Secret(
+                    {"private-key": initial_private_key},
+                    label=f"{LIBID}-private-key-0-{certificates_relation.endpoint}",
+                    owner="unit",
+                )
+            },
+        )
+
+        state_out = self.ctx.run(
+            self.ctx.on.action(
+                "import-private-key", params={"private-key": str(external_private_key)}
+            ),
+            state_in,
+        )
+
+        secret = state_out.get_secret(
+            label=f"{LIBID}-private-key-0-{certificates_relation.endpoint}"
+        )
+        assert secret.latest_content is not None
+        assert secret.latest_content["private-key"] == str(external_private_key)
+        assert secret.latest_content["private-key"] != initial_private_key
+
+    def test_given_weak_private_key_when_import_private_key_then_raises_error(self):
+        """Test that importing a weak private key raises TLSCertificatesError."""
+        weak_key = PrivateKey.from_string(generate_private_key(key_size=1024))
+
+        certificates_relation = testing.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-provider",
+        )
+
+        state_in = testing.State(
+            relations={certificates_relation},
+            config={"common_name": "example.com"},
+            secrets={
+                Secret(
+                    {"private-key": "initial-key"},
+                    label=f"{LIBID}-private-key-0-{certificates_relation.endpoint}",
+                    owner="unit",
+                )
+            },
+        )
+
+        with self.ctx(self.ctx.on.update_status(), state_in) as manager:
+            charm: DummyTLSCertificatesRequirerCharm = manager.charm
+
+            with pytest.raises(TLSCertificatesError, match="Invalid private key"):
+                charm.certificates.import_private_key(weak_key)
+
+    def test_given_private_key_from_charm_when_import_private_key_then_raises_error(self):
+        """Test that import raises error when private key was passed via charm config."""
+        external_private_key = PrivateKey.from_string(generate_private_key())
+
+        certificates_relation = testing.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-provider",
+        )
+
+        state_in = testing.State(
+            relations={certificates_relation},
+            config={
+                "common_name": "example.com",
+                "private_key": get_private_string_key_from_file(),
+            },
+        )
+
+        with self.ctx(self.ctx.on.update_status(), state_in) as manager:
+            charm: DummyTLSCertificatesRequirerCharm = manager.charm
+
+            with pytest.raises(TLSCertificatesError, match="Private key is passed by the charm"):
+                charm.certificates.import_private_key(external_private_key)
+
     def test_given_certificate_is_provided_when_get_certificate_then_certificate_is_returned(self):
         private_key = generate_private_key()
         csr = generate_csr(
