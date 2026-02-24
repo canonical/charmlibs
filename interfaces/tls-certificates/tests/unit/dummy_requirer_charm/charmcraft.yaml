@@ -52,6 +52,13 @@ config:
 actions:
   regenerate-private-key:
     description: Regenerate the private key
+  import-private-key:
+    description: Import an external private key
+    params:
+      private-key:
+        type: string
+        description: The private key to import in PEM format
+    required: ["private-key"]
   get-private-key-secret-id:
     description: Get the private key secret id
   get-certificate:

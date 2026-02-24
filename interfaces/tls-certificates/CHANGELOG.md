@@ -1,3 +1,7 @@
+# 1.8.0 - 24 February 2025
+
+Introduce the import_private_key public function to allow requirers to dynamically import an external public key.
+
 # 1.7.0 - 18 February 2025
 
 Introduce the APP_AND_UNIT mode so requirers can request both APP and UNIT certificates using one integration.
