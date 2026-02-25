@@ -8,6 +8,7 @@ from __future__ import annotations
 import ipaddress
 import json
 import logging
+import subprocess
 import uuid
 import warnings
 from contextlib import suppress
@@ -26,9 +27,24 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import ExtensionOID, NameOID
-from ops import BoundEvent, CharmBase, CharmEvents, Secret, SecretExpiredEvent, SecretRemoveEvent
+from ops import (
+    BoundEvent,
+    CharmBase,
+    CharmEvents,
+    RelationBrokenEvent,
+    Secret,
+    SecretExpiredEvent,
+    SecretRemoveEvent,
+)
 from ops.framework import EventBase, EventSource, Handle, Object
-from ops.model import Application, ModelError, Relation, SecretNotFoundError, Unit
+from ops.model import (
+    Application,
+    ModelError,
+    Relation,
+    SecretNotFoundError,
+    TooManyRelatedAppsError,
+    Unit,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Collection, Mapping, MutableMapping
@@ -1824,6 +1840,9 @@ class TLSCertificatesRequiresV4(Object):
         self.renewal_relative_time = renewal_relative_time
         self.framework.observe(charm.on[relationship_name].relation_created, self._configure)
         self.framework.observe(charm.on[relationship_name].relation_changed, self._configure)
+        self.framework.observe(
+            charm.on[relationship_name].relation_broken, self._on_relation_broken
+        )
         self.framework.observe(charm.on.secret_expired, self._on_secret_expired)
         self.framework.observe(charm.on.secret_remove, self._on_secret_remove)
         for event in refresh_events:
@@ -2047,6 +2066,43 @@ class TLSCertificatesRequiresV4(Object):
         self._renew_certificate_request(csr)
         event.secret.remove_all_revisions()
 
+    def _on_relation_broken(self, event: RelationBrokenEvent) -> None:
+        """Handle Relation Broken Event.
+
+        Clean up secrets when relation is broken.
+        This handler removes both private key secrets and certificate secrets
+        associated with the removed relation.
+        """
+        try:
+            relation = self.model.get_relation(self.relationship_name)
+            if relation and relation.id != event.relation.id:
+                logger.warning(
+                    "Multiple relations with name %s detected, skipping secret cleanup",
+                    self.relationship_name,
+                )
+                return
+        except TooManyRelatedAppsError:
+            logger.warning(
+                "Multiple relations with name %s detected (TooManyRelatedAppsError), "
+                "skipping secret cleanup",
+                self.relationship_name,
+            )
+            return
+
+        modes_to_clean = self._flatten_modes()
+
+        for mode in modes_to_clean:
+            if mode == Mode.APP and not self.model.unit.is_leader():
+                continue
+
+            try:
+                self._remove_private_key_secret(mode)
+                logger.warning("Removed private key secret for mode %s", mode)
+            except SecretNotFoundError:
+                logger.debug("No private key secret to clean up for mode %s", mode)
+
+            self._remove_certificate_secrets_for_relation(mode)
+
     def sync(self) -> None:
         """Sync TLS Certificates Relation Data.
 
@@ -2064,16 +2120,13 @@ class TLSCertificatesRequiresV4(Object):
         for mode in modes_to_try:
             if mode == Mode.APP and not self.model.unit.is_leader():
                 continue
-            secret_label = self._get_csr_secret_label(certificate_signing_request, mode)
-            try:
-                secret = self.model.get_secret(label=secret_label)
+            secret = self._get_certificate_secret(certificate_signing_request, mode)
+            if secret:
                 current_csr = secret.get_content(refresh=True).get("csr", "")
                 if current_csr == str(certificate_signing_request):
                     self._renew_certificate_request(certificate_signing_request)
                     secret.remove_all_revisions()
                     return
-            except SecretNotFoundError:
-                continue
 
         logger.warning("No matching secret found - Skipping renewal")
 
@@ -2704,12 +2757,14 @@ class TLSCertificatesRequiresV4(Object):
                     mode,
                 )
                 if provider_certificate.revoked:
-                    with suppress(SecretNotFoundError):
+                    secret = self._get_certificate_secret(
+                        provider_certificate.certificate_signing_request, mode
+                    )
+                    if secret:
                         logger.debug(
                             "Removing secret with label %s",
-                            secret_label,
+                            secret.label,
                         )
-                        secret = self.model.get_secret(label=secret_label)
                         secret.remove_all_revisions()
                 else:
                     if not self._csr_matches_certificate_request(
@@ -2723,15 +2778,17 @@ class TLSCertificatesRequiresV4(Object):
                         continue
                     if not provider_certificate.certificate.matches_private_key(private_key):
                         continue
-                    try:
-                        secret = self.model.get_secret(label=secret_label)
-                        logger.debug("Setting secret with label %s", secret_label)
+                    secret = self._get_certificate_secret(
+                        provider_certificate.certificate_signing_request, mode
+                    )
+                    if secret:
+                        logger.debug("Setting secret with label %s", secret.label)
                         # Juju < 3.6 will create a new revision even if the content is the same
                         if secret.get_content(refresh=True).get("certificate", "") == str(
                             provider_certificate.certificate
                         ):
                             logger.debug(
-                                "Secret %s with correct certificate already exists", secret_label
+                                "Secret %s with correct certificate already exists", secret.label
                             )
                             self.on.certificate_available.emit(
                                 certificate_signing_request=provider_certificate.certificate_signing_request,
@@ -2753,7 +2810,7 @@ class TLSCertificatesRequiresV4(Object):
                             ),
                         )
                         secret.get_content(refresh=True)
-                    except SecretNotFoundError:
+                    else:
                         logger.debug("Creating new secret with label %s", secret_label)
                         self.charm.unit.add_secret(
                             content={
@@ -2859,12 +2916,125 @@ class TLSCertificatesRequiresV4(Object):
     def _get_csr_secret_label(
         self, csr: CertificateSigningRequest, mode: Literal[Mode.UNIT, Mode.APP]
     ) -> str:
-        # TODO fix label in case the csr is duplicated in multiple relations
+        csr_in_sha256_hex = csr.get_sha256_hex()
+        if mode == Mode.UNIT:
+            unit_num = self._get_unit_number()
+            return f"{LIBID}-certificate-{unit_num}-{self.relationship_name}-{csr_in_sha256_hex}"
+        elif mode == Mode.APP:
+            return f"{LIBID}-certificate-{self.relationship_name}-{csr_in_sha256_hex}"
+
+    def _get_csr_secret_label_without_relation_name(
+        self, csr: CertificateSigningRequest, mode: Literal[Mode.UNIT, Mode.APP]
+    ) -> str:
+        """Get the old certificate secret label format (without relation name).
+
+        This method provides backward compatibility for secrets created
+        before the relation name was added to the label.
+        """
         csr_in_sha256_hex = csr.get_sha256_hex()
         if mode == Mode.UNIT:
             return f"{LIBID}-certificate-{self._get_unit_number()}-{csr_in_sha256_hex}"
         elif mode == Mode.APP:
             return f"{LIBID}-certificate-{csr_in_sha256_hex}"
+
+    def _get_certificate_secret(
+        self, csr: CertificateSigningRequest, mode: Literal[Mode.UNIT, Mode.APP]
+    ) -> Secret | None:
+        """Get the certificate secret for a CSR, trying new and old label formats.
+
+        This function is introduced to avoid breaking changes for
+        existing secrets created with the old label format.
+
+        Args:
+            csr: The certificate signing request.
+            mode: The mode (UNIT or APP).
+
+        Returns:
+            The secret if found, None otherwise.
+        """
+        secret_label = self._get_csr_secret_label(csr, mode)
+        try:
+            return self.model.get_secret(label=secret_label)
+        except SecretNotFoundError:
+            pass
+
+        old_secret_label = self._get_csr_secret_label_without_relation_name(csr, mode)
+        try:
+            return self.model.get_secret(label=old_secret_label)
+        except SecretNotFoundError:
+            return None
+
+    def _list_secrets(self) -> list[str]:
+        """List all secret IDs owned by this unit/app.
+
+        Uses the `secret-ids` hook tool to enumerate secrets.
+
+        Returns:
+            List of secret IDs (e.g., ['secret://...', 'secret://...']).
+            Returns empty list if command fails (e.g., not in hook context).
+        """
+        try:
+            result = subprocess.run(
+                ["secret-ids"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        except FileNotFoundError:
+            logger.debug("secret-ids command not found (not in hook context)")
+            return []
+
+        if result.returncode != 0:
+            logger.debug("secret-ids command failed: %s", result.stderr)
+            return []
+
+        secret_ids = [line.strip() for line in result.stdout.strip().split("\n") if line.strip()]
+        return secret_ids
+
+    def _get_certificate_secret_label_prefix(self, mode: Literal[Mode.UNIT, Mode.APP]) -> str:
+        """Get the certificate secret label prefix for filtering.
+
+        Args:
+            mode: The mode (UNIT or APP).
+
+        Returns:
+            The label prefix for certificate secrets with relation name.
+        """
+        if mode == Mode.UNIT:
+            unit_num = self._get_unit_number()
+            return f"{LIBID}-certificate-{unit_num}-{self.relationship_name}-"
+        elif mode == Mode.APP:
+            return f"{LIBID}-certificate-{self.relationship_name}-"
+
+    def _remove_certificate_secrets_for_relation(self, mode: Literal[Mode.UNIT, Mode.APP]) -> None:
+        """Remove certificate secrets for this relation.
+
+        Enumerates all secrets owned by the unit/app and removes those
+        matching the certificate secret label prefix for this relation.
+
+        Args:
+            mode: The mode (UNIT or APP).
+        """
+        secret_ids = self._list_secrets()
+
+        if not secret_ids:
+            logger.warning("No secrets found to clean up")
+            return
+
+        label_prefix = self._get_certificate_secret_label_prefix(mode)
+
+        for secret_id in secret_ids:
+            try:
+                secret = self.model.get_secret(id=secret_id)
+                label = secret.label or secret.get_info().label
+
+                if label and label.startswith(label_prefix):
+                    secret.remove_all_revisions()
+                    logger.debug("Removed certificate secret: %s", label)
+            except SecretNotFoundError:
+                continue
+
+        logger.debug("Removed certificate secret(s) for mode %s", mode)
 
     def _get_unit_number(self) -> str:
         return self.model.unit.name.split("/")[1]
