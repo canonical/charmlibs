@@ -39,4 +39,4 @@ Pull request titles must follow [conventional commits](https://www.conventionalc
 When working on a single library, use the scope to indicate this.
 The scope should be the distribution package name without the leading `charmlibs-`.
 For example:
-`feat(pathops): ...`, `chore(interfaces-tls-certificates).
+`feat(pathops): ...` or `chore(interfaces-tls-certificates): ...`.
