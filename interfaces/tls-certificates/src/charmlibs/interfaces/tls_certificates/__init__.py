@@ -17,7 +17,7 @@
 This is a port of ``tls_certificates_interface.tls_certificates`` v4.22.
 
 Learn more about how to use the TLS Certificates interface library by reading the
-[usage documentation on Charmhub](https://charmhub.io/tls-certificates-interface/).
+`usage documentation on Charmhub <https://charmhub.io/tls-certificates-interface>`__.
 """
 
 from ._tls_certificates import (
