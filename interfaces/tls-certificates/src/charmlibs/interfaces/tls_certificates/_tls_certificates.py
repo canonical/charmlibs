@@ -2595,23 +2595,22 @@ class TLSCertificatesRequiresV4(Object):
 
         Args:
             mode: Which mode's certificates to return.
-                  In APP_AND_UNIT mode: defaults to Mode.UNIT if not specified.
-                                       Only returns certificates for the specified mode.
-                  In UNIT/APP mode: ignored (returns all certificates for self.mode).
+                In ``APP_AND_UNIT`` mode: defaults to ``Mode.UNIT`` if not specified.
+                Only returns certificates for the specified mode.
+                In ``UNIT`` or ``APP`` mode: ignored (returns all certificates for ``self.mode``).
 
         Returns:
             A tuple of (certificates, private_key) where:
             - certificates: List of assigned certificates for the specified mode
             - private_key: The private key for those certificates
 
-        Example usage in APP_AND_UNIT mode:
-            ```python
+        Example usage in ``APP_AND_UNIT`` mode::
+
             # Get UNIT certificates with UNIT private key
             unit_certs, unit_key = self.tls.get_assigned_certificates(Mode.UNIT)
 
             # Get APP certificates with APP private key (leader only)
             app_certs, app_key = self.tls.get_assigned_certificates(Mode.APP)
-            ```
         """
         if self.mode == Mode.APP_AND_UNIT:
             if mode is None:
