@@ -20,22 +20,35 @@ shared between charms that intend to provide or consume OTLP telemetry.
 For user-facing documentation, see the package-level docstring in __init__.py.
 """
 
+import copy
 import json
 import logging
-import socket
+from collections import OrderedDict
 from collections.abc import Sequence
-from typing import ClassVar, Literal
+from typing import Any, Literal
 
 from cosl.juju_topology import JujuTopology
+from cosl.rules import AlertRules, generic_alert_groups
+from cosl.utils import LZMABase64
 from ops import CharmBase, Relation
 from ops.framework import Object
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 DEFAULT_CONSUMER_RELATION_NAME = 'send-otlp'
 DEFAULT_PROVIDER_RELATION_NAME = 'receive-otlp'
-RELATION_INTERFACE_NAME = 'otlp'
+DEFAULT_LOKI_RULES_RELATIVE_PATH = './src/loki_alert_rules'
+DEFAULT_PROM_RULES_RELATIVE_PATH = './src/prometheus_alert_rules'
 
 logger = logging.getLogger(__name__)
+
+
+class RulesModel(BaseModel):
+    """A pydantic model for all rule formats."""
+
+    model_config = ConfigDict(extra='forbid')
+
+    logql: dict[str, Any]
+    promql: dict[str, Any]
 
 
 class OtlpEndpoint(BaseModel):
@@ -51,15 +64,52 @@ class OtlpEndpoint(BaseModel):
 class OtlpProviderAppData(BaseModel):
     """A pydantic model for the OTLP provider's unit databag."""
 
-    KEY: ClassVar[str] = 'otlp'
-
     model_config = ConfigDict(extra='forbid')
 
     endpoints: list[OtlpEndpoint]
 
 
+class OtlpConsumerAppData(BaseModel):
+    """A pydantic model for the OTLP consumer's unit databag.
+
+    The rules are compressed when saved to databag to avoid hitting databag
+    size limits for large deployments. An admin can decode the rules using the
+    following command:
+    ```bash
+    <rules-from-show-unit> | base64 -d | xz -d | jq
+    ```
+    """
+
+    model_config = ConfigDict(extra='forbid')
+
+    rules: RulesModel
+    metadata: OrderedDict[str, str]
+
+    @staticmethod
+    def encode_value(obj: Any) -> str:
+        """Encode relation data values using BaseModel serialization."""
+        try:
+            RulesModel.model_validate(obj)
+            return LZMABase64.compress(json.dumps(obj, sort_keys=True))
+        except ValidationError:
+            return json.dumps(obj, sort_keys=True)
+
+
 class OtlpConsumer(Object):
-    """A class for consuming OTLP endpoints."""
+    """A class for consuming OTLP endpoints.
+
+    Args:
+        charm: The charm instance.
+        relation_name: The name of the relation to use.
+        protocols: The protocols to filter for in the provider's OTLP
+            endpoints.
+        telemetries: The telemetries to filter for in the provider's OTLP
+            endpoints.
+        loki_rules_path: The path to Loki alerting and recording rules provided
+            by this charm.
+        prometheus_rules_path: The path to Prometheus alerting and recording
+            rules provided by this charm.
+    """
 
     def __init__(
         self,
@@ -67,6 +117,9 @@ class OtlpConsumer(Object):
         relation_name: str = DEFAULT_CONSUMER_RELATION_NAME,
         protocols: Sequence[Literal['http', 'grpc']] | None = None,
         telemetries: Sequence[Literal['logs', 'metrics', 'traces']] | None = None,
+        *,
+        loki_rules_path: str = DEFAULT_LOKI_RULES_RELATIVE_PATH,
+        prometheus_rules_path: str = DEFAULT_PROM_RULES_RELATIVE_PATH,
     ):
         super().__init__(charm, relation_name)
         self._charm = charm
@@ -77,26 +130,26 @@ class OtlpConsumer(Object):
         self._telemetries: list[Literal['logs', 'metrics', 'traces']] = (
             list(telemetries) if telemetries is not None else []
         )
-        self.topology = JujuTopology.from_charm(charm)
+        self._topology = JujuTopology.from_charm(charm)
 
-    def _get_provider_databag(self, otlp_databag: str) -> OtlpProviderAppData | None:
-        """Load the OtlpProviderAppData from the given databag string.
+        charm_dir = self._charm.charm_dir
+        self._loki_rules_path = AlertRules.validate_rules_path(loki_rules_path, charm_dir)
+        self._prom_rules_path = AlertRules.validate_rules_path(prometheus_rules_path, charm_dir)
 
-        For each endpoint in the databag, if it contains unsupported telemetry types, those
-        telemetries are filtered out before validation. If an endpoint contains an unsupported
-        protocol, or has no supported telemetries, it is skipped entirely.
+    def _filter_endpoints(
+        self, endpoints: list[dict[str, str | list[str]]]
+    ) -> list[OtlpEndpoint]:
+        """Filter out unsupported OtlpEndpoints.
+
+        For each endpoint:
+            - If a telemetry type is not supported, then the endpoint is accepted, but the
+              telemetry is ignored.
+            - If there are no supported telemetries for this endpoint, the endpoint is ignored.
+            - If the endpoint contains an unsupported protocol it is ignored.
         """
-        try:
-            data = json.loads(otlp_databag)
-            endpoints_data = data.get('endpoints', [])
-        except json.JSONDecodeError as e:
-            logger.error('Failed to parse OTLP databag: %s', e)
-
-            return None
-
         valid_endpoints: list[OtlpEndpoint] = []
         supported_telemetries: set[Literal['logs', 'metrics', 'traces']] = set(self._telemetries)
-        for endpoint_data in endpoints_data:
+        for endpoint_data in endpoints:
             if filtered_telemetries := [
                 t for t in endpoint_data.get('telemetries', []) if t in supported_telemetries
             ]:
@@ -109,30 +162,71 @@ class OtlpConsumer(Object):
             except ValidationError:
                 continue
             valid_endpoints.append(endpoint)
-        try:
-            return OtlpProviderAppData(endpoints=valid_endpoints)
-        except ValidationError as e:
-            logger.error('OTLP databag failed validation %s', e)
-            return None
+        return valid_endpoints
 
-    def get_remote_otlp_endpoints(self) -> dict[int, OtlpEndpoint]:
+    def publish(self):
+        """Triggers programmatically the update of the relation data.
+
+        The rule files exist in separate directories, distinguished by format
+        (logql|promql), each including alerting and recording rule types. The
+        charm uses these paths as aggregation points for rules, acting as their
+        source of truth. For each type of rule, the charm may aggregate rules
+        from:
+            - rules bundled in the charm's source code
+            - any rules provided by related charms
+
+        Generic, injected rules (not specific to any charm) are always
+        published. Besides these generic rules, the inclusion of bundled rules
+        and rules from related charms is the responsibility of the charm using
+        the library.
+        """
+        if not self._charm.unit.is_leader():
+            # Only the leader unit can write to app data.
+            return
+
+        loki_rules = AlertRules(query_type='logql', topology=self._topology)
+        prom_rules = AlertRules(query_type='promql', topology=self._topology)
+
+        prom_rules.add(
+            copy.deepcopy(generic_alert_groups.aggregator_rules),
+            group_name_prefix=self._topology.identifier,
+        )
+        loki_rules.add_path(self._loki_rules_path, recursive=True)
+        prom_rules.add_path(self._prom_rules_path, recursive=True)
+
+        databag = OtlpConsumerAppData.model_validate({
+            'rules': {'logql': loki_rules.as_dict(), 'promql': prom_rules.as_dict()},
+            'metadata': self._topology.as_dict(),
+        })
+        for relation in self.model.relations[self._relation_name]:
+            relation.save(databag, self._charm.app, encoder=OtlpConsumerAppData.encode_value)
+
+    @property
+    def endpoints(self) -> dict[int, OtlpEndpoint]:
         """Return a mapping of relation ID to OTLP endpoint.
 
-        For each remote unit's list of OtlpEndpoints:
-            - If a telemetry type is not supported, then the endpoint is accepted, but the
-              telemetry is ignored.
-            - If the endpoint contains an unsupported protocol it is ignored.
-            - The first available (and supported) endpoint is returned.
-
-        Returns:
-            Dict mapping relation ID -> OtlpEndpoint
+        For each remote's list of OtlpEndpoints, the consumer filters out
+        unsupported endpoints and telemetries. If there are multiple supported
+        endpoints, the consumer chooses the first available endpoint in the
+        list. This allows providers to specify multiple endpoints with
+        different protocols and/or telemetry types and the consumer can choose
+        one based on its own capabilities. For example, a provider may specify
+        both an HTTP and gRPC endpoint, and a consumer that only supports HTTP
+        will choose the HTTP endpoint.
         """
         endpoints: dict[int, OtlpEndpoint] = {}
         for rel in self.model.relations[self._relation_name]:
-            if not (otlp := rel.data[rel.app].get(OtlpProviderAppData.KEY)):
+            raw_data = rel.data[rel.app].get('endpoints', '[]')
+            try:
+                endpoints_list = json.loads(raw_data)
+            except json.JSONDecodeError as e:
+                logger.error('Failed to parse OTLP databag: %s', e)
                 continue
-            if not (app_databag := self._get_provider_databag(otlp)):
+
+            if not (filtered := self._filter_endpoints(endpoints_list)):
                 continue
+
+            app_databag = OtlpProviderAppData(endpoints=filtered)
 
             # Choose the first valid endpoint in list
             if endpoint_choice := next(
@@ -148,10 +242,7 @@ class OtlpProvider(Object):
 
     Args:
         charm: The charm instance.
-        protocol_ports: A dictionary mapping ProtocolType to port number.
         relation_name: The name of the relation to use.
-        path: An optional path to append to the endpoint URLs.
-        supported_telemetries: A list of supported telemetry types.
     """
 
     def __init__(
@@ -163,11 +254,7 @@ class OtlpProvider(Object):
         self._charm = charm
         self._relation_name = relation_name
         self._endpoints: list[OtlpEndpoint] = []
-
-    @property
-    def internal_url(self) -> str:
-        """Return the internal URL for the OTLP provider."""
-        return f'http://{socket.getfqdn()}'
+        self._topology = JujuTopology.from_charm(charm)
 
     def add_endpoint(
         self,
@@ -187,17 +274,41 @@ class OtlpProvider(Object):
         """Triggers programmatically the update of the relation data.
 
         Args:
-            url: An optional URL to use instead of the internal URL.
             relation: An optional instance of `class:ops.model.Relation` to update.
-                If not provided, all instances of the `otlp`
-                relation are updated.
+                If not provided, all instances of the relation are updated.
         """
         if not self._charm.unit.is_leader():
             # Only the leader unit can write to app data.
             return
 
+        databag = OtlpProviderAppData.model_validate({'endpoints': self._endpoints})
         relations = [relation] if relation else self.model.relations[self._relation_name]
-        for relation in relations:
-            data = OtlpProviderAppData(endpoints=self._endpoints).model_dump(exclude_none=True)
-            otlp = {OtlpProviderAppData.KEY: data}
-            relation.data[self._charm.app].update({k: json.dumps(v) for k, v in otlp.items()})
+        for rel in relations:
+            rel.save(databag, self._charm.app)
+
+    def rules(self, query_type: Literal['logql', 'promql']):
+        """Fetch rules for all relations of the desired query and rule types.
+
+        This method returns all rules of the desired query and rule types
+        provided by related OTLP consumer charms.
+
+        Returns:
+            a mapping of relation ID to a dictionary of alert rule groups
+            following the OfficialRuleFileFormat from cos-lib.
+        """
+        rules_obj = AlertRules(query_type, self._topology)
+        rules_map = {}
+
+        for relation in self.model.relations[self._relation_name]:
+            consumer = relation.load(OtlpConsumerAppData, relation.app)
+
+            if not (rules := getattr(consumer.rules, rules_obj.query_type, None)):
+                continue
+
+            result = rules_obj.inject_and_validate_rules(rules, consumer.metadata)
+            if result.errmsg:
+                relation.data[self._charm.app]['event'] = json.dumps({'errors': result.errmsg})
+
+            rules_map[result.identifier] = result.rules
+
+        return rules_map
