@@ -203,6 +203,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
+          fetch-depth: 0  # We need the git history for 'Last updated on ...'
           persist-credentials: false
       - uses: astral-sh/setup-uv@v7
       - run: uvx --from rust-just just docs html
