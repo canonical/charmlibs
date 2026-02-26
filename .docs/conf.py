@@ -200,7 +200,9 @@ autodoc_default_options = {
     'members': None,  # None here means "yes"
     'special-members': None,  # meaning all
     'exclude-members': (
+        '__annotate_func__,'
         '__annotations__,'
+        '__annotations_cache__,'
         '__abstractmethods__,'
         '__dict__,'
         '__dataclass_fields__,'
