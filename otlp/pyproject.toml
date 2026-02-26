@@ -16,7 +16,7 @@ classifiers = [
 dynamic = ["version"]
 dependencies = [
     # "ops",
-    "cosl>=1.4.0",
+    "cosl @ git+https://github.com/canonical/cos-lib.git@feat/more-rules-methods",
 ]
 
 [dependency-groups]
@@ -39,6 +39,10 @@ integration = [  # installed for `just integration otlp`
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+# This section should be removed once the cosl pr is merged
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/charmlibs"]
