@@ -32,3 +32,11 @@ Read more:
 
 - [The different types of tests](https://documentation.ubuntu.com/charmlibs/explanation/charmlibs-tests/).
 - [Publishing packages](https://documentation.ubuntu.com/charmlibs/explanation/charmlibs-publishing/).
+
+# Pull requests
+
+Pull request titles must follow [conventional commits](https://www.conventionalcommits.org/en/v1.0.0/).
+When working on a single library, use the scope to indicate this.
+The scope should be the distribution package name without the leading `charmlibs-`.
+For example:
+`feat(pathops): ...`, `chore(interfaces-tls-certificates).
