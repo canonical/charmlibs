@@ -34,9 +34,11 @@ The package also enables a consumer to send `alerting` and
 
 from ._otlp import (
     OtlpConsumer,
+    OtlpConsumerAppData,
     OtlpEndpoint,
     OtlpProvider,
     OtlpProviderAppData,
+    RulesModel,
 )
 from ._version import __version__ as __version__
 
@@ -44,7 +46,9 @@ __all__ = [
     # only the names listed in __all__ are imported when executing:
     # from charmlibs.otlp import *
     'OtlpConsumer',
+    'OtlpConsumerAppData',
     'OtlpEndpoint',
     'OtlpProvider',
     'OtlpProviderAppData',
+    'RulesModel',
 ]
