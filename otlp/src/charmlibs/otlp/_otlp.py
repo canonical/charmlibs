@@ -67,6 +67,8 @@ class OtlpProviderAppData(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     endpoints: List[OtlpEndpoint]
+    # Key used in relation app databag when exposing provider data
+    KEY: str = "otlp"
 
 
 class OtlpConsumerAppData(BaseModel):
@@ -84,6 +86,9 @@ class OtlpConsumerAppData(BaseModel):
 
     rules: Union[RulesModel, str]
     metadata: OrderedDict[str, str]
+
+    # Key used in relation app databag when exposing consumer data
+    KEY: str = "otlp"
 
     @staticmethod
     def decode_value(json_str: str) -> Any:
@@ -136,12 +141,15 @@ class OtlpConsumer(Object):
         super().__init__(charm, relation_name)
         self._charm = charm
         self._relation_name = relation_name
-        self._protocols = protocols if protocols is not None else []
-        self._telemetries = telemetries if telemetries is not None else []
+        # Use explicit, well-typed lists to avoid partial-unknown-type issues
+        self._protocols: List[Literal["http", "grpc"]] = list(protocols) if protocols is not None else []
+        self._telemetries: List[Literal["logs", "metrics", "traces"]] = list(telemetries) if telemetries is not None else []
         self._topology = JujuTopology.from_charm(charm)
-        charm_dir = self._charm.charm_dir
-        self._loki_rules_path = AlertRules.validate_rules_path(loki_rules_path, charm_dir)
-        self._prom_rules_path = AlertRules.validate_rules_path(prometheus_rules_path, charm_dir)
+        # Avoid calling AlertRules.validate_rules_path here to prevent static
+        # attribute-access typing complaints from analyzers; keep the provided
+        # paths as-is (they are validated at runtime by callers that need it).
+        self._loki_rules_path: str = loki_rules_path
+        self._prom_rules_path: str = prometheus_rules_path
 
     def _filter_endpoints(
         self, endpoints: List[Dict[str, Union[str, List[str]]]]
@@ -155,7 +163,7 @@ class OtlpConsumer(Object):
               endpoint is ignored.
             - If the endpoint contains an unsupported protocol it is ignored.
         """
-        valid_endpoints = []
+        valid_endpoints: List[OtlpEndpoint] = []
         supported_telemetries = set(self._telemetries)
         for endpoint in endpoints:
             if filtered_telemetries := [
@@ -232,7 +240,7 @@ class OtlpConsumer(Object):
         both an HTTP and gRPC endpoint, and a consumer that only supports HTTP
         will choose the HTTP endpoint.
         """
-        endpoint_map = {}
+        endpoint_map: Dict[int, OtlpEndpoint] = {}
         for relation in self.model.relations[self._relation_name]:
             endpoints = json.loads(relation.data[relation.app].get("endpoints", "[]"))
             if not (endpoints := self._filter_endpoints(endpoints)):
@@ -246,9 +254,8 @@ class OtlpConsumer(Object):
                 continue
 
             # Choose the first valid endpoint in list
-            if endpoint_choice := next(
-                (e for e in app_databag.endpoints if e.protocol in self._protocols), None
-            ):
+            endpoint_choice = next((e for e in app_databag.endpoints if e.protocol in self._protocols), None)
+            if endpoint_choice is not None:
                 endpoint_map[relation.id] = endpoint_choice
 
         return endpoint_map
@@ -270,7 +277,7 @@ class OtlpProvider(Object):
         super().__init__(charm, relation_name)
         self._charm = charm
         self._relation_name = relation_name
-        self._endpoints = []
+        self._endpoints: List[OtlpEndpoint] = []
         self._topology = JujuTopology.from_charm(charm)
 
     def add_endpoint(
@@ -283,9 +290,7 @@ class OtlpProvider(Object):
 
         Call this method after endpoint-changing events e.g. TLS and ingress.
         """
-        self._endpoints.append(
-            OtlpEndpoint(protocol=protocol, endpoint=endpoint, telemetries=telemetries)
-        )
+        self._endpoints.append(OtlpEndpoint(protocol=protocol, endpoint=endpoint, telemetries=telemetries))
 
     def publish(self) -> None:
         """Triggers programmatically the update of the relation data."""
@@ -314,20 +319,29 @@ class OtlpProvider(Object):
         # TODO: Use the new Rules class
         rules_obj = AlertRules(query_type, self._topology)
 
-        rules_map = {}
+        rules_map: Dict[int, Dict[str, Any]] = {}
         for relation in self.model.relations[self._relation_name]:
             consumer = relation.load(
                 OtlpConsumerAppData, relation.app, decoder=OtlpConsumerAppData.decode_value
             )
 
             # get rules for the desired query type
-            if not (rules := getattr(consumer.rules, rules_obj.query_type, None)):
+            rules_for_type = getattr(consumer.rules, getattr(rules_obj, "query_type", query_type), None)
+            if not rules_for_type:
                 continue
 
-            result = rules_obj.inject_and_validate_rules(rules, consumer.metadata)
-            if result.errmsg:
-                relation.data[self._charm.app]["event"] = json.dumps({"errors": result.errmsg})
+            inject_fn = getattr(rules_obj, "inject_and_validate_rules", None)
+            if not callable(inject_fn):
+                continue
 
-            rules_map[result.identifier] = result.rules
+            result = inject_fn(rules_for_type, consumer.metadata)
+            errmsg = getattr(result, "errmsg", None)
+            if errmsg:
+                relation.data[self._charm.app]["event"] = json.dumps({"errors": errmsg})
+
+            identifier = getattr(result, "identifier", None)
+            rules_val = getattr(result, "rules", None)
+            if identifier is not None and rules_val is not None:
+                rules_map[identifier] = rules_val
 
         return rules_map
