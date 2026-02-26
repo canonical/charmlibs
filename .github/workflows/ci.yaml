@@ -197,3 +197,12 @@ jobs:
         with:
           sarif_file: results.sarif
           category: zizmor
+
+  local-docs-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v7
+      - run: uvx --from rust-just just docs html
