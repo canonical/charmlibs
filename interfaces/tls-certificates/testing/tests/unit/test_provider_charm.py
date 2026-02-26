@@ -49,7 +49,7 @@ def test_provider_relation_has_request():
         tls_certificates.CertificateRequestAttributes(common_name="example.com"),
         tls_certificates.CertificateRequestAttributes(common_name="eggsample.com"),
     ]
-    relation = tls_certificates_testing.for_local_provider(
+    relation = tls_certificates_testing.relation_for_provider(
         endpoint="certificates", certificate_requests=requests
     )
     state_in = ops.testing.State(relations=[relation])

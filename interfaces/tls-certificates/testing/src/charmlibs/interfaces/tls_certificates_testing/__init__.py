@@ -16,13 +16,13 @@
 
 from ._testing import (
     DEFAULT_PRIVATE_KEY,
-    for_local_provider,
-    for_local_requirer,
+    relation_for_provider,
+    relation_for_requirer,
 )
 from ._version import __version__ as __version__
 
 __all__ = [
     "DEFAULT_PRIVATE_KEY",
-    "for_local_provider",
-    "for_local_requirer",
+    "relation_for_provider",
+    "relation_for_requirer",
 ]

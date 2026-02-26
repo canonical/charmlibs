@@ -10,7 +10,7 @@ JUJU_NETWORK_KEYS = {"egress-subnets", "ingress-address", "private-address"}
 
 
 def test_local_provider():
-    rel = tls_certificates_testing.for_local_provider("foo")
+    rel = tls_certificates_testing.relation_for_provider("foo")
     assert isinstance(rel, testing.Relation)
     assert rel.endpoint == "foo"
     assert rel.interface == "tls-certificates"
@@ -25,7 +25,7 @@ def test_local_provider():
 
 
 def test_local_provider_w_mode_app():
-    rel = tls_certificates_testing.for_local_provider("foo", mode=tls_certificates.Mode.APP)
+    rel = tls_certificates_testing.relation_for_provider("foo", mode=tls_certificates.Mode.APP)
     assert isinstance(rel, testing.Relation)
     assert rel.endpoint == "foo"
     assert rel.interface == "tls-certificates"
@@ -40,7 +40,7 @@ def test_local_provider_w_mode_app():
 
 
 def test_local_provider_w_provider_false():
-    rel = tls_certificates_testing.for_local_provider("foo", provider=False)
+    rel = tls_certificates_testing.relation_for_provider("foo", provider=False)
     assert isinstance(rel, testing.Relation)
     assert rel.endpoint == "foo"
     assert rel.interface == "tls-certificates"
@@ -54,7 +54,7 @@ def test_local_provider_w_provider_false():
 
 
 def test_local_requirer():
-    rel = tls_certificates_testing.for_local_requirer("foo")
+    rel = tls_certificates_testing.relation_for_requirer("foo")
     assert isinstance(rel, testing.Relation)
     assert rel.endpoint == "foo"
     assert rel.interface == "tls-certificates"
@@ -69,7 +69,7 @@ def test_local_requirer():
 
 
 def test_local_requirer_w_mode_app():
-    rel = tls_certificates_testing.for_local_requirer("foo", mode=tls_certificates.Mode.APP)
+    rel = tls_certificates_testing.relation_for_requirer("foo", mode=tls_certificates.Mode.APP)
     assert isinstance(rel, testing.Relation)
     assert rel.endpoint == "foo"
     assert rel.interface == "tls-certificates"
@@ -84,7 +84,7 @@ def test_local_requirer_w_mode_app():
 
 
 def test_local_requirer_w_provider_false():
-    rel = tls_certificates_testing.for_local_requirer("foo", provider=False)
+    rel = tls_certificates_testing.relation_for_requirer("foo", provider=False)
     assert isinstance(rel, testing.Relation)
     assert rel.endpoint == "foo"
     assert rel.interface == "tls-certificates"

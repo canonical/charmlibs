@@ -52,7 +52,7 @@ def test_requirer_relation_has_certs(monkeypatch: pytest.MonkeyPatch):
         requirer_charm, "PRIVATE_KEY", tls_certificates_testing.DEFAULT_PRIVATE_KEY
     )
     ctx = ops.testing.Context(requirer_charm.RequirerCharm, meta=requirer_charm.META)
-    relation = tls_certificates_testing.for_local_requirer(
+    relation = tls_certificates_testing.relation_for_requirer(
         endpoint="certificates", certificate_requests=requirer_charm.REQUESTS
     )
     state_in = ops.testing.State(relations=[relation])

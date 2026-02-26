@@ -28,7 +28,7 @@ class _RelationKwargs(typing.TypedDict, total=False):
     remote_units_data: dict[int, dict[str, str]]
 
 
-def for_local_requirer(
+def relation_for_requirer(
     # testing.Relation args
     endpoint: str,
     *,
@@ -51,7 +51,7 @@ def for_local_requirer(
     return _relation(endpoint, kwargs=kwargs)
 
 
-def for_local_provider(
+def relation_for_provider(
     # testing.Relation args
     endpoint: str,
     *,
