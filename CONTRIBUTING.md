@@ -36,7 +36,8 @@ Read more:
 # Pull requests
 
 Pull request titles must follow [conventional commits](https://www.conventionalcommits.org/en/v1.0.0/).
-When working on a single library, use the scope to indicate this.
-The scope should be the distribution package name without the leading `charmlibs-`.
+
+When a PR affects a single library, use the distribution package name without the leading `charmlibs-` as the conventional commit scope.
+
 For example:
 `feat(pathops): ...` or `chore(interfaces-tls-certificates): ...`.
