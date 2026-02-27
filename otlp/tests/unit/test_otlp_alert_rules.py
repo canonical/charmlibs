@@ -74,7 +74,9 @@ ALL_RULES = {
 }
 
 
-def _decompress(rules: str) -> Dict[str, Any]:
+def _decompress(rules: Optional[str]) -> Dict[str, Any]:
+    if not rules:
+        return {}
     return json.loads(LZMABase64.decompress(rules))
 
 
@@ -142,13 +144,13 @@ def test_forwarded_rules_compression(
         else:
             # THEN the decompressed databag contains rules
             assert actual_groups
-            actual_group_names = set()
+            actual_group_names: set[str] = set()
             for group in actual_groups:
                 name = group.get("name")
                 if isinstance(name, str):
                     actual_group_names.add(name)
             expected_groups = ALL_RULES.get("logql", {}).get("groups", [])
-            expected_group_names = set()
+            expected_group_names: set[str] = set()
             for group in expected_groups:
                 name = group.get("name")
                 if isinstance(name, str):

@@ -91,7 +91,7 @@ class OtlpDualCharm(CharmBase):
         except Exception as e:
             logger.info('An exception occured when observing the event: %s', e)
 
-    def _on_endpoints_changed(self):
+    def _on_endpoints_changed(self, event: ops.EventBase) -> None:
         return None
 
 
