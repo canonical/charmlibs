@@ -24,7 +24,7 @@ import copy
 import json
 import logging
 from lzma import LZMAError
-from typing import Any, Dict, List, Literal, Optional, OrderedDict, Sequence, Union
+from typing import Any, ClassVar, Dict, List, Literal, Optional, OrderedDict, Sequence, Union
 
 from cosl.juju_topology import JujuTopology
 from cosl.rules import AlertRules, generic_alert_groups
@@ -68,7 +68,7 @@ class OtlpProviderAppData(BaseModel):
 
     endpoints: List[OtlpEndpoint]
     # Key used in relation app databag when exposing provider data
-    KEY: str = "otlp"
+    KEY: ClassVar[str] = "otlp"
 
 
 class OtlpConsumerAppData(BaseModel):
@@ -88,7 +88,7 @@ class OtlpConsumerAppData(BaseModel):
     metadata: OrderedDict[str, str]
 
     # Key used in relation app databag when exposing consumer data
-    KEY: str = "otlp"
+    KEY: ClassVar[str] = "otlp"
 
     @staticmethod
     def decode_value(json_str: str) -> Any:

@@ -3,51 +3,46 @@
 
 """Feature: OTLP endpoint handling."""
 
+import dataclasses
 import json
-from typing import Any, cast
 from unittest.mock import patch
 
-import ops
 import pytest
-from ops import testing
+import ops
 from ops.testing import Relation, State
 from pydantic import ValidationError
 
-from charmlibs.otlp import (
-    OtlpEndpoint,
-    OtlpProviderAppData,
-)
+from charmlibs.otlp import OtlpEndpoint, OtlpProviderAppData
+from ops import testing
 
-APP_DATA = {
-    OtlpProviderAppData.KEY: (
-        '{"endpoints": ['
-        '{"protocol": "grpc", '
-        '"endpoint": "http://host:4317", '
-        '"telemetries": ["logs"]}'
-        ']}'
-    )
+ALL_PROTOCOLS = ["grpc", "http"]
+ALL_TELEMETRIES = ["logs", "metrics", "traces"]
+EMPTY_CONSUMER = {
+    "rules": json.dumps({"logql": {}, "promql": {}}),
+    "metadata": json.dumps({}),
 }
+SEND_OTLP = Relation("send-otlp", remote_app_data={"endpoints": "[]"})
+RECEIVE_OTLP = Relation("receive-otlp", remote_app_data=EMPTY_CONSUMER)
 
-ALL_PROTOCOLS = ['grpc', 'http']
-ALL_TELEMETRIES = ['logs', 'metrics', 'traces']
+
+def _replace(*args, **kwargs):
+    return dataclasses.replace(*args, **kwargs)
 
 
 @pytest.mark.parametrize(
-    'data, error_match',
+    "data, error_match",
     [
         (
-            {'protocol': 'invalid', 'endpoint': 'http://host:4317', 'telemetries': ['logs']},
+            {"protocol": "invalid", "endpoint": "http://host:4317", "telemetries": ["logs"]},
             "Input should be 'http' or 'grpc'",
         ),
         (
-            {'protocol': 'grpc', 'endpoint': 'http://host:4317', 'telemetries': ['invalid']},
+            {"protocol": "grpc", "endpoint": "http://host:4317", "telemetries": ["invalid"]},
             "Input should be 'logs', 'metrics' or 'traces'",
         ),
     ],
 )
-def test_provider_app_data_raises_validation_error_lib(
-    data: dict[str, Any], error_match: str
-) -> None:
+def test_provider_app_data_raises_validation_error_lib(data, error_match):
     """Test that OtlpProviderAppData validates protocols and telemetries."""
     with pytest.raises(ValidationError, match=error_match):
         OtlpProviderAppData(endpoints=[OtlpEndpoint(**data)])
@@ -55,178 +50,184 @@ def test_provider_app_data_raises_validation_error_lib(
 
 # NOTE: we cannot use OtlpProviderAppData for "provides" since it would raise validation errors
 @pytest.mark.parametrize(
-    'provides, otlp_endpoint',
+    "provides, otlp_endpoint",
     (
         (
+            # GIVEN an endpoint with an invalid protocol
+            # * an endpoint with a valid protocol
             {
-                'endpoints': [
-                    {
-                        'protocol': 'fake',
-                        'endpoint': 'http://host:0000',
-                        'telemetries': ['metrics'],
-                    },
-                    {
-                        'protocol': 'http',
-                        'endpoint': 'http://host:4317',
-                        'telemetries': ['metrics'],
-                    },
-                ]
+                "endpoints": json.dumps(
+                    [
+                        {
+                            "protocol": "fake",
+                            "endpoint": "http://host:0000",
+                            "telemetries": ["metrics"],
+                        },
+                        {
+                            "protocol": "http",
+                            "endpoint": "http://host:4317",
+                            "telemetries": ["metrics"],
+                        },
+                    ],
+                ),
             },
             OtlpEndpoint(
-                protocol='http',
-                endpoint='http://host:4317',
-                telemetries=['metrics'],
+                protocol="http",
+                endpoint="http://host:4317",
+                telemetries=["metrics"],
             ),
         ),
         (
+            # GIVEN an endpoint with valid and invalid telemetries
             {
-                'endpoints': [
-                    {
-                        'protocol': 'http',
-                        'endpoint': 'http://host:4317',
-                        'telemetries': ['logs', 'fake', 'traces'],
-                    },
-                ]
+                "endpoints": json.dumps(
+                    [
+                        {
+                            "protocol": "http",
+                            "endpoint": "http://host:4317",
+                            "telemetries": ["logs", "fake", "traces"],
+                        },
+                    ]
+                ),
             },
             OtlpEndpoint(
-                protocol='http',
-                endpoint='http://host:4317',
-                telemetries=['logs', 'traces'],
+                protocol="http",
+                endpoint="http://host:4317",
+                telemetries=["logs", "traces"],
+            ),
+        ),
+        (
+            # GIVEN a valid endpoint
+            # * an invalid databag key
+            {
+                "endpoints": json.dumps(
+                    [
+                        {
+                            "protocol": "http",
+                            "endpoint": "http://host:4317",
+                            "telemetries": ["metrics"],
+                        }
+                    ],
+                ),
+                "does_not": "exist",
+            },
+            OtlpEndpoint(
+                protocol="http",
+                endpoint="http://host:4317",
+                telemetries=["metrics"],
             ),
         ),
     ),
 )
-def test_send_otlp_invalid_lib(
-    otlp_consumer_ctx: testing.Context[ops.CharmBase],
-    provides: dict[str, Any],
-    otlp_endpoint: OtlpEndpoint,
-) -> None:
-    # GIVEN a remote app provides an invalid OtlpEndpoint
+def test_send_otlp_invalid_databag_lib(otlp_consumer_ctx: testing.Context[ops.CharmBase], provides, otlp_endpoint):
+    # GIVEN a remote app provides an OtlpEndpoint
     # WHEN they are related over the "send-otlp" endpoint
-    provider = Relation(
-        'send-otlp',
-        id=123,
-        remote_app_data={OtlpProviderAppData.KEY: json.dumps(provides)},
-    )
-    state = State(
-        relations=[provider],
-        leader=True,
-    )
+    provider = Relation("send-otlp", id=123, remote_app_data=provides)
+    state = State(relations=[provider], leader=True)
 
     with otlp_consumer_ctx(otlp_consumer_ctx.on.update_status(), state=state) as mgr:
-        mgr.run()
-        # AND WHEN the consumer supports all telemetries
+        # WHEN the consumer processes the relation data
+        # * the consumer supports all protocols and telemetries
         with (
-            patch.object(cast('Any', mgr.charm).otlp_consumer, '_protocols', new=ALL_PROTOCOLS),
-            patch.object(
-                cast('Any', mgr.charm).otlp_consumer, '_telemetries', new=ALL_TELEMETRIES
-            ),
+            patch.object(mgr.charm.otlp_consumer, "_protocols", new=ALL_PROTOCOLS),
+            patch.object(mgr.charm.otlp_consumer, "_telemetries", new=ALL_TELEMETRIES),
         ):
-            result = cast(
-                'OtlpEndpoint',
-                cast('Any', mgr.charm).otlp_consumer.get_remote_otlp_endpoints()[123],
-            )
-
-    # THEN the returned endpoint does not include invalid protocols or telemetries
-    assert result.model_dump() == otlp_endpoint.model_dump()
+            # THEN the consumer does not raise an error
+            # * the returned endpoint does not include invalid protocols or telemetries
+            assert mgr.run()
+            result = mgr.charm.otlp_consumer.endpoints[123]
+            assert result.model_dump() == otlp_endpoint.model_dump()
 
 
 @pytest.mark.parametrize(
-    'protocols, telemetries, expected',
+    "protocols, telemetries, expected",
     [
         (
             ALL_PROTOCOLS,
             ALL_TELEMETRIES,
             {
                 123: OtlpEndpoint(
-                    protocol='http',
-                    endpoint='http://provider-123.endpoint:4318',
-                    telemetries=['logs', 'metrics'],
+                    protocol="http",
+                    endpoint="http://provider-123.endpoint:4318",
+                    telemetries=["logs", "metrics"],
                 ),
                 456: OtlpEndpoint(
-                    protocol='grpc',
-                    endpoint='http://provider-456.endpoint:4317',
-                    telemetries=['traces'],
+                    protocol="grpc",
+                    endpoint="http://provider-456.endpoint:4317",
+                    telemetries=["traces"],
                 ),
             },
         ),
         (
-            ['grpc'],
+            ["grpc"],
             ALL_TELEMETRIES,
             {
                 456: OtlpEndpoint(
-                    protocol='grpc',
-                    endpoint='http://provider-456.endpoint:4317',
-                    telemetries=['traces'],
+                    protocol="grpc",
+                    endpoint="http://provider-456.endpoint:4317",
+                    telemetries=["traces"],
                 )
             },
         ),
         (
             ALL_PROTOCOLS,
-            ['metrics'],
+            ["metrics"],
             {
                 123: OtlpEndpoint(
-                    protocol='http',
-                    endpoint='http://provider-123.endpoint:4318',
-                    telemetries=['metrics'],
+                    protocol="http",
+                    endpoint="http://provider-123.endpoint:4318",
+                    telemetries=["metrics"],
                 ),
                 456: OtlpEndpoint(
-                    protocol='http',
-                    endpoint='http://provider-456.endpoint:4318',
-                    telemetries=['metrics'],
+                    protocol="http",
+                    endpoint="http://provider-456.endpoint:4318",
+                    telemetries=["metrics"],
                 ),
             },
         ),
-        (['http'], ['traces'], {}),
+        (["http"], ["traces"], {}),
     ],
 )
 def test_send_otlp_with_varying_consumer_support_lib(
-    otlp_consumer_ctx: testing.Context[ops.CharmBase],
-    protocols: list[str],
-    telemetries: list[str],
-    expected: dict[int, OtlpEndpoint],
-) -> None:
+    otlp_consumer_ctx: testing.Context[ops.CharmBase], protocols, telemetries, expected
+):
     # GIVEN a remote app provides multiple OtlpEndpoints
     remote_app_data_1 = {
-        OtlpProviderAppData.KEY: json.dumps(
-            OtlpProviderAppData(
-                endpoints=[
-                    OtlpEndpoint(
-                        protocol='http',
-                        endpoint='http://provider-123.endpoint:4318',
-                        telemetries=['logs', 'metrics'],
-                    )
-                ]
-            ).model_dump()
+        "endpoints": json.dumps(
+            [
+                {
+                    "protocol": "http",
+                    "endpoint": "http://provider-123.endpoint:4318",
+                    "telemetries": ["logs", "metrics"],
+                }
+            ]
         )
     }
     remote_app_data_2 = {
-        OtlpProviderAppData.KEY: json.dumps(
-            OtlpProviderAppData(
-                endpoints=[
-                    OtlpEndpoint(
-                        protocol='grpc',
-                        endpoint='http://provider-456.endpoint:4317',
-                        telemetries=['traces'],
-                    ),
-                    OtlpEndpoint(
-                        protocol='http',
-                        endpoint='http://provider-456.endpoint:4318',
-                        telemetries=['metrics'],
-                    ),
-                ]
-            ).model_dump()
+        "endpoints": json.dumps(
+            [
+                {
+                    "protocol": "grpc",
+                    "endpoint": "http://provider-456.endpoint:4317",
+                    "telemetries": ["traces"],
+                },
+                {
+                    "protocol": "http",
+                    "endpoint": "http://provider-456.endpoint:4318",
+                    "telemetries": ["metrics"],
+                },
+            ]
         )
     }
 
     # WHEN they are related over the "send-otlp" endpoint
     provider_0 = Relation(
-        'send-otlp',
+        "send-otlp",
         id=123,
         remote_app_data=remote_app_data_1,
     )
     provider_1 = Relation(
-        'send-otlp',
+        "send-otlp",
         id=456,
         remote_app_data=remote_app_data_2,
     )
@@ -238,15 +239,110 @@ def test_send_otlp_with_varying_consumer_support_lib(
     # AND WHEN the consumer has varying support for OTLP protocols and telemetries
     with otlp_consumer_ctx(otlp_consumer_ctx.on.update_status(), state=state) as mgr:
         with (
-            patch.object(cast('Any', mgr.charm).otlp_consumer, '_protocols', new=protocols),
-            patch.object(cast('Any', mgr.charm).otlp_consumer, '_telemetries', new=telemetries),
+            patch.object(mgr.charm.otlp_consumer, "_protocols", new=protocols),
+            patch.object(mgr.charm.otlp_consumer, "_telemetries", new=telemetries),
         ):
-            remote_endpoints = cast(
-                'dict[int, OtlpEndpoint]',
-                cast('Any', mgr.charm).otlp_consumer.get_remote_otlp_endpoints(),
-            )
+            remote_endpoints = mgr.charm.otlp_consumer.endpoints
 
     # THEN the returned endpoints are filtered accordingly
     assert {k: v.model_dump() for k, v in remote_endpoints.items()} == {
         k: v.model_dump() for k, v in expected.items()
     }
+
+
+def test_send_otlp(otlp_consumer_ctx: testing.Context[ops.CharmBase]):
+    # GIVEN a remote app provides multiple OtlpEndpoints
+    remote_app_data_1 = {
+        "endpoints": json.dumps(
+            [
+                {
+                    "protocol": "http",
+                    "endpoint": "http://provider-123.endpoint:4318",
+                    "telemetries": ["logs", "metrics"],
+                }
+            ]
+        )
+    }
+    remote_app_data_2 = {
+        "endpoints": json.dumps(
+            [
+                {
+                    "protocol": "grpc",
+                    "endpoint": "http://provider-456.endpoint:4317",
+                    "telemetries": ["traces"],
+                },
+                {
+                    "protocol": "http",
+                    "endpoint": "http://provider-456.endpoint:4318",
+                    "telemetries": ["metrics"],
+                },
+            ]
+        )
+    }
+
+    expected_endpoints = {
+        456: OtlpEndpoint(
+            protocol="http",
+            endpoint="http://provider-456.endpoint:4318",
+            telemetries=["metrics"],
+        ),
+        123: OtlpEndpoint(
+            protocol="http",
+            endpoint="http://provider-123.endpoint:4318",
+            telemetries=["logs", "metrics"],
+        ),
+    }
+
+    # WHEN they are related over the "send-otlp" endpoint
+    provider_1 = Relation(
+        "send-otlp",
+        id=123,
+        remote_app_data=remote_app_data_1,
+    )
+    provider_2 = Relation(
+        "send-otlp",
+        id=456,
+        remote_app_data=remote_app_data_2,
+    )
+    state = State(
+        relations=[provider_1, provider_2],
+        leader=True,
+    )
+
+    # AND WHEN otelcol has supports a subset of OTLP protocols and telemetries
+    with otlp_consumer_ctx(otlp_consumer_ctx.on.update_status(), state=state) as mgr:
+        remote_endpoints = mgr.charm.otlp_consumer.endpoints
+
+    # THEN the returned endpoints are filtered accordingly
+    assert {k: v.model_dump() for k, v in remote_endpoints.items()} == {
+        k: v.model_dump() for k, v in expected_endpoints.items()
+    }
+
+
+@patch("socket.getfqdn", new=lambda *args: "fqdn")
+def test_receive_otlp(otlp_provider_ctx: testing.Context[ops.CharmBase]):
+    # GIVEN a receive-otlp relation
+    state = State(
+        leader=True,
+        relations=[RECEIVE_OTLP],
+    )
+
+    # AND WHEN any event executes the reconciler
+    state_out = otlp_provider_ctx.run(otlp_provider_ctx.on.update_status(), state=state)
+    local_app_data = list(state_out.relations)[0].local_app_data
+
+    # THEN otelcol offers its supported OTLP endpoints in the databag
+    expected_endpoints = {
+        "endpoints": [
+            {
+                "protocol": "http",
+                "endpoint": "http://fqdn:4318",
+                "telemetries": ["metrics"],
+            }
+        ],
+    }
+    assert (actual_endpoints := json.loads(local_app_data.get("endpoints", "[]")))
+    assert (
+        OtlpProviderAppData.model_validate({"endpoints": actual_endpoints}).model_dump()
+        == expected_endpoints
+    )

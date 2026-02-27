@@ -75,3 +75,40 @@ def otlp_consumer_ctx() -> testing.Context[OtlpConsumerCharm]:
 def otlp_provider_ctx() -> testing.Context[OtlpProviderCharm]:
     meta = {'name': 'otlp-provider', 'provides': {'receive-otlp': {'interface': 'otlp'}}}
     return testing.Context(OtlpProviderCharm, meta=meta)
+
+
+# Charm used in tests that acts as both an OTLP provider and consumer
+class OtlpDualCharm(CharmBase):
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        self.otlp_consumer = OtlpConsumer(self)
+        self.otlp_provider = OtlpProvider(self)
+
+        try:
+            self.framework.observe(
+                self.otlp_consumer.on.endpoints_changed, self._on_endpoints_changed
+            )
+        except Exception as e:
+            logger.info('An exception occured when observing the event: %s', e)
+
+    def _on_endpoints_changed(self):
+        return None
+
+
+@pytest.fixture
+def otlp_dual_ctx() -> testing.Context[OtlpDualCharm]:
+    meta = {
+        'name': 'otlp-dual',
+        'requires': {'send-otlp': {'interface': 'otlp'}},
+        'provides': {'receive-otlp': {'interface': 'otlp'}},
+    }
+    config = {
+        'options': {
+            'forward_alert_rules': {
+                'type': 'boolean',
+                'default': True,
+            },
+        },
+    }
+    return testing.Context(OtlpDualCharm, meta=meta, config=config)
+

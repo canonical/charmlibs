@@ -5,7 +5,8 @@
 
 import json
 from typing import Any, Dict, Optional
-
+import ops
+from ops import testing
 import pytest
 from cosl.utils import LZMABase64
 from ops.testing import Model, Relation, State
@@ -14,6 +15,11 @@ from charmlibs.otlp import (
     OtlpConsumerAppData,
     RulesModel,
 )
+
+# REMOVE
+import logging
+
+logger = logging.getLogger(__name__)
 
 OTELCOL_LABELS = {
     "juju_model": "otelcol",
@@ -68,7 +74,7 @@ ALL_RULES = {
 }
 
 
-def _decompress(rules: str) -> dict:
+def _decompress(rules: str) -> Dict[str, Any]:
     return json.loads(LZMABase64.decompress(rules))
 
 
@@ -101,25 +107,23 @@ def _rules_have_labels(groups: Dict[str, Any], labels: Dict[str, Any]) -> bool:
     ],
 )
 def test_forwarded_rules_compression(
-    ctx,
-    otelcol_container,
-    valid_compression,
-    compressed_rules,
-):
+    otlp_dual_ctx: testing.Context[ops.CharmBase],
+    valid_compression: bool,
+    compressed_rules: str,
+) -> None:
     # GIVEN receive-otlp and send-otlp relations
-    databag = {"rules": compressed_rules, "metadata": "{}"}
+    databag: Dict[str, Any] = {"rules": compressed_rules, "metadata": "{}"}
     receiver = Relation("receive-otlp", remote_app_data=databag)
     sender_1 = Relation("send-otlp", remote_app_data={"endpoints": "[]"})
     sender_2 = Relation("send-otlp", remote_app_data={"endpoints": "[]"})
     state = State(
         relations=[receiver, sender_1, sender_2],
         leader=True,
-        containers=otelcol_container,
         model=Model("otelcol", uuid="f4d59020-c8e7-4053-8044-a2c1e5591c7f"),
     )
 
     # WHEN any event executes the reconciler
-    state_out = ctx.run(ctx.on.update_status(), state=state)
+    state_out = otlp_dual_ctx.run(otlp_dual_ctx.on.update_status(), state=state)
 
     for relation in list(state_out.relations):
         if relation.endpoint != "send-otlp":
@@ -138,9 +142,17 @@ def test_forwarded_rules_compression(
         else:
             # THEN the decompressed databag contains rules
             assert actual_groups
-            assert (actual_group_names := {group.get("name") for group in actual_groups})
-            assert (expected_groups := ALL_RULES.get("logql", {}).get("groups", []))
-            assert (expected_group_names := {group.get("name") for group in expected_groups})
+            actual_group_names = set()
+            for group in actual_groups:
+                name = group.get("name")
+                if isinstance(name, str):
+                    actual_group_names.add(name)
+            expected_groups = ALL_RULES.get("logql", {}).get("groups", [])
+            expected_group_names = set()
+            for group in expected_groups:
+                name = group.get("name")
+                if isinstance(name, str):
+                    expected_group_names.add(name)
             assert actual_group_names == expected_group_names
 
 
@@ -188,37 +200,40 @@ def test_forwarded_rules_compression(
     ],
 )
 def test_forwarding_otlp_rule_counts(
-    ctx, otelcol_container, forwarding_enabled, rules, expected_group_counts
-):
+    otlp_dual_ctx: testing.Context[ops.CharmBase],
+    forwarding_enabled: bool,
+    rules: Dict[str, Any],
+    expected_group_counts: Dict[str, int],
+) -> None:
     # GIVEN forwarding of rules is enabled
     # * a receive-otlp with rules in the databag
     # * two send-otlp relations
-    databag = {"rules": json.dumps(rules), "metadata": "{}"}
+    databag: Dict[str, Any] = {"rules": json.dumps(rules), "metadata": "{}"}
     receiver = Relation("receive-otlp", remote_app_data=databag)
     sender_1 = Relation("send-otlp", remote_app_data={"endpoints": "[]"})
     sender_2 = Relation("send-otlp", remote_app_data={"endpoints": "[]"})
     state = State(
         relations=[receiver, sender_1, sender_2],
         leader=True,
-        containers=otelcol_container,
         model=Model("otelcol", uuid="f4d59020-c8e7-4053-8044-a2c1e5591c7f"),
         config={"forward_alert_rules": forwarding_enabled},
     )
 
     # WHEN any event executes the reconciler
-    state_out = ctx.run(ctx.on.update_status(), state=state)
+    state_out = otlp_dual_ctx.run(otlp_dual_ctx.on.update_status(), state=state)
 
     for relation in list(state_out.relations):
         if relation.endpoint != "send-otlp":
             continue
+        logger.info("Testing rules %s", relation.local_app_data.get("rules"))
         assert (decompressed := _decompress(relation.local_app_data.get("rules")))
-        databag = OtlpConsumerAppData.model_validate({"rules": decompressed, "metadata": {}})
+        consumer_databag: OtlpConsumerAppData = OtlpConsumerAppData.model_validate({"rules": decompressed, "metadata": {}})
 
         # THEN all expected rules exist in the databag
         # * databag_groups are included/forwarded
-        assert isinstance(databag.rules, RulesModel)
-        assert len(databag.rules.logql.get("groups", [])) == expected_group_counts["logql"]
-        assert len(databag.rules.promql.get("groups", [])) == expected_group_counts["promql"]
+        assert isinstance(consumer_databag.rules, RulesModel)
+        assert len(consumer_databag.rules.logql.get("groups", [])) == expected_group_counts["logql"]
+        assert len(consumer_databag.rules.promql.get("groups", [])) == expected_group_counts["promql"]
 
 
 @pytest.mark.parametrize(
@@ -288,60 +303,63 @@ def test_forwarding_otlp_rule_counts(
         ),
     ],
 )
-def test_forwarded_rules_have_topology(ctx, otelcol_container, metadata, expected_labels):
+def test_forwarded_rules_have_topology(
+    otlp_dual_ctx: testing.Context[ops.CharmBase],
+    metadata: Dict[str, Any],
+    expected_labels: Dict[str, Any],
+) -> None:
     # GIVEN receive-otlp and send-otlp relations
     rules = {
         "logql": {"groups": [LOGQL_ALERT, LOGQL_RECORD]},
         "promql": {"groups": [PROMQL_ALERT, PROMQL_RECORD]},
     }
-    databag = {"rules": json.dumps(rules), "metadata": json.dumps(metadata)}
+    databag: Dict[str, Any] = {"rules": json.dumps(rules), "metadata": json.dumps(metadata)}
     receiver = Relation("receive-otlp", remote_app_data=databag)
     sender_1 = Relation("send-otlp", remote_app_data={"endpoints": "[]"})
     sender_2 = Relation("send-otlp", remote_app_data={"endpoints": "[]"})
     state = State(
         relations=[receiver, sender_1, sender_2],
         leader=True,
-        containers=otelcol_container,
         model=Model("otelcol", uuid="f4d59020-c8e7-4053-8044-a2c1e5591c7f"),
     )
 
     # WHEN any event executes the reconciler
-    state_out = ctx.run(ctx.on.update_status(), state=state)
+    state_out = otlp_dual_ctx.run(otlp_dual_ctx.on.update_status(), state=state)
     for relation in list(state_out.relations):
         if relation.endpoint != "send-otlp":
             continue
         assert (decompressed := _decompress(relation.local_app_data.get("rules")))
-        databag = OtlpConsumerAppData.model_validate({"rules": decompressed, "metadata": metadata})
-        assert isinstance(databag.rules, RulesModel)
+        consumer_databag: OtlpConsumerAppData = OtlpConsumerAppData.model_validate({"rules": decompressed, "metadata": metadata})
+        assert isinstance(consumer_databag.rules, RulesModel)
 
         # --- logql assertions ---
         # THEN the upstream databag alert rule has topology labels injected
         group_name = "otelcol_f4d59020_charm_x_foo_alerts"
-        assert (actual := _get_group_by_name(databag.rules.logql, group_name))
+        assert (actual := _get_group_by_name(consumer_databag.rules.logql, group_name))
         assert _rules_have_labels(actual, expected_labels)
 
         # THEN the upstream databag record rule has topology labels injected
         group_name = "otelcol_f4d59020_charm_x_foobar_alerts"
-        assert (actual := _get_group_by_name(databag.rules.logql, group_name))
+        assert (actual := _get_group_by_name(consumer_databag.rules.logql, group_name))
         assert _rules_have_labels(actual, expected_labels)
 
         # --- promql assertions ---
         # THEN the upstream databag alert rule has topology labels injected
         group_name = "otelcol_f4d59020_charm_x_bar_alerts"
-        assert (actual := _get_group_by_name(databag.rules.promql, group_name))
+        assert (actual := _get_group_by_name(consumer_databag.rules.promql, group_name))
         assert _rules_have_labels(actual, expected_labels)
 
         # THEN the upstream databag record rule has topology labels injected
         group_name = "otelcol_f4d59020_charm_x_barfoo_alerts"
-        assert (actual := _get_group_by_name(databag.rules.promql, group_name))
+        assert (actual := _get_group_by_name(consumer_databag.rules.promql, group_name))
         assert _rules_have_labels(actual, expected_labels)
 
         # THEN the bundled alert rule has topology labels injected
         group_name = "otelcol_f4d59020_opentelemetry_collector_k8s_Hardware_alerts"
-        assert (actual := _get_group_by_name(databag.rules.promql, group_name))
+        assert (actual := _get_group_by_name(consumer_databag.rules.promql, group_name))
         assert _rules_have_labels(actual, OTELCOL_LABELS)
 
         # THEN the generic alert rule has topology labels injected
         group_name = "otelcol_f4d59020_opentelemetry_collector_k8s_AggregatorHostHealth_alerts"
-        assert (actual := _get_group_by_name(databag.rules.promql, group_name))
+        assert (actual := _get_group_by_name(consumer_databag.rules.promql, group_name))
         assert _rules_have_labels(actual, OTELCOL_LABELS)
