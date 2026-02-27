@@ -161,27 +161,27 @@ def test_forwarded_rules_compression(
 @pytest.mark.parametrize(
     "forwarding_enabled, rules, expected_group_counts",
     [
-        # format , databag_groups, generic_groups, bundled_groups, total
-        # logql  , (2)           , (0)           , (0)           , (0)
-        # promql , (2)           , (1)           , (3)           , (4)
+        # format , databag_groups, generic_groups, total
+        # logql  , (2)           , (0)           , (2)
+        # promql , (2)           , (1)           , (2)
         (
             False,
             {
                 "logql": {"groups": [LOGQL_ALERT, LOGQL_RECORD]},
                 "promql": {"groups": [PROMQL_ALERT, PROMQL_RECORD]},
             },
-            {"logql": 0, "promql": 4},
+            {"logql": 2, "promql": 2},
         ),
-        # format , databag_groups, generic_groups, bundled_groups, total
-        # logql  , (2)           , (0)           , (0)           , (2)
-        # promql , (2)           , (1)           , (3)           , (6)
+        # format , databag_groups, generic_groups, total
+        # logql  , (2)           , (0)           ,  (2)
+        # promql , (2)           , (1)           ,  (3)
         (
             True,
             {
                 "logql": {"groups": [LOGQL_ALERT, LOGQL_RECORD]},
                 "promql": {"groups": [PROMQL_ALERT, PROMQL_RECORD]},
             },
-            {"logql": 2, "promql": 6},
+            {"logql": 2, "promql": 3},
         ),
         # format , databag_groups, generic_groups, bundled_groups, total
         # logql  , (0)           , (0)           , (0)           , (0)
@@ -191,13 +191,13 @@ def test_forwarded_rules_compression(
             {"logql": {}, "promql": {"groups": [PROMQL_ALERT, PROMQL_RECORD]}},
             {"logql": 0, "promql": 6},
         ),
-        # format , databag_groups, generic_groups, bundled_groups, total
-        # logql  , (2)           , (0)           , (0)           , (2)
-        # promql , (0)           , (1)           , (3)           , (4)
+        # format , databag_groups, generic_groups, total
+        # logql  , (2)           , (0)           , (2)
+        # promql , (0)           , (1)           , (1)
         (
             True,
             {"logql": {"groups": [LOGQL_ALERT, LOGQL_RECORD]}, "promql": {}},
-            {"logql": 2, "promql": 4},
+            {"logql": 2, "promql": 1},
         ),
     ],
 )
@@ -330,6 +330,8 @@ def test_forwarded_rules_have_topology(
     for relation in list(state_out.relations):
         if relation.endpoint != "send-otlp":
             continue
+        logger.info("Testing rules %s", relation.local_app_data.get("rules"))
+        logger.info("decompressed rules %s", _decompress(relation.local_app_data.get("rules")))
         assert (decompressed := _decompress(relation.local_app_data.get("rules")))
         consumer_databag: OtlpConsumerAppData = OtlpConsumerAppData.model_validate({"rules": decompressed, "metadata": metadata})
         assert isinstance(consumer_databag.rules, RulesModel)

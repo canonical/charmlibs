@@ -22,7 +22,8 @@ import ops
 import pytest
 from ops import testing
 from ops.charm import CharmBase
-
+import socket
+from unittest.mock import patch
 from charmlibs.otlp import OtlpConsumer, OtlpProvider
 
 logger = logging.getLogger(__name__)
@@ -38,6 +39,10 @@ def ctx() -> testing.Context[ops.CharmBase]:
         },
     )
 
+@pytest.fixture(autouse=True)
+def mock_hostname():
+    with patch("socket.getfqdn", return_value="http://fqdn"):
+        yield
 
 # Minimal test charms used by unit tests
 class OtlpConsumerCharm(CharmBase):
@@ -54,14 +59,41 @@ class OtlpConsumerCharm(CharmBase):
             # some library objects may not expose events in unit tests; ignore
             logger.info('An exception occured when observing the event: %s', e)
 
+        # observe update-status to trigger the consumer's publish in tests
+        try:
+            self.framework.observe(self.on.update_status, self._on_update_status)
+        except Exception as e:
+            logger.info('An exception occured when observing the event: %s', e)
+
     def _on_endpoints_changed(self, event: ops.EventBase):
         return None
+
+    def _on_update_status(self, event: ops.EventBase) -> None:
+        # Trigger the library to (re)publish consumer data to related apps
+        try:
+            self.otlp_consumer.publish()
+        except Exception:
+            # In unit-tests the filesystem or relations may not exist as in real charms; swallow errors
+            return None
 
 
 class OtlpProviderCharm(CharmBase):
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
         self.otlp_provider = OtlpProvider(self)
+        # observe update-status to add and publish provider endpoints in tests
+        try:
+            self.framework.observe(self.on.update_status, self._on_update_status)
+        except Exception as e:
+            logger.info('An exception occured when observing the event: %s', e)
+
+    def _on_update_status(self, event: ops.EventBase) -> None:
+        # Add a default HTTP metrics endpoint and publish it
+        try:
+            self.otlp_provider.add_endpoint(protocol="http", endpoint=f"{socket.getfqdn()}:4318", telemetries=["metrics"])
+            self.otlp_provider.publish()
+        except Exception:
+            return None
 
 
 # Fixtures returning testing.Context for each charm type
@@ -91,8 +123,29 @@ class OtlpDualCharm(CharmBase):
         except Exception as e:
             logger.info('An exception occured when observing the event: %s', e)
 
+        # Observe update-status to publish both provider and consumer data
+        try:
+            self.framework.observe(self.on.update_status, self._on_update_status)
+        except Exception as e:
+            logger.info('An exception occured when observing the event: %s', e)
+
     def _on_endpoints_changed(self, event: ops.EventBase) -> None:
         return None
+
+    def _on_update_status(self, event: ops.EventBase) -> None:
+        # add a provider endpoint and publish both sides
+        try:
+            self.otlp_provider.add_endpoint(protocol="http", endpoint=f"{socket.getfqdn()}:4318", telemetries=["metrics"])
+        except Exception:
+            pass
+        try:
+            self.otlp_provider.publish()
+        except Exception:
+            pass
+        try:
+            self.otlp_consumer.publish()
+        except Exception:
+            pass
 
 
 @pytest.fixture
