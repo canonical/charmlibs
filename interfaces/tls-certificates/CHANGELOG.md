@@ -1,3 +1,7 @@
+# 1.8.1 - 27 February 2025
+
+Cleanup secrets when relation is removed.
+
 # 1.8.0 - 24 February 2025
 
 Introduce the import_private_key public function to allow requirers to dynamically import an external public key.
