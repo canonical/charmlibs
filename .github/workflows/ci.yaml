@@ -181,6 +181,26 @@ jobs:
           echo '${{ toJSON(needs) }}' | jq  # logging
           exit 1
 
+  testing-versions-match:
+    needs: [init]
+    if: ${{ needs.init.outputs.packages != '[]' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v7
+      - name: Ensure testing versions matches package versions
+        run: |
+          set -xueo pipefail
+          if .scripts/testing-versions-match.py; then
+            : 'Main package versions match testing package versions :)'
+          else
+            : 'At least one testing package version does not match its main package version :('
+            exit 1
+          fi
+
   zizmor:
     runs-on: ubuntu-latest
     permissions:

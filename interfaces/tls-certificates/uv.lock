@@ -237,6 +237,11 @@ dependencies = [
     { name = "pydantic" },
 ]
 
+[package.optional-dependencies]
+testing = [
+    { name = "charmlibs-interfaces-tls-certificates-testing" },
+]
+
 [package.dev-dependencies]
 integration = [
     { name = "juju" },
@@ -253,10 +258,12 @@ unit = [
 
 [package.metadata]
 requires-dist = [
+    { name = "charmlibs-interfaces-tls-certificates-testing", marker = "extra == 'testing'", editable = "testing" },
     { name = "cryptography", specifier = ">=43.0.0" },
     { name = "ops" },
     { name = "pydantic" },
 ]
+provides-extras = ["testing"]
 
 [package.metadata.requires-dev]
 functional = []
@@ -270,6 +277,26 @@ unit = [
     { name = "ops", extras = ["testing"] },
     { name = "pkilint" },
 ]
+
+[[package]]
+name = "charmlibs-interfaces-tls-certificates-testing"
+source = { editable = "testing" }
+dependencies = [
+    { name = "charmlibs-interfaces-tls-certificates" },
+    { name = "ops", extra = ["testing"] },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "charmlibs-interfaces-tls-certificates", editable = "." },
+    { name = "ops", extras = ["testing"] },
+]
+
+[package.metadata.requires-dev]
+functional = []
+integration = []
+lint = []
+unit = []
 
 [[package]]
 name = "charset-normalizer"
