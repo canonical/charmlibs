@@ -4,7 +4,6 @@
 """Feature: Rules aggregation and forwarding."""
 
 import json
-
 from typing import Any
 
 import ops
@@ -17,7 +16,6 @@ from charmlibs.otlp import (
     OtlpConsumerAppData,
     RulesModel,
 )
-from typing import Dict
 
 OTELCOL_LABELS = {
     'juju_model': 'otelcol',
@@ -79,18 +77,18 @@ METADATA = {
     'unit': 'opentelemetry-collector-k8s/0',
 }
 
+
 def _decompress(rules: str | None) -> dict[str, Any]:
     if not rules:
         return {}
     return json.loads(LZMABase64.decompress(rules))
 
 
-
 @pytest.mark.parametrize(
-    "valid_compression, compressed_rules",
+    'valid_compression, compressed_rules',
     [
         (True, LZMABase64.compress(json.dumps(ALL_RULES, sort_keys=True))),
-        (False, "/Td6WFoAAATm1rRGAgAhARYAAAB0L+Wj4AM4AWFdAD2I"),
+        (False, '/Td6WFoAAATm1rRGAgAhARYAAAB0L+Wj4AM4AWFdAD2I'),
     ],
 )
 def test_forwarded_rules_compression(
@@ -99,30 +97,31 @@ def test_forwarded_rules_compression(
     compressed_rules: str,
 ) -> None:
     # GIVEN receive-otlp and send-otlp relations
-    databag: Dict[str, Any] = {"rules": compressed_rules, "metadata": json.dumps(METADATA)}
-    receiver = Relation("receive-otlp", remote_app_data=databag)
-    sender_1 = Relation("send-otlp", remote_app_data={"endpoints": "[]"})
-    sender_2 = Relation("send-otlp", remote_app_data={"endpoints": "[]"})
+    databag: dict[str, Any] = {'rules': compressed_rules, 'metadata': json.dumps(METADATA)}
+    receiver = Relation('receive-otlp', remote_app_data=databag)
+    sender_1 = Relation('send-otlp', remote_app_data={'endpoints': '[]'})
+    sender_2 = Relation('send-otlp', remote_app_data={'endpoints': '[]'})
     state = State(
         relations=[receiver, sender_1, sender_2],
         leader=True,
-        model=Model("otelcol", uuid="f4d59020-c8e7-4053-8044-a2c1e5591c7f"),
+        model=Model('otelcol', uuid='f4d59020-c8e7-4053-8044-a2c1e5591c7f'),
     )
 
     # WHEN any event executes the reconciler
     state_out = otlp_dual_ctx.run(otlp_dual_ctx.on.update_status(), state=state)
 
     for relation in list(state_out.relations):
-        if relation.endpoint != "send-otlp":
+        if relation.endpoint != 'send-otlp':
             continue
-        raw_rules = relation.local_app_data.get("rules")
+        raw_rules = relation.local_app_data.get('rules')
 
         # THEN the databag contains a compressed set of rules
         assert isinstance(raw_rules, str)
-        assert raw_rules.startswith("/")
-        assert (decompressed := _decompress(raw_rules))
+        assert raw_rules.startswith('/')
+        decompressed = _decompress(raw_rules)
+        assert decompressed
         assert isinstance(decompressed, dict)
-        actual_groups = decompressed.get("logql", {}).get("groups", [])
+        actual_groups = decompressed.get('logql', {}).get('groups', [])
         if not valid_compression:
             # THEN the decompressed databag contains no rules
             assert not actual_groups
@@ -131,23 +130,24 @@ def test_forwarded_rules_compression(
             assert actual_groups
             actual_group_names: set[str] = set()
             for group in actual_groups:
-                name = group.get("name")
+                name = group.get('name')
                 if isinstance(name, str):
                     actual_group_names.add(name)
-            expected_groups = ALL_RULES.get("logql", {}).get("groups", [])
+            expected_groups = ALL_RULES.get('logql', {}).get('groups', [])
             expected_group_names: set[str] = set()
             for group in expected_groups:
-                name = group.get("name")
+                name = group.get('name')
                 if isinstance(name, str):
                     expected_group_names.add(name)
             assert actual_group_names == expected_group_names
+
 
 @pytest.mark.parametrize(
     'forwarding_enabled, rules, expected_group_counts',
     [
         # format , databag_groups, generic_groups, total
         # logql  , (2)           , (0)           , (2)
-        # promql , (2)           , (1)           , (2)
+        # promql , (2)           , (1)           , (3)
         (
             True,
             {
@@ -212,7 +212,8 @@ def test_forwarding_otlp_rule_counts(
         if relation.endpoint != 'send-otlp':
             continue
 
-        assert (decompressed := _decompress(relation.local_app_data.get('rules')))
+        decompressed = _decompress(relation.local_app_data.get('rules'))
+        assert decompressed
         consumer_databag: OtlpConsumerAppData = OtlpConsumerAppData.model_validate({
             'rules': decompressed,
             'metadata': {},

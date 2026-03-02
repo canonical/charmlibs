@@ -326,7 +326,7 @@ def test_receive_otlp(otlp_provider_ctx: testing.Context[ops.CharmBase]):
 
     # AND WHEN any event executes the reconciler
     state_out = otlp_provider_ctx.run(otlp_provider_ctx.on.update_status(), state=state)
-    local_app_data = list(state_out.relations)[0].local_app_data
+    local_app_data = next(iter(state_out.relations)).local_app_data
 
     # THEN otelcol offers its supported OTLP endpoints in the databag
     expected_endpoints = {

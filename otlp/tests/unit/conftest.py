@@ -18,8 +18,11 @@ from __future__ import annotations
 
 import logging
 import socket
-from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pathlib import Path
+from typing import Any, cast
 from unittest.mock import patch
 
 import ops
@@ -82,7 +85,8 @@ class OtlpConsumerCharm(CharmBase):
         try:
             self.otlp_consumer.publish()
         except Exception:
-            # In unit-tests the filesystem or relations may not exist as in real charms; swallow errors
+            # In unit-tests the filesystem or relations may not exist as in real charms;
+            # swallow errors
             return None
 
 
@@ -124,7 +128,7 @@ LOKI_RULES_DEST_PATH = 'loki_alert_rules'
 METRICS_RULES_DEST_PATH = 'prometheus_alert_rules'
 
 
-def _add_alerts(alerts: dict, dest_path: Path):
+def _add_alerts(alerts: dict[str, dict[str, Any]], dest_path: Path) -> None:
     """Save the alerts to files in the specified destination folder.
 
     For K8s charms, alerts are saved in the charm container.
@@ -137,7 +141,7 @@ def _add_alerts(alerts: dict, dest_path: Path):
     for topology_identifier, rule in alerts.items():
         rule_file = dest_path.joinpath(f'juju_{topology_identifier}.rules')
         rule_file.write_text(yaml.safe_dump(rule))
-        logger.debug(f'updated alert rules file {rule_file.as_posix()}')
+        logger.debug('updated alert rules file: %s', rule_file.as_posix())
 
 
 # Charm used in tests that acts as both an OTLP provider and consumer
@@ -188,15 +192,15 @@ class OtlpDualCharm(CharmBase):
                 dest_path=self.charm_root.joinpath(*METRICS_RULES_DEST_PATH.split('/')),
             )
         except Exception:
-            pass
+            logger.error('An exception occured when preparing the OTLP provider')
         try:
             self.otlp_provider.publish()
         except Exception:
-            pass
+            logger.error("An exception in the OTLP Provider's publish method")
         try:
             self.otlp_consumer.publish()
         except Exception:
-            pass
+            logger.error("An exception in the OTLP Consumer's publish method")
 
 
 @pytest.fixture

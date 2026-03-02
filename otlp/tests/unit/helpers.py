@@ -1,7 +1,22 @@
+# Copyright 2026 Canonical Ltd.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import logging
 from collections.abc import Callable
 from functools import wraps
 from pathlib import Path
+from typing import ParamSpec, TypeVar
 from unittest.mock import patch
 
 import requests
@@ -13,7 +28,11 @@ COS_TOOL_URL = 'https://github.com/canonical/cos-tool/releases/latest/download/c
 PROJECT_DIR = Path(__file__).resolve().parent.parent.parent
 
 
-def patch_cos_tool_path(func) -> Callable:
+P = ParamSpec('P')
+R = TypeVar('R')
+
+
+def patch_cos_tool_path(func: Callable[P, R]) -> Callable[P, R]:
     """Patch cos tool path.
 
     Downloads from GitHub, if it does not exist locally.
@@ -26,7 +45,7 @@ def patch_cos_tool_path(func) -> Callable:
     cos_path = PROJECT_DIR / 'cos-tool-amd64'
     if not cos_path.exists():
         logging.debug('cos-tool was not found, download it')
-        with requests.get(COS_TOOL_URL, stream=True) as r:
+        with requests.get(COS_TOOL_URL, stream=True, timeout=10) as r:
             r.raise_for_status()
             with open(cos_path, 'wb') as f:
                 for chunk in r.iter_content(chunk_size=1024):
@@ -39,7 +58,7 @@ def patch_cos_tool_path(func) -> Callable:
     path = patch.object(target=_CosTool, attribute='_path', new=str(cos_path))
 
     @wraps(func)
-    def wrapper_decorator(*args, **kwargs):
+    def wrapper_decorator(*args: P.args, **kwargs: P.kwargs) -> R:
         with path:
             value = func(*args, **kwargs)
         return value

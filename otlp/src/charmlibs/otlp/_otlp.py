@@ -26,6 +26,7 @@ import logging
 from collections import OrderedDict
 from collections.abc import Sequence
 from lzma import LZMAError
+from pathlib import Path
 from typing import Any, ClassVar, Literal
 
 from cosl.juju_topology import JujuTopology
@@ -130,6 +131,8 @@ class OtlpConsumer(Object):
             rules provided by this charm.
     """
 
+    _rules_cls = AlertRules
+
     def __init__(
         self,
         charm: CharmBase,
@@ -137,8 +140,8 @@ class OtlpConsumer(Object):
         protocols: Sequence[Literal['http', 'grpc']] | None = None,
         telemetries: Sequence[Literal['logs', 'metrics', 'traces']] | None = None,
         *,
-        loki_rules_path: str = DEFAULT_LOKI_RULES_RELATIVE_PATH,
-        prometheus_rules_path: str = DEFAULT_PROM_RULES_RELATIVE_PATH,
+        loki_rules_path: str | Path = DEFAULT_LOKI_RULES_RELATIVE_PATH,
+        prometheus_rules_path: str | Path = DEFAULT_PROM_RULES_RELATIVE_PATH,
     ):
         super().__init__(charm, relation_name)
         self._charm = charm
@@ -154,12 +157,10 @@ class OtlpConsumer(Object):
         # Avoid calling AlertRules.validate_rules_path here to prevent static
         # attribute-access typing complaints from analyzers; keep the provided
         # paths as-is (they are validated at runtime by callers that need it).
-        self._loki_rules_path: str = loki_rules_path
-        self._prom_rules_path: str = prometheus_rules_path
+        self._loki_rules_path: str | Path = loki_rules_path
+        self._prom_rules_path: str | Path = prometheus_rules_path
 
-    def _filter_endpoints(
-        self, endpoints: list[dict[str, str | list[str]]]
-    ) -> list[OtlpEndpoint]:
+    def _filter_endpoints(self, endpoints: list[dict[str, str | list[str]]]) -> list[OtlpEndpoint]:
         """Filter out unsupported OtlpEndpoints.
 
         For each endpoint:
@@ -211,9 +212,8 @@ class OtlpConsumer(Object):
             return
 
         # Define the rule types
-        # TODO: Create a type named "Rules"
-        loki_rules = AlertRules(query_type='logql', topology=self._topology)
-        prom_rules = AlertRules(query_type='promql', topology=self._topology)
+        loki_rules = self._rules_cls(query_type='logql', topology=self._topology)
+        prom_rules = self._rules_cls(query_type='promql', topology=self._topology)
 
         # Add rules
         prom_rules.add(
@@ -254,7 +254,7 @@ class OtlpConsumer(Object):
                 # Ensure that the databag is valid
                 app_databag = OtlpProviderAppData(endpoints=endpoints)
             except ValidationError as e:
-                logger.error(f'OTLP databag failed validation: {e}')
+                logger.error('OTLP databag failed validation: %s', e)
                 continue
 
             # Choose the first valid endpoint in list
@@ -274,6 +274,8 @@ class OtlpProvider(Object):
         charm: The charm instance.
         relation_name: The name of the relation to use.
     """
+
+    _rules_cls = AlertRules
 
     def __init__(
         self,
@@ -324,17 +326,17 @@ class OtlpProvider(Object):
             a mapping of relation ID to a dictionary of alert rule groups
             following the OfficialRuleFileFormat from cos-lib.
         """
-        # TODO: Use the new Rules class
-        rules_obj = AlertRules(query_type, self._topology)
+        rules_obj = self._rules_cls(query_type, self._topology)
 
-        rules_map: dict[int, dict[str, Any]] = {}
+        # InjectResult.identifier is a string identifier; use str keys
+        rules_map: dict[str, dict[str, Any]] = {}
         for relation in self.model.relations[self._relation_name]:
             consumer = relation.load(
                 OtlpConsumerAppData, relation.app, decoder=OtlpConsumerAppData.decode_value
             )
 
             # get rules for the desired query type
-            rules_for_type = getattr(
+            rules_for_type: dict[str, Any] | None = getattr(
                 consumer.rules, getattr(rules_obj, 'query_type', query_type), None
             )
             if not rules_for_type:
@@ -352,12 +354,11 @@ class OtlpProvider(Object):
 
             identifier = result.identifier
             rules_val = result.rules
-            # Q: what do we do when we don't have an identifier?
-            # If we cannot generate an identifier, we should not write them to disk
+
             # If an identifier does not exist, then we should assume that something is broken
             # This could signal an issue on the cosl side
             # We should not return any rules without an identifier
-            if identifier is not None and rules_val is not None:
+            if identifier is not None:
                 rules_map[identifier] = rules_val
 
         return rules_map
