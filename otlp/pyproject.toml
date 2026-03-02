@@ -17,6 +17,8 @@ dynamic = ["version"]
 dependencies = [
     # "ops",
     "cosl @ git+https://github.com/canonical/cos-lib.git@feat/more-rules-methods",
+    "pytest",
+    "requests",
 ]
 
 [dependency-groups]

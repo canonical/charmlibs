@@ -23,20 +23,22 @@ For user-facing documentation, see the package-level docstring in __init__.py.
 import copy
 import json
 import logging
+from collections import OrderedDict
+from collections.abc import Sequence
 from lzma import LZMAError
-from typing import Any, ClassVar, Dict, List, Literal, Optional, OrderedDict, Sequence, Union
+from typing import Any, ClassVar, Literal
 
 from cosl.juju_topology import JujuTopology
-from cosl.rules import AlertRules, generic_alert_groups
+from cosl.rules import AlertRules, InjectResult, generic_alert_groups
 from cosl.utils import LZMABase64
 from ops import CharmBase
 from ops.framework import Object
 from pydantic import BaseModel, ConfigDict, ValidationError
 
-DEFAULT_CONSUMER_RELATION_NAME = "send-otlp"
-DEFAULT_PROVIDER_RELATION_NAME = "receive-otlp"
-DEFAULT_LOKI_RULES_RELATIVE_PATH = "./src/loki_alert_rules"
-DEFAULT_PROM_RULES_RELATIVE_PATH = "./src/prometheus_alert_rules"
+DEFAULT_CONSUMER_RELATION_NAME = 'send-otlp'
+DEFAULT_PROVIDER_RELATION_NAME = 'receive-otlp'
+DEFAULT_LOKI_RULES_RELATIVE_PATH = './src/loki_alert_rules'
+DEFAULT_PROM_RULES_RELATIVE_PATH = './src/prometheus_alert_rules'
 
 
 logger = logging.getLogger(__name__)
@@ -45,30 +47,30 @@ logger = logging.getLogger(__name__)
 class RulesModel(BaseModel):
     """A pydantic model for all rule formats."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra='forbid')
 
-    logql: Dict[str, Any]
-    promql: Dict[str, Any]
+    logql: dict[str, Any]
+    promql: dict[str, Any]
 
 
 class OtlpEndpoint(BaseModel):
     """A pydantic model for a single OTLP endpoint."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra='forbid')
 
-    protocol: Literal["http", "grpc"]
+    protocol: Literal['http', 'grpc']
     endpoint: str
-    telemetries: Sequence[Literal["logs", "metrics", "traces"]]
+    telemetries: Sequence[Literal['logs', 'metrics', 'traces']]
 
 
 class OtlpProviderAppData(BaseModel):
     """A pydantic model for the OTLP provider's unit databag."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra='forbid')
 
-    endpoints: List[OtlpEndpoint]
+    endpoints: list[OtlpEndpoint]
     # Key used in relation app databag when exposing provider data
-    KEY: ClassVar[str] = "otlp"
+    KEY: ClassVar[str] = 'otlp'
 
 
 class OtlpConsumerAppData(BaseModel):
@@ -82,13 +84,13 @@ class OtlpConsumerAppData(BaseModel):
     ```
     """
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra='forbid')
 
-    rules: Union[RulesModel, str]
+    rules: RulesModel | str
     metadata: OrderedDict[str, str]
 
     # Key used in relation app databag when exposing consumer data
-    KEY: ClassVar[str] = "otlp"
+    KEY: ClassVar[str] = 'otlp'
 
     @staticmethod
     def decode_value(json_str: str) -> Any:
@@ -100,7 +102,7 @@ class OtlpConsumerAppData(BaseModel):
                 decompressed = LZMABase64.decompress(json_str)
                 return RulesModel.model_validate(json.loads(decompressed))
             except (json.JSONDecodeError, ValidationError, LZMAError):
-                return ""
+                return ''
 
     @staticmethod
     def encode_value(obj: Any) -> str:
@@ -132,8 +134,8 @@ class OtlpConsumer(Object):
         self,
         charm: CharmBase,
         relation_name: str = DEFAULT_CONSUMER_RELATION_NAME,
-        protocols: Optional[Sequence[Literal["http", "grpc"]]] = None,
-        telemetries: Optional[Sequence[Literal["logs", "metrics", "traces"]]] = None,
+        protocols: Sequence[Literal['http', 'grpc']] | None = None,
+        telemetries: Sequence[Literal['logs', 'metrics', 'traces']] | None = None,
         *,
         loki_rules_path: str = DEFAULT_LOKI_RULES_RELATIVE_PATH,
         prometheus_rules_path: str = DEFAULT_PROM_RULES_RELATIVE_PATH,
@@ -142,8 +144,12 @@ class OtlpConsumer(Object):
         self._charm = charm
         self._relation_name = relation_name
         # Use explicit, well-typed lists to avoid partial-unknown-type issues
-        self._protocols: List[Literal["http", "grpc"]] = list(protocols) if protocols is not None else []
-        self._telemetries: List[Literal["logs", "metrics", "traces"]] = list(telemetries) if telemetries is not None else []
+        self._protocols: list[Literal['http', 'grpc']] = (
+            list(protocols) if protocols is not None else []
+        )
+        self._telemetries: list[Literal['logs', 'metrics', 'traces']] = (
+            list(telemetries) if telemetries is not None else []
+        )
         self._topology = JujuTopology.from_charm(charm)
         # Avoid calling AlertRules.validate_rules_path here to prevent static
         # attribute-access typing complaints from analyzers; keep the provided
@@ -152,8 +158,8 @@ class OtlpConsumer(Object):
         self._prom_rules_path: str = prometheus_rules_path
 
     def _filter_endpoints(
-        self, endpoints: List[Dict[str, Union[str, List[str]]]]
-    ) -> List[OtlpEndpoint]:
+        self, endpoints: list[dict[str, str | list[str]]]
+    ) -> list[OtlpEndpoint]:
         """Filter out unsupported OtlpEndpoints.
 
         For each endpoint:
@@ -163,13 +169,13 @@ class OtlpConsumer(Object):
               endpoint is ignored.
             - If the endpoint contains an unsupported protocol it is ignored.
         """
-        valid_endpoints: List[OtlpEndpoint] = []
+        valid_endpoints: list[OtlpEndpoint] = []
         supported_telemetries = set(self._telemetries)
         for endpoint in endpoints:
             if filtered_telemetries := [
-                t for t in endpoint.get("telemetries", []) if t in supported_telemetries
+                t for t in endpoint.get('telemetries', []) if t in supported_telemetries
             ]:
-                endpoint["telemetries"] = filtered_telemetries
+                endpoint['telemetries'] = filtered_telemetries
             else:
                 # If there are no supported telemetries for this endpoint, skip it entirely
                 continue
@@ -206,8 +212,8 @@ class OtlpConsumer(Object):
 
         # Define the rule types
         # TODO: Create a type named "Rules"
-        loki_rules = AlertRules(query_type="logql", topology=self._topology)
-        prom_rules = AlertRules(query_type="promql", topology=self._topology)
+        loki_rules = AlertRules(query_type='logql', topology=self._topology)
+        prom_rules = AlertRules(query_type='promql', topology=self._topology)
 
         # Add rules
         prom_rules.add(
@@ -218,17 +224,15 @@ class OtlpConsumer(Object):
         prom_rules.add_path(self._prom_rules_path, recursive=True)
 
         # Publish to databag
-        databag = OtlpConsumerAppData.model_validate(
-            {
-                "rules": {"logql": loki_rules.as_dict(), "promql": prom_rules.as_dict()},
-                "metadata": self._topology.as_dict(),
-            }
-        )
+        databag = OtlpConsumerAppData.model_validate({
+            'rules': {'logql': loki_rules.as_dict(), 'promql': prom_rules.as_dict()},
+            'metadata': self._topology.as_dict(),
+        })
         for relation in self.model.relations[self._relation_name]:
             relation.save(databag, self._charm.app, encoder=OtlpConsumerAppData.encode_value)
 
     @property
-    def endpoints(self) -> Dict[int, OtlpEndpoint]:
+    def endpoints(self) -> dict[int, OtlpEndpoint]:
         """Return a mapping of relation ID to OTLP endpoint.
 
         For each remote's list of OtlpEndpoints, the consumer filters out
@@ -240,9 +244,9 @@ class OtlpConsumer(Object):
         both an HTTP and gRPC endpoint, and a consumer that only supports HTTP
         will choose the HTTP endpoint.
         """
-        endpoint_map: Dict[int, OtlpEndpoint] = {}
+        endpoint_map: dict[int, OtlpEndpoint] = {}
         for relation in self.model.relations[self._relation_name]:
-            endpoints = json.loads(relation.data[relation.app].get("endpoints", "[]"))
+            endpoints = json.loads(relation.data[relation.app].get('endpoints', '[]'))
             if not (endpoints := self._filter_endpoints(endpoints)):
                 continue
 
@@ -250,11 +254,13 @@ class OtlpConsumer(Object):
                 # Ensure that the databag is valid
                 app_databag = OtlpProviderAppData(endpoints=endpoints)
             except ValidationError as e:
-                logger.error(f"OTLP databag failed validation: {e}")
+                logger.error(f'OTLP databag failed validation: {e}')
                 continue
 
             # Choose the first valid endpoint in list
-            endpoint_choice = next((e for e in app_databag.endpoints if e.protocol in self._protocols), None)
+            endpoint_choice = next(
+                (e for e in app_databag.endpoints if e.protocol in self._protocols), None
+            )
             if endpoint_choice is not None:
                 endpoint_map[relation.id] = endpoint_choice
 
@@ -277,20 +283,22 @@ class OtlpProvider(Object):
         super().__init__(charm, relation_name)
         self._charm = charm
         self._relation_name = relation_name
-        self._endpoints: List[OtlpEndpoint] = []
+        self._endpoints: list[OtlpEndpoint] = []
         self._topology = JujuTopology.from_charm(charm)
 
     def add_endpoint(
         self,
-        protocol: Literal["http", "grpc"],
+        protocol: Literal['http', 'grpc'],
         endpoint: str,
-        telemetries: Sequence[Literal["logs", "metrics", "traces"]],
+        telemetries: Sequence[Literal['logs', 'metrics', 'traces']],
     ):
         """Add an OtlpEndpoint to the list of endpoints to publish.
 
         Call this method after endpoint-changing events e.g. TLS and ingress.
         """
-        self._endpoints.append(OtlpEndpoint(protocol=protocol, endpoint=endpoint, telemetries=telemetries))
+        self._endpoints.append(
+            OtlpEndpoint(protocol=protocol, endpoint=endpoint, telemetries=telemetries)
+        )
 
     def publish(self) -> None:
         """Triggers programmatically the update of the relation data."""
@@ -298,11 +306,11 @@ class OtlpProvider(Object):
             # Only the leader unit can write to app data.
             return
 
-        databag = OtlpProviderAppData.model_validate({"endpoints": self._endpoints})
+        databag = OtlpProviderAppData.model_validate({'endpoints': self._endpoints})
         for relation in self.model.relations[self._relation_name]:
             relation.save(databag, self._charm.app)
 
-    def rules(self, query_type: Literal["logql", "promql"]):
+    def rules(self, query_type: Literal['logql', 'promql']):
         """Fetch rules for all relations of the desired query and rule types.
 
         This method returns all rules of the desired query and rule types
@@ -319,28 +327,36 @@ class OtlpProvider(Object):
         # TODO: Use the new Rules class
         rules_obj = AlertRules(query_type, self._topology)
 
-        rules_map: Dict[int, Dict[str, Any]] = {}
+        rules_map: dict[int, dict[str, Any]] = {}
         for relation in self.model.relations[self._relation_name]:
             consumer = relation.load(
                 OtlpConsumerAppData, relation.app, decoder=OtlpConsumerAppData.decode_value
             )
 
             # get rules for the desired query type
-            rules_for_type = getattr(consumer.rules, getattr(rules_obj, "query_type", query_type), None)
+            rules_for_type = getattr(
+                consumer.rules, getattr(rules_obj, 'query_type', query_type), None
+            )
             if not rules_for_type:
                 continue
 
-            inject_fn = getattr(rules_obj, "inject_and_validate_rules", None)
-            if not callable(inject_fn):
+            if not hasattr(rules_obj, 'inject_and_validate_rules'):
                 continue
 
-            result = inject_fn(rules_for_type, consumer.metadata)
-            errmsg = getattr(result, "errmsg", None)
-            if errmsg:
-                relation.data[self._charm.app]["event"] = json.dumps({"errors": errmsg})
+            # inject_and_validate_rules returns an InjectResult; annotate it
+            result: InjectResult = rules_obj.inject_and_validate_rules(
+                rules_for_type, consumer.metadata
+            )
+            if result.errmsg:
+                relation.data[self._charm.app]['event'] = json.dumps({'errors': result.errmsg})
 
-            identifier = getattr(result, "identifier", None)
-            rules_val = getattr(result, "rules", None)
+            identifier = result.identifier
+            rules_val = result.rules
+            # Q: what do we do when we don't have an identifier?
+            # If we cannot generate an identifier, we should not write them to disk
+            # If an identifier does not exist, then we should assume that something is broken
+            # This could signal an issue on the cosl side
+            # We should not return any rules without an identifier
             if identifier is not None and rules_val is not None:
                 rules_map[identifier] = rules_val
 

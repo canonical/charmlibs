@@ -17,14 +17,19 @@
 from __future__ import annotations
 
 import logging
+import socket
+from pathlib import Path
+from typing import cast
+from unittest.mock import patch
 
 import ops
 import pytest
+import yaml
 from ops import testing
 from ops.charm import CharmBase
-import socket
-from unittest.mock import patch
+
 from charmlibs.otlp import OtlpConsumer, OtlpProvider
+from helpers import patch_cos_tool_path
 
 logger = logging.getLogger(__name__)
 
@@ -39,17 +44,21 @@ def ctx() -> testing.Context[ops.CharmBase]:
         },
     )
 
+
 @pytest.fixture(autouse=True)
 def mock_hostname():
-    with patch("socket.getfqdn", return_value="http://fqdn"):
+    with patch('socket.getfqdn', return_value='http://fqdn'):
         yield
+
 
 # Minimal test charms used by unit tests
 class OtlpConsumerCharm(CharmBase):
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
         # instantiate the library object the tests rely on
-        self.otlp_consumer = OtlpConsumer(self)
+        self.otlp_consumer = OtlpConsumer(
+            self, protocols=['http', 'grpc'], telemetries=['metrics', 'logs']
+        )
         # observe the library's endpoints_changed event if present (no-op handler)
         try:
             self.framework.observe(
@@ -90,7 +99,9 @@ class OtlpProviderCharm(CharmBase):
     def _on_update_status(self, event: ops.EventBase) -> None:
         # Add a default HTTP metrics endpoint and publish it
         try:
-            self.otlp_provider.add_endpoint(protocol="http", endpoint=f"{socket.getfqdn()}:4318", telemetries=["metrics"])
+            self.otlp_provider.add_endpoint(
+                protocol='http', endpoint=f'{socket.getfqdn()}:4318', telemetries=['metrics']
+            )
             self.otlp_provider.publish()
         except Exception:
             return None
@@ -109,11 +120,40 @@ def otlp_provider_ctx() -> testing.Context[OtlpProviderCharm]:
     return testing.Context(OtlpProviderCharm, meta=meta)
 
 
+LOKI_RULES_DEST_PATH = 'loki_alert_rules'
+METRICS_RULES_DEST_PATH = 'prometheus_alert_rules'
+
+
+def _add_alerts(alerts: dict, dest_path: Path):
+    """Save the alerts to files in the specified destination folder.
+
+    For K8s charms, alerts are saved in the charm container.
+
+    Args:
+        alerts: Dictionary of alerts to save to disk
+        dest_path: Path to the folder where alerts will be saved
+    """
+    dest_path.mkdir(parents=True, exist_ok=True)
+    for topology_identifier, rule in alerts.items():
+        rule_file = dest_path.joinpath(f'juju_{topology_identifier}.rules')
+        rule_file.write_text(yaml.safe_dump(rule))
+        logger.debug(f'updated alert rules file {rule_file.as_posix()}')
+
+
 # Charm used in tests that acts as both an OTLP provider and consumer
 class OtlpDualCharm(CharmBase):
+    @patch_cos_tool_path
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
-        self.otlp_consumer = OtlpConsumer(self)
+        self.charm_root = self.charm_dir.absolute()
+        self.otlp_consumer = OtlpConsumer(
+            self,
+            protocols=['http', 'grpc'],
+            telemetries=['metrics', 'logs'],
+            loki_rules_path=self.charm_root.joinpath(*LOKI_RULES_DEST_PATH.split('/')),
+            prometheus_rules_path=self.charm_root.joinpath(*METRICS_RULES_DEST_PATH.split('/')),
+        )
+
         self.otlp_provider = OtlpProvider(self)
 
         try:
@@ -134,8 +174,19 @@ class OtlpDualCharm(CharmBase):
 
     def _on_update_status(self, event: ops.EventBase) -> None:
         # add a provider endpoint and publish both sides
+        forward_alert_rules = cast('bool', self.config.get('forward_alert_rules'))
         try:
-            self.otlp_provider.add_endpoint(protocol="http", endpoint=f"{socket.getfqdn()}:4318", telemetries=["metrics"])
+            self.otlp_provider.add_endpoint(
+                protocol='http', endpoint=f'{socket.getfqdn()}:4318', telemetries=['metrics']
+            )
+            _add_alerts(
+                alerts=self.otlp_provider.rules('logql') if forward_alert_rules else {},
+                dest_path=self.charm_root.joinpath(*LOKI_RULES_DEST_PATH.split('/')),
+            )
+            _add_alerts(
+                alerts=self.otlp_provider.rules('promql') if forward_alert_rules else {},
+                dest_path=self.charm_root.joinpath(*METRICS_RULES_DEST_PATH.split('/')),
+            )
         except Exception:
             pass
         try:
@@ -164,4 +215,3 @@ def otlp_dual_ctx() -> testing.Context[OtlpDualCharm]:
         },
     }
     return testing.Context(OtlpDualCharm, meta=meta, config=config)
-
