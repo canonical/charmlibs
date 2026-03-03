@@ -26,7 +26,7 @@ from collections import OrderedDict
 from collections.abc import Sequence
 from lzma import LZMAError
 from pathlib import Path
-from typing import Any, ClassVar, Literal
+from typing import Any, Literal
 
 from cosl.juju_topology import JujuTopology
 from cosl.rules import AlertRules, InjectResult, generic_alert_groups
@@ -69,8 +69,6 @@ class OtlpProviderAppData(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
     endpoints: list[OtlpEndpoint]
-    # Key used in relation app databag when exposing provider data
-    KEY: ClassVar[str] = 'otlp'
 
 
 class OtlpConsumerAppData(BaseModel):
@@ -88,9 +86,6 @@ class OtlpConsumerAppData(BaseModel):
 
     rules: RulesModel | str
     metadata: OrderedDict[str, str]
-
-    # Key used in relation app databag when exposing consumer data
-    KEY: ClassVar[str] = 'otlp'
 
     @staticmethod
     def decode_value(json_str: str) -> Any:
