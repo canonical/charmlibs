@@ -16,8 +16,7 @@ classifiers = [
 dynamic = ["version"]
 dependencies = [
     # "ops",
-    "cosl @ git+https://github.com/canonical/cos-lib.git@feat/more-rules-methods",
-    "pytest",
+    "cosl==1.5.0",
     "requests",
 ]
 
@@ -27,6 +26,7 @@ lint = [  # installed for `just lint otlp` (unit, functional, and integration ar
 ]
 unit = [  # installed for `just unit otlp`
     "ops[testing]",
+    "pytest",
 ]
 functional = [  # installed for `just functional otlp`
 ]

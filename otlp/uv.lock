@@ -25,7 +25,6 @@ name = "charmlibs-otlp"
 source = { editable = "." }
 dependencies = [
     { name = "cosl" },
-    { name = "pytest" },
     { name = "requests" },
 ]
 
@@ -35,12 +34,12 @@ integration = [
 ]
 unit = [
     { name = "ops", extra = ["testing"] },
+    { name = "pytest" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "cosl", git = "https://github.com/canonical/cos-lib.git?rev=feat%2Fmore-rules-methods" },
-    { name = "pytest" },
+    { name = "cosl", specifier = "==1.5.0" },
     { name = "requests" },
 ]
 
@@ -48,7 +47,10 @@ requires-dist = [
 functional = []
 integration = [{ name = "jubilant" }]
 lint = []
-unit = [{ name = "ops", extras = ["testing"] }]
+unit = [
+    { name = "ops", extras = ["testing"] },
+    { name = "pytest" },
+]
 
 [[package]]
 name = "charset-normalizer"
@@ -150,14 +152,18 @@ wheels = [
 
 [[package]]
 name = "cosl"
-version = "1.3.1"
-source = { git = "https://github.com/canonical/cos-lib.git?rev=feat%2Fmore-rules-methods#e06209fcc7c8a845a8ab0c8fb49205ea3f9f9747" }
+version = "1.5.0"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "ops" },
     { name = "pydantic" },
     { name = "pyyaml" },
     { name = "tenacity" },
     { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/d3/af/692908f79b4be658d4ac7d83a87d58feeb2951c9fd23096c8fe259bd8a6e/cosl-1.5.0.tar.gz", hash = "sha256:cf650495e355081b44401ca7fad0d6f307f9cb2251370fc0c8ad1c7cc8ac12c3", size = 48770, upload-time = "2026-03-03T13:49:14.308Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e9/e0/a5ec5bab38a0b4b5107c6d9af304c8eb1662e40e31298a03edf49a8d73f5/cosl-1.5.0-py3-none-any.whl", hash = "sha256:b281eb343553bc25dae6401d54e4d0bd7894bdff6ad240ca889d313f9f044e52", size = 37912, upload-time = "2026-03-03T13:49:13.137Z" },
 ]
 
 [[package]]

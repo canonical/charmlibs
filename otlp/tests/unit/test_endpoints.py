@@ -304,7 +304,7 @@ def test_send_otlp(otlp_consumer_ctx: testing.Context[ops.CharmBase]):
         leader=True,
     )
 
-    # AND WHEN otelcol has supports a subset of OTLP protocols and telemetries
+    # AND WHEN otelcol supports a subset of OTLP protocols and telemetries
     with otlp_consumer_ctx(otlp_consumer_ctx.on.update_status(), state=state) as mgr:
         charm_any = cast('Any', mgr.charm)
         remote_endpoints = charm_any.otlp_consumer.endpoints

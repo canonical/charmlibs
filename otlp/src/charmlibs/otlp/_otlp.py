@@ -14,7 +14,6 @@
 
 """Internal implementation of the OTLP Provider and Requirer library.
 
-This document explains how to integrate with charms that can send/receive OTLP data.
 This document is the authoritative reference on the structure of relation data that is
 shared between charms that intend to provide or consume OTLP telemetry.
 For user-facing documentation, see the package-level docstring in __init__.py.
@@ -146,7 +145,6 @@ class OtlpConsumer(Object):
         super().__init__(charm, relation_name)
         self._charm = charm
         self._relation_name = relation_name
-        # Use explicit, well-typed lists to avoid partial-unknown-type issues
         self._protocols: list[Literal['http', 'grpc']] = (
             list(protocols) if protocols is not None else []
         )
@@ -326,10 +324,10 @@ class OtlpProvider(Object):
             a mapping of relation ID to a dictionary of alert rule groups
             following the OfficialRuleFileFormat from cos-lib.
         """
+        rules_map: dict[str, dict[str, Any]] = {}
+
         rules_obj = self._rules_cls(query_type, self._topology)
 
-        # InjectResult.identifier is a string identifier; use str keys
-        rules_map: dict[str, dict[str, Any]] = {}
         for relation in self.model.relations[self._relation_name]:
             consumer = relation.load(
                 OtlpConsumerAppData, relation.app, decoder=OtlpConsumerAppData.decode_value
@@ -345,7 +343,6 @@ class OtlpProvider(Object):
             if not hasattr(rules_obj, 'inject_and_validate_rules'):
                 continue
 
-            # inject_and_validate_rules returns an InjectResult; annotate it
             result: InjectResult = rules_obj.inject_and_validate_rules(
                 rules_for_type, consumer.metadata
             )
@@ -353,12 +350,12 @@ class OtlpProvider(Object):
                 relation.data[self._charm.app]['event'] = json.dumps({'errors': result.errmsg})
 
             identifier = result.identifier
-            rules_val = result.rules
+            rules = result.rules
 
             # If an identifier does not exist, then we should assume that something is broken
             # This could signal an issue on the cosl side
             # We should not return any rules without an identifier
             if identifier is not None:
-                rules_map[identifier] = rules_val
+                rules_map[identifier] = rules
 
         return rules_map
