@@ -38,9 +38,7 @@ RECEIVE_OTLP = Relation('receive-otlp', remote_app_data=EMPTY_CONSUMER)
         ),
     ],
 )
-def test_provider_app_data_raises_validation_error_lib(
-    data: dict[str, Any], error_match: str
-) -> None:
+def test_provider_app_data_raises_validation_error(data: dict[str, Any], error_match: str) -> None:
     """Test that OtlpProviderAppData validates protocols and telemetries."""
     with pytest.raises(ValidationError, match=error_match):
         OtlpProviderAppData(endpoints=[OtlpEndpoint(**data)])
@@ -115,7 +113,7 @@ def test_provider_app_data_raises_validation_error_lib(
         ),
     ),
 )
-def test_send_otlp_invalid_databag_lib(
+def test_send_otlp_invalid_databag(
     otlp_consumer_ctx: testing.Context[ops.CharmBase],
     provides: dict[str, Any],
     otlp_endpoint: OtlpEndpoint,
@@ -189,7 +187,7 @@ def test_send_otlp_invalid_databag_lib(
         (['http'], ['traces'], {}),
     ],
 )
-def test_send_otlp_with_varying_consumer_support_lib(
+def test_send_otlp_with_varying_consumer_support(
     otlp_consumer_ctx: testing.Context[ops.CharmBase],
     protocols: list[str],
     telemetries: list[str],
