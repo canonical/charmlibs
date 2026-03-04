@@ -16,6 +16,7 @@ from charmlibs.otlp import (
     OtlpConsumerAppData,
     RulesModel,
 )
+from helpers import patch_cos_tool_path
 
 OTELCOL_LABELS = {
     'juju_model': 'otelcol',
@@ -109,7 +110,8 @@ def test_forwarded_rules_compression(
     )
 
     # WHEN any event executes the reconciler
-    state_out = otlp_dual_ctx.run(otlp_dual_ctx.on.update_status(), state=state)
+    with patch_cos_tool_path():
+        state_out = otlp_dual_ctx.run(otlp_dual_ctx.on.update_status(), state=state)
 
     for relation in list(state_out.relations):
         if relation.endpoint != 'send-otlp':
