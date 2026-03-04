@@ -127,6 +127,7 @@ def otlp_provider_ctx() -> testing.Context[OtlpProviderCharm]:
 LOKI_RULES_DEST_PATH = 'loki_alert_rules'
 METRICS_RULES_DEST_PATH = 'prometheus_alert_rules'
 
+
 @patch_cos_tool_path
 def _add_alerts(alerts: dict[str, dict[str, Any]], dest_path: Path) -> None:
     """Save the alerts to files in the specified destination folder.
