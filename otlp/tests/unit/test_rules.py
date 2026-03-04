@@ -157,17 +157,6 @@ def test_forwarded_rules_compression(
             {'logql': 2, 'promql': 3},
         ),
         # format , databag_groups, generic_groups, total
-        # logql  , (2)           , (0)           ,  (2)
-        # promql , (2)           , (1)           ,  (3)
-        (
-            True,
-            {
-                'logql': {'groups': [LOGQL_ALERT, LOGQL_RECORD]},
-                'promql': {'groups': [PROMQL_ALERT, PROMQL_RECORD]},
-            },
-            {'logql': 2, 'promql': 3},
-        ),
-        # format , databag_groups, generic_groups, total
         # logql  , (0)           , (0)           , (0)
         # promql , (2)           , (1)           , (3)
         (

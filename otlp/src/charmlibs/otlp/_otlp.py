@@ -342,7 +342,13 @@ class OtlpProvider(Object):
                 rules_for_type, consumer.metadata
             )
             if result.errmsg:
-                relation.data[self._charm.app]['event'] = json.dumps({'errors': result.errmsg})
+                if self._charm.unit.is_leader():
+                    relation.data[self._charm.app]['event'] = json.dumps({'errors': result.errmsg})
+                else:
+                    logging.warning(
+                        "Skipping write to app-level relation data 'event' on non-leader unit: %s",
+                        result.errmsg,
+                    )
 
             identifier = result.identifier
             rules = result.rules

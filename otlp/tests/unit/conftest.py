@@ -69,13 +69,13 @@ class OtlpConsumerCharm(CharmBase):
             )
         except Exception as e:
             # some library objects may not expose events in unit tests; ignore
-            logger.info('An exception occured when observing the event: %s', e)
+            logger.info('An exception occurred when observing the event: %s', e)
 
         # observe update-status to trigger the consumer's publish in tests
         try:
             self.framework.observe(self.on.update_status, self._on_update_status)
         except Exception as e:
-            logger.info('An exception occured when observing the event: %s', e)
+            logger.info('An exception occurred when observing the event: %s', e)
 
     def _on_endpoints_changed(self, event: ops.EventBase):
         return None
@@ -98,7 +98,7 @@ class OtlpProviderCharm(CharmBase):
         try:
             self.framework.observe(self.on.update_status, self._on_update_status)
         except Exception as e:
-            logger.info('An exception occured when observing the event: %s', e)
+            logger.info('An exception occurred when observing the event: %s', e)
 
     def _on_update_status(self, event: ops.EventBase) -> None:
         # Add a default HTTP metrics endpoint and publish it
@@ -127,7 +127,7 @@ def otlp_provider_ctx() -> testing.Context[OtlpProviderCharm]:
 LOKI_RULES_DEST_PATH = 'loki_alert_rules'
 METRICS_RULES_DEST_PATH = 'prometheus_alert_rules'
 
-
+@patch_cos_tool_path
 def _add_alerts(alerts: dict[str, dict[str, Any]], dest_path: Path) -> None:
     """Save the alerts to files in the specified destination folder.
 
@@ -146,7 +146,6 @@ def _add_alerts(alerts: dict[str, dict[str, Any]], dest_path: Path) -> None:
 
 # Charm used in tests that acts as both an OTLP provider and consumer
 class OtlpDualCharm(CharmBase):
-    @patch_cos_tool_path
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
         self.charm_root = self.charm_dir.absolute()
@@ -165,13 +164,13 @@ class OtlpDualCharm(CharmBase):
                 self.otlp_consumer.on.endpoints_changed, self._on_endpoints_changed
             )
         except Exception as e:
-            logger.info('An exception occured when observing the event: %s', e)
+            logger.info('An exception occurred when observing the event: %s', e)
 
         # Observe update-status to publish both provider and consumer data
         try:
             self.framework.observe(self.on.update_status, self._on_update_status)
         except Exception as e:
-            logger.info('An exception occured when observing the event: %s', e)
+            logger.info('An exception occurred when observing the event: %s', e)
 
     def _on_endpoints_changed(self, event: ops.EventBase) -> None:
         return None
@@ -192,7 +191,7 @@ class OtlpDualCharm(CharmBase):
                 dest_path=self.charm_root.joinpath(*METRICS_RULES_DEST_PATH.split('/')),
             )
         except Exception:
-            logger.error('An exception occured when preparing the OTLP provider')
+            logger.error('An exception occurred when preparing the OTLP provider')
         try:
             self.otlp_provider.publish()
         except Exception:

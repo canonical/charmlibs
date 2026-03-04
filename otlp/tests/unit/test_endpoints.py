@@ -21,7 +21,7 @@ EMPTY_CONSUMER = {
     'rules': json.dumps({'logql': {}, 'promql': {}}),
     'metadata': json.dumps({}),
 }
-SEND_OTLP = Relation('send-otlp', remote_app_data={'endpoints': '[]'})
+
 RECEIVE_OTLP = Relation('receive-otlp', remote_app_data=EMPTY_CONSUMER)
 
 
