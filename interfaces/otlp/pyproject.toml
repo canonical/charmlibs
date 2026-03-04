@@ -1,5 +1,5 @@
 [project]
-name = "charmlibs-otlp"
+name = "charmlibs-interfaces-otlp"
 description = "The charmlibs.otlp package."
 readme = "README.md"
 requires-python = ">=3.10"

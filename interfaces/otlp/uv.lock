@@ -21,7 +21,7 @@ wheels = [
 ]
 
 [[package]]
-name = "charmlibs-otlp"
+name = "charmlibs-interfaces-otlp"
 source = { editable = "." }
 dependencies = [
     { name = "cosl" },
