@@ -34,12 +34,15 @@ The package also enables a consumer to send `alerting` and
 
 from ._otlp import (
     DEFAULT_CONSUMER_RELATION_NAME,
+    DEFAULT_LOKI_RULES_RELATIVE_PATH,
+    DEFAULT_PROM_RULES_RELATIVE_PATH,
     DEFAULT_PROVIDER_RELATION_NAME,
-    RELATION_INTERFACE_NAME,
     OtlpConsumer,
+    OtlpConsumerAppData,
     OtlpEndpoint,
     OtlpProvider,
     OtlpProviderAppData,
+    RulesModel,
 )
 from ._version import __version__ as __version__
 
@@ -47,10 +50,13 @@ __all__ = [
     # only the names listed in __all__ are imported when executing:
     # from charmlibs.otlp import *
     'DEFAULT_CONSUMER_RELATION_NAME',
+    'DEFAULT_LOKI_RULES_RELATIVE_PATH',
+    'DEFAULT_PROM_RULES_RELATIVE_PATH',
     'DEFAULT_PROVIDER_RELATION_NAME',
-    'RELATION_INTERFACE_NAME',
     'OtlpConsumer',
+    'OtlpConsumerAppData',
     'OtlpEndpoint',
     'OtlpProvider',
     'OtlpProviderAppData',
+    'RulesModel',
 ]
