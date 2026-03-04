@@ -147,9 +147,6 @@ class OtlpConsumer(Object):
             list(telemetries) if telemetries is not None else []
         )
         self._topology = JujuTopology.from_charm(charm)
-        # Avoid calling AlertRules.validate_rules_path here to prevent static
-        # attribute-access typing complaints from analyzers; keep the provided
-        # paths as-is (they are validated at runtime by callers that need it).
         self._loki_rules_path: str | Path = loki_rules_path
         self._prom_rules_path: str | Path = prometheus_rules_path
 
