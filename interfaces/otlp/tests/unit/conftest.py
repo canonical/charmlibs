@@ -27,7 +27,7 @@ from ops import testing
 from ops.charm import CharmBase
 
 from charmlibs.otlp import OtlpConsumer, OtlpProvider
-from helpers import add_alerts
+from helpers import add_alerts, patch_cos_tool_path
 
 logger = logging.getLogger(__name__)
 
@@ -78,10 +78,11 @@ class OtlpDualCharm(CharmBase):
 
     def _on_update_status(self, event: ops.EventBase) -> None:
         forward_alert_rules = cast('bool', self.config.get('forward_alert_rules'))
-        try:
-            self.otlp_provider.add_endpoint(
-                protocol='http', endpoint=f'{socket.getfqdn()}:4318', telemetries=['metrics']
-            )
+        self.otlp_provider.add_endpoint(
+            protocol='http', endpoint=f'{socket.getfqdn()}:4318', telemetries=['metrics']
+        )
+
+        with patch_cos_tool_path():
             add_alerts(
                 alerts=self.otlp_provider.rules('logql') if forward_alert_rules else {},
                 dest_path=self.charm_root.joinpath(*LOKI_RULES_DEST_PATH.split('/')),
@@ -90,8 +91,6 @@ class OtlpDualCharm(CharmBase):
                 alerts=self.otlp_provider.rules('promql') if forward_alert_rules else {},
                 dest_path=self.charm_root.joinpath(*METRICS_RULES_DEST_PATH.split('/')),
             )
-        except Exception:
-            logger.error('An exception occurred when preparing the OTLP provider')
 
         self.otlp_provider.publish()
         self.otlp_consumer.publish()
