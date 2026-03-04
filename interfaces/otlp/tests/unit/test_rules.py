@@ -90,6 +90,7 @@ def _decompress(rules: str | None) -> dict[str, Any]:
         (True, LZMABase64.compress(json.dumps(ALL_RULES, sort_keys=True))),
         (False, '/Td6WFoAAATm1rRGAgAhARYAAAB0L+Wj4AM4AWFdAD2I'),
     ],
+    ids=['valid compression', 'invalid compression'],
 )
 def test_forwarded_rules_compression(
     otlp_dual_ctx: testing.Context[ops.CharmBase],
