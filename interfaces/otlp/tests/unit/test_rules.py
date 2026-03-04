@@ -16,7 +16,6 @@ from charmlibs.otlp import (
     OtlpConsumerAppData,
     RulesModel,
 )
-from helpers import patch_cos_tool_path
 
 OTELCOL_LABELS = {
     'juju_model': 'otelcol',
