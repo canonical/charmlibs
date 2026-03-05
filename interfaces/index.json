@@ -290,6 +290,16 @@
     "status": "published"
   },
   {
+    "name": "k8s_backup_target",
+    "version": "0",
+    "lib": "charmlibs.interfaces.k8s_backup_target",
+    "lib_url": "",
+    "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/k8s_backup_target/",
+    "summary": "Configure Kubernetes backup target specifications.",
+    "description": "The `k8s_backup_target` interface allows client charms to specify Kubernetes backup requirements to a backup integrator charm.\nThe provider charm (client) provides backup specifications including namespaces, resource types, and retention policies, while the requirer charm (backup integrator) receives these specifications and forwards them to a backup operator.",
+    "status": "draft"
+  },
+  {
     "name": "kafka_client",
     "version": "0",
     "lib": "charms.data_platform_libs.data_interfaces",
