@@ -51,16 +51,23 @@ class MyOtlpServer(CharmBase):
 
 ```python
 from charmlibs.interfaces.otlp import OtlpConsumer
+from cosl.juju_topology import JujuTopology
+from cosl.rules import AlertRules
 
 class MyOtlpSender(CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
+        topology = JujuTopology.from_charm(self)
+        loki_rules = AlertRules(query_type="logql", topology=topology)
+        prom_rules = AlertRules(query_type="promql", topology=topology)
+        loki_rules.add_path("./src/loki_alert_rules", recursive=True)
+        prom_rules.add_path("./src/prometheus_alert_rules", recursive=True)
+
         self.otlp_consumer = OtlpConsumer(
             self,
             protocols=["grpc", "http"],
             telemetries=["logs", "metrics", "traces"],
-            loki_rules_path="./src/loki_alert_rules",
-            prometheus_rules_path="./src/prometheus_alert_rules",
+            rules=[loki_rules, prom_rules],
         )
         self.framework.observe(self.on.update_status, self._reconcile)
 

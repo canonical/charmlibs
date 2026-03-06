@@ -70,17 +70,24 @@ Consumer Side (Charms consuming OTLP endpoints)
 To consume OTLP endpoints, use the ``OtlpConsumer`` class. The OTLP sender may only support a
 subset of protocols and telemetries, which can be configured at instantiation::
 
-    from charmlibs.interfaces.otlp import OtlpConsumer
+    from charmlibs.interfaces.otlp import OtlpConsumer, RulesInput
+    from cosl.juju_topology import JujuTopology
+    from cosl.rules import AlertRules
 
     class MyOtlpSender(CharmBase):
         def __init__(self, *args):
             super().__init__(*args)
+            topology = JujuTopology.from_charm(self)
+            loki_rules = AlertRules(query_type="logql", topology=topology)
+            prom_rules = AlertRules(query_type="promql", topology=topology)
+            loki_rules.add_path("./src/loki_alert_rules", recursive=True)
+            prom_rules.add_path("./src/prometheus_alert_rules", recursive=True)
+
             self.otlp_consumer = OtlpConsumer(
                 self,
                 protocols=["grpc", "http"],
                 telemetries=["logs", "metrics", "traces"],
-                loki_rules_path="./src/loki_alert_rules",
-                prometheus_rules_path="./src/prometheus_alert_rules",
+                rules=RulesInput(loki=loki_rules, prometheus=prom_rules),
             )
             self.framework.observe(self.on.update_status, self._reconcile)
 
@@ -96,8 +103,9 @@ method::
     # snip ...
     self.otlp_consumer.publish()
 
-It is the charm's responsibility to manage the rules in the ``loki_rules_path`` and
-``prometheus_rules_path`` directories, which will be forwarded to the related OtlpProvider charms.
+It is the charm's responsibility to build and pass ``Rules`` objects (for example, one
+``AlertRules`` for ``logql`` and one for ``promql``) before publishing to related OtlpProvider
+charms.
 
 Relation Data Format
 ====================
@@ -145,6 +153,7 @@ from ._otlp import (
     OtlpEndpoint,
     OtlpProvider,
     OtlpProviderAppData,
+    RulesInput,
     RulesModel,
 )
 from ._version import __version__ as __version__
@@ -161,5 +170,6 @@ __all__ = [
     'OtlpEndpoint',
     'OtlpProvider',
     'OtlpProviderAppData',
+    'RulesInput',
     'RulesModel',
 ]

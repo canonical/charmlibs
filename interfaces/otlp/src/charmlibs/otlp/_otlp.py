@@ -24,12 +24,12 @@ import json
 import logging
 from collections import OrderedDict
 from collections.abc import Sequence
+from dataclasses import dataclass
 from lzma import LZMAError
-from pathlib import Path
 from typing import Any, Literal
 
 from cosl.juju_topology import JujuTopology
-from cosl.rules import AlertRules, InjectResult, generic_alert_groups
+from cosl.rules import AlertRules, InjectResult, Rules, generic_alert_groups
 from cosl.utils import LZMABase64
 from ops import CharmBase
 from ops.framework import Object
@@ -42,6 +42,12 @@ DEFAULT_PROM_RULES_RELATIVE_PATH = './src/prometheus_alert_rules'
 
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class RulesInput:
+    loki: Rules | None = None
+    prometheus: Rules | None = None
 
 
 class RulesModel(BaseModel):
@@ -119,10 +125,8 @@ class OtlpConsumer(Object):
             endpoints.
         telemetries: The telemetries to filter for in the provider's OTLP
             endpoints.
-        loki_rules_path: The path to Loki alerting and recording rules provided
-            by this charm.
-        prometheus_rules_path: The path to Prometheus alerting and recording
-            rules provided by this charm.
+        rules: Multiple Rules objects for different types of rules (e.g. AlertRules for logql and
+            promql) that the consumer will publish to the provider.
     """
 
     _rules_cls = AlertRules
@@ -133,12 +137,11 @@ class OtlpConsumer(Object):
         relation_name: str = DEFAULT_CONSUMER_RELATION_NAME,
         protocols: Sequence[Literal['http', 'grpc']] | None = None,
         telemetries: Sequence[Literal['logs', 'metrics', 'traces']] | None = None,
-        *,
-        loki_rules_path: str | Path = DEFAULT_LOKI_RULES_RELATIVE_PATH,
-        prometheus_rules_path: str | Path = DEFAULT_PROM_RULES_RELATIVE_PATH,
+        rules: RulesInput | None = None,
     ):
         super().__init__(charm, relation_name)
         self._charm = charm
+        self._topology = JujuTopology.from_charm(charm)
         self._relation_name = relation_name
         self._protocols: list[Literal['http', 'grpc']] = (
             list(protocols) if protocols is not None else []
@@ -146,9 +149,7 @@ class OtlpConsumer(Object):
         self._telemetries: list[Literal['logs', 'metrics', 'traces']] = (
             list(telemetries) if telemetries is not None else []
         )
-        self._topology = JujuTopology.from_charm(charm)
-        self._loki_rules_path: str | Path = loki_rules_path
-        self._prom_rules_path: str | Path = prometheus_rules_path
+        self._rules = rules if rules is not None else RulesInput(loki=None, prometheus=None)
 
     def _filter_endpoints(self, endpoints: list[dict[str, str | list[str]]]) -> list[OtlpEndpoint]:
         """Filter out unsupported OtlpEndpoints.
@@ -181,43 +182,37 @@ class OtlpConsumer(Object):
     def publish(self):
         """Triggers programmatically the update of the relation data.
 
-        The rule files exist in separate directories, distinguished by format
-        (logql|promql), each including alerting and recording rule types. The
-        charm uses these paths as aggregation points for rules, acting as their
-        source of truth. For each type of rule, the charm may aggregate rules
-        from:
-            - rules bundled in the charm's source code
-            - any rules provided by related charms
+        Rules are provided by the charm as `Rules` objects. The charm is
+        responsible for aggregating rule sources (e.g. bundled files and
+        related charm rules) before constructing this class.
 
         Generic, injected rules (not specific to any charm) are always
-        published. Besides these generic rules, the inclusion of bundled rules
-        and rules from related charms is the responsibility of the charm using
-        the library. Including bundled rules and rules from related charms is
-        achieved by copying these rules to the respective paths within the
-        charm's filesystem and providing those paths to the OtlpConsumer
-        constructor.
+        published for PromQL.
         """
         if not self._charm.unit.is_leader():
             # Only the leader unit can write to app data.
             return
 
-        # Define the rule types
-        loki_rules = self._rules_cls(query_type='logql', topology=self._topology)
-        prom_rules = self._rules_cls(query_type='promql', topology=self._topology)
+        rules = {}
+        # Loki rules
+        if self._rules.loki is not None:
+            rules['logql'] = self._rules.loki.as_dict()
 
-        # Add rules
-        prom_rules.add(
-            copy.deepcopy(generic_alert_groups.aggregator_rules),
-            group_name_prefix=self._topology.identifier,
-        )
-        loki_rules.add_path(self._loki_rules_path, recursive=True)
-        prom_rules.add_path(self._prom_rules_path, recursive=True)
+        # Prometheus rules
+        if self._rules.prometheus is not None:
+            self._rules.prometheus.add(
+                copy.deepcopy(generic_alert_groups.aggregator_rules),
+                group_name_prefix=self._topology.identifier,
+            )
+            rules['promql'] = self._rules.prometheus.as_dict()
 
         # Publish to databag
-        databag = OtlpConsumerAppData.model_validate({
-            'rules': {'logql': loki_rules.as_dict(), 'promql': prom_rules.as_dict()},
-            'metadata': self._topology.as_dict(),
-        })
+        databag = OtlpConsumerAppData.model_validate(
+            {
+                'rules': rules,
+                'metadata': self._topology.as_dict(),
+            }
+        )
         for relation in self.model.relations[self._relation_name]:
             relation.save(databag, self._charm.app, encoder=OtlpConsumerAppData.encode_value)
 
