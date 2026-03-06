@@ -20,6 +20,7 @@ For user-facing documentation, see the package-level docstring in __init__.py.
 """
 
 import copy
+import hashlib
 import json
 import logging
 from collections import OrderedDict
@@ -350,10 +351,24 @@ class OtlpProvider(Object):
             identifier = result.identifier
             rules = result.rules
 
-            # If an identifier does not exist, then we should assume that something is broken
-            # This could signal an issue on the cosl side
-            # We should not return any rules without an identifier
-            if identifier is not None:
-                rules_map[identifier] = rules
+            # If an identifier does not exist, we generate a deterministic hash
+            # derived from the rules content so the rules can still be recorded
+            # for this relation. This avoids dropping rules when the upstream
+            # consumer metadata does not provide an identifier.
+            if identifier is None:
+                try:
+                    rules_json = json.dumps(rules, sort_keys=True)
+                except (TypeError, ValueError):
+                    rules_json = repr(rules)
+
+                content_hash = hashlib.sha256(rules_json.encode('utf-8')).hexdigest()[:12]
+                identifier = content_hash
+                logger.debug(
+                    'No identifier from injected rules for relation %s; generated hash %s',
+                    relation.id,
+                    identifier,
+                )
+
+            rules_map[identifier] = rules
 
         return rules_map

@@ -175,16 +175,22 @@ def test_forwarded_rules_compression(
         ),
     ],
 )
+@pytest.mark.parametrize(
+    'metadata',
+    [METADATA, {}],
+    ids=['with_metadata', 'without_metadata'],
+)
 def test_forwarding_otlp_rule_counts(
     otlp_dual_ctx: testing.Context[ops.CharmBase],
     forwarding_enabled: bool,
     rules: dict[str, Any],
     expected_group_counts: dict[str, int],
+    metadata: dict[str, Any],
 ) -> None:
     # GIVEN forwarding of rules is enabled
     # * a receive-otlp with rules in the databag
     # * two send-otlp relations
-    databag: dict[str, Any] = {'rules': json.dumps(rules), 'metadata': json.dumps(METADATA)}
+    databag: dict[str, Any] = {'rules': json.dumps(rules), 'metadata': json.dumps(metadata)}
     receiver = Relation('receive-otlp', remote_app_data=databag)
     sender_1 = Relation('send-otlp', remote_app_data={'endpoints': '[]'})
     sender_2 = Relation('send-otlp', remote_app_data={'endpoints': '[]'})
