@@ -49,7 +49,7 @@ ogp_image = "https://assets.ubuntu.com/v1/253da317-image-document-ubuntudocs.svg
 
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#confval-html_context
 html_context = {
-    "product_page": "github.com/canonical/charmlibs",
+    "product_page": "canonical.com/juju/docs",
     'product_tag': '_static/logos/juju-logo-no-text.png',
     "discourse": "https://discourse.charmhub.io/",
     "discourse_prefix": "https://discourse.charmhub.io/t/",

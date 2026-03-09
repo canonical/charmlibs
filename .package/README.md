@@ -2,7 +2,7 @@
 
 This package should not be installed - it exists solely to reserve the `charmlibs` namespace.
 
-This namespace is for packages designed to be used by [Juju charms](https://juju.is/charms-architecture). Visit the [charmlibs documentation site](https://canonical-charmlibs.readthedocs-hosted.com/) for more information about charm libraries.
+This namespace is for packages designed to be used by [Juju charms](https://canonical.com/juju/charms-architecture). Visit the [charmlibs documentation site](https://canonical-charmlibs.readthedocs-hosted.com/) for more information about charm libraries.
 
 See more:
 
