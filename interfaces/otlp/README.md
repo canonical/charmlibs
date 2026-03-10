@@ -6,8 +6,8 @@ OTLP integration library for Juju charms, providing OTLP endpoint information fo
 
 ## Features
 
-- **Provider/Consumer pattern**: Enables charms to share OTLP endpoint information and rules
-- **Define endpoint support**: Providers and consumers define what OTLP protocols and telemetries they support.
+- **Provider/Requirer pattern**: Enables charms to share OTLP endpoint information and rules
+- **Define endpoint support**: Providers and requirers define what OTLP protocols and telemetries they support.
 - **Automatic topology injection**: Inject Juju topology labels into rule expressions and labels with metadata if the labels are not already labeled.
 
 ## Getting started
@@ -15,7 +15,7 @@ OTLP integration library for Juju charms, providing OTLP endpoint information fo
 To install, add `charmlibs-interfaces-otlp` to your Python dependencies. Then in your Python code, import as:
 
 ```py
-from charmlibs.interfaces.otlp import OtlpProvider, OtlpConsumer
+from charmlibs.interfaces.otlp import OtlpProvider, OtlpRequirer
 ```
 
 ### Provider Side
@@ -47,15 +47,15 @@ class MyOtlpServer(CharmBase):
         logql_rules = self.otlp_provider.rules("logql")
 ```
 
-### Consumer Side
+### Requirer Side
 
 ```python
-from charmlibs.interfaces.otlp import OtlpConsumer
+from charmlibs.interfaces.otlp import OtlpRequirer
 
 class MyOtlpSender(CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
-        self.otlp_consumer = OtlpConsumer(
+        self.otlp_requirer = OtlpRequirer(
             self,
             protocols=["grpc", "http"],
             telemetries=["logs", "metrics", "traces"],
@@ -66,9 +66,9 @@ class MyOtlpSender(CharmBase):
 
     def _reconcile(self, event):
         # publish the rules to the relation databag
-        self.otlp_consumer.publish()
+        self.otlp_requirer.publish()
         # get the endpoints from the provider
-        supported_endpoints = self.otlp_consumer.endpoints
+        supported_endpoints = self.otlp_requirer.endpoints
 ```
 
 ## Documentation

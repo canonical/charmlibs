@@ -17,12 +17,12 @@ from charmlibs.otlp import OtlpEndpoint, OtlpProviderAppData
 
 ALL_PROTOCOLS = ['grpc', 'http']
 ALL_TELEMETRIES = ['logs', 'metrics', 'traces']
-EMPTY_CONSUMER = {
+EMPTY_REQUIRER = {
     'rules': json.dumps({'logql': {}, 'promql': {}}),
     'metadata': json.dumps({}),
 }
 
-RECEIVE_OTLP = Relation('receive-otlp', remote_app_data=EMPTY_CONSUMER)
+RECEIVE_OTLP = Relation('receive-otlp', remote_app_data=EMPTY_REQUIRER)
 
 
 @pytest.mark.parametrize(
@@ -114,7 +114,7 @@ def test_provider_app_data_raises_validation_error(data: dict[str, Any], error_m
     ),
 )
 def test_send_otlp_invalid_databag(
-    otlp_consumer_ctx: testing.Context[ops.CharmBase],
+    otlp_requirer_ctx: testing.Context[ops.CharmBase],
     provides: dict[str, Any],
     otlp_endpoint: OtlpEndpoint,
 ):
@@ -123,18 +123,18 @@ def test_send_otlp_invalid_databag(
     provider = Relation('send-otlp', id=123, remote_app_data=provides)
     state = State(relations=[provider], leader=True)
 
-    with otlp_consumer_ctx(otlp_consumer_ctx.on.update_status(), state=state) as mgr:
-        # WHEN the consumer processes the relation data
-        # * the consumer supports all protocols and telemetries
+    with otlp_requirer_ctx(otlp_requirer_ctx.on.update_status(), state=state) as mgr:
+        # WHEN the requirer processes the relation data
+        # * the requirer supports all protocols and telemetries
         charm_any = cast('Any', mgr.charm)
         with (
-            patch.object(charm_any.otlp_consumer, '_protocols', new=ALL_PROTOCOLS),
-            patch.object(charm_any.otlp_consumer, '_telemetries', new=ALL_TELEMETRIES),
+            patch.object(charm_any.otlp_requirer, '_protocols', new=ALL_PROTOCOLS),
+            patch.object(charm_any.otlp_requirer, '_telemetries', new=ALL_TELEMETRIES),
         ):
-            # THEN the consumer does not raise an error
+            # THEN the requirer does not raise an error
             # * the returned endpoint does not include invalid protocols or telemetries
             assert mgr.run()
-            result = charm_any.otlp_consumer.endpoints[123]
+            result = charm_any.otlp_requirer.endpoints[123]
             assert result.model_dump() == otlp_endpoint.model_dump()
 
 
@@ -187,8 +187,8 @@ def test_send_otlp_invalid_databag(
         (['http'], ['traces'], {}),
     ],
 )
-def test_send_otlp_with_varying_consumer_support(
-    otlp_consumer_ctx: testing.Context[ops.CharmBase],
+def test_send_otlp_with_varying_requirer_support(
+    otlp_requirer_ctx: testing.Context[ops.CharmBase],
     protocols: list[str],
     telemetries: list[str],
     expected: dict[int, OtlpEndpoint],
@@ -234,14 +234,14 @@ def test_send_otlp_with_varying_consumer_support(
         leader=True,
     )
 
-    # AND WHEN the consumer has varying support for OTLP protocols and telemetries
-    with otlp_consumer_ctx(otlp_consumer_ctx.on.update_status(), state=state) as mgr:
+    # AND WHEN the requirer has varying support for OTLP protocols and telemetries
+    with otlp_requirer_ctx(otlp_requirer_ctx.on.update_status(), state=state) as mgr:
         charm_any = cast('Any', mgr.charm)
         with (
-            patch.object(charm_any.otlp_consumer, '_protocols', new=protocols),
-            patch.object(charm_any.otlp_consumer, '_telemetries', new=telemetries),
+            patch.object(charm_any.otlp_requirer, '_protocols', new=protocols),
+            patch.object(charm_any.otlp_requirer, '_telemetries', new=telemetries),
         ):
-            remote_endpoints = charm_any.otlp_consumer.endpoints
+            remote_endpoints = charm_any.otlp_requirer.endpoints
 
     # THEN the returned endpoints are filtered accordingly
     assert {k: v.model_dump() for k, v in remote_endpoints.items()} == {
@@ -249,7 +249,7 @@ def test_send_otlp_with_varying_consumer_support(
     }
 
 
-def test_send_otlp(otlp_consumer_ctx: testing.Context[ops.CharmBase]):
+def test_send_otlp(otlp_requirer_ctx: testing.Context[ops.CharmBase]):
     # GIVEN a remote app provides multiple OtlpEndpoints
     remote_app_data_1 = {
         'endpoints': json.dumps([
@@ -305,9 +305,9 @@ def test_send_otlp(otlp_consumer_ctx: testing.Context[ops.CharmBase]):
     )
 
     # AND WHEN otelcol supports a subset of OTLP protocols and telemetries
-    with otlp_consumer_ctx(otlp_consumer_ctx.on.update_status(), state=state) as mgr:
+    with otlp_requirer_ctx(otlp_requirer_ctx.on.update_status(), state=state) as mgr:
         charm_any = cast('Any', mgr.charm)
-        remote_endpoints = charm_any.otlp_consumer.endpoints
+        remote_endpoints = charm_any.otlp_requirer.endpoints
 
     # THEN the returned endpoints are filtered accordingly
     assert {k: v.model_dump() for k, v in remote_endpoints.items()} == {

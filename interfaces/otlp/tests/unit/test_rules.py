@@ -13,7 +13,7 @@ from ops import testing
 from ops.testing import Model, Relation, State
 
 from charmlibs.otlp import (
-    OtlpConsumerAppData,
+    OtlpRequirerAppData,
     RulesModel,
 )
 
@@ -197,18 +197,18 @@ def test_forwarding_otlp_rule_counts(
 
         decompressed = _decompress(relation.local_app_data.get('rules'))
         assert decompressed
-        consumer_databag: OtlpConsumerAppData = OtlpConsumerAppData.model_validate({
+        requirer_databag: OtlpRequirerAppData = OtlpRequirerAppData.model_validate({
             'rules': decompressed,
             'metadata': {},
         })
 
         # THEN all expected rules exist in the databag
         # * databag_groups are included/forwarded
-        assert isinstance(consumer_databag.rules, RulesModel)
+        assert isinstance(requirer_databag.rules, RulesModel)
 
         assert (
-            len(consumer_databag.rules.logql.get('groups', [])) == expected_group_counts['logql']
+            len(requirer_databag.rules.logql.get('groups', [])) == expected_group_counts['logql']
         )
         assert (
-            len(consumer_databag.rules.promql.get('groups', [])) == expected_group_counts['promql']
+            len(requirer_databag.rules.promql.get('groups', [])) == expected_group_counts['promql']
         )

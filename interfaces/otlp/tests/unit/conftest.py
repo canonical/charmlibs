@@ -26,7 +26,7 @@ import pytest
 from ops import testing
 from ops.charm import CharmBase
 
-from charmlibs.otlp import OtlpConsumer, OtlpProvider
+from charmlibs.otlp import OtlpProvider, OtlpRequirer
 from helpers import add_alerts, patch_cos_tool_path
 
 logger = logging.getLogger(__name__)
@@ -37,16 +37,16 @@ METRICS_RULES_DEST_PATH = 'prometheus_alert_rules'
 # --- Tester charms ---
 
 
-class OtlpConsumerCharm(CharmBase):
+class OtlpRequirerCharm(CharmBase):
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
-        self.otlp_consumer = OtlpConsumer(
+        self.otlp_requirer = OtlpRequirer(
             self, protocols=['http', 'grpc'], telemetries=['metrics', 'logs']
         )
         self.framework.observe(self.on.update_status, self._on_update_status)
 
     def _on_update_status(self, event: ops.EventBase) -> None:
-        self.otlp_consumer.publish()
+        self.otlp_requirer.publish()
 
 
 class OtlpProviderCharm(CharmBase):
@@ -66,7 +66,7 @@ class OtlpDualCharm(CharmBase):
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
         self.charm_root = self.charm_dir.absolute()
-        self.otlp_consumer = OtlpConsumer(
+        self.otlp_requirer = OtlpRequirer(
             self,
             protocols=['http', 'grpc'],
             telemetries=['metrics', 'logs'],
@@ -93,7 +93,7 @@ class OtlpDualCharm(CharmBase):
             )
 
         self.otlp_provider.publish()
-        self.otlp_consumer.publish()
+        self.otlp_requirer.publish()
 
 
 # --- Fixtures ---
@@ -106,9 +106,9 @@ def mock_hostname():
 
 
 @pytest.fixture
-def otlp_consumer_ctx() -> testing.Context[OtlpConsumerCharm]:
-    meta = {'name': 'otlp-consumer', 'requires': {'send-otlp': {'interface': 'otlp'}}}
-    return testing.Context(OtlpConsumerCharm, meta=meta)
+def otlp_requirer_ctx() -> testing.Context[OtlpRequirerCharm]:
+    meta = {'name': 'otlp-requirer', 'requires': {'send-otlp': {'interface': 'otlp'}}}
+    return testing.Context(OtlpRequirerCharm, meta=meta)
 
 
 @pytest.fixture
