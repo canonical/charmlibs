@@ -15,9 +15,10 @@
 """OTLP Provider and Requirer Library.
 
 OTLP is a general-purpose telemetry data delivery protocol defined by
-`the design goals of the project <https://github.com/open-telemetry/opentelemetry-proto/blob/main/docs/design-goals.md>`_
+`the design goals <https://github.com/open-telemetry/opentelemetry-proto/blob/main/docs/design-goals.md>`_
 and
-`requirements <https://github.com/open-telemetry/opentelemetry-proto/blob/main/docs/requirements.md>`_.
+`requirements <https://github.com/open-telemetry/opentelemetry-proto/blob/main/docs/requirements.md>`_
+of the project.
 
 This library provides a way for charms to share OTLP endpoint information and associated Loki and
 Prometheus rules. This library requires that the charm's workload already supports
