@@ -12,7 +12,7 @@ from cosl.utils import LZMABase64
 from ops import testing
 from ops.testing import Model, Relation, State
 
-from charmlibs.otlp import (
+from charmlibs.interfaces.otlp import (
     OtlpRequirerAppData,
     RulesModel,
 )

@@ -26,7 +26,7 @@ import pytest
 from ops import testing
 from ops.charm import CharmBase
 
-from charmlibs.otlp import OtlpProvider, OtlpRequirer
+from charmlibs.interfaces.otlp import OtlpProvider, OtlpRequirer
 from helpers import add_alerts, patch_cos_tool_path
 
 logger = logging.getLogger(__name__)

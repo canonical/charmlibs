@@ -1,6 +1,6 @@
 [project]
 name = "charmlibs-interfaces-otlp"
-description = "The charmlibs.otlp package."
+description = "The charmlibs.interfaces.otlp package."
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [
@@ -46,7 +46,7 @@ build-backend = "hatchling.build"
 packages = ["src/charmlibs"]
 
 [tool.hatch.version]
-path = "src/charmlibs/otlp/_version.py"
+path = "src/charmlibs/interfaces/otlp/_version.py"
 
 [tool.ruff]
 extend = "../../pyproject.toml"
