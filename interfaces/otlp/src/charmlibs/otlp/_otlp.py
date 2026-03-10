@@ -63,11 +63,11 @@ class RulesModel(BaseModel):
 class OtlpEndpoint(BaseModel):
     """A pydantic model for a single OTLP endpoint."""
 
-    protocol: Literal['http', 'grpc'] = Field(
+    protocol: str = Field(
         description='Transport protocol used to send telemetry data to this endpoint.'
     )
     endpoint: str = Field(description="URL of the OTLP endpoint (e.g. 'http://collector:4318').")
-    telemetries: Sequence[Literal['logs', 'metrics', 'traces']] = Field(
+    telemetries: Sequence[str] = Field(
         description='Telemetry signal types accepted by this endpoint.'
     )
 
@@ -143,8 +143,6 @@ class OtlpRequirer(Object):
             rules provided by this charm.
     """
 
-    _rules_cls = AlertRules
-
     def __init__(
         self,
         charm: CharmBase,
@@ -168,7 +166,7 @@ class OtlpRequirer(Object):
         self._loki_rules_path: str | Path = loki_rules_path
         self._prom_rules_path: str | Path = prometheus_rules_path
 
-    def _filter_endpoints(self, endpoints: list[dict[str, str | list[str]]]) -> list[OtlpEndpoint]:
+    def _filter_endpoints(self, endpoints: list[OtlpEndpoint]) -> list[OtlpEndpoint]:
         """Filter out unsupported OtlpEndpoints.
 
         For each endpoint:
@@ -181,17 +179,17 @@ class OtlpRequirer(Object):
         valid_endpoints: list[OtlpEndpoint] = []
         supported_telemetries = set(self._telemetries)
         for endpoint in endpoints:
+            if endpoint.protocol not in self._protocols:
+                # If the endpoint contains an unsupported protocol, skip it entirely
+                continue
             if filtered_telemetries := [
-                t for t in endpoint.get('telemetries', []) if t in supported_telemetries
+                t for t in endpoint.telemetries if t in supported_telemetries
             ]:
-                endpoint['telemetries'] = filtered_telemetries
+                endpoint.telemetries = filtered_telemetries
             else:
                 # If there are no supported telemetries for this endpoint, skip it entirely
                 continue
-            try:
-                endpoint = OtlpEndpoint.model_validate(endpoint)
-            except ValidationError:
-                continue
+
             valid_endpoints.append(endpoint)
 
         return valid_endpoints
@@ -220,8 +218,8 @@ class OtlpRequirer(Object):
             return
 
         # Define the rule types
-        loki_rules = self._rules_cls(query_type='logql', topology=self._topology)
-        prom_rules = self._rules_cls(query_type='promql', topology=self._topology)
+        loki_rules = AlertRules(query_type='logql', topology=self._topology)
+        prom_rules = AlertRules(query_type='promql', topology=self._topology)
 
         # Add rules
         prom_rules.add(
@@ -254,20 +252,12 @@ class OtlpRequirer(Object):
         """
         endpoint_map: dict[int, OtlpEndpoint] = {}
         for relation in self.model.relations[self._relation_name]:
-            endpoints = json.loads(relation.data[relation.app].get('endpoints', '[]'))
-            if not (endpoints := self._filter_endpoints(endpoints)):
-                continue
-
-            try:
-                # Ensure that the databag is valid
-                app_databag = OtlpProviderAppData(endpoints=endpoints)
-            except ValidationError as e:
-                logger.error('OTLP databag failed validation: %s', e)
-                continue
+            provider = relation.load(OtlpProviderAppData, relation.app)
+            provider.endpoints = self._filter_endpoints(provider.endpoints)
 
             # Choose the first valid endpoint in list
             endpoint_choice = next(
-                (e for e in app_databag.endpoints if e.protocol in self._protocols), None
+                (e for e in provider.endpoints if e.protocol in self._protocols), None
             )
             if endpoint_choice is not None:
                 endpoint_map[relation.id] = endpoint_choice
@@ -282,8 +272,6 @@ class OtlpProvider(Object):
         charm: The charm instance.
         relation_name: The name of the relation to use.
     """
-
-    _rules_cls = AlertRules
 
     def __init__(
         self,
@@ -335,48 +323,33 @@ class OtlpProvider(Object):
             following the OfficialRuleFileFormat from cos-lib.
         """
         rules_map: dict[str, dict[str, Any]] = {}
-
-        rules_obj = self._rules_cls(query_type, self._topology)
-
+        rules_obj = AlertRules(query_type, self._topology)
         for relation in self.model.relations[self._relation_name]:
             requirer = relation.load(
                 OtlpRequirerAppData, relation.app, decoder=OtlpRequirerAppData.decode_value
             )
 
-            # get rules for the desired query type
-            rules_for_type: dict[str, Any] | None = getattr(
-                requirer.rules, getattr(rules_obj, 'query_type', query_type), None
-            )
+            # Get rules for the desired query type
+            rules_for_type: dict[str, Any] | None = getattr(requirer.rules, query_type, None)
             if not rules_for_type:
-                continue
-
-            if not hasattr(rules_obj, 'inject_and_validate_rules'):
                 continue
 
             result: InjectResult = rules_obj.inject_and_validate_rules(
                 rules_for_type, requirer.metadata
             )
-            if result.errmsg:
-                if self._charm.unit.is_leader():
-                    relation.data[self._charm.app]['event'] = json.dumps({'errors': result.errmsg})
-                else:
-                    logging.warning(
-                        "Skipping write to app-level relation data 'event' on non-leader unit: %s",
-                        result.errmsg,
-                    )
-
-            identifier = result.identifier
-            rules = result.rules
+            if result.errmsg and self._charm.unit.is_leader():
+                relation.data[self._charm.app]['event'] = json.dumps({'errors': result.errmsg})
 
             # If an identifier does not exist, we generate a deterministic hash
             # derived from the rules content so the rules can still be recorded
             # for this relation. This avoids dropping rules when the upstream
             # requirer metadata does not provide an identifier.
+            identifier = result.identifier
             if identifier is None:
                 try:
-                    rules_json = json.dumps(rules, sort_keys=True)
+                    rules_json = json.dumps(result.rules, sort_keys=True)
                 except (TypeError, ValueError):
-                    rules_json = repr(rules)
+                    rules_json = repr(result.rules)
 
                 content_hash = hashlib.sha256(rules_json.encode('utf-8')).hexdigest()[:12]
                 identifier = content_hash
@@ -386,6 +359,6 @@ class OtlpProvider(Object):
                     identifier,
                 )
 
-            rules_map[identifier] = rules
+            rules_map[identifier] = result.rules
 
         return rules_map

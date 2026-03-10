@@ -17,6 +17,7 @@ from charmlibs.otlp import (
     RulesModel,
 )
 
+MODEL = Model('otelcol', uuid='f4d59020-c8e7-4053-8044-a2c1e5591c7f')
 OTELCOL_LABELS = {
     'juju_model': 'otelcol',
     'juju_model_uuid': 'f4d59020-c8e7-4053-8044-a2c1e5591c7f',
@@ -68,7 +69,6 @@ ALL_RULES = {
     'logql': {'groups': [LOGQL_ALERT, LOGQL_RECORD]},
     'promql': {'groups': [PROMQL_ALERT, PROMQL_RECORD]},
 }
-
 METADATA = {
     'model': 'otelcol',
     'model_uuid': 'f4d59020-c8e7-4053-8044-a2c1e5591c7f',
@@ -84,20 +84,23 @@ def _decompress(rules: str | None) -> dict[str, Any]:
     return json.loads(LZMABase64.decompress(rules))
 
 
+def test_rules_compatibility() -> None:
+    # GIVEN the requirer offers a new rule type
+    # * the provider does not support this new rule type
+    rules: dict[str, dict[str, Any]] = {'logql': {}, 'promql': {}, 'new_rule': {}}
+    # WHEN validating the requirer databag model, which the provider uses to access rules
+    # THEN the validation succeeds
+    assert OtlpRequirerAppData.model_validate({'rules': rules, 'metadata': METADATA})
+
+
 def test_forwarded_rules_compression(otlp_dual_ctx: testing.Context[ops.CharmBase]) -> None:
     # GIVEN receive-otlp and send-otlp relations
     rules = LZMABase64.compress(json.dumps(ALL_RULES, sort_keys=True))
     databag: dict[str, Any] = {'rules': rules, 'metadata': json.dumps(METADATA)}
-    # GIVEN receive-otlp and send-otlp relations
-    databag: dict[str, Any] = {'rules': rules, 'metadata': json.dumps(METADATA)}
     receiver = Relation('receive-otlp', remote_app_data=databag)
     sender_1 = Relation('send-otlp', remote_app_data={'endpoints': '[]'})
     sender_2 = Relation('send-otlp', remote_app_data={'endpoints': '[]'})
-    state = State(
-        relations=[receiver, sender_1, sender_2],
-        leader=True,
-        model=Model('otelcol', uuid='f4d59020-c8e7-4053-8044-a2c1e5591c7f'),
-    )
+    state = State(relations=[receiver, sender_1, sender_2], leader=True, model=MODEL)
 
     # WHEN any event executes the reconciler
     state_out = otlp_dual_ctx.run(otlp_dual_ctx.on.update_status(), state=state)
@@ -184,7 +187,7 @@ def test_forwarding_otlp_rule_counts(
     state = State(
         relations=[receiver, sender_1, sender_2],
         leader=True,
-        model=Model('otelcol', uuid='f4d59020-c8e7-4053-8044-a2c1e5591c7f'),
+        model=MODEL,
         config={'forward_alert_rules': forwarding_enabled},
     )
 
