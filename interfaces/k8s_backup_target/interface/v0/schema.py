@@ -11,42 +11,36 @@ class BackupTargetSpec(BaseModel):
 
     include_namespaces: list[str] | None = Field(
         None,
-        alias="include-namespaces",
         description="List of namespaces to include in the backup (None means all namespaces).",
         title="Included Namespaces",
         examples=[["my-namespace"]],
     )
     include_resources: list[str] | None = Field(
         None,
-        alias="include-resources",
         description="List of resource kinds to include (None means all resource types).",
         title="Included Resources",
         examples=[["persistentvolumeclaims", "services", "deployments"]],
     )
     exclude_namespaces: list[str] | None = Field(
         None,
-        alias="exclude-namespaces",
         description="List of namespaces to exclude from the backup.",
         title="Excluded Namespaces",
         examples=[["default"]],
     )
     exclude_resources: list[str] | None = Field(
         None,
-        alias="exclude-resources",
         description="List of resource kinds to exclude from the backup.",
         title="Excluded Resources",
         examples=[["pods"]],
     )
     include_cluster_resources: bool | None = Field(
         None,
-        alias="include-cluster-resources",
         description="Whether to include cluster-scoped resources in the backup.",
         title="Include Cluster Resources",
         examples=[True],
     )
     label_selector: dict[str, str] | None = Field(
         None,
-        alias="label-selector",
         description="Label selector to filter resources for backup.",
         title="Label Selector",
         examples=[{"app": "my-app"}],

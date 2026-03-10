@@ -9,21 +9,21 @@ import scenario
 from ops.charm import CharmBase
 
 from charmlibs.interfaces.k8s_backup_target import (
-    BackupTargetProvider,
-    BackupTargetRequirer,
-    BackupTargetSpec,
+    K8sBackupTargetProvider,
+    K8sBackupTargetRequirer,
+    K8sBackupTargetSpec,
 )
 
 
 class DummyProviderCharm(CharmBase):
-    """Dummy charm for testing BackupTargetProvider."""
+    """Dummy charm for testing K8sBackupTargetProvider."""
 
     def __init__(self, *args: Any):
         super().__init__(*args)
-        self.backup = BackupTargetProvider(
+        self.backup = K8sBackupTargetProvider(
             self,
             relation_name="backup",
-            spec=BackupTargetSpec(
+            spec=K8sBackupTargetSpec(
                 include_namespaces=["my-namespace"],
                 include_resources=["persistentvolumeclaims", "services"],
                 ttl="24h",
@@ -33,14 +33,14 @@ class DummyProviderCharm(CharmBase):
 
 
 class DummyRequirerCharm(CharmBase):
-    """Dummy charm for testing BackupTargetRequirer."""
+    """Dummy charm for testing K8sBackupTargetRequirer."""
 
     def __init__(self, *args: Any):
         super().__init__(*args)
-        self.backup_requirer = BackupTargetRequirer(self, relation_name="k8s-backup-target")
+        self.backup_requirer = K8sBackupTargetRequirer(self, relation_name="k8s-backup-target")
 
 
-class TestBackupTargetProvider:
+class TestK8sBackupTargetProvider:
     @pytest.fixture(autouse=True)
     def context(self):
         self.ctx = scenario.Context(
@@ -107,7 +107,7 @@ class TestBackupTargetProvider:
         assert "no relation" in caplog.text.lower()
 
 
-class TestBackupTargetRequirer:
+class TestK8sBackupTargetRequirer:
     @pytest.fixture(autouse=True)
     def context(self):
         self.ctx = scenario.Context(
@@ -198,15 +198,15 @@ class TestBackupTargetRequirer:
             assert "no backup spec found" in caplog.text.lower()
 
 
-class TestBackupTargetSpec:
+class TestK8sBackupTargetSpec:
     def test_valid_ttl_formats(self):
         valid_ttls = ["24h", "1h30m", "10m10s", "30s", "1h", "1h1m1s"]
         for ttl in valid_ttls:
-            spec = BackupTargetSpec(ttl=ttl)
+            spec = K8sBackupTargetSpec(ttl=ttl)
             assert spec.ttl == ttl
 
     def test_spec_with_all_fields(self):
-        spec = BackupTargetSpec(
+        spec = K8sBackupTargetSpec(
             include_namespaces=["ns1", "ns2"],
             include_resources=["deployments", "services"],
             exclude_namespaces=["kube-system"],
@@ -224,7 +224,7 @@ class TestBackupTargetSpec:
         assert spec.include_cluster_resources is True
 
     def test_spec_with_defaults(self):
-        spec = BackupTargetSpec()
+        spec = K8sBackupTargetSpec()
         assert spec.include_namespaces is None
         assert spec.include_resources is None
         assert spec.exclude_namespaces is None

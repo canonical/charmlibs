@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `k8s_backup_target` interface enables a **client charm** to specify what Kubernetes data should be backed up by relating to a **backup integrator charm**. In practice, a client charm declares the namespaces and resource types to include or exclude in backups, and the backup integrator uses this specification to forward backup requests to a backup operator. This design lets the client define backup requirements **without direct cluster elevated permissions**, delegating the backup execution to the backup operator charm.
+The `k8s_backup_target` interface enables a **client charm** to specify what Kubernetes data should be backed up by relating to a **backup charm or backup integrator charm**. In practice, a client charm declares the namespaces and resource types to include or exclude in backups, and the backup charm or integrator uses this specification to forward backup requests to a backup operator. This design lets the client define backup requirements **without direct cluster elevated permissions**, delegating the backup execution to the backup operator charm.
 
 ## Direction
 
@@ -16,7 +16,7 @@ flowchart TD
 ## Behavior
 
 - **Provider (Client Charm)**: Provides the backup specification via its application relation data. Typically, a client charm will set this data as soon as the relation is formed.
-- **Requirer (Backup Integrator Charm)**: Consumes the spec. It does not send any data over the relation. The integrator charm listens for changes to the relation data and forwards the received spec to the backup operator.
+- **Requirer (Backup Charm or Backup Integrator Charm)**: Consumes the spec. It does not send any data over the relation. If the requirer is an integrator charm, it should listens for changes to the relation data and forward the received spec to the backup operator it is related to.
 
 ## Relation Data
 

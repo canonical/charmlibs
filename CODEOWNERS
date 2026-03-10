@@ -90,6 +90,7 @@
 /interfaces/tracing/ @canonical/tracing-and-profiling
 /interfaces/vault-autounseal/ @canonical/tls
 /interfaces/vault-kv/ @canonical/tls
+/interfaces/k8s_backup_target/ @canonical/analytics
 /interfaces/velero_backup_config/ @canonical/analytics
 /interfaces/wazuh_api_client/ @canonical/platform-engineering
 

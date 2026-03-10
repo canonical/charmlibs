@@ -12,77 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""K8s Backup Target library.
-
-This library implements the Requirer and Provider roles for the `k8s_backup_target` relation
-interface. It is used by client charms to declare backup specifications, and by backup
-integrator charms to consume them and forward to backup operators.
-
-The `k8s_backup_target` interface allows a charm (the provider) to provide a declarative
-description of what Kubernetes resources should be included in a backup. These specifications are
-sent to the backup integrator charm (the requirer), which merges them with schedule configuration
-and forwards to the backup operator.
-
-This interface follows a least-privilege model: client charms do not manipulate cluster resources
-themselves. Instead, they define what should be backed up and leave execution to the backup
-operator.
-
-Getting Started
-===============
-
-Install with pip::
-
-    pip install charmlibs-interfaces-k8s_backup_target
-
-Or add to your charm's pyproject.toml::
-
-    dependencies = [
-        "charmlibs-interfaces-k8s_backup_target",
-    ]
-
-Provider Example
-================
-
-::
-
-    from charmlibs.interfaces.k8s_backup_target import (
-        BackupTargetProvider,
-        BackupTargetSpec,
-    )
-
-    class SomeCharm(CharmBase):
-        def __init__(self, *args):
-            # ...
-            self.backup = BackupTargetProvider(
-                self,
-                relation_name="backup",
-                spec=BackupTargetSpec(
-                    include_namespaces=["my-namespace"],
-                    include_resources=["persistentvolumeclaims", "services", "deployments"],
-                    ttl=str(self.config["ttl"]),
-                ),
-                # Optional: refresh the data on custom events
-                refresh_event=[self.on.config_changed],
-            )
-
-Requirer Example
-================
-
-::
-
-    from charmlibs.interfaces.k8s_backup_target import (
-        BackupTargetRequirer,
-        BackupTargetSpec,
-    )
-
-    class BackupIntegratorCharm(CharmBase):
-        def __init__(self, *args):
-            # ...
-            self.backup_requirer = BackupTargetRequirer(self, relation_name="k8s-backup-target")
-
-        def get_all_specs(self):
-            return self.backup_requirer.get_all_backup_specs()
-"""
+"""K8s Backup Target library implementation."""
 
 import logging
 import re
@@ -103,7 +33,7 @@ MODEL_FIELD = "model"
 logger = logging.getLogger(__name__)
 
 
-class BackupTargetSpec(BaseModel):
+class K8sBackupTargetSpec(BaseModel):
     """Dataclass representing the backup target configuration.
 
     Args:
@@ -134,7 +64,7 @@ class BackupTargetSpec(BaseModel):
             )
 
 
-class BackupTargetRequirer(Object):
+class K8sBackupTargetRequirer(Object):
     """Requirer class for the backup target configuration relation."""
 
     def __init__(self, charm: CharmBase, relation_name: str):
@@ -148,8 +78,10 @@ class BackupTargetRequirer(Object):
         self._charm = charm
         self._relation_name = relation_name
 
-    def get_backup_spec(self, app_name: str, endpoint: str, model: str) -> BackupTargetSpec | None:
-        """Get a BackupTargetSpec for a given (app, endpoint, model).
+    def get_backup_spec(
+        self, app_name: str, endpoint: str, model: str
+    ) -> K8sBackupTargetSpec | None:
+        """Get a K8sBackupTargetSpec for a given (app, endpoint, model).
 
         Args:
             app_name: The name of the application for which the backup is configured.
@@ -169,35 +101,35 @@ class BackupTargetRequirer(Object):
                 and data.get(RELATION_FIELD) == endpoint
             ):
                 json_data = data.get(SPEC_FIELD, "{}")
-                return BackupTargetSpec.model_validate_json(json_data)
+                return K8sBackupTargetSpec.model_validate_json(json_data)
 
         logger.warning("No backup spec found for app '%s' and endpoint '%s'", app_name, endpoint)
         return None
 
-    def get_all_backup_specs(self) -> list[BackupTargetSpec]:
-        """Get a list of all active BackupTargetSpec objects across all relations.
+    def get_all_backup_specs(self) -> list[K8sBackupTargetSpec]:
+        """Get a list of all active K8sBackupTargetSpec objects across all relations.
 
         Returns:
             A list of all active backup specifications.
         """
-        specs: list[BackupTargetSpec] = []
+        specs: list[K8sBackupTargetSpec] = []
         relations = self.model.relations[self._relation_name]
 
         for relation in relations:
             json_data = relation.data[relation.app].get(SPEC_FIELD, "{}")
-            specs.append(BackupTargetSpec.model_validate_json(json_data))
+            specs.append(K8sBackupTargetSpec.model_validate_json(json_data))
 
         return specs
 
 
-class BackupTargetProvider(Object):
+class K8sBackupTargetProvider(Object):
     """Provider class for the backup target configuration relation."""
 
     def __init__(
         self,
         charm: CharmBase,
         relation_name: str,
-        spec: BackupTargetSpec,
+        spec: K8sBackupTargetSpec,
         refresh_event: BoundEvent | list[BoundEvent] | None = None,
     ):
         """Initialize the provider with the specified backup configuration.
@@ -231,7 +163,7 @@ class BackupTargetProvider(Object):
         """Handle any event where we should send data to the relation."""
         if not self._charm.model.unit.is_leader():
             logger.warning(
-                "BackupTargetProvider handled send_data event when it is not a leader. "
+                "K8sBackupTargetProvider handled send_data event when it is not a leader. "
                 "Skipping event - no data sent"
             )
             return
@@ -240,7 +172,7 @@ class BackupTargetProvider(Object):
 
         if not relations:
             logger.warning(
-                "BackupTargetProvider handled send_data event but no relation '%s' found. "
+                "K8sBackupTargetProvider handled send_data event but no relation '%s' found. "
                 "Skipping event - no data sent",
                 self._relation_name,
             )

@@ -1,6 +1,6 @@
 [project]
-name = "charmlibs-interfaces-k8s_backup_target"
-description = "The charmlibs.interfaces.k8s_backup_target package."
+name = "charmlibs-interfaces-k8s-backup-target"
+description = "The charmlibs.interfaces.k8s-backup-target package."
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [
