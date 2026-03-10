@@ -11,7 +11,6 @@ import ops
 import pytest
 from ops import testing
 from ops.testing import Relation, State
-from pydantic import ValidationError
 
 from charmlibs.otlp import OtlpEndpoint, OtlpProviderAppData
 
@@ -26,25 +25,20 @@ RECEIVE_OTLP = Relation('receive-otlp', remote_app_data=EMPTY_CONSUMER)
 
 
 @pytest.mark.parametrize(
-    'data, error_match',
+    'endpoint',
     [
-        (
-            {'protocol': 'invalid', 'endpoint': 'http://host:4317', 'telemetries': ['logs']},
-            "Input should be 'http' or 'grpc'",
-        ),
-        (
-            {'protocol': 'grpc', 'endpoint': 'http://host:4317', 'telemetries': ['invalid']},
-            "Input should be 'logs', 'metrics' or 'traces'",
-        ),
+        {'protocol': 'new_protocol', 'endpoint': 'http://host:4317', 'telemetries': ['logs']},
+        {'protocol': 'grpc', 'endpoint': 'http://host:4317', 'telemetries': ['new_telemetry']},
     ],
 )
-def test_provider_app_data_raises_validation_error(data: dict[str, Any], error_match: str) -> None:
-    """Test that OtlpProviderAppData validates protocols and telemetries."""
-    with pytest.raises(ValidationError, match=error_match):
-        OtlpProviderAppData(endpoints=[OtlpEndpoint(**data)])
+def test_endpoints_compatibility(endpoint: dict[str, Any]) -> None:
+    # GIVEN the provider offers a new endpoint type (protocol or telemetry)
+    # * the consumer does not support this new endpoint type
+    # WHEN validating the provider databag model, which the consumer uses to access endpoints
+    # THEN the validation succeeds
+    assert OtlpProviderAppData.model_validate({'endpoints': [endpoint]})
 
 
-# NOTE: we cannot use OtlpProviderAppData for "provides" since it would raise validation errors
 @pytest.mark.parametrize(
     'provides, otlp_endpoint',
     (
@@ -52,20 +46,18 @@ def test_provider_app_data_raises_validation_error(data: dict[str, Any], error_m
             # GIVEN an endpoint with an invalid protocol
             # * an endpoint with a valid protocol
             {
-                'endpoints': json.dumps(
-                    [
-                        {
-                            'protocol': 'fake',
-                            'endpoint': 'http://host:0000',
-                            'telemetries': ['metrics'],
-                        },
-                        {
-                            'protocol': 'http',
-                            'endpoint': 'http://host:4317',
-                            'telemetries': ['metrics'],
-                        },
-                    ],
-                ),
+                'endpoints': json.dumps([
+                    {
+                        'protocol': 'new_protocol',
+                        'endpoint': 'http://host:0000',
+                        'telemetries': ['metrics'],
+                    },
+                    {
+                        'protocol': 'http',
+                        'endpoint': 'http://host:4317',
+                        'telemetries': ['metrics'],
+                    },
+                ]),
             },
             OtlpEndpoint(
                 protocol='http',
@@ -80,7 +72,7 @@ def test_provider_app_data_raises_validation_error(data: dict[str, Any], error_m
                     {
                         'protocol': 'http',
                         'endpoint': 'http://host:4317',
-                        'telemetries': ['logs', 'fake', 'traces'],
+                        'telemetries': ['logs', 'new_telemetry', 'traces'],
                     },
                 ]),
             },
@@ -103,7 +95,7 @@ def test_provider_app_data_raises_validation_error(data: dict[str, Any], error_m
                         }
                     ],
                 ),
-                'does_not': 'exist',
+                'does_not': '"exist"',
             },
             OtlpEndpoint(
                 protocol='http',
@@ -132,7 +124,7 @@ def test_send_otlp_invalid_databag(
             patch.object(charm_any.otlp_consumer, '_telemetries', new=ALL_TELEMETRIES),
         ):
             # THEN the consumer does not raise an error
-            # * the returned endpoint does not include invalid protocols or telemetries
+            # * the returned endpoint does not include new protocols or telemetries
             assert mgr.run()
             result = charm_any.otlp_consumer.endpoints[123]
             assert result.model_dump() == otlp_endpoint.model_dump()
