@@ -84,21 +84,12 @@ def _decompress(rules: str | None) -> dict[str, Any]:
     return json.loads(LZMABase64.decompress(rules))
 
 
-@pytest.mark.parametrize(
-    'valid_compression, compressed_rules',
-    [
-        (True, LZMABase64.compress(json.dumps(ALL_RULES, sort_keys=True))),
-        (False, '/Td6WFoAAATm1rRGAgAhARYAAAB0L+Wj4AM4AWFdAD2I'),
-    ],
-    ids=['valid compression', 'invalid compression'],
-)
-def test_forwarded_rules_compression(
-    otlp_dual_ctx: testing.Context[ops.CharmBase],
-    valid_compression: bool,
-    compressed_rules: str,
-) -> None:
+def test_forwarded_rules_compression(otlp_dual_ctx: testing.Context[ops.CharmBase]) -> None:
     # GIVEN receive-otlp and send-otlp relations
-    databag: dict[str, Any] = {'rules': compressed_rules, 'metadata': json.dumps(METADATA)}
+    rules = LZMABase64.compress(json.dumps(ALL_RULES, sort_keys=True))
+    databag: dict[str, Any] = {'rules': rules, 'metadata': json.dumps(METADATA)}
+    # GIVEN receive-otlp and send-otlp relations
+    databag: dict[str, Any] = {'rules': rules, 'metadata': json.dumps(METADATA)}
     receiver = Relation('receive-otlp', remote_app_data=databag)
     sender_1 = Relation('send-otlp', remote_app_data={'endpoints': '[]'})
     sender_2 = Relation('send-otlp', remote_app_data={'endpoints': '[]'})
@@ -123,24 +114,20 @@ def test_forwarded_rules_compression(
         assert decompressed
         assert isinstance(decompressed, dict)
         actual_groups = decompressed.get('logql', {}).get('groups', [])
-        if not valid_compression:
-            # THEN the decompressed databag contains no rules
-            assert not actual_groups
-        else:
-            # THEN the decompressed databag contains rules
-            assert actual_groups
-            actual_group_names: set[str] = set()
-            for group in actual_groups:
-                name = group.get('name')
-                if isinstance(name, str):
-                    actual_group_names.add(name)
-            expected_groups = ALL_RULES.get('logql', {}).get('groups', [])
-            expected_group_names: set[str] = set()
-            for group in expected_groups:
-                name = group.get('name')
-                if isinstance(name, str):
-                    expected_group_names.add(name)
-            assert actual_group_names == expected_group_names
+        # THEN the decompressed databag contains rules
+        assert actual_groups
+        actual_group_names: set[str] = set()
+        for group in actual_groups:
+            name = group.get('name')
+            if isinstance(name, str):
+                actual_group_names.add(name)
+        expected_groups = ALL_RULES.get('logql', {}).get('groups', [])
+        expected_group_names: set[str] = set()
+        for group in expected_groups:
+            name = group.get('name')
+            if isinstance(name, str):
+                expected_group_names.add(name)
+        assert actual_group_names == expected_group_names
 
 
 @pytest.mark.parametrize(

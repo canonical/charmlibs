@@ -19,6 +19,7 @@ shared between charms that intend to provide or consume OTLP telemetry.
 For user-facing documentation, see the package-level docstring in __init__.py.
 """
 
+import binascii
 import copy
 import hashlib
 import json
@@ -31,10 +32,11 @@ from typing import Any, Literal
 
 from cosl.juju_topology import JujuTopology
 from cosl.rules import AlertRules, InjectResult, generic_alert_groups
+from cosl.types import OfficialRuleFileFormat
 from cosl.utils import LZMABase64
 from ops import CharmBase
 from ops.framework import Object
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import BaseModel, Field, ValidationError
 
 DEFAULT_CONSUMER_RELATION_NAME = 'send-otlp'
 DEFAULT_PROVIDER_RELATION_NAME = 'receive-otlp'
@@ -46,34 +48,40 @@ logger = logging.getLogger(__name__)
 
 
 class RulesModel(BaseModel):
-    """A pydantic model for all rule formats."""
+    """Rules of various formats (query languages) to support in the relation databag."""
 
-    model_config = ConfigDict(extra='forbid')
-
-    logql: dict[str, Any]
-    promql: dict[str, Any]
+    logql: OfficialRuleFileFormat = Field(
+        description='LogQL alerting and recording rules, following the '
+        'OfficialRuleFileFormat from cos-lib.'
+    )
+    promql: OfficialRuleFileFormat = Field(
+        description='PromQL alerting and recording rules, following the '
+        'OfficialRuleFileFormat from cos-lib.'
+    )
 
 
 class OtlpEndpoint(BaseModel):
     """A pydantic model for a single OTLP endpoint."""
 
-    model_config = ConfigDict(extra='forbid')
-
-    protocol: Literal['http', 'grpc']
-    endpoint: str
-    telemetries: Sequence[Literal['logs', 'metrics', 'traces']]
+    protocol: Literal['http', 'grpc'] = Field(
+        description='Transport protocol used to send telemetry data to this endpoint.'
+    )
+    endpoint: str = Field(description="URL of the OTLP endpoint (e.g. 'http://collector:4318').")
+    telemetries: Sequence[Literal['logs', 'metrics', 'traces']] = Field(
+        description='Telemetry signal types accepted by this endpoint.'
+    )
 
 
 class OtlpProviderAppData(BaseModel):
-    """A pydantic model for the OTLP provider's unit databag."""
+    """A pydantic model for the OTLP provider's app databag."""
 
-    model_config = ConfigDict(extra='forbid')
-
-    endpoints: list[OtlpEndpoint]
+    endpoints: list[OtlpEndpoint] = Field(
+        description='List of OTLP endpoints exposed by the provider.'
+    )
 
 
 class OtlpConsumerAppData(BaseModel):
-    """A pydantic model for the OTLP consumer's unit databag.
+    """A pydantic model for the OTLP consumer's app databag.
 
     The rules are compressed when saved to databag to avoid hitting databag
     size limits for large deployments. An admin can decode the rules using the
@@ -83,26 +91,35 @@ class OtlpConsumerAppData(BaseModel):
     ```
     """
 
-    model_config = ConfigDict(extra='forbid')
-
-    rules: RulesModel | str
-    metadata: OrderedDict[str, str]
+    rules: RulesModel | str = Field(
+        description='Rules to be forwarded to the provider.'
+        ' Stored as an LZMA-compressed, base64-encoded JSON string to reduce payload size.'
+    )
+    metadata: OrderedDict[str, str] = Field(
+        description='Juju topology of the consumer charm (e.g. model, app, unit),'
+        ' used to label rule expressions and alert routing.'
+    )
 
     @staticmethod
     def decode_value(json_str: str) -> Any:
-        """Decode relation data values using BaseModel validation."""
+        """Decode a relation databag value from its serialized string form.
+
+        Attempts to decompress and deserialize the value as a ``RulesModel``, falls back to
+        plain JSON deserialization.
+        """
         try:
+            decompressed = LZMABase64.decompress(json_str)
+            return RulesModel.model_validate(json.loads(decompressed))
+        except (LZMAError, binascii.Error):
             return json.loads(json_str)
-        except json.JSONDecodeError:
-            try:
-                decompressed = LZMABase64.decompress(json_str)
-                return RulesModel.model_validate(json.loads(decompressed))
-            except (json.JSONDecodeError, ValidationError, LZMAError):
-                return ''
 
     @staticmethod
     def encode_value(obj: Any) -> str:
-        """Encode relation data values using BaseModel serialization."""
+        """Encode relation data values into a string.
+
+        Rules are LZMA-compressed and base64-encoded to reduce content size for larger deployments.
+        Other data is serialized into a JSON formatted str.
+        """
         try:
             RulesModel.model_validate(obj)
             return LZMABase64.compress(json.dumps(obj, sort_keys=True))
