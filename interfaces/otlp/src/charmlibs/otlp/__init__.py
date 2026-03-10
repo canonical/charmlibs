@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""OTLP Provider and Consumer Library.
+"""OTLP Provider and Requirer Library.
 
 OTLP is a general-purpose telemetry data delivery protocol defined by
 [the design goals of the project]
@@ -58,24 +58,24 @@ Providers add endpoints explicitly; nothing is auto-published by default. Make s
 endpoints and publish them after the charm's endpoint details have been updated e.g., ingress or
 TLS changes.
 
-The OtlpProvider also consumes rules from related OtlpConsumer charms, which can be retrieved with
+The OtlpProvider also consumes rules from related OtlpRequirer charms, which can be retrieved with
 the ``rules()`` method::
     # snip ...
     promql_rules = self.otlp_provider.rules("promql")
     logql_rules = self.otlp_provider.rules("logql")
 
-Consumer Side (Charms consuming OTLP endpoints)
+Requirer Side (Charms requiring OTLP endpoints)
 ---------------------------------------------
 
-To consume OTLP endpoints, use the ``OtlpConsumer`` class. The OTLP sender may only support a
+To consume OTLP endpoints, use the ``OtlpRequirer`` class. The OTLP sender may only support a
 subset of protocols and telemetries, which can be configured at instantiation::
 
-    from charmlibs.interfaces.otlp import OtlpConsumer
+    from charmlibs.interfaces.otlp import OtlpRequirer
 
     class MyOtlpSender(CharmBase):
         def __init__(self, *args):
             super().__init__(*args)
-            self.otlp_consumer = OtlpConsumer(
+            self.otlp_requirer = OtlpRequirer(
                 self,
                 protocols=["grpc", "http"],
                 telemetries=["logs", "metrics", "traces"],
@@ -85,16 +85,16 @@ subset of protocols and telemetries, which can be configured at instantiation::
             self.framework.observe(self.on.update_status, self._reconcile)
 
         def _reconcile(self, event):
-            supported_endpoints = self.otlp_consumer.endpoints
+            supported_endpoints = self.otlp_requirer.endpoints
 
-Given the defined, supported protocols and telemetries, the OtlpConsumer will filter out
-unsupported endpoints and prune unsupported telemetries. After filtering, consumer selection
+Given the defined, supported protocols and telemetries, the OtlpRequirer will filter out
+unsupported endpoints and prune unsupported telemetries. After filtering, requirer selection
 condenses the list to a single endpoint per relation.
 
-The OtlpConsumer also publishes rules to related OtlpProvider charms with the ``publish()``
+The OtlpRequirer also publishes rules to related OtlpProvider charms with the ``publish()``
 method::
     # snip ...
-    self.otlp_consumer.publish()
+    self.otlp_requirer.publish()
 
 It is the charm's responsibility to manage the rules in the ``loki_rules_path`` and
 ``prometheus_rules_path`` directories, which will be forwarded to the related OtlpProvider charms.
@@ -118,7 +118,7 @@ key. Each provider may offer any number of OTLP endpoints::
         },
     ]
 
-The OtlpConsumer offers compressed rules in the relation databag under the ``rules`` key. The
+The OtlpRequirer offers compressed rules in the relation databag under the ``rules`` key. The
 charm's metadata is included under the ``metadata`` key for the provider to know the source of the
 rules::
 
@@ -136,11 +136,11 @@ rules::
 """
 
 from ._otlp import (
-    OtlpConsumer,
-    OtlpConsumerAppData,
     OtlpEndpoint,
     OtlpProvider,
     OtlpProviderAppData,
+    OtlpRequirer,
+    OtlpRequirerAppData,
     RulesModel,
 )
 from ._version import __version__ as __version__
@@ -148,10 +148,10 @@ from ._version import __version__ as __version__
 __all__ = [
     # only the names listed in __all__ are imported when executing:
     # from charmlibs.otlp import *
-    'OtlpConsumer',
-    'OtlpConsumerAppData',
     'OtlpEndpoint',
     'OtlpProvider',
     'OtlpProviderAppData',
+    'OtlpRequirer',
+    'OtlpRequirerAppData',
     'RulesModel',
 ]

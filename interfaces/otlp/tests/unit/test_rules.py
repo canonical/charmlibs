@@ -13,7 +13,7 @@ from ops import testing
 from ops.testing import Model, Relation, State
 
 from charmlibs.otlp import (
-    OtlpConsumerAppData,
+    OtlpRequirerAppData,
     RulesModel,
 )
 
@@ -85,12 +85,12 @@ def _decompress(rules: str | None) -> dict[str, Any]:
 
 
 def test_rules_compatibility() -> None:
-    # GIVEN the consumer offers a new rule type
+    # GIVEN the requirer offers a new rule type
     # * the provider does not support this new rule type
     rules: dict[str, dict[str, Any]] = {'logql': {}, 'promql': {}, 'new_rule': {}}
-    # WHEN validating the consumer databag model, which the provider uses to access rules
+    # WHEN validating the requirer databag model, which the provider uses to access rules
     # THEN the validation succeeds
-    assert OtlpConsumerAppData.model_validate({'rules': rules, 'metadata': METADATA})
+    assert OtlpRequirerAppData.model_validate({'rules': rules, 'metadata': METADATA})
 
 
 def test_forwarded_rules_compression(otlp_dual_ctx: testing.Context[ops.CharmBase]) -> None:
@@ -200,18 +200,18 @@ def test_forwarding_otlp_rule_counts(
 
         decompressed = _decompress(relation.local_app_data.get('rules'))
         assert decompressed
-        consumer_databag: OtlpConsumerAppData = OtlpConsumerAppData.model_validate({
+        requirer_databag: OtlpRequirerAppData = OtlpRequirerAppData.model_validate({
             'rules': decompressed,
             'metadata': {},
         })
 
         # THEN all expected rules exist in the databag
         # * databag_groups are included/forwarded
-        assert isinstance(consumer_databag.rules, RulesModel)
+        assert isinstance(requirer_databag.rules, RulesModel)
 
         assert (
-            len(consumer_databag.rules.logql.get('groups', [])) == expected_group_counts['logql']
+            len(requirer_databag.rules.logql.get('groups', [])) == expected_group_counts['logql']
         )
         assert (
-            len(consumer_databag.rules.promql.get('groups', [])) == expected_group_counts['promql']
+            len(requirer_databag.rules.promql.get('groups', [])) == expected_group_counts['promql']
         )
