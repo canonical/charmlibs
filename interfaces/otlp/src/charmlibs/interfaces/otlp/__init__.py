@@ -15,10 +15,9 @@
 """OTLP Provider and Requirer Library.
 
 OTLP is a general-purpose telemetry data delivery protocol defined by
-[the design goals of the project]
-(https://github.com/open-telemetry/opentelemetry-proto/blob/main/docs/design-goals.md)
+`the design goals of the project <https://github.com/open-telemetry/opentelemetry-proto/blob/main/docs/design-goals.md>`_
 and
-[requirements](https://github.com/open-telemetry/opentelemetry-proto/blob/main/docs/requirements.md).
+`requirements <https://github.com/open-telemetry/opentelemetry-proto/blob/main/docs/requirements.md>`_.
 
 This library provides a way for charms to share OTLP endpoint information and associated Loki and
 Prometheus rules. This library requires that the charm's workload already supports
@@ -28,7 +27,7 @@ Getting Started
 ===============
 
 Provider Side (Charms offering OTLP endpoints)
-----------------------------------------------
+-----------------------------------------------
 
 To provide OTLP endpoints, use the ``OtlpProvider`` class. Configure and send endpoints with the
 ``add_endpoint`` and ``publish()`` methods::
@@ -43,14 +42,14 @@ To provide OTLP endpoints, use the ``OtlpProvider`` class. Configure and send en
 
         def _on_ingress_ready(self, event):
             self.otlp_provider.add_endpoint(
-                    protocol="grpc",
-                    endpoint="https://my-app.ingress:4317",
-                    telemetries=["logs", "metrics"],
+                protocol="grpc",
+                endpoint="https://my-app.ingress:4317",
+                telemetries=["logs", "metrics"],
             )
             self.otlp_provider.add_endpoint(
-                    protocol="http",
-                    endpoint="https://my-app.ingress:4318",
-                    telemetries=["traces"],
+                protocol="http",
+                endpoint="https://my-app.ingress:4318",
+                telemetries=["traces"],
             )
             self.otlp_provider.publish()
 
@@ -60,12 +59,13 @@ TLS changes.
 
 The OtlpProvider also consumes rules from related OtlpRequirer charms, which can be retrieved with
 the ``rules()`` method::
+
     # snip ...
     promql_rules = self.otlp_provider.rules("promql")
     logql_rules = self.otlp_provider.rules("logql")
 
 Requirer Side (Charms requiring OTLP endpoints)
----------------------------------------------
+-----------------------------------------------
 
 To consume OTLP endpoints, use the ``OtlpRequirer`` class. The OTLP sender may only support a
 subset of protocols and telemetries, which can be configured at instantiation::
@@ -93,6 +93,7 @@ condenses the list to a single endpoint per relation.
 
 The OtlpRequirer also publishes rules to related OtlpProvider charms with the ``publish()``
 method::
+
     # snip ...
     self.otlp_requirer.publish()
 

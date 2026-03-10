@@ -202,6 +202,7 @@ class OtlpRequirer(Object):
         charm uses these paths as aggregation points for rules, acting as their
         source of truth. For each type of rule, the charm may aggregate rules
         from:
+
             - rules bundled in the charm's source code
             - any rules provided by related charms
 
@@ -315,6 +316,7 @@ class OtlpProvider(Object):
         provided by related OTLP requirer charms. These rules may be used to
         generate a rules file for each relation since the returned list of
         groups are indexed by relation ID. This method ensures rules:
+
             - have Juju topology from the rule's labels injected into the expr.
             - are valid using CosTool.
 
