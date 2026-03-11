@@ -254,14 +254,9 @@ class OtlpRequirer(Object):
         endpoint_map: dict[int, OtlpEndpoint] = {}
         for relation in self.model.relations[self._relation_name]:
             provider = relation.load(OtlpProviderAppData, relation.app)
-            provider.endpoints = self._filter_endpoints(provider.endpoints)
-
-            # Choose the first valid endpoint in list
-            endpoint_choice = next(
-                (e for e in provider.endpoints if e.protocol in self._protocols), None
-            )
-            if endpoint_choice is not None:
-                endpoint_map[relation.id] = endpoint_choice
+            endpoints = self._filter_endpoints(provider.endpoints)
+            if endpoints:
+                endpoint_map[relation.id] = endpoints[0]
 
         return endpoint_map
 
