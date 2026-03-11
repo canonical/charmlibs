@@ -3,7 +3,7 @@
 
 
 from interface_tester.schema_base import DataBagSchema
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, Json
 
 
 class BackupTargetSpec(BaseModel):
@@ -53,8 +53,8 @@ class BackupTargetSpec(BaseModel):
     )
 
 
-class ProviderAppData(BaseModel):
-    """Pydantic model for the provider's application databag."""
+class BackupTargetEntry(BaseModel):
+    """Pydantic model for a single backup target entry in the collection."""
 
     app: str = Field(
         ...,
@@ -78,6 +78,16 @@ class ProviderAppData(BaseModel):
         ...,
         description="Backup specification details (namespaces, resources, etc.).",
         title="Backup Target Spec",
+    )
+
+
+class ProviderAppData(BaseModel):
+    """Pydantic model for the provider's application databag."""
+
+    backup_targets: Json[list[BackupTargetEntry]] = Field(
+        ...,
+        description="List of backup target entries.",
+        title="Backup Targets",
     )
 
 

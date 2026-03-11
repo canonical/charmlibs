@@ -14,21 +14,20 @@
 
 """K8s Backup Target library implementation."""
 
+import json
 import logging
 import re
+from typing import cast
 
 from ops import BoundEvent, EventBase
 from ops.charm import CharmBase
 from ops.framework import Object
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 # Regex to check if the provided TTL is a correct duration
 DURATION_REGEX = r"^(?=.*\d)(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$"
 
-SPEC_FIELD = "spec"
-APP_FIELD = "app"
-RELATION_FIELD = "relation_name"
-MODEL_FIELD = "model"
+BACKUP_TARGETS_FIELD = "backup_targets"
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +63,15 @@ class K8sBackupTargetSpec(BaseModel):
             )
 
 
+class _BackupTargetEntry(BaseModel):
+    """Internal model for a single backup target entry on the wire."""
+
+    app: str
+    relation_name: str
+    model: str
+    spec: K8sBackupTargetSpec
+
+
 class K8sBackupTargetRequirer(Object):
     """Requirer class for the backup target configuration relation."""
 
@@ -77,6 +85,52 @@ class K8sBackupTargetRequirer(Object):
         super().__init__(charm, relation_name)
         self._charm = charm
         self._relation_name = relation_name
+
+    @property
+    def is_ready(self) -> bool:
+        """Check if the relation has valid backup target data.
+
+        Returns:
+            True if at least one relation has parseable backup_targets data.
+        """
+        relations = self.model.relations[self._relation_name]
+        for relation in relations:
+            data = relation.data.get(relation.app, {})
+            raw = data.get(BACKUP_TARGETS_FIELD)
+            if not raw:
+                continue
+            if self._parse_backup_targets(raw):
+                return True
+        return False
+
+    def _parse_backup_targets(self, raw: str) -> list[_BackupTargetEntry]:
+        """Parse the backup_targets JSON string, returning validated entries."""
+        try:
+            parsed: object = json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            logger.warning("Failed to parse backup_targets data: %s", raw)
+            return []
+
+        if not isinstance(parsed, list):
+            logger.warning("Expected a list for backup_targets, got: %s", type(parsed).__name__)
+            return []
+
+        raw_entries = cast("list[object]", parsed)
+        entries: list[_BackupTargetEntry] = []
+        for raw_entry in raw_entries:
+            entry = self._validate_entry(raw_entry)
+            if entry is not None:
+                entries.append(entry)
+        return entries
+
+    @staticmethod
+    def _validate_entry(raw_entry: object) -> _BackupTargetEntry | None:
+        """Validate a single raw entry dict into a _BackupTargetEntry."""
+        try:
+            return _BackupTargetEntry.model_validate(raw_entry)
+        except ValidationError:
+            logger.warning("Skipping invalid backup target entry: %s", raw_entry)
+            return None
 
     def get_backup_spec(
         self, app_name: str, endpoint: str, model: str
@@ -95,13 +149,16 @@ class K8sBackupTargetRequirer(Object):
 
         for relation in relations:
             data = relation.data.get(relation.app, {})
-            if (
-                data.get(APP_FIELD) == app_name
-                and data.get(MODEL_FIELD) == model
-                and data.get(RELATION_FIELD) == endpoint
-            ):
-                json_data = data.get(SPEC_FIELD, "{}")
-                return K8sBackupTargetSpec.model_validate_json(json_data)
+            raw = data.get(BACKUP_TARGETS_FIELD)
+            if not raw:
+                continue
+            for entry in self._parse_backup_targets(raw):
+                if (
+                    entry.app == app_name
+                    and entry.model == model
+                    and entry.relation_name == endpoint
+                ):
+                    return entry.spec
 
         logger.warning("No backup spec found for app '%s' and endpoint '%s'", app_name, endpoint)
         return None
@@ -116,8 +173,11 @@ class K8sBackupTargetRequirer(Object):
         relations = self.model.relations[self._relation_name]
 
         for relation in relations:
-            json_data = relation.data[relation.app].get(SPEC_FIELD, "{}")
-            specs.append(K8sBackupTargetSpec.model_validate_json(json_data))
+            data = relation.data.get(relation.app, {})
+            raw = data.get(BACKUP_TARGETS_FIELD)
+            if not raw:
+                continue
+            specs.extend(entry.spec for entry in self._parse_backup_targets(raw))
 
         return specs
 
@@ -177,10 +237,16 @@ class K8sBackupTargetProvider(Object):
                 self._relation_name,
             )
             return
+
+        entry = {
+            "app": self._app_name,
+            "relation_name": self._relation_name,
+            "model": self._model,
+            "spec": self._spec.model_dump(exclude_none=True),
+        }
+        backup_targets_json = json.dumps([entry], sort_keys=True)
+
         for relation in relations:
             relation.data[self._charm.app].update({
-                MODEL_FIELD: self._model,
-                APP_FIELD: self._app_name,
-                RELATION_FIELD: self._relation_name,
-                SPEC_FIELD: self._spec.model_dump_json(),
+                BACKUP_TARGETS_FIELD: backup_targets_json,
             })

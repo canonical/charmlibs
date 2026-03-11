@@ -2,7 +2,7 @@
 # See LICENSE file for licensing details.
 
 import json
-from typing import Any
+from typing import Any, cast
 
 import pytest
 import scenario
@@ -13,6 +13,22 @@ from charmlibs.interfaces.k8s_backup_target import (
     K8sBackupTargetRequirer,
     K8sBackupTargetSpec,
 )
+
+
+def _make_backup_targets_databag(
+    app: str = "test-app",
+    relation_name: str = "backup",
+    model: str = "test-model",
+    spec: dict[str, Any] | None = None,
+) -> dict[str, str]:
+    """Helper to build a remote_app_data dict in the nested backup_targets format."""
+    entry: dict[str, Any] = {
+        "app": app,
+        "relation_name": relation_name,
+        "model": model,
+        "spec": spec or {},
+    }
+    return {"backup_targets": json.dumps([entry], sort_keys=True)}
 
 
 class DummyProviderCharm(CharmBase):
@@ -62,13 +78,17 @@ class TestK8sBackupTargetProvider:
 
         relation_out = state_out.get_relation(relation.id)
         local_app_data = relation_out.local_app_data
-        assert local_app_data["app"] == "backup-provider"
-        assert local_app_data["relation_name"] == "backup"
-        assert "spec" in local_app_data
-        spec_data = json.loads(local_app_data["spec"])
-        assert spec_data["include_namespaces"] == ["my-namespace"]
-        assert spec_data["include_resources"] == ["persistentvolumeclaims", "services"]
-        assert spec_data["ttl"] == "24h"
+        assert "backup_targets" in local_app_data
+        parsed: object = json.loads(local_app_data["backup_targets"])
+        assert isinstance(parsed, list)
+        targets = cast("list[dict[str, Any]]", parsed)
+        assert len(targets) == 1
+        entry = targets[0]
+        assert entry["app"] == "backup-provider"
+        assert entry["relation_name"] == "backup"
+        assert entry["spec"]["include_namespaces"] == ["my-namespace"]
+        assert entry["spec"]["include_resources"] == ["persistentvolumeclaims", "services"]
+        assert entry["spec"]["ttl"] == "24h"
 
     def test_given_not_leader_when_relation_created_then_no_data_sent(
         self, caplog: pytest.LogCaptureFixture
@@ -95,7 +115,7 @@ class TestK8sBackupTargetProvider:
         state_out = self.ctx.run(self.ctx.on.config_changed(), state_in)
 
         relation_out = state_out.get_relation(relation.id)
-        assert "spec" in relation_out.local_app_data
+        assert "backup_targets" in relation_out.local_app_data
 
     def test_given_no_relation_when_leader_elected_then_warning_logged(
         self, caplog: pytest.LogCaptureFixture
@@ -127,12 +147,7 @@ class TestK8sBackupTargetRequirer:
         relation = scenario.Relation(
             endpoint="k8s-backup-target",
             interface="k8s_backup_target",
-            remote_app_data={
-                "app": "test-app",
-                "relation_name": "backup",
-                "model": "test-model",
-                "spec": json.dumps(spec_data),
-            },
+            remote_app_data=_make_backup_targets_databag(spec=spec_data),
         )
         state_in = scenario.State(leader=True, relations=[relation])
 
@@ -153,12 +168,9 @@ class TestK8sBackupTargetRequirer:
         relation = scenario.Relation(
             endpoint="k8s-backup-target",
             interface="k8s_backup_target",
-            remote_app_data={
-                "app": "my-app",
-                "relation_name": "backup",
-                "model": "my-model",
-                "spec": json.dumps(spec_data),
-            },
+            remote_app_data=_make_backup_targets_databag(
+                app="my-app", relation_name="backup", model="my-model", spec=spec_data
+            ),
         )
         state_in = scenario.State(leader=True, relations=[relation])
 
@@ -179,12 +191,9 @@ class TestK8sBackupTargetRequirer:
         relation = scenario.Relation(
             endpoint="k8s-backup-target",
             interface="k8s_backup_target",
-            remote_app_data={
-                "app": "other-app",
-                "relation_name": "backup",
-                "model": "other-model",
-                "spec": json.dumps(spec_data),
-            },
+            remote_app_data=_make_backup_targets_databag(
+                app="other-app", relation_name="backup", model="other-model", spec=spec_data
+            ),
         )
         state_in = scenario.State(leader=True, relations=[relation])
 
@@ -196,6 +205,62 @@ class TestK8sBackupTargetRequirer:
 
             assert spec is None
             assert "no backup spec found" in caplog.text.lower()
+
+    def test_given_valid_data_when_is_ready_then_true(self):
+        relation = scenario.Relation(
+            endpoint="k8s-backup-target",
+            interface="k8s_backup_target",
+            remote_app_data=_make_backup_targets_databag(spec={"include_namespaces": ["ns1"]}),
+        )
+        state_in = scenario.State(leader=True, relations=[relation])
+
+        with self.ctx(self.ctx.on.relation_changed(relation), state_in) as mgr:
+            charm = mgr.charm
+            assert charm.backup_requirer.is_ready is True
+
+    def test_given_no_relation_when_is_ready_then_false(self):
+        state_in = scenario.State(leader=True, relations=[])
+
+        with self.ctx(self.ctx.on.update_status(), state_in) as mgr:
+            charm = mgr.charm
+            assert charm.backup_requirer.is_ready is False
+
+    def test_given_empty_databag_when_is_ready_then_false(self):
+        relation = scenario.Relation(
+            endpoint="k8s-backup-target",
+            interface="k8s_backup_target",
+            remote_app_data={},
+        )
+        state_in = scenario.State(leader=True, relations=[relation])
+
+        with self.ctx(self.ctx.on.relation_changed(relation), state_in) as mgr:
+            charm = mgr.charm
+            assert charm.backup_requirer.is_ready is False
+
+    def test_given_garbage_data_when_is_ready_then_false(self):
+        relation = scenario.Relation(
+            endpoint="k8s-backup-target",
+            interface="k8s_backup_target",
+            remote_app_data={"backup_targets": "not-valid-json{{{"},
+        )
+        state_in = scenario.State(leader=True, relations=[relation])
+
+        with self.ctx(self.ctx.on.relation_changed(relation), state_in) as mgr:
+            charm = mgr.charm
+            assert charm.backup_requirer.is_ready is False
+
+    def test_given_garbage_data_when_get_all_specs_then_empty_list(self):
+        relation = scenario.Relation(
+            endpoint="k8s-backup-target",
+            interface="k8s_backup_target",
+            remote_app_data={"backup_targets": "not-valid-json{{{"},
+        )
+        state_in = scenario.State(leader=True, relations=[relation])
+
+        with self.ctx(self.ctx.on.relation_changed(relation), state_in) as mgr:
+            charm = mgr.charm
+            specs = charm.backup_requirer.get_all_backup_specs()
+            assert specs == []
 
 
 class TestK8sBackupTargetSpec:
