@@ -73,6 +73,7 @@
 /interfaces/opencti_connector/ @canonical/platform-engineering
 /interfaces/openfga @canonical/identity
 /interfaces/opensearch_client/ @canonical/data-platform-nosql
+/interfaces/otlp/ @canonical/observability-core
 /interfaces/postgresql_client/ @canonical/data-platform-postgresql
 /interfaces/profiling/ @canonical/tracing-and-profiling
 /interfaces/prometheus_remote_write/ @canonical/observability-core
