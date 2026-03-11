@@ -253,7 +253,11 @@ class OtlpRequirer(Object):
         """
         endpoint_map: dict[int, OtlpEndpoint] = {}
         for relation in self.model.relations[self._relation_name]:
-            provider = relation.load(OtlpProviderAppData, relation.app)
+            try:
+                provider = relation.load(OtlpProviderAppData, relation.app)
+            except ValidationError:
+                # the databags haven't initialized yet, continue
+                continue
             endpoints = self._filter_endpoints(provider.endpoints)
             if endpoints:
                 endpoint_map[relation.id] = endpoints[0]
@@ -322,9 +326,13 @@ class OtlpProvider(Object):
         rules_map: dict[str, dict[str, Any]] = {}
         rules_obj = AlertRules(query_type, self._topology)
         for relation in self.model.relations[self._relation_name]:
-            requirer = relation.load(
-                OtlpRequirerAppData, relation.app, decoder=OtlpRequirerAppData.decode_value
-            )
+            try:
+                requirer = relation.load(
+                    OtlpRequirerAppData, relation.app, decoder=OtlpRequirerAppData.decode_value
+                )
+            except ValidationError:
+                # the databags haven't initialized yet, continue
+                continue
 
             # Get rules for the desired query type
             rules_for_type: dict[str, Any] | None = getattr(requirer.rules, query_type, None)
