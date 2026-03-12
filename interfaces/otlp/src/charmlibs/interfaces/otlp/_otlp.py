@@ -234,7 +234,7 @@ class OtlpRequirer:
             relation.save(databag, self._charm.app)
 
     @property
-    def endpoints(self) -> dict[int, _OtlpEndpoint]:
+    def endpoints(self) -> dict[int, OtlpEndpoint]:
         """Return a mapping of relation ID to OTLP endpoint.
 
         For each remote's list of OtlpEndpoints, the requirer filters out
@@ -246,7 +246,7 @@ class OtlpRequirer:
         both an HTTP and gRPC endpoint, and a requirer that only supports HTTP
         will choose the HTTP endpoint.
         """
-        endpoint_map: dict[int, _OtlpEndpoint] = {}
+        endpoint_map: dict[int, OtlpEndpoint] = {}
         for relation in self._charm.model.relations[self._relation_name]:
             if not relation.data[relation.app]:
                 # The databags haven't initialized yet, continue
