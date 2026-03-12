@@ -192,7 +192,7 @@ class OtlpRequirer:
     def _favor_modern_endpoints(self, endpoints: list[_OtlpEndpoint]) -> _OtlpEndpoint:
         """Return the endpoint with the most modern protocol.
 
-        If an unknown protocol is encountered, it is given the highest priority.
+        If an unknown protocol is encountered, it is given the lowest priority.
         """
         modern_score: Final = {'grpc': 2, 'http': 1}
         return max(endpoints, key=lambda e: modern_score.get(e.protocol, 0))
