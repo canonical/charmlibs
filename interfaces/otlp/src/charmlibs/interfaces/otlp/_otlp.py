@@ -19,14 +19,12 @@ shared between charms that intend to provide or consume OTLP telemetry.
 For user-facing documentation, see the package-level docstring in __init__.py.
 """
 
-import binascii
 import copy
 import hashlib
 import json
 import logging
 from collections import OrderedDict
 from collections.abc import Sequence
-from lzma import LZMAError
 from pathlib import Path
 from typing import Any, Literal
 
@@ -35,7 +33,13 @@ from cosl.rules import AlertRules, InjectResult, generic_alert_groups
 from cosl.types import OfficialRuleFileFormat
 from cosl.utils import LZMABase64
 from ops import CharmBase
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import (
+    BaseModel,
+    Field,
+    ValidationError,
+    field_serializer,
+    field_validator,
+)
 
 DEFAULT_REQUIRER_RELATION_NAME = 'send-otlp'
 DEFAULT_PROVIDER_RELATION_NAME = 'receive-otlp'
@@ -92,7 +96,7 @@ class OtlpRequirerAppData(BaseModel):
     ```
     """
 
-    rules: RulesModel | str = Field(
+    rules: RulesModel = Field(
         description='Rules to be forwarded to the provider.'
         ' Stored as an LZMA-compressed, base64-encoded JSON string to reduce payload size.'
     )
@@ -101,31 +105,18 @@ class OtlpRequirerAppData(BaseModel):
         ' used to label rule expressions and alert routing.'
     )
 
-    @staticmethod
-    def decode_value(json_str: str) -> Any:
-        """Decode a relation databag value from its serialized string form.
+    @field_validator('rules', mode='before')
+    @classmethod
+    def _deserialize_rules(cls, rules: str | dict[str, Any] | RulesModel) -> Any:
+        """Decompress LZMA-compressed rules from the relation databag."""
+        if isinstance(rules, str):
+            return json.loads(LZMABase64.decompress(rules))
+        return rules
 
-        Attempts to decompress and deserialize the value as a ``RulesModel``, falls back to
-        plain JSON deserialization.
-        """
-        try:
-            decompressed = LZMABase64.decompress(json_str)
-            return RulesModel.model_validate(json.loads(decompressed))
-        except (LZMAError, binascii.Error):
-            return json.loads(json_str)
-
-    @staticmethod
-    def encode_value(obj: Any) -> str:
-        """Encode relation data values into a string.
-
-        Rules are LZMA-compressed and base64-encoded to reduce content size for larger deployments.
-        Other data is serialized into a JSON formatted str.
-        """
-        try:
-            RulesModel.model_validate(obj)
-            return LZMABase64.compress(json.dumps(obj, sort_keys=True))
-        except ValidationError:
-            return json.dumps(obj, sort_keys=True)
+    @field_serializer('rules')
+    def _serialize_rules(self, rules: RulesModel) -> str:
+        """LZMA-compress rules to reduce content size for larger deployments."""
+        return LZMABase64.compress(rules.model_dump_json())
 
 
 class OtlpRequirer:
@@ -236,7 +227,7 @@ class OtlpRequirer:
             'metadata': self._topology.as_dict(),
         })
         for relation in self._charm.model.relations[self._relation_name]:
-            relation.save(databag, self._charm.app, encoder=OtlpRequirerAppData.encode_value)
+            relation.save(databag, self._charm.app)
 
     @property
     def endpoints(self) -> dict[int, OtlpEndpoint]:
@@ -253,13 +244,17 @@ class OtlpRequirer:
         """
         endpoint_map: dict[int, OtlpEndpoint] = {}
         for relation in self._charm.model.relations[self._relation_name]:
+            if not relation.data[relation.app]:
+                # The databags haven't initialized yet, continue
+                continue
+
             try:
                 provider = relation.load(OtlpProviderAppData, relation.app)
-            except ValidationError:
-                # the databags haven't initialized yet, continue
+            except ValidationError as e:
+                logger.error('OTLP databag failed validation: %s', e)
                 continue
-            endpoints = self._filter_endpoints(provider.endpoints)
-            if endpoints:
+
+            if endpoints := self._filter_endpoints(provider.endpoints):
                 endpoint_map[relation.id] = endpoints[0]
 
         return endpoint_map
@@ -325,12 +320,14 @@ class OtlpProvider:
         rules_map: dict[str, dict[str, Any]] = {}
         rules_obj = AlertRules(query_type, self._topology)
         for relation in self._charm.model.relations[self._relation_name]:
+            if not relation.data[relation.app]:
+                # The databags haven't initialized yet, continue
+                continue
+
             try:
-                requirer = relation.load(
-                    OtlpRequirerAppData, relation.app, decoder=OtlpRequirerAppData.decode_value
-                )
-            except ValidationError:
-                # the databags haven't initialized yet, continue
+                requirer = relation.load(OtlpRequirerAppData, relation.app)
+            except ValidationError as e:
+                logger.error('OTLP databag failed validation: %s', e)
                 continue
 
             # Get rules for the desired query type
