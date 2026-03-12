@@ -194,7 +194,7 @@ class OtlpRequirer:
 
         If an unknown protocol is encountered, it is given the highest priority.
         """
-        modern_score: Final = {"grpc": 2, "http": 1}
+        modern_score: Final = {'grpc': 2, 'http': 1}
         return max(endpoints, key=lambda e: modern_score.get(e.protocol, 0))
 
     def publish(self):
