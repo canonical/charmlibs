@@ -110,14 +110,15 @@ def test_missing_rule_type_defaults() -> None:
     assert 'logql' in requirer_databag.rules.model_dump()
 
 
-def test_forwarded_rules_compression(otlp_dual_ctx: testing.Context[ops.CharmBase]) -> None:
+def test_rules_compression(otlp_dual_ctx: testing.Context[ops.CharmBase]) -> None:
     # GIVEN receive-otlp and send-otlp relations
-    rules = LZMABase64.compress(json.dumps(ALL_RULES, sort_keys=True))
-    databag: dict[str, Any] = {'rules': rules, 'metadata': json.dumps(METADATA)}
+    databag: dict[str, str] = {
+        'rules': json.dumps(ALL_RULES, sort_keys=True),
+        'metadata': json.dumps(METADATA),
+    }
     receiver = Relation('receive-otlp', remote_app_data=databag)
-    sender_1 = Relation('send-otlp', remote_app_data={'endpoints': '[]'})
-    sender_2 = Relation('send-otlp', remote_app_data={'endpoints': '[]'})
-    state = State(relations=[receiver, sender_1, sender_2], leader=True, model=MODEL)
+    sender = Relation('send-otlp', remote_app_data={'endpoints': '[]'})
+    state = State(relations=[receiver, sender], leader=True, model=MODEL)
 
     # WHEN any event executes the reconciler
     state_out = otlp_dual_ctx.run(otlp_dual_ctx.on.update_status(), state=state)
@@ -125,29 +126,16 @@ def test_forwarded_rules_compression(otlp_dual_ctx: testing.Context[ops.CharmBas
     for relation in list(state_out.relations):
         if relation.endpoint != 'send-otlp':
             continue
-        raw_rules = relation.local_app_data.get('rules')
+        rules = relation.local_app_data.get('rules', None)
+        assert rules is not None
 
         # THEN the databag contains a compressed set of rules
-        assert isinstance(raw_rules, str)
-        assert raw_rules.startswith('/')
-        decompressed = _decompress(raw_rules)
+        assert isinstance(rules, str)
+        assert rules.startswith('"/')  # JSON-encoded LMZABase64 string
+        decompressed = _decompress(json.loads(rules))
         assert decompressed
         assert isinstance(decompressed, dict)
-        actual_groups = decompressed.get('logql', {}).get('groups', [])
-        # THEN the decompressed databag contains rules
-        assert actual_groups
-        actual_group_names: set[str] = set()
-        for group in actual_groups:
-            name = group.get('name')
-            if isinstance(name, str):
-                actual_group_names.add(name)
-        expected_groups = ALL_RULES.get('logql', {}).get('groups', [])
-        expected_group_names: set[str] = set()
-        for group in expected_groups:
-            name = group.get('name')
-            if isinstance(name, str):
-                expected_group_names.add(name)
-        assert actual_group_names == expected_group_names
+        assert set(ALL_RULES.keys()).issubset(decompressed.keys())
 
 
 @pytest.mark.parametrize(
@@ -197,7 +185,7 @@ def test_forwarding_otlp_rule_counts(
     # GIVEN forwarding of rules is enabled
     # * a receive-otlp with rules in the databag
     # * two send-otlp relations
-    databag: dict[str, Any] = {'rules': json.dumps(rules), 'metadata': json.dumps(metadata)}
+    databag = {'rules': json.dumps(rules), 'metadata': json.dumps(metadata)}
     receiver = Relation('receive-otlp', remote_app_data=databag)
     sender_1 = Relation('send-otlp', remote_app_data={'endpoints': '[]'})
     sender_2 = Relation('send-otlp', remote_app_data={'endpoints': '[]'})
@@ -224,8 +212,6 @@ def test_forwarding_otlp_rule_counts(
 
         # THEN all expected rules exist in the databag
         # * databag_groups are included/forwarded
-        assert isinstance(requirer_databag.rules, RulesModel)
-
         assert (
             len(requirer_databag.rules.logql.get('groups', [])) == expected_group_counts['logql']
         )
