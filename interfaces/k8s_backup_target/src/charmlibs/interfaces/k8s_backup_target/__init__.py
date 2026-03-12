@@ -15,13 +15,13 @@
 """K8s Backup Target library.
 
 This library implements the Requirer and Provider roles for the ``k8s_backup_target`` relation
-interface. It is used by client charms to declare backup specifications, and by backup
-integrator charms to consume them and forward to backup operators.
+interface. It is used by client charms to declare backup specifications, and by backup charms or
+backup integrator charms to consume them and forward to backup operators.
 
 The ``k8s_backup_target`` interface allows a charm (the provider) to provide a declarative
 description of what Kubernetes resources should be included in a backup. These specifications are
-sent to the backup integrator charm (the requirer), which merges them with schedule configuration
-and forwards to the backup operator.
+sent to the backup charm or backup integrator charm (the requirer), which merges them with schedule
+configuration and forwards to the backup operator.
 
 This interface follows a least-privilege model: client charms do not manipulate cluster resources
 themselves. Instead, they define what should be backed up and leave execution to the backup
@@ -59,7 +59,6 @@ Requirer Example
 
     from charmlibs.interfaces.k8s_backup_target import (
         K8sBackupTargetRequirer,
-        K8sBackupTargetSpec,
     )
 
     class BackupIntegratorCharm(CharmBase):
@@ -67,15 +66,20 @@ Requirer Example
             # ...
             self.backup_requirer = K8sBackupTargetRequirer(self, relation_name="k8s-backup-target")
 
-        def get_all_specs(self):
-            return self.backup_requirer.get_all_backup_specs()
+        def _on_backup_action(self, event):
+            spec = self.backup_requirer.get_backup_spec(
+                app_name=event.params["app"],
+                endpoint=event.params["endpoint"],
+                model=event.params["model"],
+            )
+            ...
 """
 
 from ._backup_target import (
     K8sBackupTargetProvider,
     K8sBackupTargetRequirer,
-    K8sBackupTargetSpec,
 )
+from ._schema import K8sBackupTargetSpec
 from ._version import __version__ as __version__
 
 __all__ = [

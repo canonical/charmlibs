@@ -6,7 +6,7 @@ The `k8s_backup_target` interface enables a **client charm** to specify what Kub
 
 ## Direction
 
-This is a unidirectional interface where the provider (client) sends data and the requirer (backup integrator) only receives data. There is no data sent back from the requirer side.
+This is a unidirectional interface where the provider (client) sends data and the requirer (backup charm or backup integrator) only receives data. There is no data sent back from the requirer side.
 
 ```mermaid
 flowchart TD
@@ -27,9 +27,9 @@ On the provider side, the application data bag must contain structure with the f
 - `app` (string, required): Name of the client application that requires backups.
 - `relation_name` (string, required): Name of the relation on the client side through which this spec is sent (from metadata.yaml).
 - `model` (string, required): Name of the model where the client application is deployed.
-- `spec` (dict, required): A dictionary defining what to back up. This includes the following keys:
-  - `include_namespaces` (list of str, optional): Specific Kubernetes namespaces to include in the backup. If not provided, all namespaces are included.
-  - `include_resources` (list of str, optional): Specific Kubernetes resource kinds to include in the backup.
+- `spec` (dict, required): A dictionary defining what to back up. The spec structure is based on [Velero's resource filtering model](https://velero.io/docs/main/resource-filtering/) but is designed to be generic enough for alternative backup providers in future. This includes the following keys:
+  - `include_namespaces` (list of str, optional): Specific Kubernetes namespaces to include in the backup. If not provided (None), all namespaces are included.
+  - `include_resources` (list of str, optional): Specific Kubernetes resource kinds to include in the backup. If not provided (None), all resource types are included.
   - `exclude_namespaces` (list of str, optional): Namespaces to exclude from the backup.
   - `exclude_resources` (list of str, optional): Resource kinds to exclude from the backup.
   - `include_cluster_resources` (bool, optional): Whether to include cluster-scoped resources in the backup.

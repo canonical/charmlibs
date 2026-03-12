@@ -2,6 +2,7 @@
 # See LICENSE file for licensing details.
 
 import json
+import logging
 from typing import Any, cast
 
 import pytest
@@ -99,7 +100,8 @@ class TestK8sBackupTargetProvider:
         )
         state_in = scenario.State(leader=False, relations=[relation])
 
-        state_out = self.ctx.run(self.ctx.on.relation_created(relation), state_in)
+        with caplog.at_level(logging.DEBUG):
+            state_out = self.ctx.run(self.ctx.on.relation_created(relation), state_in)
 
         relation_out = state_out.get_relation(relation.id)
         assert relation_out.local_app_data == {}
@@ -137,28 +139,6 @@ class TestK8sBackupTargetRequirer:
                 "requires": {"k8s-backup-target": {"interface": "k8s_backup_target"}},
             },
         )
-
-    def test_given_relation_with_data_when_get_all_specs_then_specs_returned(self):
-        spec_data = {
-            "include_namespaces": ["test-namespace"],
-            "include_resources": ["deployments"],
-            "ttl": "48h",
-        }
-        relation = scenario.Relation(
-            endpoint="k8s-backup-target",
-            interface="k8s_backup_target",
-            remote_app_data=_make_backup_targets_databag(spec=spec_data),
-        )
-        state_in = scenario.State(leader=True, relations=[relation])
-
-        with self.ctx(self.ctx.on.relation_changed(relation), state_in) as mgr:
-            charm = mgr.charm
-            specs = charm.backup_requirer.get_all_backup_specs()
-
-            assert len(specs) == 1
-            assert specs[0].include_namespaces == ["test-namespace"]
-            assert specs[0].include_resources == ["deployments"]
-            assert specs[0].ttl == "48h"
 
     def test_given_relation_with_data_when_get_backup_spec_then_spec_returned(self):
         spec_data = {
@@ -248,19 +228,6 @@ class TestK8sBackupTargetRequirer:
         with self.ctx(self.ctx.on.relation_changed(relation), state_in) as mgr:
             charm = mgr.charm
             assert charm.backup_requirer.is_ready is False
-
-    def test_given_garbage_data_when_get_all_specs_then_empty_list(self):
-        relation = scenario.Relation(
-            endpoint="k8s-backup-target",
-            interface="k8s_backup_target",
-            remote_app_data={"backup_targets": "not-valid-json{{{"},
-        )
-        state_in = scenario.State(leader=True, relations=[relation])
-
-        with self.ctx(self.ctx.on.relation_changed(relation), state_in) as mgr:
-            charm = mgr.charm
-            specs = charm.backup_requirer.get_all_backup_specs()
-            assert specs == []
 
 
 class TestK8sBackupTargetSpec:
