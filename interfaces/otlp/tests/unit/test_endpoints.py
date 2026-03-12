@@ -12,8 +12,7 @@ import pytest
 from ops import testing
 from ops.testing import Relation, State
 
-from charmlibs.interfaces.otlp import OtlpEndpoint
-from charmlibs.interfaces.otlp._otlp import OtlpProviderAppData
+from charmlibs.interfaces.otlp._otlp import OtlpProviderAppData, _OtlpEndpoint
 
 ALL_PROTOCOLS = ['grpc', 'http']
 ALL_TELEMETRIES = ['logs', 'metrics', 'traces']
@@ -65,7 +64,7 @@ def test_new_endpoint_key_is_ignored_by_databag_model() -> None:
                     },
                 ]),
             },
-            OtlpEndpoint(
+            _OtlpEndpoint(
                 protocol='http',
                 endpoint='http://host:4317',
                 telemetries=['metrics'],
@@ -82,7 +81,7 @@ def test_new_endpoint_key_is_ignored_by_databag_model() -> None:
                     },
                 ]),
             },
-            OtlpEndpoint(
+            _OtlpEndpoint(
                 protocol='http',
                 endpoint='http://host:4317',
                 telemetries=['logs', 'traces'],
@@ -103,7 +102,7 @@ def test_new_endpoint_key_is_ignored_by_databag_model() -> None:
                 ),
                 'does_not': '"exist"',
             },
-            OtlpEndpoint(
+            _OtlpEndpoint(
                 protocol='http',
                 endpoint='http://host:4317',
                 telemetries=['metrics'],
@@ -114,9 +113,9 @@ def test_new_endpoint_key_is_ignored_by_databag_model() -> None:
 def test_send_otlp_invalid_databag(
     otlp_requirer_ctx: testing.Context[ops.CharmBase],
     provides: dict[str, Any],
-    otlp_endpoint: OtlpEndpoint,
+    otlp_endpoint: _OtlpEndpoint,
 ):
-    # GIVEN a remote app provides an OtlpEndpoint
+    # GIVEN a remote app provides an _OtlpEndpoint
     # WHEN they are related over the "send-otlp" endpoint
     provider = Relation('send-otlp', id=123, remote_app_data=provides)
     state = State(relations=[provider], leader=True)
@@ -143,12 +142,12 @@ def test_send_otlp_invalid_databag(
             ALL_PROTOCOLS,
             ALL_TELEMETRIES,
             {
-                123: OtlpEndpoint(
+                123: _OtlpEndpoint(
                     protocol='http',
                     endpoint='http://provider-123.endpoint:4318',
                     telemetries=['logs', 'metrics'],
                 ),
-                456: OtlpEndpoint(
+                456: _OtlpEndpoint(
                     protocol='grpc',
                     endpoint='http://provider-456.endpoint:4317',
                     telemetries=['traces'],
@@ -159,7 +158,7 @@ def test_send_otlp_invalid_databag(
             ['grpc'],
             ALL_TELEMETRIES,
             {
-                456: OtlpEndpoint(
+                456: _OtlpEndpoint(
                     protocol='grpc',
                     endpoint='http://provider-456.endpoint:4317',
                     telemetries=['traces'],
@@ -170,12 +169,12 @@ def test_send_otlp_invalid_databag(
             ALL_PROTOCOLS,
             ['metrics'],
             {
-                123: OtlpEndpoint(
+                123: _OtlpEndpoint(
                     protocol='http',
                     endpoint='http://provider-123.endpoint:4318',
                     telemetries=['metrics'],
                 ),
-                456: OtlpEndpoint(
+                456: _OtlpEndpoint(
                     protocol='http',
                     endpoint='http://provider-456.endpoint:4318',
                     telemetries=['metrics'],
@@ -189,9 +188,9 @@ def test_send_otlp_with_varying_requirer_support(
     otlp_requirer_ctx: testing.Context[ops.CharmBase],
     protocols: list[str],
     telemetries: list[str],
-    expected: dict[int, OtlpEndpoint],
+    expected: dict[int, _OtlpEndpoint],
 ):
-    # GIVEN a remote app provides multiple OtlpEndpoints
+    # GIVEN a remote app provides multiple _OtlpEndpoints
     remote_app_data_1 = {
         'endpoints': json.dumps([
             {
@@ -248,7 +247,7 @@ def test_send_otlp_with_varying_requirer_support(
 
 
 def test_send_otlp(otlp_requirer_ctx: testing.Context[ops.CharmBase]):
-    # GIVEN a remote app provides multiple OtlpEndpoints
+    # GIVEN a remote app provides multiple _OtlpEndpoints
     remote_app_data_1 = {
         'endpoints': json.dumps([
             {
@@ -274,12 +273,12 @@ def test_send_otlp(otlp_requirer_ctx: testing.Context[ops.CharmBase]):
     }
 
     expected_endpoints = {
-        456: OtlpEndpoint(
+        456: _OtlpEndpoint(
             protocol='http',
             endpoint='http://provider-456.endpoint:4318',
             telemetries=['metrics'],
         ),
-        123: OtlpEndpoint(
+        123: _OtlpEndpoint(
             protocol='http',
             endpoint='http://provider-123.endpoint:4318',
             telemetries=['logs', 'metrics'],

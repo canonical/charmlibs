@@ -50,7 +50,7 @@ DEFAULT_PROM_RULES_RELATIVE_PATH = './src/prometheus_alert_rules'
 logger = logging.getLogger(__name__)
 
 
-class RulesModel(BaseModel):
+class _RulesModel(BaseModel):
     """Rules of various formats (query languages) to support in the relation databag."""
 
     logql: OfficialRuleFileFormat = Field(
@@ -77,10 +77,14 @@ class OtlpEndpoint(BaseModel):
     )
 
 
+class _OtlpEndpoint(OtlpEndpoint):
+    """A pydantic model for a single OTLP endpoint."""
+
+
 class OtlpProviderAppData(BaseModel):
     """A pydantic model for the OTLP provider's app databag."""
 
-    endpoints: list[OtlpEndpoint] = Field(
+    endpoints: list[_OtlpEndpoint] = Field(
         description='List of OTLP endpoints exposed by the provider.'
     )
 
@@ -96,7 +100,7 @@ class OtlpRequirerAppData(BaseModel):
     ```
     """
 
-    rules: RulesModel = Field(
+    rules: _RulesModel = Field(
         description='Rules to be forwarded to the provider.'
         ' Stored as an LZMA-compressed, base64-encoded JSON string to reduce payload size.'
     )
@@ -107,14 +111,14 @@ class OtlpRequirerAppData(BaseModel):
 
     @field_validator('rules', mode='before')
     @classmethod
-    def _deserialize_rules(cls, rules: str | dict[str, Any] | RulesModel) -> Any:
+    def _deserialize_rules(cls, rules: str | dict[str, Any] | _RulesModel) -> Any:
         """Decompress LZMA-compressed rules from the relation databag."""
         if isinstance(rules, str):
             return json.loads(LZMABase64.decompress(rules))
         return rules
 
     @field_serializer('rules')
-    def _serialize_rules(self, rules: RulesModel) -> str:
+    def _serialize_rules(self, rules: _RulesModel) -> str:
         """LZMA-compress rules to reduce content size for larger deployments."""
         return LZMABase64.compress(rules.model_dump_json())
 
@@ -157,7 +161,7 @@ class OtlpRequirer:
         self._loki_rules_path: str | Path = loki_rules_path
         self._prom_rules_path: str | Path = prometheus_rules_path
 
-    def _filter_endpoints(self, endpoints: list[OtlpEndpoint]) -> list[OtlpEndpoint]:
+    def _filter_endpoints(self, endpoints: list[_OtlpEndpoint]) -> list[_OtlpEndpoint]:
         """Filter out unsupported OtlpEndpoints.
 
         For each endpoint:
@@ -167,7 +171,7 @@ class OtlpRequirer:
               endpoint is ignored.
             - If the endpoint contains an unsupported protocol it is ignored.
         """
-        valid_endpoints: list[OtlpEndpoint] = []
+        valid_endpoints: list[_OtlpEndpoint] = []
         supported_telemetries = set(self._telemetries)
         for endpoint in endpoints:
             if endpoint.protocol not in self._protocols:
@@ -230,7 +234,7 @@ class OtlpRequirer:
             relation.save(databag, self._charm.app)
 
     @property
-    def endpoints(self) -> dict[int, OtlpEndpoint]:
+    def endpoints(self) -> dict[int, _OtlpEndpoint]:
         """Return a mapping of relation ID to OTLP endpoint.
 
         For each remote's list of OtlpEndpoints, the requirer filters out
@@ -242,7 +246,7 @@ class OtlpRequirer:
         both an HTTP and gRPC endpoint, and a requirer that only supports HTTP
         will choose the HTTP endpoint.
         """
-        endpoint_map: dict[int, OtlpEndpoint] = {}
+        endpoint_map: dict[int, _OtlpEndpoint] = {}
         for relation in self._charm.model.relations[self._relation_name]:
             if not relation.data[relation.app]:
                 # The databags haven't initialized yet, continue
@@ -275,7 +279,7 @@ class OtlpProvider:
     ):
         self._charm = charm
         self._relation_name = relation_name
-        self._endpoints: list[OtlpEndpoint] = []
+        self._endpoints: list[_OtlpEndpoint] = []
         self._topology = JujuTopology.from_charm(charm)
 
     def add_endpoint(
@@ -289,7 +293,7 @@ class OtlpProvider:
         Call this method after endpoint-changing events e.g. TLS and ingress.
         """
         self._endpoints.append(
-            OtlpEndpoint(protocol=protocol, endpoint=endpoint, telemetries=telemetries)
+            _OtlpEndpoint(protocol=protocol, endpoint=endpoint, telemetries=telemetries)
         )
 
     def publish(self) -> None:
