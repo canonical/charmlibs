@@ -26,7 +26,7 @@ import logging
 from collections import OrderedDict
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Final, Literal
 
 from cosl.juju_topology import JujuTopology
 from cosl.rules import AlertRules, InjectResult, generic_alert_groups
@@ -189,6 +189,14 @@ class OtlpRequirer:
 
         return valid_endpoints
 
+    def _favor_modern_endpoints(self, endpoints: list[_OtlpEndpoint]) -> _OtlpEndpoint:
+        """Return the endpoint with the most modern protocol.
+
+        If an unknown protocol is encountered, it is given the highest priority.
+        """
+        modern_score: Final = {"grpc": 2, "http": 1}
+        return max(endpoints, key=lambda e: modern_score.get(e.protocol, 0))
+
     def publish(self):
         """Triggers programmatically the update of the relation data.
 
@@ -234,7 +242,7 @@ class OtlpRequirer:
             relation.save(databag, self._charm.app)
 
     @property
-    def endpoints(self) -> dict[int, _OtlpEndpoint]:
+    def endpoints(self) -> dict[int, OtlpEndpoint]:
         """Return a mapping of relation ID to OTLP endpoint.
 
         For each remote's list of OtlpEndpoints, the requirer filters out
@@ -246,7 +254,7 @@ class OtlpRequirer:
         both an HTTP and gRPC endpoint, and a requirer that only supports HTTP
         will choose the HTTP endpoint.
         """
-        endpoint_map: dict[int, _OtlpEndpoint] = {}
+        endpoint_map: dict[int, OtlpEndpoint] = {}
         for relation in self._charm.model.relations[self._relation_name]:
             if not relation.data[relation.app]:
                 # The databags haven't initialized yet, continue
@@ -259,7 +267,7 @@ class OtlpRequirer:
                 continue
 
             if endpoints := self._filter_endpoints(provider.endpoints):
-                endpoint_map[relation.id] = endpoints[0]
+                endpoint_map[relation.id] = self._favor_modern_endpoints(endpoints)
 
         return endpoint_map
 

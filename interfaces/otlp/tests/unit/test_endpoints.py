@@ -36,9 +36,9 @@ def test_new_endpoint_key_is_ignored_by_databag_model() -> None:
 
     # WHEN validating the provider databag model, which the requirer uses to access endpoints
     # THEN the validation succeeds
-    provider_databag: OtlpProviderAppData = OtlpProviderAppData.model_validate({
-        'endpoints': [endpoint]
-    })
+    provider_databag: OtlpProviderAppData = OtlpProviderAppData.model_validate(
+        {'endpoints': [endpoint]}
+    )
     assert provider_databag
     # AND the new endpoint key is ignored
     assert 'new_key' not in provider_databag.endpoints[0].model_dump()
@@ -51,18 +51,20 @@ def test_new_endpoint_key_is_ignored_by_databag_model() -> None:
             # GIVEN an endpoint with an invalid protocol
             # * an endpoint with a valid protocol
             {
-                'endpoints': json.dumps([
-                    {
-                        'protocol': 'new_protocol',
-                        'endpoint': 'http://host:0000',
-                        'telemetries': ['metrics'],
-                    },
-                    {
-                        'protocol': 'http',
-                        'endpoint': 'http://host:4317',
-                        'telemetries': ['metrics'],
-                    },
-                ]),
+                'endpoints': json.dumps(
+                    [
+                        {
+                            'protocol': 'new_protocol',
+                            'endpoint': 'http://host:0000',
+                            'telemetries': ['metrics'],
+                        },
+                        {
+                            'protocol': 'http',
+                            'endpoint': 'http://host:4317',
+                            'telemetries': ['metrics'],
+                        },
+                    ]
+                ),
             },
             _OtlpEndpoint(
                 protocol='http',
@@ -73,13 +75,15 @@ def test_new_endpoint_key_is_ignored_by_databag_model() -> None:
         (
             # GIVEN an endpoint with valid and invalid telemetries
             {
-                'endpoints': json.dumps([
-                    {
-                        'protocol': 'http',
-                        'endpoint': 'http://host:4317',
-                        'telemetries': ['logs', 'new_telemetry', 'traces'],
-                    },
-                ]),
+                'endpoints': json.dumps(
+                    [
+                        {
+                            'protocol': 'http',
+                            'endpoint': 'http://host:4317',
+                            'telemetries': ['logs', 'new_telemetry', 'traces'],
+                        },
+                    ]
+                ),
             },
             _OtlpEndpoint(
                 protocol='http',
@@ -192,27 +196,31 @@ def test_send_otlp_with_varying_requirer_support(
 ):
     # GIVEN a remote app provides multiple _OtlpEndpoints
     remote_app_data_1 = {
-        'endpoints': json.dumps([
-            {
-                'protocol': 'http',
-                'endpoint': 'http://provider-123.endpoint:4318',
-                'telemetries': ['logs', 'metrics'],
-            }
-        ])
+        'endpoints': json.dumps(
+            [
+                {
+                    'protocol': 'http',
+                    'endpoint': 'http://provider-123.endpoint:4318',
+                    'telemetries': ['logs', 'metrics'],
+                }
+            ]
+        )
     }
     remote_app_data_2 = {
-        'endpoints': json.dumps([
-            {
-                'protocol': 'grpc',
-                'endpoint': 'http://provider-456.endpoint:4317',
-                'telemetries': ['traces'],
-            },
-            {
-                'protocol': 'http',
-                'endpoint': 'http://provider-456.endpoint:4318',
-                'telemetries': ['metrics'],
-            },
-        ])
+        'endpoints': json.dumps(
+            [
+                {
+                    'protocol': 'grpc',
+                    'endpoint': 'http://provider-456.endpoint:4317',
+                    'telemetries': ['traces'],
+                },
+                {
+                    'protocol': 'http',
+                    'endpoint': 'http://provider-456.endpoint:4318',
+                    'telemetries': ['metrics'],
+                },
+            ]
+        )
     }
 
     # WHEN they are related over the "send-otlp" endpoint
@@ -249,27 +257,31 @@ def test_send_otlp_with_varying_requirer_support(
 def test_send_otlp(otlp_requirer_ctx: testing.Context[ops.CharmBase]):
     # GIVEN a remote app provides multiple _OtlpEndpoints
     remote_app_data_1 = {
-        'endpoints': json.dumps([
-            {
-                'protocol': 'http',
-                'endpoint': 'http://provider-123.endpoint:4318',
-                'telemetries': ['logs', 'metrics'],
-            }
-        ])
+        'endpoints': json.dumps(
+            [
+                {
+                    'protocol': 'http',
+                    'endpoint': 'http://provider-123.endpoint:4318',
+                    'telemetries': ['logs', 'metrics'],
+                }
+            ]
+        )
     }
     remote_app_data_2 = {
-        'endpoints': json.dumps([
-            {
-                'protocol': 'grpc',
-                'endpoint': 'http://provider-456.endpoint:4317',
-                'telemetries': ['traces'],
-            },
-            {
-                'protocol': 'http',
-                'endpoint': 'http://provider-456.endpoint:4318',
-                'telemetries': ['metrics'],
-            },
-        ])
+        'endpoints': json.dumps(
+            [
+                {
+                    'protocol': 'grpc',
+                    'endpoint': 'http://provider-456.endpoint:4317',
+                    'telemetries': ['traces'],
+                },
+                {
+                    'protocol': 'http',
+                    'endpoint': 'http://provider-456.endpoint:4318',
+                    'telemetries': ['metrics'],
+                },
+            ]
+        )
     }
 
     expected_endpoints = {
@@ -338,3 +350,67 @@ def test_receive_otlp(otlp_provider_ctx: testing.Context[ops.CharmBase]):
         OtlpProviderAppData.model_validate({'endpoints': actual_endpoints}).model_dump()
         == expected_endpoints
     )
+
+
+@pytest.mark.parametrize(
+    'endpoints, expected_protocol',
+    [
+        # gRPC preferred over HTTP
+        (
+            [
+                _OtlpEndpoint(
+                    protocol='http', endpoint='http://host:4318', telemetries=['metrics']
+                ),
+                _OtlpEndpoint(
+                    protocol='grpc', endpoint='http://host:4317', telemetries=['metrics']
+                ),
+            ],
+            'grpc',
+        ),
+        # HTTP returned when gRPC is absent
+        (
+            [
+                _OtlpEndpoint(
+                    protocol='http', endpoint='http://host:4318', telemetries=['metrics']
+                ),
+            ],
+            'http',
+        ),
+        # gRPC returned when HTTP is absent
+        (
+            [
+                _OtlpEndpoint(
+                    protocol='grpc', endpoint='http://host:4317', telemetries=['metrics']
+                ),
+            ],
+            'grpc',
+        ),
+        # HTTP returned when new endpoint is present
+        (
+            [
+                _OtlpEndpoint(
+                    protocol='http', endpoint='http://host:4318', telemetries=['metrics']
+                ),
+                _OtlpEndpoint(
+                    protocol='new', endpoint='http://host:4316', telemetries=['metrics']
+                ),
+            ],
+            'http',
+        ),
+    ],
+)
+def test_favor_modern_endpoints(
+    otlp_requirer_ctx: testing.Context,
+    endpoints: list[_OtlpEndpoint],
+    expected_protocol: str,
+):
+    # GIVEN a list of endpoints
+    state = State(leader=True)
+    with otlp_requirer_ctx(otlp_requirer_ctx.on.update_status(), state=state) as mgr:
+        charm_any = cast('Any', mgr.charm)
+
+        # WHEN the requirer selects an endpoint
+        result = charm_any.otlp_requirer._favor_modern_endpoints(endpoints)
+
+    # THEN the most modern one is chosen
+    assert result.protocol == expected_protocol
