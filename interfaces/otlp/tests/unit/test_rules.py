@@ -12,8 +12,7 @@ from cosl.utils import LZMABase64
 from ops import testing
 from ops.testing import Model, Relation, State
 
-from charmlibs.interfaces.otlp import RulesModel
-from charmlibs.interfaces.otlp._otlp import OtlpRequirerAppData
+from charmlibs.interfaces.otlp._otlp import OtlpRequirerAppData, _RulesModel
 
 MODEL = Model('otelcol', uuid='f4d59020-c8e7-4053-8044-a2c1e5591c7f')
 OTELCOL_LABELS = {
@@ -92,7 +91,7 @@ def test_new_rule_is_ignored_by_databag_model() -> None:
         'metadata': METADATA,
     })
     assert requirer_databag
-    assert isinstance(requirer_databag.rules, RulesModel)
+    assert isinstance(requirer_databag.rules, _RulesModel)
     # AND the new rule type is ignored
     assert 'new_rule' not in requirer_databag.rules.model_dump()
 
@@ -104,7 +103,7 @@ def test_missing_rule_type_defaults() -> None:
     # THEN the validation succeeds
     requirer_databag = OtlpRequirerAppData.model_validate({'rules': {}, 'metadata': METADATA})
     assert requirer_databag
-    assert isinstance(requirer_databag.rules, RulesModel)
+    assert isinstance(requirer_databag.rules, _RulesModel)
     # AND the new rule type is ignored
     assert 'promql' in requirer_databag.rules.model_dump()
     assert 'logql' in requirer_databag.rules.model_dump()

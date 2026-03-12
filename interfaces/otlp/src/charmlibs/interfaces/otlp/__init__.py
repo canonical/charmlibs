@@ -141,7 +141,6 @@ from ._otlp import (
     OtlpEndpoint,
     OtlpProvider,
     OtlpRequirer,
-    RulesModel,
 )
 from ._version import __version__ as __version__
 
@@ -151,5 +150,4 @@ __all__ = [
     'OtlpEndpoint',
     'OtlpProvider',
     'OtlpRequirer',
-    'RulesModel',
 ]
