@@ -12,10 +12,8 @@ from cosl.utils import LZMABase64
 from ops import testing
 from ops.testing import Model, Relation, State
 
-from charmlibs.interfaces.otlp import (
-    OtlpRequirerAppData,
-    RulesModel,
-)
+from charmlibs.interfaces.otlp import RulesModel
+from charmlibs.interfaces.otlp._otlp import OtlpRequirerAppData
 
 MODEL = Model('otelcol', uuid='f4d59020-c8e7-4053-8044-a2c1e5591c7f')
 OTELCOL_LABELS = {
@@ -84,13 +82,32 @@ def _decompress(rules: str | None) -> dict[str, Any]:
     return json.loads(LZMABase64.decompress(rules))
 
 
-def test_rules_compatibility() -> None:
+def test_new_rule_is_ignored_by_databag_model() -> None:
     # GIVEN the requirer offers a new rule type
     # * the provider does not support this new rule type
-    rules: dict[str, dict[str, Any]] = {'logql': {}, 'promql': {}, 'new_rule': {}}
     # WHEN validating the requirer databag model, which the provider uses to access rules
     # THEN the validation succeeds
-    assert OtlpRequirerAppData.model_validate({'rules': rules, 'metadata': METADATA})
+    requirer_databag = OtlpRequirerAppData.model_validate({
+        'rules': {'promql': {}, 'new_rule': {}},
+        'metadata': METADATA,
+    })
+    assert requirer_databag
+    assert isinstance(requirer_databag.rules, RulesModel)
+    # AND the new rule type is ignored
+    assert 'new_rule' not in requirer_databag.rules.model_dump()
+
+
+def test_missing_rule_type_defaults() -> None:
+    # GIVEN the requirer offers a new rule type
+    # * the provider does not support this new rule type
+    # WHEN validating the requirer databag model, which the provider uses to access rules
+    # THEN the validation succeeds
+    requirer_databag = OtlpRequirerAppData.model_validate({'rules': {}, 'metadata': METADATA})
+    assert requirer_databag
+    assert isinstance(requirer_databag.rules, RulesModel)
+    # AND the new rule type is ignored
+    assert 'promql' in requirer_databag.rules.model_dump()
+    assert 'logql' in requirer_databag.rules.model_dump()
 
 
 def test_forwarded_rules_compression(otlp_dual_ctx: testing.Context[ops.CharmBase]) -> None:

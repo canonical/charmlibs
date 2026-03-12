@@ -51,11 +51,13 @@ class RulesModel(BaseModel):
 
     logql: OfficialRuleFileFormat = Field(
         description='LogQL alerting and recording rules, following the '
-        'OfficialRuleFileFormat from cos-lib.'
+        'OfficialRuleFileFormat from cos-lib.',
+        default_factory=OfficialRuleFileFormat,
     )
     promql: OfficialRuleFileFormat = Field(
         description='PromQL alerting and recording rules, following the '
-        'OfficialRuleFileFormat from cos-lib.'
+        'OfficialRuleFileFormat from cos-lib.',
+        default_factory=OfficialRuleFileFormat,
     )
 
 

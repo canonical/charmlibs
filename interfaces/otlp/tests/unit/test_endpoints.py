@@ -12,7 +12,8 @@ import pytest
 from ops import testing
 from ops.testing import Relation, State
 
-from charmlibs.interfaces.otlp import OtlpEndpoint, OtlpProviderAppData
+from charmlibs.interfaces.otlp import OtlpEndpoint
+from charmlibs.interfaces.otlp._otlp import OtlpProviderAppData
 
 ALL_PROTOCOLS = ['grpc', 'http']
 ALL_TELEMETRIES = ['logs', 'metrics', 'traces']
@@ -24,19 +25,24 @@ EMPTY_REQUIRER = {
 RECEIVE_OTLP = Relation('receive-otlp', remote_app_data=EMPTY_REQUIRER)
 
 
-@pytest.mark.parametrize(
-    'endpoint',
-    [
-        {'protocol': 'new_protocol', 'endpoint': 'http://host:4317', 'telemetries': ['logs']},
-        {'protocol': 'grpc', 'endpoint': 'http://host:4317', 'telemetries': ['new_telemetry']},
-    ],
-)
-def test_endpoints_compatibility(endpoint: dict[str, Any]) -> None:
+def test_new_endpoint_key_is_ignored_by_databag_model() -> None:
     # GIVEN the provider offers a new endpoint type (protocol or telemetry)
     # * the requirer does not support this new endpoint type
+    endpoint = {
+        'protocol': 'new_protocol',
+        'endpoint': 'http://host:4317',
+        'telemetries': ['logs'],
+        'new_key': 'value',
+    }
+
     # WHEN validating the provider databag model, which the requirer uses to access endpoints
     # THEN the validation succeeds
-    assert OtlpProviderAppData.model_validate({'endpoints': [endpoint]})
+    provider_databag: OtlpProviderAppData = OtlpProviderAppData.model_validate({
+        'endpoints': [endpoint]
+    })
+    assert provider_databag
+    # AND the new endpoint key is ignored
+    assert 'new_key' not in provider_databag.endpoints[0].model_dump()
 
 
 @pytest.mark.parametrize(

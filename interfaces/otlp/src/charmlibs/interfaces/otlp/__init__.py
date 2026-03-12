@@ -140,9 +140,7 @@ rules::
 from ._otlp import (
     OtlpEndpoint,
     OtlpProvider,
-    OtlpProviderAppData,
     OtlpRequirer,
-    OtlpRequirerAppData,
     RulesModel,
 )
 from ._version import __version__ as __version__
@@ -152,8 +150,6 @@ __all__ = [
     # from charmlibs.interfaces.otlp import *
     'OtlpEndpoint',
     'OtlpProvider',
-    'OtlpProviderAppData',
     'OtlpRequirer',
-    'OtlpRequirerAppData',
     'RulesModel',
 ]
