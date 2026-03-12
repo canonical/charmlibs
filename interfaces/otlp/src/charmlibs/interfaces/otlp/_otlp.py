@@ -35,7 +35,6 @@ from cosl.rules import AlertRules, InjectResult, generic_alert_groups
 from cosl.types import OfficialRuleFileFormat
 from cosl.utils import LZMABase64
 from ops import CharmBase
-from ops.framework import Object
 from pydantic import BaseModel, Field, ValidationError
 
 DEFAULT_REQUIRER_RELATION_NAME = 'send-otlp'
@@ -127,7 +126,7 @@ class OtlpRequirerAppData(BaseModel):
             return json.dumps(obj, sort_keys=True)
 
 
-class OtlpRequirer(Object):
+class OtlpRequirer:
     """A class for consuming OTLP endpoints.
 
     Args:
@@ -153,7 +152,6 @@ class OtlpRequirer(Object):
         loki_rules_path: str | Path = DEFAULT_LOKI_RULES_RELATIVE_PATH,
         prometheus_rules_path: str | Path = DEFAULT_PROM_RULES_RELATIVE_PATH,
     ):
-        super().__init__(charm, relation_name)
         self._charm = charm
         self._relation_name = relation_name
         self._protocols: list[Literal['http', 'grpc']] = (
@@ -235,7 +233,7 @@ class OtlpRequirer(Object):
             'rules': {'logql': loki_rules.as_dict(), 'promql': prom_rules.as_dict()},
             'metadata': self._topology.as_dict(),
         })
-        for relation in self.model.relations[self._relation_name]:
+        for relation in self._charm.model.relations[self._relation_name]:
             relation.save(databag, self._charm.app, encoder=OtlpRequirerAppData.encode_value)
 
     @property
@@ -252,7 +250,7 @@ class OtlpRequirer(Object):
         will choose the HTTP endpoint.
         """
         endpoint_map: dict[int, OtlpEndpoint] = {}
-        for relation in self.model.relations[self._relation_name]:
+        for relation in self._charm.model.relations[self._relation_name]:
             try:
                 provider = relation.load(OtlpProviderAppData, relation.app)
             except ValidationError:
@@ -265,7 +263,7 @@ class OtlpRequirer(Object):
         return endpoint_map
 
 
-class OtlpProvider(Object):
+class OtlpProvider:
     """A class for publishing all supported OTLP endpoints.
 
     Args:
@@ -278,7 +276,6 @@ class OtlpProvider(Object):
         charm: CharmBase,
         relation_name: str = DEFAULT_PROVIDER_RELATION_NAME,
     ):
-        super().__init__(charm, relation_name)
         self._charm = charm
         self._relation_name = relation_name
         self._endpoints: list[OtlpEndpoint] = []
@@ -305,7 +302,7 @@ class OtlpProvider(Object):
             return
 
         databag = OtlpProviderAppData.model_validate({'endpoints': self._endpoints})
-        for relation in self.model.relations[self._relation_name]:
+        for relation in self._charm.model.relations[self._relation_name]:
             relation.save(databag, self._charm.app)
 
     def rules(self, query_type: Literal['logql', 'promql']):
@@ -325,7 +322,7 @@ class OtlpProvider(Object):
         """
         rules_map: dict[str, dict[str, Any]] = {}
         rules_obj = AlertRules(query_type, self._topology)
-        for relation in self.model.relations[self._relation_name]:
+        for relation in self._charm.model.relations[self._relation_name]:
             try:
                 requirer = relation.load(
                     OtlpRequirerAppData, relation.app, decoder=OtlpRequirerAppData.decode_value
