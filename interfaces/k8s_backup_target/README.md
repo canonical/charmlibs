@@ -8,4 +8,4 @@ To install, add `charmlibs-interfaces-k8s-backup-target` to your Python dependen
 from charmlibs.interfaces import k8s_backup_target
 ```
 
-See the [reference documentation](https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/k8s_backup_target).
+See the [reference documentation](https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/k8s-backup-target).
