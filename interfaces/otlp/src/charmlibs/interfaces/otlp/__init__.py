@@ -91,6 +91,9 @@ subset of protocols and telemetries, which can be configured at instantiation::
 Given the defined, supported protocols and telemetries, the OtlpRequirer will filter out
 unsupported endpoints and prune unsupported telemetries. After filtering, requirer selection
 condenses the list to a single endpoint per relation.
+Endpoints with modern protocols are favoured over legacy ones.
+That means an endpoint supporting the `gRPC` protocol will be selected over one supporting `HTTP`.
+Unknown protocols will receive the lowest priority.
 
 The OtlpRequirer also publishes rules to related OtlpProvider charms with the ``publish()``
 method::

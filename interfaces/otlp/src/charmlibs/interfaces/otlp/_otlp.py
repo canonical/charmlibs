@@ -190,9 +190,10 @@ class OtlpRequirer:
         return valid_endpoints
 
     def _favor_modern_endpoints(self, endpoints: list[_OtlpEndpoint]) -> _OtlpEndpoint:
-        """Return the endpoint with the most modern protocol.
+        """Return the preferred endpoint using protocol priority.
 
-        If an unknown protocol is encountered, it is given the lowest priority.
+        Modern protocols receive higher priority.
+        Protocol ranking is `grpc` > `http`; unknown protocols rank lowest.
         """
         modern_score: Final = {'grpc': 2, 'http': 1}
         return max(endpoints, key=lambda e: modern_score.get(e.protocol, 0))
@@ -246,13 +247,11 @@ class OtlpRequirer:
         """Return a mapping of relation ID to OTLP endpoint.
 
         For each remote's list of OtlpEndpoints, the requirer filters out
-        unsupported endpoints and telemetries. If there are multiple supported
-        endpoints, the requirer chooses the first available endpoint in the
-        list. This allows providers to specify multiple endpoints with
-        different protocols and/or telemetry types and the requirer can choose
-        one based on its own capabilities. For example, a provider may specify
-        both an HTTP and gRPC endpoint, and a requirer that only supports HTTP
-        will choose the HTTP endpoint.
+        unsupported endpoints and telemetries. If multiple compatible
+        endpoints remain, the requirer prefers newer protocols (`grpc` over
+        `http`). Unknown protocols are treated as the lowest priority. This
+        allows providers to expose multiple endpoints with different protocol
+        and telemetry combinations while the requirer selects the best match.
         """
         endpoint_map: dict[int, OtlpEndpoint] = {}
         for relation in self._charm.model.relations[self._relation_name]:
