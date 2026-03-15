@@ -53,7 +53,7 @@ def user_exists(user: str | int) -> pwd.struct_passwd | None:
         elif isinstance(user, str):
             return pwd.getpwnam(user)
         else:
-            raise TypeError("specified argument '%r' should be a string or int", user)
+            raise TypeError(f'specified argument {user!r} should be a string or int')
     except KeyError:
         logger.info("specified user '%s' doesn't exist", str(user))
         return None
@@ -73,7 +73,7 @@ def group_exists(group: str | int) -> grp.struct_group | None:
         elif isinstance(group, str):
             return grp.getgrnam(group)
         else:
-            raise TypeError("specified argument '%r' should be a string or int", group)
+            raise TypeError(f'specified argument {group!r} should be a string or int')
     except KeyError:
         logger.info("specified group '%s' doesn't exist", str(group))
         return None
