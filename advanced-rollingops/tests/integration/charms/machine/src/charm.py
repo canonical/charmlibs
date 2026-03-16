@@ -16,13 +16,13 @@
 
 import logging
 
-from .common import Charm
+import common
 import ops
 
 logger = logging.getLogger(__name__)
 
 
-class RollingOpsCharm(Charm):
+class RollingOpsCharm(common.Charm):
     """Charm the application."""
 
     def __init__(self, framework: ops.Framework):

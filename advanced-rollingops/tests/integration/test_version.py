@@ -14,9 +14,28 @@
 
 """Integration tests using real Juju and pre-packed charm(s)."""
 
+import json
+import logging
+import time
+from datetime import datetime
+
 import jubilant
 
-from charmlibs import advanced_rollingops
+TRACE_FILE = '/var/lib/charm-rolling-ops/transitions.log'
+logger = logging.getLogger(__name__)
+
+
+def get_unit_events(juju: jubilant.Juju, unit: str) -> list[dict]:
+    task = juju.exec(f'cat {TRACE_FILE}', unit=unit)
+
+    if not task.stdout.strip():
+        return []
+
+    return [json.loads(line) for line in task.stdout.strip().splitlines()]
+
+
+def parse_ts(event: dict) -> datetime:
+    return datetime.fromisoformat(event['ts'])
 
 
 def test_deploy(juju: jubilant.Juju, charm: str):
@@ -24,6 +43,82 @@ def test_deploy(juju: jubilant.Juju, charm: str):
     assert charm in juju.status().apps
 
 
-def test_lib_version(juju: jubilant.Juju, charm: str):
-    result = juju.run(f'{charm}/0', 'lib-version')
-    assert result.results['version'] == advanced_rollingops.__version__
+def test_restart_action_one_unit(juju: jubilant.Juju, charm: str):
+    """Verify that restart action runs through the expected workflow."""
+
+    juju.deploy(
+        'self-signed-certificates',
+        app='self-signed-certificates',
+        channel='1/stable',
+    )
+    juju.deploy(
+        'charmed-etcd',
+        app='etcd',
+        channel='3.6/stable',
+    )
+
+    juju.integrate(
+        'etcd:client-certificates',
+        'self-signed-certificates:certificates',
+    )
+    juju.wait(jubilant.all_active, error=jubilant.any_error)
+
+    juju.integrate(f'{charm}:etcd', 'etcd:etcd-client')
+    juju.wait(jubilant.all_active, error=jubilant.any_error)
+
+    time.sleep(30)
+
+    task = juju.run(f'{charm}/0', 'restart', {'delay': 1}, wait=300)
+    logger.info(task.results)
+
+    juju.wait(
+        jubilant.all_active,
+        error=jubilant.any_error,
+        timeout=300,
+    )
+
+    events = get_unit_events(juju, f'{charm}/0')
+    restart_events = [e['event'] for e in events]
+    logger.info(restart_events)
+
+    expected = [
+        'action:restart',
+        '_restart:start',
+        '_restart:done',
+    ]
+
+    assert expected == restart_events
+
+
+def test_all_units_can_connect_to_etcd(juju: jubilant.Juju, charm: str):
+    juju.add_unit(charm, num_units=2)
+    juju.wait(
+        lambda status: jubilant.all_active(status, charm),
+        error=jubilant.any_error,
+    )
+
+    status = juju.status()
+    units = sorted(status.apps[charm].units)
+
+    for unit in units:
+        juju.exec(f'rm -f {TRACE_FILE}', unit=unit)
+
+    for unit in units:
+        juju.run(unit, 'restart', {'delay': 2}, wait=300)
+
+    juju.wait(
+        lambda status: jubilant.all_active(status, charm, 'etcd', 'self-signed-certificates'),
+        error=jubilant.any_error,
+        timeout=600,
+    )
+
+    expected = [
+        'action:restart',
+        '_restart:start',
+        '_restart:done',
+    ]
+
+    for unit in units:
+        events = get_unit_events(juju, unit)
+        restart_events = [e['event'] for e in events]
+        assert restart_events == expected

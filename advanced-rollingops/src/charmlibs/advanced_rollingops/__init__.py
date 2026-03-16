@@ -14,23 +14,23 @@
 
 """The charmlibs.advanced_rollingops package."""
 
-from ._version import __version__ as __version__
-
-from ._etcd_rollingops import (EtcdRollingOpsManager,
+from ._certificates import CertificatesManager
+from ._etcdctl import EtcdCtl
+from ._manager import EtcdRollingOpsManager
+from ._models import (
     SECRET_FIELD,
-    CertificatesManager,
-    EtcdCtl,
     OperationResult,
     RollingOpsEtcdNotConfiguredError,
     RollingOpsKeys,
 )
+from ._version import __version__ as __version__
 
 __all__ = (
-    'EtcdRollingOpsManager',
-    'OperationResult',
     'SECRET_FIELD',
     'CertificatesManager',
     'EtcdCtl',
+    'EtcdRollingOpsManager',
+    'OperationResult',
     'RollingOpsEtcdNotConfiguredError',
-    'RollingOpsKeys'
+    'RollingOpsKeys',
 )

@@ -261,10 +261,12 @@ from typing import (
     Literal,
     NamedTuple,
     NewType,
+    Self,
     TypeAlias,
     TypedDict,
     TypeVar,
     overload,
+    override,
 )
 
 from ops import (
@@ -297,7 +299,6 @@ from pydantic import (
     model_serializer,
     model_validator,
 )
-from typing_extensions import Self, TypeAliasType, override
 
 try:
     import psycopg2
@@ -305,7 +306,7 @@ except ImportError:
     psycopg2 = None
 
 # The unique Charmhub library identifier, never change it
-LIBID = "6c3e6b6680d64e9c89e611d1a15f65be"
+LIBID = '6c3e6b6680d64e9c89e611d1a15f65be'
 
 # Increment this major API version when introducing breaking changes
 LIBAPI = 1
@@ -314,28 +315,28 @@ LIBAPI = 1
 # to 0 if you are raising the major API version
 LIBPATCH = 3
 
-PYDEPS = ["ops>=2.0.0", "pydantic>=2.11"]
+PYDEPS = ['ops>=2.0.0', 'pydantic>=2.11']
 
 logger = logging.getLogger(__name__)
 
 MODEL_ERRORS = {
-    "not_leader": "this unit is not the leader",
-    "no_label_and_uri": "ERROR either URI or label should be used for getting an owned secret but not both",
-    "owner_no_refresh": "ERROR secret owner cannot use --refresh",
-    "permission_denied": "ERROR permission denied",
+    'not_leader': 'this unit is not the leader',
+    'no_label_and_uri': 'ERROR either URI or label should be used for getting an owned secret but not both',
+    'owner_no_refresh': 'ERROR secret owner cannot use --refresh',
+    'permission_denied': 'ERROR permission denied',
 }
 
 RESOURCE_ALIASES = [
-    "database",
-    "subject",
-    "topic",
-    "index",
-    "plugin-url",
-    "prefix",
+    'database',
+    'subject',
+    'topic',
+    'index',
+    'plugin-url',
+    'prefix',
 ]
 
-SECRET_PREFIX = "secret-"
-STATUS_FIELD = "status"
+SECRET_PREFIX = 'secret-'
+STATUS_FIELD = 'status'
 
 
 ##############################################################################
@@ -370,13 +371,13 @@ class IllegalOperationError(DataInterfacesError):
 
 def gen_salt() -> str:
     """Generates a consistent salt."""
-    return "".join(random.choices(string.ascii_letters + string.digits, k=16))
+    return ''.join(random.choices(string.ascii_letters + string.digits, k=16))
 
 
 def gen_hash(resource_name: str, salt: str) -> str:
     """Generates a consistent hash based on the resource name and salt."""
     hasher = hashlib.sha256()
-    hasher.update(f"{resource_name}:{salt}".encode())
+    hasher.update(f'{resource_name}:{salt}'.encode())
     return hasher.hexdigest()[:16]
 
 
@@ -385,7 +386,7 @@ def ensure_leader_for_app(f):
 
     def wrapper(self, *args, **kwargs):
         if self.component == self._local_app and not self._local_unit.is_leader():
-            logger.error(f"This operation ({f.__name__}) can only be performed by the leader unit")
+            logger.error(f'This operation ({f.__name__}) can only be performed by the leader unit')
             return
         return f(self, *args, **kwargs)
 
@@ -396,10 +397,10 @@ def get_encoded_dict(
     relation: Relation, member: Unit | Application, field: str
 ) -> dict[str, Any] | None:
     """Retrieve and decode an encoded field from relation data."""
-    data = json.loads(relation.data[member].get(field, "{}"))
+    data = json.loads(relation.data[member].get(field, '{}'))
     if isinstance(data, dict):
         return data
-    logger.error("Unexpected datatype for %s instead of dict.", str(data))
+    logger.error('Unexpected datatype for %s instead of dict.', str(data))
 
 
 class Diff(NamedTuple):
@@ -441,7 +442,7 @@ def diff(old_data: dict[str, str] | None, new_data: dict[str, str]) -> Diff:
 
 def resource_added(diff: Diff) -> bool:
     """Ensures that one of the aliased resources has been added."""
-    return any(item in diff.added for item in RESOURCE_ALIASES + ["resource"])
+    return any(item in diff.added for item in RESOURCE_ALIASES + ['resource'])
 
 
 def store_new_data(
@@ -463,24 +464,24 @@ def store_new_data(
     global_data = {k: v for k, v in global_data.items() if v}
     # First, the case for V0
     if not short_uuid:
-        relation.data[component].update({"data": json.dumps(new_data | global_data)})
+        relation.data[component].update({'data': json.dumps(new_data | global_data)})
     # Then the case for V1, where we have a ShortUUID
     else:
-        data = json.loads(relation.data[component].get("data", "{}")) | global_data
+        data = json.loads(relation.data[component].get('data', '{}')) | global_data
         if not isinstance(data, dict):
             raise ValueError
         data[short_uuid] = new_data
-        relation.data[component].update({"data": json.dumps(data)})
+        relation.data[component].update({'data': json.dumps(data)})
 
 
 ##############################################################################
 # Helper classes
 ##############################################################################
 
-SecretGroup = NewType("SecretGroup", str)
+SecretGroup = NewType('SecretGroup', str)
 
 
-SecretString = TypeAliasType("SecretString", Annotated[str, Field(pattern="secret:.*")])
+type SecretString = Annotated[str, Field(pattern='secret:.*')]
 
 
 OptionalSecretStr: TypeAlias = str | None
@@ -490,19 +491,19 @@ OptionalSecrets = (OptionalSecretStr, OptionalSecretBool)
 
 OptionalPathLike = PathLike | str | None
 
-UserSecretStr = Annotated[OptionalSecretStr, Field(exclude=True, default=None), "user"]
-TlsSecretStr = Annotated[OptionalSecretStr, Field(exclude=True, default=None), "tls"]
-TlsSecretBool = Annotated[OptionalSecretBool, Field(exclude=True, default=None), "tls"]
-MtlsSecretStr = Annotated[OptionalSecretStr, Field(exclude=True, default=None), "mtls"]
-ExtraSecretStr = Annotated[OptionalSecretStr, Field(exclude=True, default=None), "extra"]
-EntitySecretStr = Annotated[OptionalSecretStr, Field(exclude=True, default=None), "entity"]
+UserSecretStr = Annotated[OptionalSecretStr, Field(exclude=True, default=None), 'user']
+TlsSecretStr = Annotated[OptionalSecretStr, Field(exclude=True, default=None), 'tls']
+TlsSecretBool = Annotated[OptionalSecretBool, Field(exclude=True, default=None), 'tls']
+MtlsSecretStr = Annotated[OptionalSecretStr, Field(exclude=True, default=None), 'mtls']
+ExtraSecretStr = Annotated[OptionalSecretStr, Field(exclude=True, default=None), 'extra']
+EntitySecretStr = Annotated[OptionalSecretStr, Field(exclude=True, default=None), 'entity']
 
 
 class Scope(Enum):
     """Peer relations scope."""
 
-    APP = "app"
-    UNIT = "unit"
+    APP = 'app'
+    UNIT = 'unit'
 
 
 class RelationStatusDict(TypedDict):
@@ -520,9 +521,9 @@ class CachedSecret:
     """
 
     KNOWN_MODEL_ERRORS = [
-        MODEL_ERRORS["no_label_and_uri"],
-        MODEL_ERRORS["owner_no_refresh"],
-        MODEL_ERRORS["permission_denied"],
+        MODEL_ERRORS['no_label_and_uri'],
+        MODEL_ERRORS['owner_no_refresh'],
+        MODEL_ERRORS['permission_denied'],
     ]
 
     def __init__(
@@ -553,7 +554,7 @@ class CachedSecret:
             self._secret_meta = self._model.get_secret(label=self.label)
         except SecretNotFoundError:
             # Falling back to seeking for potential legacy labels
-            logger.debug(f"Secret with label {self.label} not found")
+            logger.debug(f'Secret with label {self.label} not found')
         except ModelError as err:
             if not any(msg in str(err) for msg in self.KNOWN_MODEL_ERRORS):
                 raise
@@ -581,7 +582,7 @@ class CachedSecret:
         """Create a new secret."""
         if self._secret_uri:
             raise SecretAlreadyExistsError(
-                "Secret is already defined with uri %s", self._secret_uri
+                'Secret is already defined with uri %s', self._secret_uri
             )
 
         label = self.label if not label else label
@@ -633,7 +634,7 @@ class CachedSecret:
     def remove(self) -> None:
         """Remove secret."""
         if not self.meta:
-            raise SecretsUnavailableError("Non-existent secret was attempted to be removed.")
+            raise SecretsUnavailableError('Non-existent secret was attempted to be removed.')
         try:
             self.meta.remove_all_revisions()
         except SecretNotFoundError:
@@ -662,7 +663,7 @@ class SecretCache:
     def add(self, label: str, content: dict[str, str], relation: Relation) -> CachedSecret:
         """Adding a secret to Juju Secret."""
         if self._secrets.get(label):
-            raise SecretAlreadyExistsError(f"Secret {label} already exists")
+            raise SecretAlreadyExistsError(f'Secret {label} already exists')
 
         secret = CachedSecret(self._model, self.component, label)
         secret.add_secret(content, relation)
@@ -679,7 +680,7 @@ class SecretCache:
                 pass
             else:
                 return
-        logging.debug("Non-existing Juju Secret was attempted to be removed %s", label)
+        logging.debug('Non-existing Juju Secret was attempted to be removed %s', label)
 
 
 ##############################################################################
@@ -695,17 +696,17 @@ class PeerModel(BaseModel):
         validate_by_alias=True,
         populate_by_name=True,
         serialize_by_alias=True,
-        alias_generator=lambda x: x.replace("_", "-"),
-        extra="allow",
+        alias_generator=lambda x: x.replace('_', '-'),
+        extra='allow',
     )
 
-    @model_validator(mode="after")
+    @model_validator(mode='after')
     def extract_secrets(self, info: ValidationInfo):
         """Extract all secret_fields into their local field."""
-        if not info.context or not isinstance(info.context.get("repository"), AbstractRepository):
+        if not info.context or not isinstance(info.context.get('repository'), AbstractRepository):
             logger.debug("No secret parsing as we're lacking context here.")
             return self
-        repository: AbstractRepository = info.context.get("repository")
+        repository: AbstractRepository = info.context.get('repository')
         for field, field_info in self.__pydantic_fields__.items():
             if field_info.annotation in OptionalSecrets and len(field_info.metadata) == 1:
                 secret_group = SecretGroup(field_info.metadata[0])
@@ -716,7 +717,7 @@ class PeerModel(BaseModel):
                 secret = repository.get_secret(secret_group, secret_uri=None)
 
                 if not secret:
-                    logger.info(f"No secret for group {secret_group}")
+                    logger.info(f'No secret for group {secret_group}')
                     continue
 
                 value = secret.get_content().get(aliased_field)
@@ -726,13 +727,13 @@ class PeerModel(BaseModel):
 
         return self
 
-    @model_serializer(mode="wrap")
+    @model_serializer(mode='wrap')
     def serialize_model(self, handler: SerializerFunctionWrapHandler, info: SerializationInfo):
         """Serializes the model writing the secrets in their respective secrets."""
-        if not info.context or not isinstance(info.context.get("repository"), AbstractRepository):
+        if not info.context or not isinstance(info.context.get('repository'), AbstractRepository):
             logger.debug("No secret parsing serialization as we're lacking context here.")
             return handler(self)
-        repository: AbstractRepository = info.context.get("repository")
+        repository: AbstractRepository = info.context.get('repository')
 
         for field, field_info in self.__pydantic_fields__.items():
             if field_info.annotation in OptionalSecrets and len(field_info.metadata) == 1:
@@ -756,7 +757,7 @@ class PeerModel(BaseModel):
                             secret_group,
                         )
                         if not secret or not secret.meta:
-                            raise SecretError("No secret to send back")
+                            raise SecretError('No secret to send back')
                     continue
 
                 content = secret.get_content()
@@ -772,20 +773,20 @@ class PeerModel(BaseModel):
     def __getitem__(self, key):
         """Dict like access to the model."""
         try:
-            return getattr(self, key.replace("-", "_"))
+            return getattr(self, key.replace('-', '_'))
         except Exception:
-            raise KeyError(f"{key} is not present in the model")
+            raise KeyError(f'{key} is not present in the model')
 
     def __setitem__(self, key, value):
         """Dict like setter for the model."""
-        return setattr(self, key.replace("-", "_"), value)
+        return setattr(self, key.replace('-', '_'), value)
 
     def __delitem__(self, key):
         """Dict like deleter for the model."""
         try:
-            return delattr(self, key.replace("-", "_"))
+            return delattr(self, key.replace('-', '_'))
         except Exception:
-            raise KeyError(f"{key} is not present in the model.")
+            raise KeyError(f'{key} is not present in the model.')
 
 
 class BaseCommonModel(BaseModel):
@@ -796,8 +797,8 @@ class BaseCommonModel(BaseModel):
         validate_by_alias=True,
         populate_by_name=True,
         serialize_by_alias=True,
-        alias_generator=lambda x: x.replace("_", "-"),
-        extra="allow",
+        alias_generator=lambda x: x.replace('_', '-'),
+        extra='allow',
     )
 
     def update(self: Self, model: Self):
@@ -805,18 +806,18 @@ class BaseCommonModel(BaseModel):
         # Iterate on all the fields that where explicitly set.
         for item in model.model_fields_set:
             # ignore the outstanding fields.
-            if item not in ["salt", "request_id"]:
+            if item not in ['salt', 'request_id']:
                 value = getattr(model, item)
                 setattr(self, item, value)
         return self
 
-    @model_validator(mode="after")
+    @model_validator(mode='after')
     def extract_secrets(self, info: ValidationInfo):
         """Extract all secret_fields into their local field."""
-        if not info.context or not isinstance(info.context.get("repository"), AbstractRepository):
+        if not info.context or not isinstance(info.context.get('repository'), AbstractRepository):
             logger.debug("No secret parsing as we're lacking context here.")
             return self
-        repository: AbstractRepository = info.context.get("repository")
+        repository: AbstractRepository = info.context.get('repository')
         short_uuid = self.short_uuid
         for field, field_info in self.__pydantic_fields__.items():
             if field_info.annotation in OptionalSecrets and len(field_info.metadata) == 1:
@@ -826,7 +827,7 @@ class BaseCommonModel(BaseModel):
 
                 aliased_field = field_info.serialization_alias or field
                 secret_field = repository.secret_field(secret_group, aliased_field).replace(
-                    "-", "_"
+                    '-', '_'
                 )
                 secret_uri: str | None = getattr(self, secret_field, None)
 
@@ -838,7 +839,7 @@ class BaseCommonModel(BaseModel):
                 )
 
                 if not secret:
-                    logger.info(f"No secret for group {secret_group} and short uuid {short_uuid}")
+                    logger.info(f'No secret for group {secret_group} and short uuid {short_uuid}')
                     continue
 
                 value = secret.get_content().get(aliased_field)
@@ -850,19 +851,17 @@ class BaseCommonModel(BaseModel):
 
         return self
 
-    @model_serializer(mode="wrap")
-    def serialize_model(
-        self, handler: SerializerFunctionWrapHandler, info: SerializationInfo
-    ):  # noqa: C901
+    @model_serializer(mode='wrap')
+    def serialize_model(self, handler: SerializerFunctionWrapHandler, info: SerializationInfo):
         """Serializes the model writing the secrets in their respective secrets."""
-        if not info.context or not isinstance(info.context.get("repository"), AbstractRepository):
+        if not info.context or not isinstance(info.context.get('repository'), AbstractRepository):
             logger.debug("No secret parsing serialization as we're lacking context here.")
             return handler(self)
-        repository: AbstractRepository = info.context.get("repository")
+        repository: AbstractRepository = info.context.get('repository')
 
         short_uuid = self.short_uuid
         # Backward compatibility for v0 regarding secrets.
-        if info.context.get("version") == "v0":
+        if info.context.get('version') == 'v0':
             short_uuid = None
 
         for field, field_info in self.__pydantic_fields__.items():
@@ -872,7 +871,7 @@ class BaseCommonModel(BaseModel):
                     raise SecretsUnavailableError(field)
                 aliased_field = field_info.serialization_alias or field
                 secret_field = repository.secret_field(secret_group, aliased_field).replace(
-                    "-", "_"
+                    '-', '_'
                 )
                 secret_uri: str | None = getattr(self, secret_field, None)
                 secret = repository.get_secret(
@@ -890,7 +889,7 @@ class BaseCommonModel(BaseModel):
                             aliased_field, value, secret_group, short_uuid
                         )
                         if not secret or not secret.meta:
-                            raise SecretError("No secret to send back")
+                            raise SecretError('No secret to send back')
                         setattr(self, secret_field, secret.meta.id)
                     continue
 
@@ -920,8 +919,8 @@ class BaseCommonModel(BaseModel):
         if not field.startswith(SECRET_PREFIX):
             return None
 
-        value = field.split("-")[1]
-        if info := cls.__pydantic_fields__.get(field.replace("-", "_")):
+        value = field.split('-')[1]
+        if info := cls.__pydantic_fields__.get(field.replace('-', '_')):
             if info.annotation == SecretString:
                 return SecretGroup(value)
         return None
@@ -934,20 +933,20 @@ class BaseCommonModel(BaseModel):
     def __getitem__(self, key):
         """Dict like access to the model."""
         try:
-            return getattr(self, key.replace("-", "_"))
+            return getattr(self, key.replace('-', '_'))
         except Exception:
-            raise KeyError(f"{key} is not present in the model")
+            raise KeyError(f'{key} is not present in the model')
 
     def __setitem__(self, key, value):
         """Dict like setter for the model."""
-        return setattr(self, key.replace("-", "_"), value)
+        return setattr(self, key.replace('-', '_'), value)
 
     def __delitem__(self, key):
         """Dict like deleter for the model."""
         try:
-            return delattr(self, key.replace("-", "_"))
+            return delattr(self, key.replace('-', '_'))
         except Exception:
-            raise KeyError(f"{key} is not present in the model.")
+            raise KeyError(f'{key} is not present in the model.')
 
 
 class CommonModel(BaseCommonModel):
@@ -963,14 +962,14 @@ class CommonModel(BaseCommonModel):
         validate_by_alias=True,
         populate_by_name=True,
         serialize_by_alias=True,
-        alias_generator=lambda x: x.replace("_", "-"),
-        extra="allow",
+        alias_generator=lambda x: x.replace('_', '-'),
+        extra='allow',
     )
 
-    resource: str = Field(validation_alias=AliasChoices(*RESOURCE_ALIASES), default="")
+    resource: str = Field(validation_alias=AliasChoices(*RESOURCE_ALIASES), default='')
     request_id: str | None = Field(default=None)
     salt: str = Field(
-        description="This salt is used to create unique hashes even when other fields map 1-1",
+        description='This salt is used to create unique hashes even when other fields map 1-1',
         default_factory=gen_salt,
     )
 
@@ -998,22 +997,22 @@ class RequirerCommonModel(CommonModel):
     extra_user_roles: str | None = Field(default=None)
     extra_group_roles: str | None = Field(default=None)
     external_node_connectivity: bool = Field(default=False)
-    entity_type: Literal["USER", "GROUP"] | None = Field(default=None)
+    entity_type: Literal['USER', 'GROUP'] | None = Field(default=None)
     entity_permissions: list[EntityPermissionModel] | None = Field(default=None)
     secret_mtls: SecretString | None = Field(default=None)
     mtls_cert: MtlsSecretStr = Field(default=None)
 
-    @model_validator(mode="after")
+    @model_validator(mode='after')
     def validate_fields(self):
         """Validates that no inconsistent request is being sent."""
-        if self.entity_type and self.entity_type not in ["USER", "GROUP"]:
-            raise ValueError("Invalid entity-type. Possible values are USER and GROUP")
+        if self.entity_type and self.entity_type not in ['USER', 'GROUP']:
+            raise ValueError('Invalid entity-type. Possible values are USER and GROUP')
 
-        if self.entity_type == "USER" and self.extra_group_roles:
-            raise ValueError("Inconsistent entity information. Use extra_user_roles instead")
+        if self.entity_type == 'USER' and self.extra_group_roles:
+            raise ValueError('Inconsistent entity information. Use extra_user_roles instead')
 
-        if self.entity_type == "GROUP" and self.extra_user_roles:
-            raise ValueError("Inconsistent entity information. Use extra_group_roles instead")
+        if self.entity_type == 'GROUP' and self.extra_user_roles:
+            raise ValueError('Inconsistent entity information. Use extra_group_roles instead')
 
         return self
 
@@ -1052,18 +1051,18 @@ class ResourceProviderModel(ProviderCommonModel):
 class RequirerDataContractV0(RequirerCommonModel):
     """Backward compatibility."""
 
-    version: Literal["v0"] = Field(default="v0")
+    version: Literal['v0'] = Field(default='v0')
 
-    original_field: str = Field(exclude=True, default="")
+    original_field: str = Field(exclude=True, default='')
 
-    @model_validator(mode="before")
+    @model_validator(mode='before')
     @classmethod
     def ensure_original_field(cls, data: Any):
         """Ensures that we keep the original field."""
         if isinstance(data, dict):
             for alias in RESOURCE_ALIASES:
                 if data.get(alias) is not None:
-                    data["original_field"] = alias
+                    data['original_field'] = alias
                     break
         else:
             for alias in RESOURCE_ALIASES:
@@ -1072,26 +1071,26 @@ class RequirerDataContractV0(RequirerCommonModel):
         return data
 
 
-TResourceProviderModel = TypeVar("TResourceProviderModel", bound=ResourceProviderModel)
-TRequirerCommonModel = TypeVar("TRequirerCommonModel", bound=RequirerCommonModel)
+TResourceProviderModel = TypeVar('TResourceProviderModel', bound=ResourceProviderModel)
+TRequirerCommonModel = TypeVar('TRequirerCommonModel', bound=RequirerCommonModel)
 
 
 class RequirerDataContractV1(BaseModel, Generic[TRequirerCommonModel]):
     """The new Data Contract."""
 
-    version: Literal["v1"] = Field(default="v1")
+    version: Literal['v1'] = Field(default='v1')
     requests: list[TRequirerCommonModel] = Field(default_factory=list)
 
 
 def discriminate_on_version(payload: Any) -> str:
     """Use the version to discriminate."""
     if isinstance(payload, dict):
-        return payload.get("version", "v0")
-    return getattr(payload, "version", "v0")
+        return payload.get('version', 'v0')
+    return getattr(payload, 'version', 'v0')
 
 
 RequirerDataContractType = Annotated[
-    Annotated[RequirerDataContractV0, Tag("v0")] | Annotated[RequirerDataContractV1, Tag("v1")],
+    Annotated[RequirerDataContractV0, Tag('v0')] | Annotated[RequirerDataContractV1, Tag('v1')],
     Discriminator(discriminate_on_version),
 ]
 
@@ -1106,19 +1105,19 @@ class DataContractV0(ResourceProviderModel):
 class DataContractV1(BaseModel, Generic[TResourceProviderModel]):
     """The Data contract of the response, for V1."""
 
-    version: Literal["v1"] = Field(default="v1")
+    version: Literal['v1'] = Field(default='v1')
     requests: list[TResourceProviderModel] = Field(default_factory=list)
 
 
 DataContract = TypeAdapter(DataContractV1[ResourceProviderModel])
 
 
-TCommonModel = TypeVar("TCommonModel", bound=CommonModel)
+TCommonModel = TypeVar('TCommonModel', bound=CommonModel)
 
 
 def is_topic_value_acceptable(value: str | None) -> str | None:
     """Check whether the given Kafka topic value is acceptable."""
-    if value and "*" in value[:3]:
+    if value and '*' in value[:3]:
         raise ValueError(f"Error on topic '{value}',, unacceptable value.")
     return value
 
@@ -1289,10 +1288,10 @@ class OpsRepository(AbstractRepository):
     def get_data(self) -> dict[str, Any] | None:
         ret: dict[str, Any] = {}
         if not self.relation:
-            logger.info("No relation to get value from")
+            logger.info('No relation to get value from')
             return None
         if self.component not in self.relation.data:
-            logger.info(f"Component {self.component} not in relation {self.relation}")
+            logger.info(f'Component {self.component} not in relation {self.relation}')
             return None
 
         for key, value in self.relation.data[self.component].items():
@@ -1310,10 +1309,10 @@ class OpsRepository(AbstractRepository):
         field: str,
     ) -> str | None:
         if not self.relation:
-            logger.info("No relation to get value from")
+            logger.info('No relation to get value from')
             return None
         if self.component not in self.relation.data:
-            logger.info(f"Component {self.component} not in relation {self.relation}")
+            logger.info(f'Component {self.component} not in relation {self.relation}')
             return None
         relation_data = self.relation.data[self.component]
         return relation_data.get(field)
@@ -1331,10 +1330,10 @@ class OpsRepository(AbstractRepository):
     @ensure_leader_for_app
     def write_field(self, field: str, value: Any) -> None:
         if not self.relation:
-            logger.info("No relation to get value from")
+            logger.info('No relation to get value from')
             return None
         if self.component not in self.relation.data:
-            logger.info(f"Component {self.component} not in relation {self.relation}")
+            logger.info(f'Component {self.component} not in relation {self.relation}')
             return None
         if not value:
             return None
@@ -1344,10 +1343,10 @@ class OpsRepository(AbstractRepository):
     @ensure_leader_for_app
     def write_fields(self, mapping: dict[str, Any]) -> None:
         if not self.relation:
-            logger.info("No relation to get value from")
+            logger.info('No relation to get value from')
             return None
         if self.component not in self.relation.data:
-            logger.info(f"Component {self.component} not in relation {self.relation}")
+            logger.info(f'Component {self.component} not in relation {self.relation}')
             return None
         (self.write_field(field, value) for field, value in mapping.items())
 
@@ -1357,10 +1356,10 @@ class OpsRepository(AbstractRepository):
         self, field: str, value: Any, secret_group: SecretGroup
     ) -> CachedSecret | None:
         if not self.relation:
-            logger.info("No relation to get value from")
+            logger.info('No relation to get value from')
             return None
         if self.component not in self.relation.data:
-            logger.info(f"Component {self.component} not in relation {self.relation}")
+            logger.info(f'Component {self.component} not in relation {self.relation}')
             return None
 
         label = self._generate_secret_label(self.relation, secret_group)
@@ -1380,17 +1379,17 @@ class OpsRepository(AbstractRepository):
     @ensure_leader_for_app
     def delete_field(self, field: str) -> None:
         if not self.relation:
-            logger.info("No relation to get value from")
+            logger.info('No relation to get value from')
             return None
         if self.component not in self.relation.data:
-            logger.info(f"Component {self.component} not in relation {self.relation}")
+            logger.info(f'Component {self.component} not in relation {self.relation}')
             return None
         relation_data = self.relation.data[self.component]
         try:
             relation_data.pop(field)
         except KeyError:
             logger.debug(
-                f"Non existent field {field} was attempted to be removed from the databag (relation ID: {self.relation.id})"
+                f'Non existent field {field} was attempted to be removed from the databag (relation ID: {self.relation.id})'
             )
 
     @override
@@ -1402,10 +1401,10 @@ class OpsRepository(AbstractRepository):
     @ensure_leader_for_app
     def delete_secret_field(self, field: str, secret_group: SecretGroup) -> None:
         if not self.relation:
-            logger.info("No relation to get value from")
+            logger.info('No relation to get value from')
             return None
         if self.component not in self.relation.data:
-            logger.info(f"Component {self.component} not in relation {self.relation}")
+            logger.info(f'Component {self.component} not in relation {self.relation}')
             return None
 
         relation_data = self.relation.data[self.component]
@@ -1427,7 +1426,7 @@ class OpsRepository(AbstractRepository):
         except KeyError:
             logging.debug(
                 f"Non-existing secret '{field}' was attempted to be removed"
-                f"from relation {self.relation.id} and group {secret_group}"
+                f'from relation {self.relation.id} and group {secret_group}'
             )
 
         # Write the new secret content if necessary
@@ -1456,7 +1455,7 @@ class OpsRepository(AbstractRepository):
         'secret-changed' events), and map it to the corresponding relation.
         """
         if not self.relation:
-            raise ValueError("Cannot register without relation.")
+            raise ValueError('Cannot register without relation.')
 
         label = self._generate_secret_label(self.relation, secret_group, short_uuid=short_uuid)
         CachedSecret(self.model, self.component, label, uri).meta
@@ -1467,10 +1466,10 @@ class OpsRepository(AbstractRepository):
     ) -> CachedSecret | None:
         """Gets a secret from the secret cache by uri or label."""
         if not self.relation:
-            logger.info("No relation to get value from")
+            logger.info('No relation to get value from')
             return None
         if self.component not in self.relation.data:
-            logger.info(f"Component {self.component} not in relation {self.relation}")
+            logger.info(f'Component {self.component} not in relation {self.relation}')
             return None
 
         label = self._generate_secret_label(self.relation, secret_group, short_uuid=short_uuid)
@@ -1487,10 +1486,10 @@ class OpsRepository(AbstractRepository):
     ) -> str | None:
         """Gets a value for a field stored in a secret group."""
         if not self.relation:
-            logger.info("No relation to get value from")
+            logger.info('No relation to get value from')
             return None
         if self.component not in self.relation.data:
-            logger.info(f"Component {self.component} not in relation {self.relation}")
+            logger.info(f'Component {self.component} not in relation {self.relation}')
             return None
 
         secret_field = self.secret_field(secret_group, field)
@@ -1500,13 +1499,13 @@ class OpsRepository(AbstractRepository):
         label = self._generate_secret_label(self.relation, secret_group, short_uuid=short_uuid)
 
         if self.uri_to_databag and not secret_uri:
-            logger.info(f"No secret for group {secret_group} in relation {self.relation}")
+            logger.info(f'No secret for group {secret_group} in relation {self.relation}')
             return None
 
         secret = self.secrets.get(label=label, uri=secret_uri)
 
         if not secret:
-            logger.info(f"No secret for group {secret_group} in relation {self.relation}")
+            logger.info(f'No secret for group {secret_group} in relation {self.relation}')
             return None
 
         content = secret.get_content().get(field)
@@ -1529,11 +1528,11 @@ class OpsRepository(AbstractRepository):
         short_uuid: str | None = None,
     ) -> CachedSecret | None:
         if not self.relation:
-            logger.info("No relation to get value from")
+            logger.info('No relation to get value from')
             return None
 
         if self.component not in self.relation.data:
-            logger.info(f"Component {self.component} not in relation {self.relation}")
+            logger.info(f'Component {self.component} not in relation {self.relation}')
             return None
 
         label = self._generate_secret_label(self.relation, secret_group, short_uuid)
@@ -1541,8 +1540,8 @@ class OpsRepository(AbstractRepository):
         secret = self.secrets.add(label, {field: value}, self.relation)
 
         if not secret.meta or not secret.meta.id:
-            logging.error("Secret is missing Secret ID")
-            raise SecretError("Secret added but is missing Secret ID")
+            logging.error('Secret is missing Secret ID')
+            raise SecretError('Secret added but is missing Secret ID')
 
         return secret
 
@@ -1555,7 +1554,7 @@ class OpsRepository(AbstractRepository):
 class OpsRelationRepository(OpsRepository):
     """Implementation of the Abstract Repository for non peer relations."""
 
-    SECRET_FIELD_NAME: str = "secret"
+    SECRET_FIELD_NAME: str = 'secret'
 
     @override
     def _generate_secret_label(
@@ -1563,12 +1562,12 @@ class OpsRelationRepository(OpsRepository):
     ) -> str:
         """Generate unique group_mappings for secrets within a relation context."""
         if short_uuid:
-            return f"{relation.name}.{relation.id}.{short_uuid}.{secret_group}.secret"
-        return f"{relation.name}.{relation.id}.{secret_group}.secret"
+            return f'{relation.name}.{relation.id}.{short_uuid}.{secret_group}.secret'
+        return f'{relation.name}.{relation.id}.{secret_group}.secret'
 
     def secret_field(self, secret_group: SecretGroup, field: str | None = None) -> str:
         """Generates the field name to store in the peer relation."""
-        return f"{self.SECRET_FIELD_NAME}-{secret_group}"
+        return f'{self.SECRET_FIELD_NAME}-{secret_group}'
 
     @ensure_leader_for_app
     @override
@@ -1579,7 +1578,7 @@ class OpsRelationRepository(OpsRepository):
 class OpsPeerRepository(OpsRepository):
     """Implementation of the Ops Repository for peer relations."""
 
-    SECRET_FIELD_NAME = "internal_secret"
+    SECRET_FIELD_NAME = 'internal_secret'
 
     uri_to_databag: bool = False
 
@@ -1590,7 +1589,7 @@ class OpsPeerRepository(OpsRepository):
             return Scope.APP
         if isinstance(self.component, Unit):
             return Scope.UNIT
-        raise ValueError("Invalid component, neither a Unit nor an Application")
+        raise ValueError('Invalid component, neither a Unit nor an Application')
 
     @override
     def _generate_secret_label(
@@ -1599,15 +1598,15 @@ class OpsPeerRepository(OpsRepository):
         """Generate unique group_mappings for secrets within a relation context."""
         members = [relation.name, self._local_app.name, self.scope.value]
 
-        if secret_group != SecretGroup("extra"):
+        if secret_group != SecretGroup('extra'):
             members.append(secret_group)
-        return f"{'.'.join(members)}"
+        return f'{".".join(members)}'
 
     def secret_field(self, secret_group: SecretGroup, field: str | None = None) -> str:
         """Generates the field name to store in the peer relation."""
         if not field:
-            raise ValueError("Must have a field.")
-        return f"{field}@{secret_group}"
+            raise ValueError('Must have a field.')
+        return f'{field}@{secret_group}'
 
 
 class OpsPeerUnitRepository(OpsPeerRepository):
@@ -1654,10 +1653,10 @@ class OpsOtherPeerUnitRepository(OpsPeerRepository):
         raise NotImplementedError("It's not possible to update data of another unit.")
 
 
-TRepository = TypeVar("TRepository", bound=OpsRepository)
-TCommon = TypeVar("TCommon", bound=BaseModel)
-TPeerCommon = TypeVar("TPeerCommon", bound=PeerModel)
-TCommonBis = TypeVar("TCommonBis", bound=BaseModel)
+TRepository = TypeVar('TRepository', bound=OpsRepository)
+TCommon = TypeVar('TCommon', bound=BaseModel)
+TPeerCommon = TypeVar('TPeerCommon', bound=PeerModel)
+TCommonBis = TypeVar('TCommonBis', bound=BaseModel)
 
 
 class RepositoryInterface(Generic[TRepository, TCommon]):
@@ -1688,7 +1687,7 @@ class RepositoryInterface(Generic[TRepository, TCommon]):
         """Returns a repository for the relation."""
         relation = self._model.get_relation(self.relation_name, relation_id)
         if not relation:
-            raise ValueError("Missing relation.")
+            raise ValueError('Missing relation.')
         return self.repository_type(self._model, relation, component or self.component)
 
     @overload
@@ -1733,10 +1732,10 @@ class RepositoryInterface(Generic[TRepository, TCommon]):
         model = model or self.model  # First the provided model (allows for specialisation)
         component = component or self.component
         if not model:
-            raise ValueError("Missing model to specialise data")
+            raise ValueError('Missing model to specialise data')
         relation = self._model.get_relation(self.relation_name, relation_id)
         if not relation:
-            raise ValueError("Missing relation.")
+            raise ValueError('Missing relation.')
         return build_model(self.repository_type(self._model, relation, component), model)
 
     def write_model(
@@ -1745,7 +1744,7 @@ class RepositoryInterface(Generic[TRepository, TCommon]):
         """Writes the model using the repository."""
         relation = self._model.get_relation(self.relation_name, relation_id)
         if not relation:
-            raise ValueError("Missing relation.")
+            raise ValueError('Missing relation.')
 
         write_model(
             self.repository_type(self._model, relation, self.component), model, context=context
@@ -1813,13 +1812,13 @@ def build_model(repository: AbstractRepository, model: type[TCommon] | TypeAdapt
     """Builds a common model using the provided repository and provided model structure."""
     data = repository.get_data() or {}
 
-    data.pop("data", None)
+    data.pop('data', None)
 
     # Beware this means all fields should have a default value here.
     if isinstance(model, TypeAdapter):
-        return model.validate_python(data, context={"repository": repository})
+        return model.validate_python(data, context={'repository': repository})
 
-    return model.model_validate(data, context={"repository": repository})
+    return model.model_validate(data, context={'repository': repository})
 
 
 def write_model(
@@ -1828,7 +1827,7 @@ def write_model(
     """Writes the data stored in the model using the repository object."""
     context = context or {}
     dumped = model.model_dump(
-        mode="json", context={"repository": repository} | context, exclude_none=False
+        mode='json', context={'repository': repository} | context, exclude_none=False
     )
     for field, value in dumped.items():
         if value is None:
@@ -1867,33 +1866,33 @@ class ResourceProviderEvent(EventBase, Generic[TRequirerCommonModel]):
 
     def snapshot(self) -> dict[str, Any]:
         """Save the event information."""
-        snapshot = {"relation_name": self.relation.name, "relation_id": self.relation.id}
+        snapshot = {'relation_name': self.relation.name, 'relation_id': self.relation.id}
         if self.app:
-            snapshot["app_name"] = self.app.name
+            snapshot['app_name'] = self.app.name
         if self.unit:
-            snapshot["unit_name"] = self.unit.name
+            snapshot['unit_name'] = self.unit.name
         # The models are too complex and would be blocked by marshal so we pickle dump the model.
         # The full dictionary is pickled afterwards anyway.
-        snapshot["request"] = pickle.dumps(self.request)
+        snapshot['request'] = pickle.dumps(self.request)
         return snapshot
 
     def restore(self, snapshot: dict[str, Any]):
         """Restore event information."""
         relation = self.framework.model.get_relation(
-            snapshot["relation_name"], snapshot["relation_id"]
+            snapshot['relation_name'], snapshot['relation_id']
         )
         if not relation:
-            raise ValueError("Missing relation")
+            raise ValueError('Missing relation')
         self.relation = relation
         self.app = None
-        app_name = snapshot.get("app_name")
+        app_name = snapshot.get('app_name')
         if app_name:
             self.app = self.framework.model.get_app(app_name)
         self.unit = None
-        unit_name = snapshot.get("unit_name")
+        unit_name = snapshot.get('unit_name')
         if unit_name:
             self.app = self.framework.model.get_app(unit_name)
-        self.request = pickle.loads(snapshot["request"])
+        self.request = pickle.loads(snapshot['request'])
 
 
 class ResourceRequestedEvent(ResourceProviderEvent[TRequirerCommonModel]):
@@ -1932,12 +1931,12 @@ class MtlsCertUpdatedEvent(ResourceProviderEvent[TRequirerCommonModel]):
 
     def snapshot(self):
         """Return a snapshot of the event."""
-        return super().snapshot() | {"old_mtls_cert": self.old_mtls_cert}
+        return super().snapshot() | {'old_mtls_cert': self.old_mtls_cert}
 
     def restore(self, snapshot):
         """Restore the event from a snapshot."""
         super().restore(snapshot)
-        self.old_mtls_cert = snapshot["old_mtls_cert"]
+        self.old_mtls_cert = snapshot['old_mtls_cert']
 
 
 class BulkResourcesRequestedEvent(EventBase, Generic[TRequirerCommonModel]):
@@ -1964,33 +1963,33 @@ class BulkResourcesRequestedEvent(EventBase, Generic[TRequirerCommonModel]):
 
     def snapshot(self) -> dict[str, Any]:
         """Save the event information."""
-        snapshot = {"relation_name": self.relation.name, "relation_id": self.relation.id}
+        snapshot = {'relation_name': self.relation.name, 'relation_id': self.relation.id}
         if self.app:
-            snapshot["app_name"] = self.app.name
+            snapshot['app_name'] = self.app.name
         if self.unit:
-            snapshot["unit_name"] = self.unit.name
+            snapshot['unit_name'] = self.unit.name
         # The models are too complex and would be blocked by marshal so we pickle dump the model.
         # The full dictionary is pickled afterwards anyway.
-        snapshot["requests"] = [pickle.dumps(request) for request in self.requests]
+        snapshot['requests'] = [pickle.dumps(request) for request in self.requests]
         return snapshot
 
     def restore(self, snapshot: dict[str, Any]):
         """Restore event information."""
         relation = self.framework.model.get_relation(
-            snapshot["relation_name"], snapshot["relation_id"]
+            snapshot['relation_name'], snapshot['relation_id']
         )
         if not relation:
-            raise ValueError("Missing relation")
+            raise ValueError('Missing relation')
         self.relation = relation
         self.app = None
-        app_name = snapshot.get("app_name")
+        app_name = snapshot.get('app_name')
         if app_name:
             self.app = self.framework.model.get_app(app_name)
         self.unit = None
-        unit_name = snapshot.get("unit_name")
+        unit_name = snapshot.get('unit_name')
         if unit_name:
             self.app = self.framework.model.get_app(unit_name)
-        self.requests = [pickle.loads(request) for request in snapshot["requests"]]
+        self.requests = [pickle.loads(request) for request in snapshot['requests']]
 
 
 class ResourceProvidesEvents(CharmEvents, Generic[TRequirerCommonModel]):
@@ -2030,34 +2029,34 @@ class ResourceRequirerEvent(EventBase, Generic[TResourceProviderModel]):
 
     def snapshot(self) -> dict:
         """Save the event information."""
-        snapshot = {"relation_name": self.relation.name, "relation_id": self.relation.id}
+        snapshot = {'relation_name': self.relation.name, 'relation_id': self.relation.id}
         if self.app:
-            snapshot["app_name"] = self.app.name
+            snapshot['app_name'] = self.app.name
         if self.unit:
-            snapshot["unit_name"] = self.unit.name
+            snapshot['unit_name'] = self.unit.name
         # The models are too complex and would be blocked by marshal so we pickle dump the model.
         # The full dictionary is pickled afterwards anyway.
-        snapshot["response"] = pickle.dumps(self.response)
+        snapshot['response'] = pickle.dumps(self.response)
         return snapshot
 
     def restore(self, snapshot: dict):
         """Restore event information."""
         relation = self.framework.model.get_relation(
-            snapshot["relation_name"], snapshot["relation_id"]
+            snapshot['relation_name'], snapshot['relation_id']
         )
         if not relation:
-            raise ValueError("Missing relation")
+            raise ValueError('Missing relation')
         self.relation = relation
         self.app = None
-        app_name = snapshot.get("app_name")
+        app_name = snapshot.get('app_name')
         if app_name:
             self.app = self.framework.model.get_app(app_name)
         self.unit = None
-        unit_name = snapshot.get("unit_name")
+        unit_name = snapshot.get('unit_name')
         if unit_name:
             self.app = self.framework.model.get_app(unit_name)
 
-        self.response = pickle.loads(snapshot["response"])
+        self.response = pickle.loads(snapshot['response'])
 
 
 class ResourceCreatedEvent(ResourceRequirerEvent[TResourceProviderModel]):
@@ -2109,12 +2108,12 @@ class StatusEventBase(RelationEvent):
 
     def snapshot(self) -> dict:
         """Return a snapshot of the event."""
-        return super().snapshot() | {"status": json.dumps(self.status.model_dump())}
+        return super().snapshot() | {'status': json.dumps(self.status.model_dump())}
 
     def restore(self, snapshot: dict):
         """Restore the event from a snapshot."""
         super().restore(snapshot)
-        self.status = RelationStatus(**json.loads(snapshot["status"]))
+        self.status = RelationStatus(**json.loads(snapshot['status']))
 
     @property
     def active_statuses(self) -> list[RelationStatus]:
@@ -2122,7 +2121,7 @@ class StatusEventBase(RelationEvent):
         if not self.relation.app:
             return []
 
-        raw = json.loads(self.relation.data[self.relation.app].get(STATUS_FIELD, "[]"))
+        raw = json.loads(self.relation.data[self.relation.app].get(STATUS_FIELD, '[]'))
 
         return [RelationStatus(**item) for item in raw]
 
@@ -2161,7 +2160,7 @@ class EventHandlers(Object):
     component: Application | Unit
     interface: RepositoryInterface
 
-    def __init__(self, charm: CharmBase, relation_name: str, unique_key: str = ""):
+    def __init__(self, charm: CharmBase, relation_name: str, unique_key: str = ''):
         """Manager of base client relations."""
         if not unique_key:
             unique_key = relation_name
@@ -2212,13 +2211,13 @@ class EventHandlers(Object):
         relation = self.charm.model.get_relation(self.relation_name, relation_id)
 
         if not relation:
-            raise ValueError("Missing relation.")
+            raise ValueError('Missing relation.')
 
         component = self.charm.app if isinstance(self.component, Application) else relation.app
 
-        raw = relation.data[component].get(STATUS_FIELD, "[]")
+        raw = relation.data[component].get(STATUS_FIELD, '[]')
 
-        return {int(item["code"]): RelationStatus(**item) for item in json.loads(raw)}
+        return {int(item['code']): RelationStatus(**item) for item in json.loads(raw)}
 
     # Event handlers
 
@@ -2257,11 +2256,11 @@ class EventHandlers(Object):
         try:
             event.secret.get_info()
         except SecretNotFoundError:
-            logging.info("Secret removed event ignored for non Secret Owner")
+            logging.info('Secret removed event ignored for non Secret Owner')
             return
 
         if relation.name != self.relation_name:
-            logging.info("Secret changed on wrong relation.")
+            logging.info('Secret changed on wrong relation.')
             return
 
         event.remove_revision()
@@ -2285,7 +2284,7 @@ class EventHandlers(Object):
             repository = OpsRelationRepository(self.model, relation, component=relation.app)
 
         # Gets the data stored in the databag for diff computation
-        old_data = get_encoded_dict(relation, self.component, "data")
+        old_data = get_encoded_dict(relation, self.component, 'data')
 
         # In case we're V1, we select specifically this request
         if old_data and request.request_id:
@@ -2293,8 +2292,8 @@ class EventHandlers(Object):
 
         # dump the data of the current request so we can compare
         new_data = request.model_dump(
-            mode="json",
-            exclude={"data"},
+            mode='json',
+            exclude={'data'},
             exclude_none=True,
             exclude_defaults=True,
         )
@@ -2321,7 +2320,7 @@ class EventHandlers(Object):
 
     def _relation_from_secret_label(self, secret_label: str) -> Relation | None:
         """Retrieve the relation that belongs to a secret label."""
-        contents = secret_label.split(".")
+        contents = secret_label.split('.')
 
         if not (contents and len(contents) >= 3):
             return
@@ -2340,7 +2339,7 @@ class EventHandlers(Object):
 
     def _short_uuid_from_secret_label(self, secret_label: str) -> str | None:
         """Retrieve the relation that belongs to a secret label."""
-        contents = secret_label.split(".")
+        contents = secret_label.split('.')
 
         if not (contents and len(contents) >= 5):
             return
@@ -2358,7 +2357,7 @@ class ResourceProviderEventHandler(EventHandlers, Generic[TRequirerCommonModel])
         charm: CharmBase,
         relation_name: str,
         request_model: type[TRequirerCommonModel],
-        unique_key: str = "",
+        unique_key: str = '',
         mtls_enabled: bool = False,
         bulk_event: bool = False,
         status_schema_path: OptionalPathLike = None,
@@ -2400,9 +2399,9 @@ class ResourceProviderEventHandler(EventHandlers, Generic[TRequirerCommonModel])
         if not schema_path.exists():
             raise FileNotFoundError(f"Can't locate status schema file: {schema_path}")
 
-        content = json.load(open(schema_path, "r"))
+        content = json.load(open(schema_path))
 
-        return {s["code"]: RelationStatus(**s) for s in content.get("statuses", [])}
+        return {s['code']: RelationStatus(**s) for s in content.get('statuses', [])}
 
     @staticmethod
     def _validate_diff(event: RelationEvent, _diff: Diff) -> None:
@@ -2416,24 +2415,24 @@ class ResourceProviderEventHandler(EventHandlers, Generic[TRequirerCommonModel])
             return
 
         for key in [
-            "resource",
-            "entity-type",
-            "extra-user-roles",
-            "extra-group-roles",
+            'resource',
+            'entity-type',
+            'extra-user-roles',
+            'extra-group-roles',
         ]:
             if key in _diff.changed:
-                raise ValueError(f"Cannot change {key} after relation has already been created")
+                raise ValueError(f'Cannot change {key} after relation has already been created')
 
     def _dispatch_events(self, event: RelationEvent, _diff: Diff, request: RequirerCommonModel):
-        if self.mtls_enabled and "secret-mtls" in _diff.added:
-            getattr(self.on, "mtls_cert_updated").emit(
+        if self.mtls_enabled and 'secret-mtls' in _diff.added:
+            self.on.mtls_cert_updated.emit(
                 event.relation, app=event.app, unit=event.unit, request=request, old_mtls_cert=None
             )
             return
         # Emit a resource requested event if the setup key (resource name)
         # was added to the relation databag, but the entity-type key was not.
-        if resource_added(_diff) and "entity-type" not in _diff.added:
-            getattr(self.on, "resource_requested").emit(
+        if resource_added(_diff) and 'entity-type' not in _diff.added:
+            self.on.resource_requested.emit(
                 event.relation,
                 app=event.app,
                 unit=event.unit,
@@ -2444,8 +2443,8 @@ class ResourceProviderEventHandler(EventHandlers, Generic[TRequirerCommonModel])
 
         # Emit an entity requested event if the setup key (resource name)
         # was added to the relation databag, in addition to the entity-type key.
-        if resource_added(_diff) and "entity-type" in _diff.added:
-            getattr(self.on, "resource_entity_requested").emit(
+        if resource_added(_diff) and 'entity-type' in _diff.added:
+            self.on.resource_entity_requested.emit(
                 event.relation,
                 app=event.app,
                 unit=event.unit,
@@ -2458,10 +2457,10 @@ class ResourceProviderEventHandler(EventHandlers, Generic[TRequirerCommonModel])
         # was added to the relation databag, and the entity-permissions key changed.
         if (
             not resource_added(_diff)
-            and "entity-type" not in _diff.added
-            and ("entity-permissions" in _diff.added or "entity-permissions" in _diff.changed)
+            and 'entity-type' not in _diff.added
+            and ('entity-permissions' in _diff.added or 'entity-permissions' in _diff.changed)
         ):
-            getattr(self.on, "resource_entity_permissions_changed").emit(
+            self.on.resource_entity_permissions_changed.emit(
                 event.relation, app=event.app, unit=event.unit, request=request
             )
             # To avoid unnecessary application restarts do not trigger other events.
@@ -2494,16 +2493,16 @@ class ResourceProviderEventHandler(EventHandlers, Generic[TRequirerCommonModel])
             _diff = self.compute_diff(event.relation, request, repository, store=False)
             self._validate_diff(event, _diff)
 
-        getattr(self.on, "bulk_resources_requested").emit(
+        self.on.bulk_resources_requested.emit(
             event.relation, app=event.app, unit=event.unit, requests=request_model.requests
         )
 
         # Store all the diffs if they were not already stored.
         for request in request_model.requests:
             new_data = request.model_dump(
-                mode="json",
-                exclude={"data"},
-                context={"repository": repository},
+                mode='json',
+                exclude={'data'},
+                context={'repository': repository},
                 exclude_none=True,
                 exclude_defaults=True,
             )
@@ -2512,7 +2511,7 @@ class ResourceProviderEventHandler(EventHandlers, Generic[TRequirerCommonModel])
     @override
     def _on_secret_changed_event(self, event: SecretChangedEvent) -> None:
         if not self.mtls_enabled:
-            logger.info("MTLS is disabled, exiting early.")
+            logger.info('MTLS is disabled, exiting early.')
             return
         if not event.secret.label:
             return
@@ -2527,12 +2526,12 @@ class ResourceProviderEventHandler(EventHandlers, Generic[TRequirerCommonModel])
             return
 
         if relation.name != self.relation_name:
-            logging.info("Secret changed on wrong relation.")
+            logging.info('Secret changed on wrong relation.')
             return
 
         try:
             event.secret.get_info()
-            logging.info("Secret changed event ignored for Secret Owner")
+            logging.info('Secret changed event ignored for Secret Owner')
             return
         except SecretNotFoundError:
             pass
@@ -2540,13 +2539,13 @@ class ResourceProviderEventHandler(EventHandlers, Generic[TRequirerCommonModel])
         remote_unit = self.get_remote_unit(relation)
 
         repository = OpsRelationRepository(self.model, relation, component=relation.app)
-        version = repository.get_field("version") or "v0"
+        version = repository.get_field('version') or 'v0'
 
-        old_mtls_cert = event.secret.get_content().get("mtls-cert")
-        logger.info("mtls-cert-updated")
+        old_mtls_cert = event.secret.get_content().get('mtls-cert')
+        logger.info('mtls-cert-updated')
 
         # V0, just fire the event.
-        if version == "v0":
+        if version == 'v0':
             request = build_model(repository, RequirerDataContractV0)
         # V1, find the corresponding request.
         else:
@@ -2558,10 +2557,10 @@ class ResourceProviderEventHandler(EventHandlers, Generic[TRequirerCommonModel])
                     request = _request
                     break
             else:
-                logger.info(f"Unknown request id {short_uuid}")
+                logger.info(f'Unknown request id {short_uuid}')
                 return
 
-        getattr(self.on, "mtls_cert_updated").emit(
+        self.on.mtls_cert_updated.emit(
             relation,
             app=relation.app,
             unit=remote_unit,
@@ -2582,8 +2581,8 @@ class ResourceProviderEventHandler(EventHandlers, Generic[TRequirerCommonModel])
         if not repository.get_data():
             return
 
-        version = repository.get_field("version") or "v0"
-        if version == "v0":
+        version = repository.get_field('version') or 'v0'
+        if version == 'v0':
             request_model = build_model(repository, RequirerDataContractV0)
             old_name = request_model.original_field
             request_model.request_id = None  # For safety, let's ensure that we don't have a model.
@@ -2621,16 +2620,16 @@ class ResourceProviderEventHandler(EventHandlers, Generic[TRequirerCommonModel])
         relation = self.charm.model.get_relation(self.relation_name, relation_id)
 
         if not relation:
-            raise ValueError("Missing relation.")
+            raise ValueError('Missing relation.')
 
         repository = OpsRelationRepository(self.model, relation, component=relation.app)
-        version = repository.get_field("version") or "v0"
+        version = repository.get_field('version') or 'v0'
 
-        if version == "v0":
+        if version == 'v0':
             # Ensure the request_id is None
             response.request_id = None
             self.interface.write_model(
-                relation_id, response, context={"version": "v0"}
+                relation_id, response, context={'version': 'v0'}
             )  # {"database": "database-name", "secret-user": "uri", ...}
             return
 
@@ -2666,21 +2665,21 @@ class ResourceProviderEventHandler(EventHandlers, Generic[TRequirerCommonModel])
 
         relation = self.charm.model.get_relation(self.relation_name, relation_id)
 
-        assert len(responses) >= 1, "List of responses is empty"
+        assert len(responses) >= 1, 'List of responses is empty'
 
         if not relation:
-            raise ValueError("Missing relation.")
+            raise ValueError('Missing relation.')
 
         repository = OpsRelationRepository(self.model, relation, component=relation.app)
-        version = repository.get_field("version") or "v0"
+        version = repository.get_field('version') or 'v0'
 
-        if version == "v0":
-            assert len(responses) == 1, "V0 only expects one response"
+        if version == 'v0':
+            assert len(responses) == 1, 'V0 only expects one response'
             # Ensure the request_id is None
             response = responses[0]
             response.request_id = None
             self.interface.write_model(
-                relation_id, response, context={"version": "v0"}
+                relation_id, response, context={'version': 'v0'}
             )  # {"database": "database-name", "secret-user": "uri", ...}
             return
 
@@ -2692,7 +2691,7 @@ class ResourceProviderEventHandler(EventHandlers, Generic[TRequirerCommonModel])
 
         # Update all the already existing keys
         for index, _response in enumerate(model.requests):
-            assert _response.request_id, "Missing request id in the response"
+            assert _response.request_id, 'Missing request id in the response'
             response = response_map.get(_response.request_id)
             if response:
                 model.requests[index].update(response)
@@ -2712,8 +2711,8 @@ class ResourceProviderEventHandler(EventHandlers, Generic[TRequirerCommonModel])
         if not repository.get_data():
             return []
 
-        version = repository.get_field("version") or "v0"
-        if version == "v0":
+        version = repository.get_field('version') or 'v0'
+        if version == 'v0':
             request_model = build_model(repository, RequirerDataContractV0)
             request_model.request_id = None  # For safety, let's ensure that we don't have a model.
             return [request_model]
@@ -2727,8 +2726,8 @@ class ResourceProviderEventHandler(EventHandlers, Generic[TRequirerCommonModel])
         """Returns the list of responses that we currently have."""
         repository = self.interface.repository(relation.id, component=relation.app)
 
-        version = repository.get_field("version") or "v0"
-        if version == "v0":
+        version = repository.get_field('version') or 'v0'
+        if version == 'v0':
             # Ensure the request_id is None
             return [self.interface.build_model(relation.id, DataContractV0)]
 
@@ -2759,12 +2758,12 @@ class ResourceProviderEventHandler(EventHandlers, Generic[TRequirerCommonModel])
         relation = self.charm.model.get_relation(self.relation_name, relation_id)
 
         if not relation:
-            raise ValueError("Missing relation.")
+            raise ValueError('Missing relation.')
 
         if isinstance(status, int):
             # we expect the status schema to be defined in this case.
             if status not in self._status_schema:
-                raise KeyError(f"Status code [{status}] not defined.")
+                raise KeyError(f'Status code [{status}] not defined.')
             _status = self._status_schema[status]
         elif isinstance(status, dict):
             _status = RelationStatus(**status)
@@ -2772,7 +2771,7 @@ class ResourceProviderEventHandler(EventHandlers, Generic[TRequirerCommonModel])
             _status = status
         else:
             raise ValueError(
-                "The status should be either a RelationStatus, an appropriate dict, or the numeric status code."
+                'The status should be either a RelationStatus, an appropriate dict, or the numeric status code.'
             )
 
         statuses = self.get_statuses(relation_id)
@@ -2792,11 +2791,11 @@ class ResourceProviderEventHandler(EventHandlers, Generic[TRequirerCommonModel])
         relation = self.charm.model.get_relation(self.relation_name, relation_id)
 
         if not relation:
-            raise ValueError("Missing relation.")
+            raise ValueError('Missing relation.')
 
         statuses = self.get_statuses(relation_id)
         if status_code not in statuses:
-            logger.error(f"Status [{status_code}] has never been raised before.")
+            logger.error(f'Status [{status_code}] has never been raised before.')
             return
 
         statuses.pop(status_code)
@@ -2814,7 +2813,7 @@ class ResourceProviderEventHandler(EventHandlers, Generic[TRequirerCommonModel])
         relation = self.charm.model.get_relation(self.relation_name, relation_id)
 
         if not relation:
-            raise ValueError("Missing relation.")
+            raise ValueError('Missing relation.')
 
         repository = OpsRelationRepository(self.model, relation, component=self.charm.app)
         repository.delete_field(STATUS_FIELD)
@@ -2831,7 +2830,7 @@ class ResourceRequirerEventHandler(EventHandlers, Generic[TResourceProviderModel
         relation_name: str,
         requests: list[RequirerCommonModel],
         response_model: type[TResourceProviderModel],
-        unique_key: str = "",
+        unique_key: str = '',
         relation_aliases: list[str] | None = None,
     ):
         super().__init__(charm, relation_name, unique_key)
@@ -2853,26 +2852,26 @@ class ResourceRequirerEventHandler(EventHandlers, Generic[TResourceProviderModel
             relation_connection_limit = self.charm.meta.requires[relation_name].limit
             if len(self.relation_aliases) != relation_connection_limit:
                 raise ValueError(
-                    f"Invalid number of aliases, expected {relation_connection_limit}, received {len(self.relation_aliases)}"
+                    f'Invalid number of aliases, expected {relation_connection_limit}, received {len(self.relation_aliases)}'
                 )
 
         # Created custom event names for each alias.
         if self.relation_aliases:
             for relation_alias in self.relation_aliases:
                 self.on.define_event(
-                    f"{relation_alias}_resource_created",
+                    f'{relation_alias}_resource_created',
                     ResourceCreatedEvent,
                 )
                 self.on.define_event(
-                    f"{relation_alias}_resource_entity_created",
+                    f'{relation_alias}_resource_entity_created',
                     ResourceEntityCreatedEvent,
                 )
                 self.on.define_event(
-                    f"{relation_alias}_endpoints_changed",
+                    f'{relation_alias}_endpoints_changed',
                     ResourceEndpointsChangedEvent,
                 )
                 self.on.define_event(
-                    f"{relation_alias}_read_only_endpoints_changed",
+                    f'{relation_alias}_read_only_endpoints_changed',
                     ResourceReadOnlyEndpointsChangedEvent,
                 )
 
@@ -2929,12 +2928,12 @@ class ResourceRequirerEventHandler(EventHandlers, Generic[TResourceProviderModel
             with psycopg2.connect(connection_string) as connection:
                 with connection.cursor() as cursor:
                     cursor.execute(
-                        "SELECT TRUE FROM pg_extension WHERE extname=%s::text;", (plugin,)
+                        'SELECT TRUE FROM pg_extension WHERE extname=%s::text;', (plugin,)
                     )
                     return cursor.fetchone() is not None
         except psycopg2.Error as e:
             logger.exception(
-                f"failed to check whether {plugin} plugin is enabled in the database: %s",
+                f'failed to check whether {plugin} plugin is enabled in the database: %s',
                 str(e),
             )
             return False
@@ -2957,13 +2956,13 @@ class ResourceRequirerEventHandler(EventHandlers, Generic[TResourceProviderModel
         model = self.interface.build_model(relation_id=relation.id, component=relation.app)
         for request in model.requests:
             if request.endpoints and request.username and request.password:
-                host = request.endpoints.split(":")[0]
+                host = request.endpoints.split(':')[0]
                 username = request.username
                 password = request.password
 
                 connection_string = f"host='{host}' dbname='{request.resource}' user='{username}' password='{password}'"
                 return self._is_pg_plugin_enabled(plugin, connection_string)
-        logger.info("No valid request to use to check for plugin.")
+        logger.info('No valid request to use to check for plugin.')
         return False
 
     ##############################################################################
@@ -2985,26 +2984,26 @@ class ResourceRequirerEventHandler(EventHandlers, Generic[TResourceProviderModel
         # Return if an alias was already assigned to this relation
         # (like when there are more than one unit joining the relation).
         relation = self.charm.model.get_relation(self.relation_name, relation_id)
-        if relation and relation.data[self.charm.unit].get("alias"):
+        if relation and relation.data[self.charm.unit].get('alias'):
             return
 
         # Retrieve the available aliases (the ones that weren't assigned to any relation).
         available_aliases = self.relation_aliases[:]
         for relation in self.charm.model.relations[self.relation_name]:
-            alias = relation.data[self.charm.unit].get("alias")
+            alias = relation.data[self.charm.unit].get('alias')
             if alias:
-                logger.debug("Alias %s was already assigned to relation %d", alias, relation.id)
+                logger.debug('Alias %s was already assigned to relation %d', alias, relation.id)
                 available_aliases.remove(alias)
 
         # Set the alias in the unit relation databag of the specific relation.
         relation = self.charm.model.get_relation(self.relation_name, relation_id)
         if relation:
-            relation.data[self.charm.unit].update({"alias": available_aliases[0]})
+            relation.data[self.charm.unit].update({'alias': available_aliases[0]})
 
         # We need to set relation alias also on the application level so,
         # it will be accessible in show-unit juju command, executed for a consumer application unit
         if relation and self.charm.unit.is_leader():
-            relation.data[self.charm.app].update({"alias": available_aliases[0]})
+            relation.data[self.charm.app].update({'alias': available_aliases[0]})
 
     def _emit_aliased_event(
         self, event: RelationChangedEvent, event_name: str, response: ResourceProviderModel
@@ -3012,7 +3011,7 @@ class ResourceRequirerEventHandler(EventHandlers, Generic[TResourceProviderModel
         """Emit all aliased events."""
         alias = self._get_relation_alias(event.relation.id)
         if alias:
-            getattr(self.on, f"{alias}_{event_name}").emit(
+            getattr(self.on, f'{alias}_{event_name}').emit(
                 event.relation, app=event.app, unit=event.unit, response=response
             )
 
@@ -3020,7 +3019,7 @@ class ResourceRequirerEventHandler(EventHandlers, Generic[TResourceProviderModel
         """Gets the relation alias for a relation id."""
         for relation in self.charm.model.relations[self.relation_name]:
             if relation.id == relation_id:
-                return relation.data[self.charm.unit].get("alias")
+                return relation.data[self.charm.unit].get('alias')
         return None
 
     ##############################################################################
@@ -3041,12 +3040,12 @@ class ResourceRequirerEventHandler(EventHandlers, Generic[TResourceProviderModel
             return
 
         if relation.name != self.relation_name:
-            logging.info("Secret changed on wrong relation.")
+            logging.info('Secret changed on wrong relation.')
             return
 
         try:
             event.secret.get_info()
-            logging.info("Secret changed event ignored for Secret Owner")
+            logging.info('Secret changed event ignored for Secret Owner')
             return
         except SecretNotFoundError:
             pass
@@ -3061,10 +3060,10 @@ class ResourceRequirerEventHandler(EventHandlers, Generic[TResourceProviderModel
                 response = _response
                 break
         else:
-            logger.info(f"Unknown request id {short_uuid}")
+            logger.info(f'Unknown request id {short_uuid}')
             return
 
-        getattr(self.on, "authentication_updated").emit(
+        self.on.authentication_updated.emit(
             relation,
             app=relation.app,
             unit=remote_unit,
@@ -3088,7 +3087,7 @@ class ResourceRequirerEventHandler(EventHandlers, Generic[TResourceProviderModel
             request.request_id = gen_hash(request.resource, request.salt)
 
         full_request = RequirerDataContractV1[self._request_model](
-            version="v1", requests=self._requests
+            version='v1', requests=self._requests
         )
         write_model(repository, full_request)
 
@@ -3100,22 +3099,22 @@ class ResourceRequirerEventHandler(EventHandlers, Generic[TResourceProviderModel
             if isinstance(key, Unit) and not key.name.startswith(self.charm.app.name):
                 remote_unit_data = event.relation.data[key]
             elif isinstance(key, Application) and key.name != self.charm.app.name:
-                is_subordinate = event.relation.data[key].get("subordinated") == "true"
+                is_subordinate = event.relation.data[key].get('subordinated') == 'true'
 
         if is_subordinate:
-            if not remote_unit_data or remote_unit_data.get("state") != "ready":
+            if not remote_unit_data or remote_unit_data.get('state') != 'ready':
                 return
 
         repository = self.interface.repository(event.relation.id, event.app)
         response_model = self.interface.build_model(event.relation.id, component=event.app)
 
         if not response_model.requests:
-            logger.info("Still waiting for data.")
+            logger.info('Still waiting for data.')
             return
 
-        data = repository.get_field("data")
+        data = repository.get_field('data')
         if not data:
-            logger.info("Missing data to compute diffs")
+            logger.info('Missing data to compute diffs')
             return
 
         request_map = TypeAdapter(dict[str, self._request_model]).validate_json(data)
@@ -3125,28 +3124,28 @@ class ResourceRequirerEventHandler(EventHandlers, Generic[TResourceProviderModel
             request = request_map.get(response_id, None)
             if not request:
                 raise ValueError(
-                    f"No request matching the response with response_id {response_id}"
+                    f'No request matching the response with response_id {response_id}'
                 )
             self._handle_event(event, repository, request, response)
 
         # Retrieve old statuses from "data"
-        old_data = json.loads(data or "{}")
+        old_data = json.loads(data or '{}')
         old_statuses = old_data.get(STATUS_FIELD, {})
         previous_codes = {int(k) for k in old_statuses.keys()}
 
         # Compute current statuses
-        current_statuses = json.loads(repository.get_field(STATUS_FIELD) or "[]")
-        current_codes = {status.get("code") for status in current_statuses}
+        current_statuses = json.loads(repository.get_field(STATUS_FIELD) or '[]')
+        current_codes = {status.get('code') for status in current_statuses}
 
         # Detect changes
         raised = current_codes - previous_codes
         resolved = previous_codes - current_codes
 
         for status_code in raised:
-            logger.debug(f"Status [{status_code}] raised")
-            _status = next(s for s in current_statuses if s["code"] == status_code)
+            logger.debug(f'Status [{status_code}] raised')
+            _status = next(s for s in current_statuses if s['code'] == status_code)
             _status_instance = RelationStatus(**_status)
-            getattr(self.on, "status_raised").emit(
+            self.on.status_raised.emit(
                 event.relation,
                 status=_status_instance,
                 app=event.app,
@@ -3154,11 +3153,11 @@ class ResourceRequirerEventHandler(EventHandlers, Generic[TResourceProviderModel
             )
 
         for status_code in resolved:
-            logger.debug(f"Status [{status_code}] resolved")
+            logger.debug(f'Status [{status_code}] resolved')
             # Because JSON keys are always string, we should convert the int code to str.
             _status = old_statuses[str(status_code)]
             _status_instance = RelationStatus(**_status)
-            getattr(self.on, "status_resolved").emit(
+            self.on.status_resolved.emit(
                 event.relation,
                 status=_status_instance,
                 app=event.app,
@@ -3169,7 +3168,7 @@ class ResourceRequirerEventHandler(EventHandlers, Generic[TResourceProviderModel
             return
 
         # Store new state of the statuses in the "data" field
-        data = get_encoded_dict(event.relation, self.component, "data") or {}
+        data = get_encoded_dict(event.relation, self.component, 'data') or {}
         store_new_data(
             event.relation,
             self.component,
@@ -3199,45 +3198,45 @@ class ResourceRequirerEventHandler(EventHandlers, Generic[TResourceProviderModel
 
         for newval in _diff.added:
             if secret_group := response._get_secret_field(newval):
-                uri = getattr(response, newval.replace("-", "_"))
+                uri = getattr(response, newval.replace('-', '_'))
                 repository.register_secret(uri, secret_group, response.request_id)
 
-        if "secret-user" in _diff.added and not request.entity_type:
-            logger.info(f"resource {response.resource} created at {datetime.now()}")
-            getattr(self.on, "resource_created").emit(
+        if 'secret-user' in _diff.added and not request.entity_type:
+            logger.info(f'resource {response.resource} created at {datetime.now()}')
+            self.on.resource_created.emit(
                 event.relation, app=event.app, unit=event.unit, response=response
             )
-            self._emit_aliased_event(event, "resource_created", response)
+            self._emit_aliased_event(event, 'resource_created', response)
             return
 
-        if "secret-entity" in _diff.added and request.entity_type:
-            logger.info(f"entity {response.entity_name} created at {datetime.now()}")
-            getattr(self.on, "resource_entity_created").emit(
+        if 'secret-entity' in _diff.added and request.entity_type:
+            logger.info(f'entity {response.entity_name} created at {datetime.now()}')
+            self.on.resource_entity_created.emit(
                 event.relation, app=event.app, unit=event.unit, response=response
             )
-            self._emit_aliased_event(event, "resource_entity_created", response)
+            self._emit_aliased_event(event, 'resource_entity_created', response)
             return
 
-        if "endpoints" in _diff.added or "endpoints" in _diff.changed:
-            logger.info(f"endpoints changed at {datetime.now()}")
-            getattr(self.on, "endpoints_changed").emit(
+        if 'endpoints' in _diff.added or 'endpoints' in _diff.changed:
+            logger.info(f'endpoints changed at {datetime.now()}')
+            self.on.endpoints_changed.emit(
                 event.relation, app=event.app, unit=event.unit, response=response
             )
-            self._emit_aliased_event(event, "endpoints_changed", response)
+            self._emit_aliased_event(event, 'endpoints_changed', response)
             return
 
-        if "read-only-endpoints" in _diff.added or "read-only-endpoints" in _diff.changed:
-            logger.info(f"read-only-endpoints changed at {datetime.now()}")
-            getattr(self.on, "read_only_endpoints_changed").emit(
+        if 'read-only-endpoints' in _diff.added or 'read-only-endpoints' in _diff.changed:
+            logger.info(f'read-only-endpoints changed at {datetime.now()}')
+            self.on.read_only_endpoints_changed.emit(
                 event.relation, app=event.app, unit=event.unit, response=response
             )
-            self._emit_aliased_event(event, "read_only_endpoints_changed", response)
+            self._emit_aliased_event(event, 'read_only_endpoints_changed', response)
             return
 
-        if "secret-tls" in _diff.added or "secret-tls" in _diff.changed:
-            logger.info(f"auth updated for {response.resource} at {datetime.now()}")
-            getattr(self.on, "authentication_updated").emit(
+        if 'secret-tls' in _diff.added or 'secret-tls' in _diff.changed:
+            logger.info(f'auth updated for {response.resource} at {datetime.now()}')
+            self.on.authentication_updated.emit(
                 event.relation, app=event.app, unit=event.unit, response=response
             )
-            self._emit_aliased_event(event, "authentication_updated", response)
+            self._emit_aliased_event(event, 'authentication_updated', response)
             return
