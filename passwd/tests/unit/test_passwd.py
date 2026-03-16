@@ -35,7 +35,7 @@ def test_user_exists_by_uid_true(getpwuid_mock: MagicMock) -> None:
 
 
 def test_user_exists_invalid_input() -> None:
-    with pytest.raises(TypeError, match='should be a string or int'):
+    with pytest.raises(TypeError, match="'True' should be a string or int"):
         passwd.user_exists(True)
 
 
@@ -60,7 +60,7 @@ def test_group_exists_by_gid_true(getgrgid_mock: MagicMock) -> None:
 
 
 def test_group_exists_invalid_input() -> None:
-    with pytest.raises(TypeError, match='should be a string or int'):
+    with pytest.raises(TypeError, match="'True' should be a string or int"):
         passwd.group_exists(True)
 
 
