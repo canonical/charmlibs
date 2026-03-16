@@ -1,0 +1,56 @@
+# common charmcraft.yaml file symlinked by these charms
+# k8s charms can define containers + resources in metadata.yaml
+
+name: test
+type: charm
+summary: A small charm for use in integration tests.
+description: A small charm for use in integration tests.
+
+base: ubuntu@24.04
+platforms:
+  amd64:
+
+parts:
+  charm:
+    source: .
+    plugin: uv
+    build-snaps: [astral-uv]
+
+peers:
+  restart:
+      interface: rolling_op
+
+requires:
+  etcd:
+    interface: etcd_client
+
+actions:
+  restart:
+    description: Restarts the example service
+    params:
+      delay:
+        description: "Introduce an artificial delay (for testing)."
+        type: integer
+        default: 0
+
+  failed-restart:
+    description: Example restart with a custom callback function. Used in testing
+    params:
+      delay:
+        description: "Introduce an artificial delay (for testing)."
+        type: integer
+        default: 0
+      max-retry:
+        description: "Number of times the operation should be retried."
+        type: integer
+
+  deferred-restart:
+    description: Example restart with a custom callback function. Used in testing
+    params:
+      delay:
+        description: "Introduce an artificial delay (for testing)."
+        type: integer
+        default: 0
+      max-retry:
+        description: "Number of times the operation should be retried."
+        type: integer
