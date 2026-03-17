@@ -65,8 +65,8 @@ class EtcdCtl:
 
         Args:
             endpoints: Comma-separated list of etcd endpoints.
-            client_cert_path:
-            client_key_path:
+            client_cert_path: Path to the client certificate.
+            client_key_path: Path to the client private key.
         """
         cls.BASE_DIR.mkdir(parents=True, exist_ok=True)
 

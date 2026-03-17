@@ -55,6 +55,7 @@ src = ["src", "tests/unit", "tests/functional", "tests/integration"]  # correctl
 "tests/**/*" = [
     # "E501",  # line too long
 ]
+"src/charmlibs/advanced_rollingops/_dp_interfaces_v1.py" = ["ALL"]
 
 [tool.pyright]
 extends = "../pyproject.toml"

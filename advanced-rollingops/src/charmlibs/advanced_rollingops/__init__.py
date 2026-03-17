@@ -18,11 +18,11 @@ from ._certificates import CertificatesManager
 from ._etcdctl import EtcdCtl
 from ._manager import EtcdRollingOpsManager
 from ._models import (
-    SECRET_FIELD,
     OperationResult,
     RollingOpsEtcdNotConfiguredError,
     RollingOpsKeys,
 )
+from ._relations import SECRET_FIELD
 from ._version import __version__ as __version__
 
 __all__ = (

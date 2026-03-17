@@ -18,10 +18,9 @@ import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
+from typing import ClassVar
 
 logger = logging.getLogger(__name__)
-
-SECRET_FIELD = 'rollingops-client-secret-id'
 
 
 class RollingOpsNoEtcdRelationError(Exception):
@@ -62,7 +61,7 @@ class RollingOpsKeys:
     The distributed lock key is cluster-scoped
     """
 
-    ROOT = '/rollingops'
+    ROOT: ClassVar[str] = '/rollingops'
 
     cluster_id: str
     owner: str

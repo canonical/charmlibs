@@ -17,30 +17,6 @@
 This file is symlinked alongside src/charm.py by these charms.
 """
 
-# import logging
-
-# import ops
-
-# from charmlibs import advanced_rollingops
-
-# logger = logging.getLogger(__name__)
-
-
-# class Charm(ops.CharmBase):
-#    """Charm the application."""
-
-#    def __init__(self, framework: ops.Framework):
-#        super().__init__(framework)
-#        framework.observe(self.on['lib-version'].action, self._on_lib_version)
-
-#    def _on_lib_version(self, event: ops.ActionEvent):
-#        logger.info('action [lib-version] called with params: %s', event.params)
-#        results = {'version': advanced_rollingops.__version__}
-#        event.set_results(results)
-#        logger.info('action [lib-version] set_results: %s', results)
-
-"""Sample charm using the rolling ops library."""
-
 import json
 import logging
 import time

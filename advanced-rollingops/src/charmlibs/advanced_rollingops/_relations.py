@@ -27,9 +27,9 @@ from charmlibs.advanced_rollingops._dp_interfaces_v1 import (
     ResourceRequirerEventHandler,
 )
 from charmlibs.advanced_rollingops._etcdctl import EtcdCtl
-from charmlibs.advanced_rollingops._models import SECRET_FIELD
 
 logger = logging.getLogger(__name__)
+SECRET_FIELD = 'rollingops-client-secret-id'  # noqa: S105
 
 
 class SharedClientCertificateManager(Object):

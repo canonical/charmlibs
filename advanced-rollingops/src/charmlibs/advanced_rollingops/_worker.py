@@ -84,9 +84,18 @@ class EtcdRollingOpsAsyncWorker(Object):
 
         worker = (
             self._charm_dir
-            / f'venv/lib/python{version_info.major}.{version_info.minor}/site-packages/charmlibs/advanced_rollingops'
+            / 'venv'
+            / 'lib'
+            / f'python{version_info.major}.{version_info.minor}'
+            / 'site-packages'
+            / 'charmlibs'
+            / 'advanced_rollingops'
             / '_etcd_rollingops.py'
         )
+
+        # These files must stay open for the lifetime of the worker process.
+        log_out = open('/var/log/etcd_rollingops_worker.log', 'a')  # noqa: SIM115
+        log_err = open('/var/log/etcd_rollingops_worker.err', 'a')  # noqa: SIM115
 
         pid = subprocess.Popen(
             [
@@ -103,8 +112,8 @@ class EtcdRollingOpsAsyncWorker(Object):
                 self._owner,
             ],
             cwd=str(self._charm_dir),
-            stdout=open('/var/log/etcd_rollingops_worker.log', 'a'),
-            stderr=open('/var/log/etcd_rollingops_worker.err', 'a'),
+            stdout=log_out,
+            stderr=log_err,
             env=new_env,
         ).pid
 

@@ -20,8 +20,6 @@ from ops import Relation
 from ops.charm import CharmBase, RelationBrokenEvent, RelationDepartedEvent
 from ops.framework import EventBase, Object
 
-logger = logging.getLogger(__name__)
-
 from charmlibs.advanced_rollingops._etcdctl import EtcdCtl
 from charmlibs.advanced_rollingops._models import (
     RollingOpsEtcdNotConfiguredError,
@@ -30,6 +28,8 @@ from charmlibs.advanced_rollingops._models import (
 )
 from charmlibs.advanced_rollingops._relations import EtcdRequiresV1, SharedClientCertificateManager
 from charmlibs.advanced_rollingops._worker import EtcdRollingOpsAsyncWorker
+
+logger = logging.getLogger(__name__)
 
 
 class RollingOpsLockGrantedEvent(EventBase):
