@@ -32,9 +32,7 @@ def _assert_certificate_fields(task: jubilant.Task):
 
 class TestIntegration:
     @pytest.mark.upgrade
-    def test_given_main_deployed_when_upgraded_then_certs_are_retrieved(
-        self, juju: jubilant.Juju
-    ):
+    def test_given_main_deployed_when_upgraded_then_certs_are_retrieved(self, juju: jubilant.Juju):
         requirer_app_name = f"{TLS_CERTIFICATES_REQUIRER_APP_NAME}-upgrade"
         provider_app_name = f"{TLS_CERTIFICATES_PROVIDER_APP_NAME}-upgrade"
 
@@ -101,9 +99,7 @@ class TestIntegration:
             timeout=1000,
         )
 
-    def test_given_charms_deployed_when_relate_then_status_is_active(
-        self, juju: jubilant.Juju
-    ):
+    def test_given_charms_deployed_when_relate_then_status_is_active(self, juju: jubilant.Juju):
         juju.integrate(
             TLS_CERTIFICATES_REQUIRER_APP_NAME,
             TLS_CERTIFICATES_PROVIDER_APP_NAME,
@@ -126,9 +122,7 @@ class TestIntegration:
         self, juju: jubilant.Juju
     ):
         new_requirer_app_name = "new-tls-requirer"
-        juju.deploy(
-            REQUIRER_LOCAL, app=new_requirer_app_name, base="ubuntu@22.04"
-        )
+        juju.deploy(REQUIRER_LOCAL, app=new_requirer_app_name, base="ubuntu@22.04")
         juju.integrate(new_requirer_app_name, TLS_CERTIFICATES_PROVIDER_APP_NAME)
         juju.wait(
             lambda status: jubilant.all_active(
