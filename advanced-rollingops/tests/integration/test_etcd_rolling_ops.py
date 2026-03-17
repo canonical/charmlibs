@@ -75,8 +75,7 @@ def test_restart_action_one_unit(juju: jubilant.Juju, charm: str):
 
     wait_for_etcdctl_env(juju, f'{charm}/0')
 
-    task = juju.run(f'{charm}/0', 'restart', {'delay': 1}, wait=300)
-    logger.info(task.results)
+    juju.run(f'{charm}/0', 'restart', {'delay': 1}, wait=300)
 
     juju.wait(
         jubilant.all_active,
@@ -86,7 +85,6 @@ def test_restart_action_one_unit(juju: jubilant.Juju, charm: str):
 
     events = get_unit_events(juju, f'{charm}/0')
     restart_events = [e['event'] for e in events]
-    logger.info(restart_events)
 
     expected = [
         'action:restart',
