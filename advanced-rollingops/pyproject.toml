@@ -30,6 +30,7 @@ functional = [  # installed for `just functional advanced-rollingops`
 ]
 integration = [  # installed for `just integration advanced-rollingops`
     "jubilant",
+    "tenacity",
 ]
 
 [project.urls]

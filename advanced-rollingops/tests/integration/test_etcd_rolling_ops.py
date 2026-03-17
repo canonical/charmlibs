@@ -16,13 +16,20 @@
 
 import json
 import logging
-import time
 from datetime import datetime
 
 import jubilant
+from tenacity import retry, stop_after_delay, wait_fixed
 
 TRACE_FILE = '/var/lib/charm-rolling-ops/transitions.log'
 logger = logging.getLogger(__name__)
+
+
+@retry(wait=wait_fixed(10), stop=stop_after_delay(60), reraise=True)
+def wait_for_etcdctl_env(juju: jubilant.Juju, unit: str) -> None:
+    task = juju.exec('test -f /var/lib/rollingops/etcd/etcdctl.env', unit=unit)
+    if task.status != 'completed' or task.return_code != 0:
+        raise RuntimeError('etcdctl env file not ready')
 
 
 def get_unit_events(juju: jubilant.Juju, unit: str) -> list[dict[str, str]]:
@@ -66,7 +73,7 @@ def test_restart_action_one_unit(juju: jubilant.Juju, charm: str):
     juju.integrate(f'{charm}:etcd', 'etcd:etcd-client')
     juju.wait(jubilant.all_active, error=jubilant.any_error)
 
-    time.sleep(30)
+    wait_for_etcdctl_env(juju, f'{charm}/0')
 
     task = juju.run(f'{charm}/0', 'restart', {'delay': 1}, wait=300)
     logger.info(task.results)
