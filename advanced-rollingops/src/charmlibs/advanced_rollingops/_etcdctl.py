@@ -138,7 +138,7 @@ class EtcdCtl:
     @classmethod
     def run(
         cls, args: list[str], check: bool = True, capture: bool = True
-    ) -> subprocess.CompletedProcess:
+    ) -> subprocess.CompletedProcess[str]:
         """Execute an etcdctl command.
 
         Args:
@@ -156,7 +156,7 @@ class EtcdCtl:
         )
 
     @classmethod
-    def get_first_key_value(cls, key_prefix: str) -> tuple[str, dict] | None:
+    def get_first_key_value(cls, key_prefix: str) -> tuple[str, dict[str, str]] | None:
         """Retrieve the first key and value under a given prefix.
 
         Args:
@@ -184,7 +184,7 @@ class EtcdCtl:
         return out[0], json.loads(out[1])
 
     @classmethod
-    def get_last_key_value(cls, key_prefix: str) -> tuple[str, dict] | None:
+    def get_last_key_value(cls, key_prefix: str) -> tuple[str, dict[str, str]] | None:
         """Retrieve the last key and value under a given prefix.
 
         Args:

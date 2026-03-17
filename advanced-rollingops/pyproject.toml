@@ -60,6 +60,7 @@ src = ["src", "tests/unit", "tests/functional", "tests/integration"]  # correctl
 [tool.pyright]
 extends = "../pyproject.toml"
 include = ["src", "tests"]
+exclude = ["**/_dp_interfaces_v1.py", "tests/integration/.tmp/**"]
 pythonVersion = "3.12"  # check no python > 3.12 features are used
 
 [tool.charmlibs.functional]

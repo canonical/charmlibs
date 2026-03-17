@@ -117,7 +117,7 @@ class CertificatesManager:
             - The client CA certificate PEM string
         """
         if cls._exists():
-            return cls.CLIENT_CERT.read_text(), cls.CLIENT_KEY.read_text()
+            return cls.CLIENT_CERT.read_text(), cls.CLIENT_KEY.read_text(), cls.CA_CERT.read_text()
 
         cls.BASE_DIR.mkdir(parents=True, exist_ok=True)
 

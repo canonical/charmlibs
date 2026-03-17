@@ -15,7 +15,10 @@
 # Learn more about testing at: https://juju.is/docs/sdk/testing
 
 
-from ops.testing import PeerRelation, Secret, State
+from unittest.mock import MagicMock
+
+from ops.testing import Context, PeerRelation, Secret, State
+from tests.unit.conftest import RollingOpsCharm
 
 from charmlibs.advanced_rollingops import (
     SECRET_FIELD,
@@ -23,7 +26,9 @@ from charmlibs.advanced_rollingops import (
 
 
 def test_leader_elected_creates_shared_secret_and_stores_id(
-    certificates_manager_patches, etcdctl_patch, ctx
+    certificates_manager_patches: dict[str, MagicMock],
+    etcdctl_patch: MagicMock,
+    ctx: Context[RollingOpsCharm],
 ):
     peer_relation = PeerRelation(endpoint='restart')
 
@@ -38,14 +43,16 @@ def test_leader_elected_creates_shared_secret_and_stores_id(
 
 
 def test_leader_elected_does_not_regenerate_when_secret_already_exists(
-    certificates_manager_patches, etcdctl_patch, ctx
+    certificates_manager_patches: dict[str, MagicMock],
+    etcdctl_patch: MagicMock,
+    ctx: Context[RollingOpsCharm],
 ):
     peer_relation = PeerRelation(
         endpoint='restart', local_app_data={SECRET_FIELD: 'secret:existing'}
     )
     secret = Secret(
         id='secret:existing',
-        owner='application',
+        owner='app',
         tracked_content={
             'client-cert': 'CERT_PEM',
             'client-key': 'KEY_PEM',
@@ -63,7 +70,9 @@ def test_leader_elected_does_not_regenerate_when_secret_already_exists(
 
 
 def test_non_leader_does_not_create_shared_secret(
-    certificates_manager_patches, etcdctl_patch, ctx
+    certificates_manager_patches: dict[str, MagicMock],
+    etcdctl_patch: MagicMock,
+    ctx: Context[RollingOpsCharm],
 ):
     peer_relation = PeerRelation(endpoint='restart')
     state_in = State(leader=False, relations={peer_relation})
@@ -76,7 +85,9 @@ def test_non_leader_does_not_create_shared_secret(
 
 
 def test_relation_changed_syncs_local_certificate_from_secret(
-    certificates_manager_patches, etcdctl_patch, ctx
+    certificates_manager_patches: dict[str, MagicMock],
+    etcdctl_patch: MagicMock,
+    ctx: Context[RollingOpsCharm],
 ):
     peer_relation = PeerRelation(
         endpoint='restart', local_app_data={SECRET_FIELD: 'secret:rollingops-cert'}

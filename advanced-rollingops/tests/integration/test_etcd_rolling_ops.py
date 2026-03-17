@@ -25,7 +25,7 @@ TRACE_FILE = '/var/lib/charm-rolling-ops/transitions.log'
 logger = logging.getLogger(__name__)
 
 
-def get_unit_events(juju: jubilant.Juju, unit: str) -> list[dict]:
+def get_unit_events(juju: jubilant.Juju, unit: str) -> list[dict[str, str]]:
     task = juju.exec(f'cat {TRACE_FILE}', unit=unit)
 
     if not task.stdout.strip():
@@ -34,7 +34,7 @@ def get_unit_events(juju: jubilant.Juju, unit: str) -> list[dict]:
     return [json.loads(line) for line in task.stdout.strip().splitlines()]
 
 
-def parse_ts(event: dict) -> datetime:
+def parse_ts(event: dict[str, str]) -> datetime:
     return datetime.fromisoformat(event['ts'])
 
 

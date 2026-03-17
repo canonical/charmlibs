@@ -16,7 +16,6 @@
 
 import logging
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from enum import StrEnum
 from typing import ClassVar
 
@@ -33,11 +32,6 @@ class RollingOpsEtcdUnreachableError(Exception):
 
 class RollingOpsEtcdNotConfiguredError(Exception):
     """Raised if etcd client has not been configured yet (env file does not exist)."""
-
-
-def _now_timestamp_str() -> str:
-    """UTC timestamp as a string using ISO 8601 format."""
-    return datetime.now(UTC).isoformat()
 
 
 class OperationResult(StrEnum):

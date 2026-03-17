@@ -14,16 +14,20 @@
 
 """Fixtures for unit tests, typically mocking out parts of the external system."""
 
-from unittest.mock import patch
+from collections.abc import Generator
+from pathlib import Path
+from typing import Any
+from unittest.mock import MagicMock, patch
 
 import ops
 import pytest
+from ops.testing import Context
 
 from charmlibs import advanced_rollingops
 
 
 @pytest.fixture
-def temp_cert_manager(tmp_path):
+def temp_cert_manager(tmp_path: Path) -> type[advanced_rollingops.CertificatesManager]:
     class TestCertificatesManager(advanced_rollingops.CertificatesManager):
         BASE_DIR = tmp_path / 'tls'
         CA_CERT = BASE_DIR / 'client-ca.pem'
@@ -35,7 +39,7 @@ def temp_cert_manager(tmp_path):
 
 
 @pytest.fixture
-def temp_etcdctl(tmp_path):
+def temp_etcdctl(tmp_path: Path) -> type[advanced_rollingops.EtcdCtl]:
     class TestEtcdCtl(advanced_rollingops.EtcdCtl):
         BASE_DIR = tmp_path / 'etcd'
         SERVER_CA = BASE_DIR / 'server-ca.pem'
@@ -45,13 +49,13 @@ def temp_etcdctl(tmp_path):
 
 
 @pytest.fixture
-def etcdctl_patch():
+def etcdctl_patch() -> Generator[MagicMock, None, None]:
     with patch('charmlibs.advanced_rollingops.EtcdCtl') as mock_etcdctl:
         yield mock_etcdctl
 
 
 @pytest.fixture
-def certificates_manager_patches():
+def certificates_manager_patches() -> Generator[dict[str, MagicMock], None, None]:
     with (
         patch(
             'charmlibs.advanced_rollingops.CertificatesManager._exists',
@@ -88,16 +92,16 @@ class RollingOpsCharm(ops.CharmBase):
             callback_targets=callback_targets,
         )
 
-    def restart(self):
+    def restart(self) -> None:
         pass
 
 
 @pytest.fixture
-def charm_test():
+def charm_test() -> type[RollingOpsCharm]:
     return RollingOpsCharm
 
 
-meta = {
+meta: dict[str, Any] = {
     'name': 'charm',
     'peers': {
         'restart': {
@@ -113,5 +117,5 @@ meta = {
 
 
 @pytest.fixture
-def ctx(charm_test):
-    return ops.testing.Context(charm_test, meta=meta)
+def ctx(charm_test: type[RollingOpsCharm]) -> Context[RollingOpsCharm]:
+    return Context(charm_test, meta=meta)

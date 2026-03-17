@@ -13,14 +13,17 @@
 # limitations under the License.
 #
 # Learn more about testing at: https://juju.is/docs/sdk/testing
+from charmlibs.advanced_rollingops import CertificatesManager
 
 
-def test_certificates_manager_exists_returns_false_when_no_files(temp_cert_manager) -> None:
+def test_certificates_manager_exists_returns_false_when_no_files(
+    temp_cert_manager: CertificatesManager,
+) -> None:
     assert temp_cert_manager._exists() is False
 
 
 def test_certificates_manager_exists_returns_false_when_cert_does_not_exist(
-    temp_cert_manager,
+    temp_cert_manager: CertificatesManager,
 ) -> None:
     temp_cert_manager.CLIENT_KEY.write_text('client-key')
 
@@ -28,14 +31,16 @@ def test_certificates_manager_exists_returns_false_when_cert_does_not_exist(
 
 
 def test_certificates_manager_exists_returns_false_when_key_does_not_exist(
-    temp_cert_manager,
+    temp_cert_manager: CertificatesManager,
 ) -> None:
     temp_cert_manager.CLIENT_CERT.write_text('client-cert')
 
     assert temp_cert_manager._exists() is False
 
 
-def test_certificates_manager_exists_returns_true_when_all_files_exist(temp_cert_manager) -> None:
+def test_certificates_manager_exists_returns_true_when_all_files_exist(
+    temp_cert_manager: CertificatesManager,
+) -> None:
     temp_cert_manager.CLIENT_KEY.write_text('client-key')
     temp_cert_manager.CLIENT_CERT.write_text('client-cert')
     temp_cert_manager.CA_CERT.write_text('ca-cert')
@@ -44,7 +49,7 @@ def test_certificates_manager_exists_returns_true_when_all_files_exist(temp_cert
 
 
 def test_certificates_manager_persist_client_cert_and_key_writes_files(
-    temp_cert_manager,
+    temp_cert_manager: CertificatesManager,
 ) -> None:
     temp_cert_manager.persist_client_cert_key_and_ca('cert-pem', 'key-pem', 'ca-pem')
 
@@ -53,13 +58,13 @@ def test_certificates_manager_persist_client_cert_and_key_writes_files(
 
 
 def test_certificates_manager_has_client_cert_and_key_returns_false_when_files_missing(
-    temp_cert_manager,
+    temp_cert_manager: CertificatesManager,
 ) -> None:
     assert temp_cert_manager.has_client_cert_key_and_ca('cert', 'key', 'ca') is False
 
 
 def test_certificates_manager_has_client_cert_and_key_returns_true_when_material_matches(
-    temp_cert_manager,
+    temp_cert_manager: CertificatesManager,
 ) -> None:
     temp_cert_manager.CLIENT_CERT.write_text('cert-pem')
     temp_cert_manager.CLIENT_KEY.write_text('key-pem')
@@ -69,7 +74,7 @@ def test_certificates_manager_has_client_cert_and_key_returns_true_when_material
 
 
 def test_certificates_manager_has_client_cert_and_key_returns_false_when_material_differs(
-    temp_cert_manager,
+    temp_cert_manager: CertificatesManager,
 ) -> None:
     temp_cert_manager.CLIENT_CERT.write_text('cert-pem')
     temp_cert_manager.CLIENT_KEY.write_text('key-pem')
@@ -83,7 +88,7 @@ def test_certificates_manager_has_client_cert_and_key_returns_false_when_materia
 
 
 def test_certificates_manager_generate_does_nothing_when_files_already_exist(
-    temp_cert_manager,
+    temp_cert_manager: CertificatesManager,
 ) -> None:
     temp_cert_manager.CA_CERT.write_text('existing-ca-cert')
     temp_cert_manager.CLIENT_KEY.write_text('existing-client-key')
@@ -97,7 +102,7 @@ def test_certificates_manager_generate_does_nothing_when_files_already_exist(
 
 
 def test_certificates_manager_generate_creates_all_files(
-    temp_cert_manager,
+    temp_cert_manager: CertificatesManager,
 ) -> None:
     temp_cert_manager.generate(common_name='unit-1')
     assert temp_cert_manager._exists() is True

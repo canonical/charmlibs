@@ -15,7 +15,13 @@
 import logging
 
 from ops import Relation
-from ops.charm import RelationBrokenEvent
+from ops.charm import (
+    CharmBase,
+    LeaderElectedEvent,
+    RelationBrokenEvent,
+    RelationChangedEvent,
+    SecretChangedEvent,
+)
 from ops.framework import Object
 
 from charmlibs.advanced_rollingops._certificates import CertificatesManager
@@ -35,7 +41,7 @@ SECRET_FIELD = 'rollingops-client-secret-id'  # noqa: S105
 class SharedClientCertificateManager(Object):
     """Manage the shared rollingops client certificate via peer relation secret."""
 
-    def __init__(self, charm, peer_relation_name: str) -> None:
+    def __init__(self, charm: CharmBase, peer_relation_name: str) -> None:
         super().__init__(charm, 'shared-client-certificate')
         self.charm = charm
         self.peer_relation_name = peer_relation_name
@@ -51,15 +57,15 @@ class SharedClientCertificateManager(Object):
     def _peer_relation(self) -> Relation | None:
         return self.model.get_relation(self.peer_relation_name)
 
-    def _on_leader_elected(self, event) -> None:
+    def _on_leader_elected(self, event: LeaderElectedEvent) -> None:
         self.create_and_share_certificate()
 
-    def _on_secret_changed(self, event):
+    def _on_secret_changed(self, event: SecretChangedEvent) -> None:
         # if event.secret.label == "rollingops-client-cert":
         #    self._sync_client_certificate()
         self.sync_to_local_files()
 
-    def _on_peer_relation_changed(self, event) -> None:
+    def _on_peer_relation_changed(self, event: RelationChangedEvent) -> None:
         """React to peer relation changes.
 
         The leader ensures the shared certificate exists.
@@ -91,7 +97,8 @@ class SharedClientCertificateManager(Object):
             'client-key': key_pem,
             'client-ca': ca_pem,
         })
-        app_data[SECRET_FIELD] = secret.id
+
+        app_data.update({SECRET_FIELD: secret.id})  # type: ignore[arg-type]
 
     def get_shared_certificate(self) -> tuple[str, str, str] | None:
         """Return the client certificate, key and ca from peer app data.
@@ -116,7 +123,7 @@ class SharedClientCertificateManager(Object):
         shared = self.get_shared_certificate()
         if shared is None:
             logger.debug('Shared rollingops client certificate is not available yet')
-            return False
+            return
 
         cert_pem, key_pem, ca_pem = shared
         if CertificatesManager.has_client_cert_key_and_ca(cert_pem, key_pem, ca_pem):
@@ -135,7 +142,7 @@ class EtcdRequiresV1(Object):
 
     def __init__(
         self,
-        charm,
+        charm: CharmBase,
         relation_name: str,
         cluster_id: str,
         shared_certificates: SharedClientCertificateManager,

@@ -22,8 +22,9 @@ import logging
 import time
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
-from ops import CharmBase
+from ops import ActionEvent, CharmBase, Framework, InstallEvent
 from ops.model import ActiveStatus, MaintenanceStatus, WaitingStatus
 
 from charmlibs.advanced_rollingops import (
@@ -44,9 +45,8 @@ def _now_timestamp_str() -> str:
 class Charm(CharmBase):
     """Charm the service."""
 
-    def __init__(self, *args):
-        super().__init__(*args)
-
+    def __init__(self, framework: Framework):
+        super().__init__(framework)
         callback_targets = {
             '_restart': self._restart,
             '_failed_restart': self._failed_restart,
@@ -66,7 +66,7 @@ class Charm(CharmBase):
         self.framework.observe(self.on.failed_restart_action, self._on_failed_restart_action)
         self.framework.observe(self.on.deferred_restart_action, self._on_deferred_restart_action)
 
-    def _restart(self, delay: int = 0):
+    def _restart(self, delay: int = 0) -> None:
         self._record_transition('_restart:start', delay=delay)
         logger.info('Starting restart operation')
         self.model.unit.status = MaintenanceStatus('Executing _restart operation')
@@ -74,7 +74,7 @@ class Charm(CharmBase):
         self.model.unit.status = ActiveStatus()
         self._record_transition('_restart:done')
 
-    def _failed_restart(self, delay: int = 0):
+    def _failed_restart(self, delay: int = 0) -> OperationResult:
         self._record_transition('_failed_restart:start', delay=delay)
         logger.info('Starting failed restart operation')
         self.model.unit.status = MaintenanceStatus('Executing _failed_restart operation')
@@ -83,7 +83,7 @@ class Charm(CharmBase):
         self._record_transition('_failed_restart:retry_release')
         return OperationResult.RETRY_RELEASE
 
-    def _deferred_restart(self, delay: int = 0):
+    def _deferred_restart(self, delay: int = 0) -> OperationResult:
         self._record_transition('_deferred_restart:start', delay=delay)
         logger.info('Starting deferred restart operation')
         self.model.unit.status = MaintenanceStatus('Executing _deferred_restart operation')
@@ -92,16 +92,16 @@ class Charm(CharmBase):
         self._record_transition('_deferred_restart:retry_hold', delay=delay)
         return OperationResult.RETRY_HOLD
 
-    def _on_install(self, event):
+    def _on_install(self, event: InstallEvent) -> None:
         self.unit.status = ActiveStatus()
 
-    def _on_restart_action(self, event):
+    def _on_restart_action(self, event: ActionEvent) -> None:
         delay = event.params.get('delay')
         self._record_transition('action:restart', delay=delay)
         self.model.unit.status = WaitingStatus('Awaiting _restart operation')
         self.restart_manager.request_async_lock(callback_id='_restart', kwargs={'delay': delay})
 
-    def _on_failed_restart_action(self, event):
+    def _on_failed_restart_action(self, event: ActionEvent) -> None:
         delay = event.params.get('delay')
         max_retry = event.params.get('max-retry', None)
         self._record_transition('action:failed-restart', delay=delay, max_retry=max_retry)
@@ -112,7 +112,7 @@ class Charm(CharmBase):
             max_retry=max_retry,
         )
 
-    def _on_deferred_restart_action(self, event):
+    def _on_deferred_restart_action(self, event: ActionEvent) -> None:
         delay = event.params.get('delay')
         max_retry = event.params.get('max-retry', None)
         self._record_transition('action:deferred-restart', delay=delay, max_retry=max_retry)
@@ -123,7 +123,7 @@ class Charm(CharmBase):
             max_retry=max_retry,
         )
 
-    def _record_transition(self, name: str, **data) -> None:
+    def _record_transition(self, name: str, **data: Any) -> None:
         TRACE_FILE.parent.mkdir(parents=True, exist_ok=True)
         payload = {
             'ts': _now_timestamp_str(),

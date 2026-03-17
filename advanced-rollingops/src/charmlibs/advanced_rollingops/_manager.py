@@ -17,7 +17,7 @@ import subprocess
 from typing import Any
 
 from ops import Relation
-from ops.charm import CharmBase, RelationBrokenEvent, RelationDepartedEvent
+from ops.charm import CharmBase, InstallEvent, RelationBrokenEvent, RelationDepartedEvent
 from ops.framework import EventBase, Object
 
 from charmlibs.advanced_rollingops._etcdctl import EtcdCtl
@@ -100,7 +100,7 @@ class EtcdRollingOpsManager(Object):
     def _etcd_relation(self) -> Relation | None:
         return self.model.get_relation(self.etcd_relation_name)
 
-    def _on_install(self, event) -> None:
+    def _on_install(self, event: InstallEvent) -> None:
         subprocess.run(['apt-get', 'update'], check=True)
         subprocess.run(['apt-get', 'install', '-y', 'etcd-client'], check=True)
 
@@ -180,7 +180,7 @@ class EtcdRollingOpsManager(Object):
         proc = EtcdCtl.run(['get', self.keys.lock_key, '--print-value-only'], check=False)
 
         if proc.returncode != 0:
-            return False
+            return
 
         value = proc.stdout.strip()
         if value != self.keys.owner:

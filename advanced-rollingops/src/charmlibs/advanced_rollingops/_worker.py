@@ -21,6 +21,7 @@ import subprocess
 from pathlib import Path
 from sys import version_info
 
+from ops import Relation
 from ops.charm import CharmBase
 from ops.framework import Object
 
@@ -39,19 +40,15 @@ class EtcdRollingOpsAsyncWorker(Object):
         self._charm_dir = charm.charm_dir
 
     @property
-    def _relation(self):
+    def _relation(self) -> Relation | None:
         return self.model.get_relation(self._peer_relation_name)
-
-    @property
-    def _unit_data(self):
-        return self._relation.data[self.model.unit]
 
     def start(self) -> None:
         """Start a new worker process."""
         if self._relation is None:
             return
 
-        pid_str = self._unit_data.get('etcd-rollingops-worker-pid', '')
+        pid_str = self._relation.data[self.model.unit].get('etcd-rollingops-worker-pid', '')
         if pid_str:
             try:
                 pid = int(pid_str)
@@ -117,7 +114,7 @@ class EtcdRollingOpsAsyncWorker(Object):
             env=new_env,
         ).pid
 
-        self._unit_data.update({'etcd-rollingops-worker-pid': str(pid)})
+        self._relation.data[self.model.unit].update({'etcd-rollingops-worker-pid': str(pid)})
         logger.info('Started etcd rollingops worker process with PID %s', pid)
 
     def _is_pid_alive(self, pid: int) -> bool:
@@ -135,7 +132,7 @@ class EtcdRollingOpsAsyncWorker(Object):
         """Stop the running worker process if it exists."""
         if self._relation is None:
             return
-        pid_str = self._unit_data.get('etcd-rollingops-worker-pid', '')
+        pid_str = self._relation.data[self.model.unit].get('etcd-rollingops-worker-pid', '')
         if not pid_str:
             return
 
@@ -146,4 +143,4 @@ class EtcdRollingOpsAsyncWorker(Object):
         except OSError:
             logger.info('Failed to stop etcd rollingops worker process PID %s', pid)
             pass
-        self._unit_data.update({'etcd-rollingops-worker-pid': ''})
+        self._relation.data[self.model.unit].update({'etcd-rollingops-worker-pid': ''})
