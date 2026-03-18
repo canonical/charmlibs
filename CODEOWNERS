@@ -23,11 +23,11 @@
 /interfaces/.package/ @canonical/charmlibs-maintainers
 
 # charmlibs packages (alphabetical)
-/advanced-rollingops/ @canonical/data-platform
 /apt/ @canonical/charmlibs-maintainers
 /nginx_k8s/ @canonical/tracing-and-profiling
 /passwd/ @canonical/charmlibs-maintainers
 /pathops/ @canonical/charmlibs-maintainers
+/rollingops/ @canonical/data
 /snap/ @canonical/charmlibs-maintainers
 /sysctl/ @canonical/charmlibs-maintainers
 /systemd/ @canonical/charmlibs-maintainers
