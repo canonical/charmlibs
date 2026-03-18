@@ -36,6 +36,7 @@ def pytest_addoption(parser: pytest.OptionGroup):
         help='keep temporarily-created models',
     )
 
+
 @pytest.fixture(scope='session')
 def app_name() -> str:
     """Return the default application name."""
