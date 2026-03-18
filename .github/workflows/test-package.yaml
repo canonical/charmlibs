@@ -76,11 +76,15 @@ jobs:
       - name: Check substrates needed for integration tests
         id: integration-substrates
         if: contains(fromJson(steps.tests.outputs.tests), 'integration')
+        env:
+          PACKAGE: ${{ inputs.package }}
+          PYTHON: ${{ steps.python.outputs.min_version }}
         run: |
+          set -x  # print lines before executing them
           substrates=()
           for substrate in k8s machine; do
             set +e  # don't abort if the next process has a non-zero exit code
-            uvx --from rust-just just integration-$substrate ${{ inputs.package }} --collect-only -q
+            uvx --from rust-just just python="$PYTHON" integration-$substrate "$PACKAGE" --collect-only -q
             case $? in
                 0) substrates+=($substrate);;
                 5) echo "No tests for $substrate";;
