@@ -69,7 +69,7 @@ To consume OTLP endpoints, use the ``OtlpRequirer`` class. The OTLP sender may o
 subset of protocols and telemetries, which can be configured at instantiation::
 
     from charmlibs.interfaces.otlp import OtlpRequirer
-
+TODO: Update these examples
     class MyOtlpSender(CharmBase):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
