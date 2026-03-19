@@ -31,6 +31,7 @@ jobs:
     outputs:
       tests: ${{ steps.tests.outputs.tests }}
       python: ${{ steps.python.outputs.versions }}
+      min_python_version: ${{ steps.python.outputs.min_version }}
       functional-matrix: ${{ steps.functional.outputs.matrix }}
       integration-substrates: ${{ steps.integration-substrates.outputs.substrates }}
       integration-tags: ${{ steps.integration-tags.outputs.tags }}
@@ -76,11 +77,15 @@ jobs:
       - name: Check substrates needed for integration tests
         id: integration-substrates
         if: contains(fromJson(steps.tests.outputs.tests), 'integration')
+        env:
+          PACKAGE: ${{ inputs.package }}
+          PYTHON: ${{ steps.python.outputs.min_version }}
         run: |
+          set -x  # print lines before executing them
           substrates=()
           for substrate in k8s machine; do
             set +e  # don't abort if the next process has a non-zero exit code
-            uvx --from rust-just just integration-$substrate ${{ inputs.package }} --collect-only -q
+            uvx --from rust-just just python="$PYTHON" integration-$substrate "$PACKAGE" --collect-only -q
             case $? in
                 0) substrates+=($substrate);;
                 5) echo "No tests for $substrate";;
@@ -210,4 +215,9 @@ jobs:
         run: uvx --from rust-just just tag='${{ matrix.tag }}' pack-${{ matrix.substrate }} ${{ inputs.package }}
 
       - name: Run Juju integration tests
-        run: uvx --from rust-just just tag='${{ matrix.tag }}' integration-${{ matrix.substrate }} ${{ inputs.package }}
+        env:
+          PACKAGE: ${{ inputs.package }}
+          PYTHON: ${{ needs.init.outputs.min_python_version }}
+          RECIPE: integration-${{ matrix.substrate }}
+          TAG: ${{ matrix.tag }}
+        run: uvx --from rust-just just python="$PYTHON" tag="$TAG" "$RECIPE" "$PACKAGE"
