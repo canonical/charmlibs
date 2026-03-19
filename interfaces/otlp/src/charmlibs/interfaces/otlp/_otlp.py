@@ -80,7 +80,7 @@ class _OtlpEndpoint(OtlpEndpoint):
     """A pydantic model for a single OTLP endpoint."""
 
 
-class OtlpProviderAppData(BaseModel):
+class _OtlpProviderAppData(BaseModel):
     """A pydantic model for the OTLP provider's app databag."""
 
     endpoints: list[_OtlpEndpoint] = Field(
@@ -88,7 +88,7 @@ class OtlpProviderAppData(BaseModel):
     )
 
 
-class OtlpRequirerAppData(BaseModel):
+class _OtlpRequirerAppData(BaseModel):
     """A pydantic model for the OTLP requirer's app databag.
 
     The rules are compressed when saved to databag to avoid hitting databag
@@ -234,7 +234,7 @@ class OtlpRequirer:
         prom_rules.add_path(self._prom_rules_path, recursive=True)
 
         # Publish to databag
-        databag = OtlpRequirerAppData.model_validate({
+        databag = _OtlpRequirerAppData.model_validate({
             'rules': {'logql': loki_rules.as_dict(), 'promql': prom_rules.as_dict()},
             'metadata': self._topology.as_dict(),
         })
@@ -259,11 +259,10 @@ class OtlpRequirer:
                 continue
 
             try:
-                provider = relation.load(OtlpProviderAppData, relation.app)
+                provider = relation.load(_OtlpProviderAppData, relation.app)
             except ValidationError as e:
                 logger.error('OTLP databag failed validation: %s', e)
                 continue
-
             if endpoints := self._filter_endpoints(provider.endpoints):
                 endpoint_map[relation.id] = self._favor_modern_endpoints(endpoints)
 
@@ -293,7 +292,7 @@ class OtlpProvider:
         protocol: Literal['http', 'grpc'],
         endpoint: str,
         telemetries: Sequence[Literal['logs', 'metrics', 'traces']],
-    ):
+    ) -> 'OtlpProvider':
         """Add an OtlpEndpoint to the list of endpoints to publish.
 
         Call this method after endpoint-changing events e.g. TLS and ingress.
@@ -301,6 +300,7 @@ class OtlpProvider:
         self._endpoints.append(
             _OtlpEndpoint(protocol=protocol, endpoint=endpoint, telemetries=telemetries)
         )
+        return self
 
     def publish(self) -> None:
         """Triggers programmatically the update of the relation data."""
@@ -308,11 +308,11 @@ class OtlpProvider:
             # Only the leader unit can write to app data.
             return
 
-        databag = OtlpProviderAppData.model_validate({'endpoints': self._endpoints})
+        databag = _OtlpProviderAppData.model_validate({'endpoints': self._endpoints})
         for relation in self._charm.model.relations[self._relation_name]:
             relation.save(databag, self._charm.app)
 
-    def rules(self, query_type: Literal['logql', 'promql']):
+    def rules(self, query_type: Literal['logql', 'promql']) -> dict[str, dict[str, Any]]:
         """Fetch rules for all relations of the desired query and rule types.
 
         This method returns all rules of the desired query and rule types
@@ -336,7 +336,7 @@ class OtlpProvider:
                 continue
 
             try:
-                requirer = relation.load(OtlpRequirerAppData, relation.app)
+                requirer = relation.load(_OtlpRequirerAppData, relation.app)
             except ValidationError as e:
                 logger.error('OTLP databag failed validation: %s', e)
                 continue

@@ -26,25 +26,22 @@ from charmlibs.interfaces.otlp import OtlpProvider
 class MyOtlpServer(CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
-        self.otlp_provider = OtlpProvider(self)
         self.framework.observe(self.on.ingress_ready, self._on_ingress_ready)
 
     def _on_ingress_ready(self, event):
-        self.otlp_provider.add_endpoint(
-                protocol="grpc",
-                endpoint="https://my-app.ingress:4317",
-                telemetries=["logs", "metrics"],
-        )
-        self.otlp_provider.add_endpoint(
-                protocol="http",
-                endpoint="https://my-app.ingress:4318",
-                telemetries=["traces"],
-        )
-        # publish the registered endpoints to the relation databag
-        self.otlp_provider.publish()
+        OtlpProvider(self).add_endpoint(
+            protocol="grpc",
+            endpoint="https://my-app.ingress:4317",
+            telemetries=["logs", "metrics"],
+        ).add_endpoint(
+            protocol="http",
+            endpoint="https://my-app.ingress:4318",
+            telemetries=["traces"],
+        ).publish()
+
         # optionally, get the alerting and recording rules
-        promql_rules = self.otlp_provider.rules("promql")
-        logql_rules = self.otlp_provider.rules("logql")
+        promql_rules = OtlpProvider(self).rules("promql")
+        logql_rules = OtlpProvider(self).rules("logql")
 ```
 
 ### Requirer Side
@@ -53,22 +50,18 @@ class MyOtlpServer(CharmBase):
 from charmlibs.interfaces.otlp import OtlpRequirer
 
 class MyOtlpSender(CharmBase):
-    def __init__(self, *args):
-        super().__init__(*args)
-        self.otlp_requirer = OtlpRequirer(
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        self.framework.observe(self.on.update_status, self._publish_rules)
+
+    def _publish_rules(self, _: ops.EventBase) -> None:
+        OtlpRequirer(
             self,
             protocols=["grpc", "http"],
             telemetries=["logs", "metrics", "traces"],
             loki_rules_path="./src/loki_alert_rules",
             prometheus_rules_path="./src/prometheus_alert_rules",
-        )
-        self.framework.observe(self.on.update_status, self._reconcile)
-
-    def _reconcile(self, event):
-        # publish the rules to the relation databag
-        self.otlp_requirer.publish()
-        # get the endpoints from the provider
-        supported_endpoints = self.otlp_requirer.endpoints
+        ).publish()
 ```
 
 ## Documentation

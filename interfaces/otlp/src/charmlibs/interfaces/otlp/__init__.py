@@ -38,21 +38,18 @@ To provide OTLP endpoints, use the ``OtlpProvider`` class. Configure and send en
     class MyOtlpServer(CharmBase):
         def __init__(self, *args):
             super().__init__(*args)
-            self.otlp_provider = OtlpProvider(self)
             self.framework.observe(self.on.ingress_ready, self._on_ingress_ready)
 
         def _on_ingress_ready(self, event):
-            self.otlp_provider.add_endpoint(
+            OtlpProvider(self).add_endpoint(
                 protocol="grpc",
                 endpoint="https://my-app.ingress:4317",
                 telemetries=["logs", "metrics"],
-            )
-            self.otlp_provider.add_endpoint(
+            ).add_endpoint(
                 protocol="http",
                 endpoint="https://my-app.ingress:4318",
                 telemetries=["traces"],
-            )
-            self.otlp_provider.publish()
+            ).publish()
 
 Providers add endpoints explicitly; nothing is auto-published by default. Make sure to add
 endpoints and publish them after the charm's endpoint details have been updated e.g., ingress or
@@ -62,8 +59,8 @@ The OtlpProvider also consumes rules from related OtlpRequirer charms, which can
 the ``rules()`` method::
 
     # snip ...
-    promql_rules = self.otlp_provider.rules("promql")
-    logql_rules = self.otlp_provider.rules("logql")
+    promql_rules = OtlpProvider(self).rules("promql")
+    logql_rules = OtlpProvider(self).rules("logql")
 
 Requirer Side (Charms requiring OTLP endpoints)
 -----------------------------------------------
@@ -74,19 +71,18 @@ subset of protocols and telemetries, which can be configured at instantiation::
     from charmlibs.interfaces.otlp import OtlpRequirer
 
     class MyOtlpSender(CharmBase):
-        def __init__(self, *args):
-            super().__init__(*args)
-            self.otlp_requirer = OtlpRequirer(
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            self.framework.observe(self.on.update_status, self._publish_rules)
+
+        def _publish_rules(self, _: ops.EventBase) -> None:
+            OtlpRequirer(
                 self,
                 protocols=["grpc", "http"],
                 telemetries=["logs", "metrics", "traces"],
                 loki_rules_path="./src/loki_alert_rules",
                 prometheus_rules_path="./src/prometheus_alert_rules",
-            )
-            self.framework.observe(self.on.update_status, self._reconcile)
-
-        def _reconcile(self, event):
-            supported_endpoints = self.otlp_requirer.endpoints
+            ).publish()
 
 Given the defined, supported protocols and telemetries, the OtlpRequirer will filter out
 unsupported endpoints and prune unsupported telemetries. After filtering, requirer selection
@@ -99,7 +95,7 @@ The OtlpRequirer also publishes rules to related OtlpProvider charms with the ``
 method::
 
     # snip ...
-    self.otlp_requirer.publish()
+    OtlpRequirer(...).publish()
 
 It is the charm's responsibility to manage the rules in the ``loki_rules_path`` and
 ``prometheus_rules_path`` directories, which will be forwarded to the related OtlpProvider charms.
@@ -135,7 +131,7 @@ rules::
         "model": "my-model",
         "model_uuid": "f4d59020-c8e7-4053-8044-a2c1e5591c7f",
         "application": "my-app",
-        "charm": "my-charm",
+        "charm_name": "my-charm",
         "unit": "my-charm/0",
     }
 """
