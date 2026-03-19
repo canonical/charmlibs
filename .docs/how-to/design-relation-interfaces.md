@@ -1,13 +1,13 @@
 (design-relation-interfaces)=
 # How to design relation interfaces
 
-Words words words words.
+When designing a schema for a new interface, observe the following rules.
 
-Why we design interfaces up front.
+[TBD] Why we design interfaces up front.
 
-Why wire format and charm-facing API are different.
+[TBD] Why wire format and charm-facing API are different.
 
-Library API for delta and holistic charms.
+[TBD] Library API for delta and holistic charms.
 
 Using newer Pydantic, prefer the `MISSING` sentinel value over the more traditional `None`.
 
@@ -192,3 +192,200 @@ charm library -------------^^^^^^^^^^^^^^^
 ```
 
 ## Testing
+
+Unit tests must capture the interface schema evolution. Unit tests typically also capture the charm-facing API evolution.
+
+When the interface is modified, running unit tests against both new and old test vectors informs the charm library developer what is extended and what is broken.
+The developer then updates the unit tests encoding the conscious choice how the old data is meant to be handled.
+
+### Fixed field types
+
+```py
+V1_FLOAT = {"number": 42.1}
+V1_INT = {"number": 42}
+V1_MISSING = {}
+
+def test_field_types():
+    Data.model_validate(V1_FLOAT)
+    Data.model_validate(V1_INT)
+    Data.model_validate(V1_MISSING)
+
+# Note that Pydantic coerces False to 0 and "42" to 42
+@pytest.mark.parametrize("bad_value", ["str", [], {}, None])
+def test_invalid_field_types(bad_value: Any):
+    with pytest.raises(ValueError):
+        Data.model_validate({"number": bad_value})
+```
+
+### No mandatory fields
+
+```py
+V1_DATABAG = {"name": "aa", "surname": "bb"}
+@pytest.mark.parametrize("field_to_remove", ["name", "surname"])
+def test_missing_fields(field_to_remove):
+    data = {**V1_DATABAG}
+    del data[field_to_remove]
+    assert DataV2.model_validate(data)
+```
+
+### No field reuse
+
+A unit test:
+
+```py
+V1_DATABAG = {"name": "a name", "surname": "bb"}
+
+def test_removed_fields():
+    assert DataV2.model_validate(V1_DATABAG).name == "a name"
+    assert "surname" not in DataV2.model_fields  # Removed in V2
+
+    # alternatively
+    assert DataV2.model_validate(V1_DATABAG).model_dump == {"name": "a name"}
+```
+
+Or a state transition test:
+
+```py
+def _on_relation_changed(self, event: ops.RelationChangedEvent):
+    data = event.relation.load(lib.DataV2, event.app)
+    assert data.name == "aa"
+
+# test
+data = {"name": '"aa"', "surname": '"bb"'}
+rel = testing.Relation('db', remote_app_data=data)
+state_in = testing.State(leader=True, relations={rel})
+ctx.run(ctx.on.relation_changed(rel), state_in)
+```
+
+### Collections
+
+```py
+DATABAG = {"foos": [
+    {"foo": "a"},
+    {"strange-data": "bar"},
+    {"foo": "b", "new-field": "d"}
+]}
+
+def test_foos():
+    foos_seen_by_charm = charm_lib.parse(DATABAG).foos
+    assert charm_sees = {"a", "b"}
+```
+
+### URLs and URIs
+
+```py
+@pytest.mark.parametrize("bad_url", [
+    "ftp://an.example",        # unsupported scheme
+    "https://1.1.1.1",         # hostnames only
+    "http://user@an.example",  # credentials not allowed
+    "http://an.example/#bar",  # fragment not allowed
+])
+def test_bad_url_field_values(bad_url: str):
+    with pytest.raises(ValueError):
+        SomeData(url_field=bad_url)
+
+@pytest.mark.parametrize("good_url", [
+    "http://an.example",
+    "https://an.example",
+    "http://an.example/some/path",
+    "http://an.example/some/path?some=query",
+])
+def test_good_url_field_values(good_url: str)
+    SomeData(url_field=good_url)
+```
+
+### Secret content schema
+
+Using a state transition test, in essence:
+
+```py
+@pytest.mark.parametrize("secret_content, status", [
+    (GOOD_SECRET_CONTENT, ops.ActiveStatus()),
+    (BAD_SECRET_CONTENT, ops.WaitingStatus("...")),
+])
+def test_secret_content(secret_content: dict[str, Any], status):
+    ...
+    state_out = ctx.run(
+        ctx.on.relation_changed(relation=rel, remote_unit=1), state_in)
+
+    assert state_out.unit_status == status
+```
+
+[Full test code](https://github.com/dimaqq/op083-samples/blob/main/test_secret_content.py)
+
+Or a unit test:
+
+```py
+GOOD_SECRET_CONTENT = {"secret_thing": "foo", "some_future_field": "42"}
+BAD_SECRET_CONTENT = {"unknown_field": "42"}
+DATABAG = {"server_uri": '"secret://42"'}
+
+def test_good_secret(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr("charm_lib._load_secret", GOOD_SECRET_CONTENT)
+    charm_lib.parse(DATABAG)
+    assert charm_lib.get_secret_thing == "foo"
+
+def test_bad_secret():
+    monkeypatch.setattr("charm_lib._load_secret", BAD_SECRET_CONTENT)
+    charm_lib.parse(DATABAG)
+    with pytest.raises(SomeCharmLibError):
+        charm_lib.get_secret_thing()
+```
+
+### Handle bad remote data
+
+```py
+# dummy charm
+def __init__(self, framework):
+    foo = FooRequirer(self, relation="foo")
+    assert not foo.is_ready
+
+# test
+data = {"bad": '"data"', "weird": "[{}, {}]"}
+rel = testing.Relation("foo", remote_app_data=data)
+state_in = testing.State(relations={rel})
+ctx.run(ctx.on.relation_changed(rel), state_in)
+```
+
+
+### Provide .is\_ready
+
+```py
+# dummy charm
+def __init__(self, framework):
+    foo = FooRequirer(self, relation="foo")
+    assert foo.is_ready
+
+# test
+data = {"good": '"value"', "some-future-thing": '"sss"'}
+rel = testing.Relation("foo", remote_app_data=data)
+state_in = testing.State(relations={rel})
+ctx.run(ctx.on.relation_changed(rel), state_in)
+```
+
+### Advanced status
+
+```py
+# dummy charm
+def __init__(self, framework):
+    self.foo = FooRequirer(self, relation="foo")
+    ...
+
+def _on_relation_changed(self, event: ops.RelationChangedEvent):
+    if not self.foo.is_ready:
+        self.unit.status = ops.WaitingStatus(self.foo.rich_status)
+    try:
+        host = self.foo.get_hostname()
+        use(host)
+    except SomeException as e:
+        self.unit.status = ops.BlockedStatus(str(e)) 
+
+# test
+data = {"host": '"fe80::1"'}
+rel = testing.Relation("foo", remote_app_data=data)
+state_in = testing.State(relations={rel})
+state_out = ctx.run(ctx.on.relation_changed(rel), state_in)
+assert state_out.unit_status == ops.testing.BlockedStatus(
+    "foo not ready: host must be a domain name"
+)
+```
