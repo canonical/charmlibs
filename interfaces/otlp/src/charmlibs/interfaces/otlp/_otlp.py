@@ -20,7 +20,6 @@ For user-facing documentation, see the package-level docstring in __init__.py.
 """
 
 import copy
-import hashlib
 import json
 import logging
 from collections import OrderedDict
@@ -329,6 +328,8 @@ class OtlpProvider:
             following the OfficialRuleFileFormat from cos-lib.
         """
         rules_map: dict[str, dict[str, Any]] = {}
+        # We instantiate AlertRules with topology to ensure that we always have a rules identifier,
+        # in case charm metadata is omitted, to avoid missing identifiers.
         rules_obj = AlertRules(query_type, self._topology)
         for relation in self._charm.model.relations[self._relation_name]:
             if not relation.data[relation.app]:
@@ -351,6 +352,7 @@ class OtlpProvider:
             )
             if result.errmsg and self._charm.unit.is_leader():
                 relation.data[self._charm.app]['event'] = json.dumps({'errors': result.errmsg})
-            rules_map[result.identifier] = result.rules
+            if result.identifier:
+                rules_map[result.identifier] = result.rules
 
         return rules_map
