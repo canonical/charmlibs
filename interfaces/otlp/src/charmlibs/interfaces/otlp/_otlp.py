@@ -333,7 +333,7 @@ class OtlpProvider:
         for relation in self._charm.model.relations[self._relation_name]:
             relation.save(databag, self._charm.app)
 
-    def rules(self, query_type: Literal['logql', 'promql']) -> dict[str, dict[str, Any]]:
+    def rules(self, query_type: Literal['logql', 'promql']) -> dict[str, OfficialRuleFileFormat]:
         """Fetch rules for all relations of the desired query and rule types.
 
         This method returns all rules of the desired query and rule types

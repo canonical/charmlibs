@@ -166,12 +166,13 @@ def test_provider_rules(
             for group in groups:
                 for rule in group.get('rules', []):
                     # AND the rules are labeled with the provider's topology
-                    assert rule['labels']['juju_model'] == 'foo-model'
+                    assert rule.get('labels', {}).get('juju_model') == 'foo-model'
                     assert (
-                        rule['labels']['juju_model_uuid'] == 'f4d59020-c8e7-4053-8044-a2c1e5591c7f'
+                        rule.get('labels', {}).get('juju_model_uuid')
+                        == 'f4d59020-c8e7-4053-8044-a2c1e5591c7f'
                     )
-                    assert rule['labels']['juju_application'] == app
-                    assert rule['labels']['juju_charm'] == charm
+                    assert rule.get('labels', {}).get('juju_application') == app
+                    assert rule.get('labels', {}).get('juju_charm') == charm
 
                     # AND the expressions are labeled
                     assert 'juju_model="foo-model"' in rule['expr']

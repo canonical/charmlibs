@@ -6,8 +6,9 @@ OTLP integration library for Juju charms, providing OTLP endpoint information fo
 
 ## Features
 
-- **Provider/Requirer pattern**: Enables charms to share OTLP endpoint information and rules
+- **Provider/Requirer pattern**: Enables charms to share OTLP endpoint information and rules content
 - **Define endpoint support**: Providers and requirers define what OTLP protocols and telemetries they support.
+- **Rules interface**: Add rules to a 'RuleStore' object and provide that to the requirer for publishing.
 - **Automatic topology injection**: Inject Juju topology labels into rule expressions and labels with metadata if the labels are not already labeled.
 
 ## Getting started
@@ -26,9 +27,10 @@ from charmlibs.interfaces.otlp import OtlpProvider
 class MyOtlpServer(CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
-        self.framework.observe(self.on.ingress_ready, self._on_ingress_ready)
+        self.framework.observe(self.on.ingress_ready, self._publish_endpoints)
+        self.framework.observe(self.on.update_status, self._access_rules)
 
-    def _on_ingress_ready(self, event):
+    def _publish_endpoints(self, event):
         OtlpProvider(self).add_endpoint(
             protocol="grpc",
             endpoint="https://my-app.ingress:4317",
@@ -39,9 +41,9 @@ class MyOtlpServer(CharmBase):
             telemetries=["traces"],
         ).publish()
 
-        # optionally, get the alerting and recording rules
-        promql_rules = OtlpProvider(self).rules("promql")
-        logql_rules = OtlpProvider(self).rules("logql")
+    def _access_rules(self, event):
+        OtlpProvider(self).rules("promql")
+        OtlpProvider(self).rules("logql")
 ```
 
 ### Requirer Side
@@ -52,6 +54,7 @@ from charmlibs.interfaces.otlp import OtlpRequirer
 class MyOtlpSender(CharmBase):
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
+        self.framework.observe(self.on.update_status, self._access_endpoints)
         self.framework.observe(self.on.update_status, self._publish_rules)
 
     def _publish_rules(self, _: ops.EventBase) -> None:
@@ -59,9 +62,16 @@ class MyOtlpSender(CharmBase):
             self,
             protocols=["grpc", "http"],
             telemetries=["logs", "metrics", "traces"],
-            loki_rules_path="./src/loki_alert_rules",
-            prometheus_rules_path="./src/prometheus_alert_rules",
         ).publish()
+
+    def _access_endpoints(self, _: ops.EventBase) -> None:
+        rules = (
+            RuleStore(JujuTopology.from_charm(self))
+            .add_logql(SINGLE_LOGQL_ALERT, group_name='test_logql_alert')
+            .add_promql(SINGLE_PROMQL_RECORD, group_name='test_promql_record')
+            .add_logql(OFFICIAL_LOGQL_RULES)
+        )
+        OtlpRequirer(self, rules=rules).publish()
 ```
 
 ## Documentation
