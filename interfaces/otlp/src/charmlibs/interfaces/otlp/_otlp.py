@@ -246,20 +246,17 @@ class OtlpRequirer:
             # Only the leader unit can write to app data.
             return
 
-        rules = {}
-        # Loki rules
-        rules['logql'] = self._rules.logql.as_dict()
-
-        # Prometheus rules
         self._rules.add_promql(
             copy.deepcopy(generic_alert_groups.aggregator_rules),
             group_name_prefix=self._topology.identifier,
         )
-        rules['promql'] = self._rules.promql.as_dict()
 
         # Publish to databag
         databag = _OtlpRequirerAppData.model_validate({
-            'rules': rules,
+            'rules': {
+                'logql': self._rules.logql.as_dict(),
+                'promql': self._rules.promql.as_dict(),
+            },
             'metadata': self._topology.as_dict(),
         })
         for relation in self._charm.model.relations[self._relation_name]:
