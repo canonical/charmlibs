@@ -328,8 +328,7 @@ class OtlpProvider:
             following the OfficialRuleFileFormat from cos-lib.
         """
         rules_map: dict[str, dict[str, Any]] = {}
-        # We instantiate AlertRules with topology to ensure that we always have a rules identifier,
-        # in case charm metadata is omitted, to avoid missing identifiers.
+        # Instantiate AlertRules with topology to ensure that rules always have an identifier
         rules_obj = AlertRules(query_type, self._topology)
         for relation in self._charm.model.relations[self._relation_name]:
             if not relation.data[relation.app]:
