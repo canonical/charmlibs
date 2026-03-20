@@ -57,7 +57,10 @@ class OtlpProviderCharm(CharmBase):
 
     def _on_update_status(self, event: ops.EventBase) -> None:
         self.otlp_provider.add_endpoint(
-            protocol='http', endpoint=f'{socket.getfqdn()}:4318', telemetries=['metrics']
+            protocol='http',
+            endpoint=f'{socket.getfqdn()}:4318',
+            telemetries=['metrics'],
+            insecure=True,
         )
         self.otlp_provider.publish()
 
@@ -79,7 +82,10 @@ class OtlpDualCharm(CharmBase):
     def _on_update_status(self, event: ops.EventBase) -> None:
         forward_alert_rules = cast('bool', self.config.get('forward_alert_rules'))
         self.otlp_provider.add_endpoint(
-            protocol='http', endpoint=f'{socket.getfqdn()}:4318', telemetries=['metrics']
+            protocol='http',
+            endpoint=f'{socket.getfqdn()}:4318',
+            telemetries=['metrics'],
+            insecure=True,
         )
 
         with patch_cos_tool_path():

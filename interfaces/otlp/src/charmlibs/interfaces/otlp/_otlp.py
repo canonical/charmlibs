@@ -75,6 +75,9 @@ class OtlpEndpoint(BaseModel):
     telemetries: Sequence[str] = Field(
         description='Telemetry signal types accepted by this endpoint.'
     )
+    insecure: bool = Field(
+        description='Whether this endpoint requires an insecure connection (e.g. no TLS).'
+    )
 
 
 class _OtlpEndpoint(OtlpEndpoint):
@@ -294,13 +297,16 @@ class OtlpProvider:
         protocol: Literal['http', 'grpc'],
         endpoint: str,
         telemetries: Sequence[Literal['logs', 'metrics', 'traces']],
+        insecure: bool = False,
     ):
-        """Add an OtlpEndpoint to the list of endpoints to publish.
-
-        Call this method after endpoint-changing events e.g. TLS and ingress.
-        """
+        """Add an OtlpEndpoint to the list of endpoints to publish."""
         self._endpoints.append(
-            _OtlpEndpoint(protocol=protocol, endpoint=endpoint, telemetries=telemetries)
+            _OtlpEndpoint(
+                protocol=protocol,
+                endpoint=endpoint,
+                telemetries=telemetries,
+                insecure=insecure,
+            )
         )
 
     def publish(self) -> None:
