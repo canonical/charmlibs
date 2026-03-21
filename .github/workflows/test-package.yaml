@@ -178,6 +178,7 @@ jobs:
         if: matrix.pebble != 'no-pebble'
         env:
           PEBBLE: ${{ matrix.pebble }}
+          GOTOOLCHAIN: auto
         run: go install "github.com/canonical/pebble/cmd/$PEBBLE"
 
       - name: Install uv
