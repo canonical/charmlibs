@@ -75,19 +75,19 @@ Requirer Side (Charms requiring OTLP endpoints)
 To consume OTLP endpoints, use the ``OtlpRequirer`` class. The OTLP sender may only support a
 subset of protocols and telemetries, which can be configured at instantiation::
 
-    from charmlibs.interfaces.otlp import OtlpRequirer
+    from charmlibs.interfaces.otlp import OtlpEndpoint, OtlpRequirer
 
     class MyOtlpSender(CharmBase):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
-            self.framework.observe(self.on.update_status, self._publish_rules)
+            self.framework.observe(self.on.update_status, self._access_endpoints)
 
-        def _publish_rules(self, _: ops.EventBase) -> None:
+        def _access_endpoints(self, _: ops.EventBase) -> dict[int, OtlpEndpoint]:
             OtlpRequirer(
                 self,
                 protocols=["grpc", "http"],
                 telemetries=["logs", "metrics", "traces"],
-            ).publish()
+            ).endpoints
 
 Given the defined, supported protocols and telemetries, the OtlpRequirer will filter out
 unsupported endpoints and prune unsupported telemetries. After filtering, requirer selection
@@ -104,9 +104,9 @@ OtlpProvider charms with the ``publish()`` method::
     class MyOtlpSender(CharmBase):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
-            self.framework.observe(self.on.update_status, self._access_endpoints)
+            self.framework.observe(self.on.update_status, self._publish_rules)
 
-        def _access_endpoints(self, _: ops.EventBase) -> None:
+        def _publish_rules(self, _: ops.EventBase) -> None:
             rules = (
                 RuleStore(JujuTopology.from_charm(self))
                 .add_logql(SINGLE_LOGQL_ALERT, group_name='test_logql_alert')
