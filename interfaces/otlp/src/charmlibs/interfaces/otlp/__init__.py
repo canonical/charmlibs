@@ -75,14 +75,14 @@ Requirer Side (Charms requiring OTLP endpoints)
 To consume OTLP endpoints, use the ``OtlpRequirer`` class. The OTLP sender may only support a
 subset of protocols and telemetries, which can be configured at instantiation::
 
-    from charmlibs.interfaces.otlp import OtlpEndpoint, OtlpRequirer
+    from charmlibs.interfaces.otlp import OtlpRequirer
 
     class MyOtlpSender(CharmBase):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
             self.framework.observe(self.on.update_status, self._access_endpoints)
 
-        def _access_endpoints(self, _: ops.EventBase) -> dict[int, OtlpEndpoint]:
+        def _access_endpoints(self, _: ops.EventBase):
             OtlpRequirer(
                 self,
                 protocols=["grpc", "http"],
@@ -106,7 +106,7 @@ OtlpProvider charms with the ``publish()`` method::
             super().__init__(framework)
             self.framework.observe(self.on.update_status, self._publish_rules)
 
-        def _publish_rules(self, _: ops.EventBase) -> None:
+        def _publish_rules(self, _: ops.EventBase):
             rules = (
                 RuleStore(JujuTopology.from_charm(self))
                 .add_logql(SINGLE_LOGQL_ALERT, group_name='test_logql_alert')

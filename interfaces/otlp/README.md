@@ -49,7 +49,7 @@ class MyOtlpServer(CharmBase):
 ### Requirer Side
 
 ```python
-from charmlibs.interfaces.otlp import OtlpEndpoint, OtlpRequirer
+from charmlibs.interfaces.otlp import OtlpRequirer
 
 class MyOtlpSender(CharmBase):
     def __init__(self, framework: ops.Framework):
@@ -57,7 +57,7 @@ class MyOtlpSender(CharmBase):
         self.framework.observe(self.on.update_status, self._access_endpoints)
         self.framework.observe(self.on.update_status, self._publish_rules)
 
-    def _publish_rules(self, _: ops.EventBase) -> None:
+    def _publish_rules(self, _: ops.EventBase):
         rules = (
             RuleStore(JujuTopology.from_charm(self))
             .add_logql(SINGLE_LOGQL_ALERT, group_name='test_logql_alert')
@@ -66,7 +66,7 @@ class MyOtlpSender(CharmBase):
         )
         OtlpRequirer(self, rules=rules).publish()
 
-    def _access_endpoints(self, _: ops.EventBase) -> dict[int, OtlpEndpoint]:
+    def _access_endpoints(self, _: ops.EventBase):
         OtlpRequirer(
             self,
             protocols=["grpc", "http"],
