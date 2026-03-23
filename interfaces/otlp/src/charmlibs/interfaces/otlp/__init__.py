@@ -38,9 +38,9 @@ To provide OTLP endpoints, use the ``OtlpProvider`` class. Configure and send en
     class MyOtlpServer(CharmBase):
         def __init__(self, *args):
             super().__init__(*args)
-            self.framework.observe(self.on.ingress_ready, self._on_ingress_ready)
+            self.framework.observe(self.on.ingress_ready, self._publish_endpoints)
 
-        def _on_ingress_ready(self, event):
+        def _publish_endpoints(self, event):
             OtlpProvider(self).add_endpoint(
                 protocol="grpc",
                 endpoint="https://my-app.ingress:4317",
@@ -58,9 +58,16 @@ TLS changes.
 The OtlpProvider also consumes rules from related OtlpRequirer charms, which can be retrieved with
 the ``rules()`` method::
 
-    # snip ...
-    promql_rules = OtlpProvider(self).rules("promql")
-    logql_rules = OtlpProvider(self).rules("logql")
+    from charmlibs.interfaces.otlp import OtlpProvider
+
+    class MyOtlpServer(CharmBase):
+        def __init__(self, *args):
+            super().__init__(*args)
+            self.framework.observe(self.on.update_status, self._access_rules)
+
+        def _access_rules(self, event):
+            OtlpProvider(self).rules("promql")
+            OtlpProvider(self).rules("logql")
 
 Requirer Side (Charms requiring OTLP endpoints)
 -----------------------------------------------
@@ -73,16 +80,14 @@ subset of protocols and telemetries, which can be configured at instantiation::
     class MyOtlpSender(CharmBase):
         def __init__(self, framework: ops.Framework):
             super().__init__(framework)
-            self.framework.observe(self.on.update_status, self._publish_rules)
+            self.framework.observe(self.on.update_status, self._access_endpoints)
 
-        def _publish_rules(self, _: ops.EventBase) -> None:
+        def _access_endpoints(self, _: ops.EventBase):
             OtlpRequirer(
                 self,
                 protocols=["grpc", "http"],
                 telemetries=["logs", "metrics", "traces"],
-                loki_rules_path="./src/loki_alert_rules",
-                prometheus_rules_path="./src/prometheus_alert_rules",
-            ).publish()
+            ).endpoints
 
 Given the defined, supported protocols and telemetries, the OtlpRequirer will filter out
 unsupported endpoints and prune unsupported telemetries. After filtering, requirer selection
@@ -94,8 +99,19 @@ Unknown protocols will receive the lowest priority.
 The OtlpRequirer also publishes rules to related OtlpProvider charms with the ``publish()``
 method::
 
-    # snip ...
-    OtlpRequirer(...).publish()
+    from charmlibs.interfaces.otlp import OtlpRequirer
+
+    class MyOtlpSender(CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            self.framework.observe(self.on.update_status, self._publish_rules)
+
+        def _publish_rules(self, _: ops.EventBase):
+            OtlpRequirer(
+                self,
+                loki_rules_path="./src/loki_alert_rules",
+                prometheus_rules_path="./src/prometheus_alert_rules",
+            ).publish()
 
 It is the charm's responsibility to manage the rules in the ``loki_rules_path`` and
 ``prometheus_rules_path`` directories, which will be forwarded to the related OtlpProvider charms.
