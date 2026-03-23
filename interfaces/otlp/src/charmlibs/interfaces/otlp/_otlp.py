@@ -348,7 +348,7 @@ class OtlpProvider:
             a mapping of relation ID to a dictionary of alert rule groups
             following the OfficialRuleFileFormat from cos-lib.
         """
-        rules_map: dict[str, dict[str, Any]] = {}
+        rules_map: dict[str, OfficialRuleFileFormat] = {}
         # Instantiate Rules with topology to ensure that rules always have an identifier
         rules_obj = Rules(query_type, self._topology)
         for relation in self._charm.model.relations[self._relation_name]:
