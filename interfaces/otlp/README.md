@@ -49,7 +49,7 @@ class MyOtlpServer(CharmBase):
 ### Requirer Side
 
 ```python
-from charmlibs.interfaces.otlp import OtlpRequirer
+from charmlibs.interfaces.otlp import OtlpRequirer, RulesStore
 
 class MyOtlpSender(CharmBase):
     def __init__(self, framework: ops.Framework):

@@ -99,7 +99,7 @@ Unknown protocols will receive the lowest priority.
 The OtlpRequirer also publishes user-defined and generic (applied to all charms) rules to related
 OtlpProvider charms with the ``publish()`` method::
 
-    from charmlibs.interfaces.otlp import OtlpRequirer
+    from charmlibs.interfaces.otlp import OtlpRequirer, RulesStore
 
     class MyOtlpSender(CharmBase):
         def __init__(self, framework: ops.Framework):
