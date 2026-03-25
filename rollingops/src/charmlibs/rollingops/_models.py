@@ -12,14 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""etcd rolling ops."""
+"""etcd rolling ops models."""
 
-import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import ClassVar, NamedTuple
+from typing import ClassVar, NamedTuple, TypeVar
 
-logger = logging.getLogger(__name__)
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_fixed
+
+from charmlibs.pathops import PebbleConnectionError
+
+T = TypeVar('T')
 
 
 class RollingOpsNoEtcdRelationError(Exception):
@@ -44,6 +48,20 @@ class RollingOpsInvalidLockRequestError(Exception):
 
 class RollingOpsDecodingError(Exception):
     """Raised if json content cannot be processed."""
+
+
+class RollingOpsInvalidSecretContentError(Exception):
+    """Raised if the content of a secret is invalid."""
+
+
+@retry(
+    retry=retry_if_exception_type(PebbleConnectionError),
+    stop=stop_after_attempt(3),
+    wait=wait_fixed(10),
+    reraise=True,
+)
+def with_pebble_retry[T](func: Callable[[], T]) -> T:
+    return func()
 
 
 class OperationResult(StrEnum):

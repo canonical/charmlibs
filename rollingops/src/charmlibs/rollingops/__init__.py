@@ -19,7 +19,6 @@ from ._models import (
     OperationResult,
     RollingOpsEtcdNotConfiguredError,
     RollingOpsInvalidLockRequestError,
-    RollingOpsKeys,
 )
 from ._version import __version__ as __version__
 
@@ -28,5 +27,4 @@ __all__ = (
     'OperationResult',
     'RollingOpsEtcdNotConfiguredError',
     'RollingOpsInvalidLockRequestError',
-    'RollingOpsKeys',
 )

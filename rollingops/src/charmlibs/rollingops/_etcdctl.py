@@ -29,6 +29,7 @@ from charmlibs.rollingops._models import (
     EtcdConfig,
     RollingOpsEtcdNotConfiguredError,
     RollingOpsFileSystemError,
+    with_pebble_retry,
 )
 
 BASE_DIR = pathops.LocalPath('/var/lib/rollingops/etcd')
@@ -47,9 +48,8 @@ def write_trusted_server_ca(tls_ca_pem: str) -> None:
         RollingOpsFileSystemError: if there is a problem when writing the certificates
     """
     try:
-        BASE_DIR.mkdir(parents=True, exist_ok=True)
-
-        SERVER_CA_PATH.write_text(tls_ca_pem, mode=0o644)
+        with_pebble_retry(lambda: BASE_DIR.mkdir(parents=True, exist_ok=True))
+        with_pebble_retry(lambda: SERVER_CA_PATH.write_text(tls_ca_pem, mode=0o644))
     except (FileNotFoundError, LookupError, NotADirectoryError, PermissionError) as e:
         raise RollingOpsFileSystemError('Failed to persist etcd trusted CA certificate.') from e
 
@@ -81,8 +81,10 @@ def write_config_file(
     )
 
     try:
-        BASE_DIR.mkdir(parents=True, exist_ok=True)
-        CONFIG_FILE_PATH.write_text(json.dumps(asdict(config), indent=2), mode=0o600)
+        with_pebble_retry(lambda: BASE_DIR.mkdir(parents=True, exist_ok=True))
+        with_pebble_retry(
+            lambda: CONFIG_FILE_PATH.write_text(json.dumps(asdict(config), indent=2), mode=0o600)
+        )
     except (FileNotFoundError, LookupError, NotADirectoryError, PermissionError) as e:
         raise RollingOpsFileSystemError('Failed to persist etcd config file.') from e
 
@@ -94,8 +96,12 @@ def _load_config() -> EtcdConfig:
         RollingOpsEtcdNotConfiguredError: If the environment file does not exist.
         RollingOpsFileSystemError: if we faile to read the etcd configuration file or
             file cannot be deserialized.
+        PebbleConnectionError: if the remote container cannot be reached
     """
-    ensure_initialized()
+    if not with_pebble_retry(lambda: CONFIG_FILE_PATH.exists()):
+        raise RollingOpsEtcdNotConfiguredError(
+            f'etcdctl env file does not exist: {CONFIG_FILE_PATH}'
+        )
 
     try:
         data = json.loads(CONFIG_FILE_PATH.read_text())
@@ -117,6 +123,7 @@ def load_env() -> dict[str, str]:
         RollingOpsEtcdNotConfiguredError: If the environment file does not exist.
         RollingOpsFileSystemError: if we faile to read the etcd configuration file or
             file cannot be deserialized.
+        PebbleConnectionError: if the remote container cannot be reached
     """
     config = _load_config()
 
@@ -132,17 +139,17 @@ def load_env() -> dict[str, str]:
 
 
 def ensure_initialized():
-    """Checks whether the environment file for etcdctl is setup.
+    """Checks whether the etcd config file for etcdctl is setup.
 
     Raises:
         RollingOpsEtcdNotConfiguredError: if the etcd config file does not exist.
-        PebbleConnectionError: if the remote container cannot be reached
+        PebbleConnectionError: if the remote container cannot be reached.
     """
-    if not CONFIG_FILE_PATH.exists():
+    if not with_pebble_retry(lambda: CONFIG_FILE_PATH.exists()):
         raise RollingOpsEtcdNotConfiguredError(
             f'etcdctl env file does not exist: {CONFIG_FILE_PATH}'
         )
-    if not SERVER_CA_PATH.exists():
+    if not with_pebble_retry(lambda: SERVER_CA_PATH.exists()):
         raise RollingOpsEtcdNotConfiguredError(
             f'etcdctl server CA file does not exist: {SERVER_CA_PATH}'
         )
@@ -153,11 +160,11 @@ def cleanup() -> None:
 
     Raises:
         RollingOpsFileSystemError: if there is a problem when deleting the files.
+        PebbleConnectionError: if the remote container cannot be reached.
     """
     try:
-        SERVER_CA_PATH.unlink(missing_ok=True)
-        CONFIG_FILE_PATH.unlink(missing_ok=True)
-
+        with_pebble_retry(lambda: SERVER_CA_PATH.unlink(missing_ok=True))
+        with_pebble_retry(lambda: CONFIG_FILE_PATH.unlink(missing_ok=True))
     except (IsADirectoryError, PermissionError) as e:
         raise RollingOpsFileSystemError('Failed to remove etcd config file and CA.') from e
 

@@ -33,7 +33,7 @@ from ops.framework import Object
 
 from charmlibs.rollingops import _certificates as certificates
 from charmlibs.rollingops import _etcdctl as etcdctl
-from charmlibs.rollingops._models import SharedCertificate
+from charmlibs.rollingops._models import RollingOpsInvalidSecretContentError, SharedCertificate
 
 logger = logging.getLogger(__name__)
 CERT_SECRET_FIELD = 'rollingops-client-secret-id'  # noqa: S105
@@ -130,6 +130,10 @@ class SharedClientCertificateManager(Object):
 
         Returns:
             SharedCertificate or None if not yet available.
+
+        Raises:
+            RollingOpsInvalidSecretContent: if the content of the secret holding
+                the certificates does not contain all the fields or they are empty.
         """
         if not (relation := self._peer_relation):
             logger.debug('Peer relation is not available yet.')
@@ -141,11 +145,23 @@ class SharedClientCertificateManager(Object):
 
         secret = self.model.get_secret(id=secret_id)
         content = secret.get_content(refresh=True)
-        return SharedCertificate(
+        shared_certificate = SharedCertificate(
             certificate=content.get(CLIENT_CERT_FIELD, ''),
             key=content.get(CLIENT_KEY_FIELD, ''),
             ca=content.get(CLIENT_CA_FIELD, ''),
         )
+        if (
+            not shared_certificate.certificate
+            or not shared_certificate.key
+            or not shared_certificate.ca
+        ):
+            raise RollingOpsInvalidSecretContentError(
+                'Invalid secret content: expected non-empty values for '
+                f"'{CLIENT_CERT_FIELD}', '{CLIENT_KEY_FIELD}', and '{CLIENT_CA_FIELD}'. "
+                'Missing or empty values are not allowed.'
+            )
+
+        return shared_certificate
 
     def sync_to_local_files(self) -> None:
         """Persist shared certificate locally if available."""

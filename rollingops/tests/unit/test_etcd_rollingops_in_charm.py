@@ -17,10 +17,12 @@
 
 from unittest.mock import MagicMock
 
+import pytest
 from ops.testing import Context, PeerRelation, Secret, State
+from scenario.errors import UncaughtCharmError
 from tests.unit.conftest import RollingOpsCharm
 
-from charmlibs.rollingops._models import SharedCertificate
+from charmlibs.rollingops._models import RollingOpsInvalidSecretContentError, SharedCertificate
 from charmlibs.rollingops._relations import (
     CERT_SECRET_FIELD,
 )
@@ -109,3 +111,27 @@ def test_relation_changed_syncs_local_certificate_from_secret(
     certificates_manager_patches['persist'].assert_called_once_with(
         SharedCertificate(certificate='CERT_PEM', key='KEY_PEM', ca='CA_PEM')
     )
+
+
+def test_invalid_certificate_secret_content_raises(
+    certificates_manager_patches: dict[str, MagicMock],
+    etcdctl_patch: MagicMock,
+    ctx: Context[RollingOpsCharm],
+):
+    peer_relation = PeerRelation(
+        endpoint='restart', local_app_data={CERT_SECRET_FIELD: 'secret:rollingops-cert'}
+    )
+
+    secret = Secret(
+        id='secret:rollingops-cert',
+        tracked_content={
+            'client-cert': '',
+            'client-key': 'KEY_PEM',
+            'client-ca': 'CA_PEM',
+        },
+    )
+
+    state_in = State(leader=False, relations={peer_relation}, secrets=[secret])
+    with pytest.raises(UncaughtCharmError) as exc_info:
+        ctx.run(ctx.on.relation_changed(peer_relation, remote_unit=1), state_in)
+        assert isinstance(exc_info.value.__cause__, RollingOpsInvalidSecretContentError)

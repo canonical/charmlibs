@@ -156,12 +156,14 @@ class EtcdRollingOpsManager(Object):
         """This is a dummy function.
 
         Here we spawn a new process that will trigger a Juju hook.
-        This function will be completely removed remade in the next PR.
+        This function will be completely remade in the next PR.
 
         Raises:
-            ValueError: If the callback_id is not registered or invalid parameters
+            RollingOpsInvalidLockRequestError: If the callback_id is not registered or
+                invalid parameters were provided.
             RollingOpsNoEtcdRelationError: if the etcd relation does not exist
             RollingOpsEtcdNotConfiguredError: if etcd client has not been configured yet
+            PebbleConnectionError: if the remote container cannot be reached.
         """
         if callback_id not in self.callback_targets:
             raise RollingOpsInvalidLockRequestError(f'Unknown callback_id: {callback_id}')
@@ -171,14 +173,17 @@ class EtcdRollingOpsManager(Object):
 
         etcdctl.ensure_initialized()
 
+        # TODO: implement actual lock request
+
         self.worker.start()
 
     def _on_run_with_lock(self) -> None:
         """This is a dummy function.
 
         Here we try to reach etcd from each unit.
-        This function will be completely removed remade in the next PR.
+        This function will be completely remade in the next PR.
         """
+        # TODO: implement the actual execution under lock
         etcdctl.run(['put', self.keys.lock_key, self.keys.owner])
 
         proc = etcdctl.run(['get', self.keys.lock_key, '--print-value-only'])

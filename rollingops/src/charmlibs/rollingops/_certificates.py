@@ -31,7 +31,11 @@ from charmlibs.interfaces.tls_certificates import (
     CertificateSigningRequest,
     PrivateKey,
 )
-from charmlibs.rollingops._models import RollingOpsFileSystemError, SharedCertificate
+from charmlibs.rollingops._models import (
+    RollingOpsFileSystemError,
+    SharedCertificate,
+    with_pebble_retry,
+)
 
 BASE_DIR = pathops.LocalPath('/var/lib/rollingops/tls')
 CA_CERT_PATH = BASE_DIR / 'client-ca.pem'
@@ -51,11 +55,10 @@ def persist_client_cert_key_and_ca(shared: SharedCertificate) -> None:
     if _has_client_cert_key_and_ca(shared):
         return
     try:
-        BASE_DIR.mkdir(parents=True, exist_ok=True)
-
-        CLIENT_CERT_PATH.write_text(shared.certificate, mode=0o644)
-        CLIENT_KEY_PATH.write_text(shared.key, mode=0o600)
-        CA_CERT_PATH.write_text(shared.ca, mode=0o644)
+        _mkdir_with_retry(BASE_DIR)
+        _write_text_with_retry(path=CLIENT_CERT_PATH, content=shared.certificate, mode=0o644)
+        _write_text_with_retry(path=CLIENT_KEY_PATH, content=shared.key, mode=0o600)
+        _write_text_with_retry(path=CA_CERT_PATH, content=shared.ca, mode=0o644)
 
     except (FileNotFoundError, LookupError, NotADirectoryError, PermissionError) as e:
         raise RollingOpsFileSystemError('Failed to persist client certificates and key.') from e
@@ -72,9 +75,9 @@ def _has_client_cert_key_and_ca(shared: SharedCertificate) -> bool:
         return False
     try:
         return (
-            CLIENT_CERT_PATH.read_text() == shared.certificate
-            and CLIENT_KEY_PATH.read_text() == shared.key
-            and CA_CERT_PATH.read_text() == shared.ca
+            _read_text_with_retry(CLIENT_CERT_PATH) == shared.certificate
+            and _read_text_with_retry(CLIENT_KEY_PATH) == shared.key
+            and _read_text_with_retry(CA_CERT_PATH) == shared.ca
         )
     except (FileNotFoundError, IsADirectoryError, PermissionError) as e:
         raise RollingOpsFileSystemError('Failed to read certificates and key.') from e
@@ -95,6 +98,7 @@ def generate(common_name: str) -> SharedCertificate:
     Args:
         common_name: Common Name (CN) used in the client certificate
             subject. This value should not contain slashes.
+        sans_dns: Name of the unit creating the certificate.
 
     Raises:
         PebbleConnectionError: if the remote container cannot be reached
@@ -102,13 +106,18 @@ def generate(common_name: str) -> SharedCertificate:
     """
     if _exists():
         return SharedCertificate(
-            certificate=CLIENT_CERT_PATH.read_text(),
-            key=CLIENT_KEY_PATH.read_text(),
-            ca=CA_CERT_PATH.read_text(),
+            certificate=_read_text_with_retry(CLIENT_CERT_PATH),
+            key=_read_text_with_retry(CLIENT_KEY_PATH),
+            ca=_read_text_with_retry(CA_CERT_PATH),
         )
 
     ca_key = PrivateKey.generate(key_size=KEY_SIZE)
-    ca_attributes = CertificateRequestAttributes(common_name='rollingops-client-ca', is_ca=True)
+    ca_attributes = CertificateRequestAttributes(
+        common_name=common_name,
+        sans_dns=[common_name],
+        is_ca=True,
+        add_unique_id_to_subject_name=False,
+    )
     ca_crt = Certificate.generate_self_signed_ca(
         attributes=ca_attributes,
         private_key=ca_key,
@@ -118,7 +127,7 @@ def generate(common_name: str) -> SharedCertificate:
     client_key = PrivateKey.generate(key_size=KEY_SIZE)
 
     csr_attributes = CertificateRequestAttributes(
-        common_name=common_name, add_unique_id_to_subject_name=False
+        common_name=common_name, sans_dns=[common_name], add_unique_id_to_subject_name=False
     )
     csr = CertificateSigningRequest.generate(
         attributes=csr_attributes,
@@ -149,4 +158,72 @@ def _exists() -> bool:
     Raises:
         PebbleConnectionError: if the remote container cannot be reached
     """
-    return CA_CERT_PATH.exists() and CLIENT_KEY_PATH.exists() and CLIENT_CERT_PATH.exists()
+    return (
+        _exists_with_retry(CA_CERT_PATH)
+        and _exists_with_retry(CLIENT_KEY_PATH)
+        and _exists_with_retry(CLIENT_CERT_PATH)
+    )
+
+
+def _exists_with_retry(path: pathops.LocalPath) -> bool:
+    """Check whether a path exists, retrying on transient Pebble errors.
+
+    Args:
+        path: The path to check.
+
+    Returns:
+        True if the path exists, False otherwise.
+
+    Raises:
+        PebbleConnectionError: If the remote container cannot be reached after retries.
+    """
+    return with_pebble_retry(lambda: path.exists())
+
+
+def _read_text_with_retry(path: pathops.LocalPath) -> str:
+    """Read the content of a file, retrying on transient Pebble errors.
+
+    Args:
+        path: The file path to read.
+
+    Returns:
+        The file content as a string.
+
+    Raises:
+        PebbleConnectionError: If the remote container cannot be reached
+            after retries.
+        FileNotFoundError: If the file does not exist.
+        PermissionError: If the file cannot be accessed.
+    """
+    return with_pebble_retry(lambda: path.read_text())
+
+
+def _write_text_with_retry(path: pathops.LocalPath, content: str, mode: int) -> None:
+    """Write text to a file, retrying on transient Pebble errors.
+
+    Args:
+        path: The file path to write to.
+        content: The text content to write.
+        mode: File permission mode to apply (e.g. 0o600).
+
+    Raises:
+        PebbleConnectionError: If the remote container cannot be reached
+            after retries.
+        PermissionError: If the file cannot be written.
+        NotADirectoryError: If the parent path is invalid.
+    """
+    with_pebble_retry(lambda: path.write_text(content, mode=mode))
+
+
+def _mkdir_with_retry(path: pathops.LocalPath) -> None:
+    """Create a directory, retrying on transient Pebble errors.
+
+    Args:
+        path: The directory path to create.
+
+    Raises:
+        PebbleConnectionError: If the remote container cannot be reached
+            after retries.
+        PermissionError: If the directory cannot be created.
+    """
+    with_pebble_retry(lambda: path.mkdir(parents=True, exist_ok=True))
