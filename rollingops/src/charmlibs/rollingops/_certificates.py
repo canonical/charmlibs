@@ -12,149 +12,141 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
-import os
-from datetime import timedelta
-from pathlib import Path
+"""Manage generation and persistence of TLS certificates for etcd client access.
 
+This file contains functions responsible for creating and storing a client Certificate
+Authority (CA) and a client certificate/key pair used to authenticate
+with etcd via TLS. Certificates are generated only once and persisted
+under a local directory so they can be reused across charm executions.
+
+Certificates are valid for 20 years. They are not renewed or rotated.
+"""
+
+from datetime import timedelta
+
+from charmlibs import pathops
 from charmlibs.interfaces.tls_certificates import (
     Certificate,
     CertificateRequestAttributes,
     CertificateSigningRequest,
     PrivateKey,
 )
+from charmlibs.rollingops._models import RollingOpsFileSystemError, SharedCertificate
 
-logger = logging.getLogger(__name__)
+BASE_DIR = pathops.LocalPath('/var/lib/rollingops/tls')
+CA_CERT_PATH = BASE_DIR / 'client-ca.pem'
+CLIENT_KEY_PATH = BASE_DIR / 'client.key'
+CLIENT_CERT_PATH = BASE_DIR / 'client.pem'
+VALIDITY_DAYS = 365 * 50
+KEY_SIZE = 4096
 
 
-class CertificatesManager:
-    """Manage generation and persistence of TLS certificates for etcd client access.
+def persist_client_cert_key_and_ca(shared: SharedCertificate) -> None:
+    """Persist the provided client certificate, key, and CA to disk.
 
-    This class is responsible for creating and storing a client Certificate
-    Authority (CA) and a client certificate/key pair used to authenticate
-    with etcd via TLS. Certificates are generated only once and persisted
-    under a local directory so they can be reused across charm executions.
-
-    Certificates are valid for 20 years. They are not renewed or rotated.
+    Raises:
+        PebbleConnectionError: if the remote container cannot be reached
+        RollingOpsFileSystemError: if there is a problem when writing the certificates
     """
+    if _has_client_cert_key_and_ca(shared):
+        return
+    try:
+        BASE_DIR.mkdir(parents=True, exist_ok=True)
 
-    BASE_DIR = Path('/var/lib/rollingops/tls')
+        CLIENT_CERT_PATH.write_text(shared.certificate, mode=0o644)
+        CLIENT_KEY_PATH.write_text(shared.key, mode=0o600)
+        CA_CERT_PATH.write_text(shared.ca, mode=0o644)
 
-    CA_CERT = BASE_DIR / 'client-ca.pem'
-    CLIENT_KEY = BASE_DIR / 'client.key'
-    CLIENT_CERT = BASE_DIR / 'client.pem'
+    except (FileNotFoundError, LookupError, NotADirectoryError, PermissionError) as e:
+        raise RollingOpsFileSystemError('Failed to persist client certificates and key.') from e
 
-    VALIDITY_DAYS = 365 * 20
 
-    @classmethod
-    def _exists(cls) -> bool:
-        """Check whether the client certificates and CA certificate already exist."""
-        return cls.CA_CERT.exists() and cls.CLIENT_KEY.exists() and cls.CLIENT_CERT.exists()
+def _has_client_cert_key_and_ca(shared: SharedCertificate) -> bool:
+    """Return whether the provided certificate material matches local files.
 
-    @classmethod
-    def client_paths(cls) -> tuple[Path, Path]:
-        """Return filesystem paths for the client certificate and key.
-
-        Returns:
-            A tuple containing:
-            - Path to the client certificate
-            - Path to the client private key
-        """
-        return cls.CLIENT_CERT, cls.CLIENT_KEY
-
-    @classmethod
-    def persist_client_cert_key_and_ca(cls, cert_pem: str, key_pem: str, ca_pem: str) -> None:
-        """Persist the provided client certificate, key, and CA to disk.
-
-        Args:
-            cert_pem: PEM-encoded client certificate.
-            key_pem: PEM-encoded client private key.
-            ca_pem: PEM-encoded CA certificate.
-        """
-        cls.BASE_DIR.mkdir(parents=True, exist_ok=True)
-
-        cls.CLIENT_CERT.write_text(cert_pem)
-        cls.CLIENT_KEY.write_text(key_pem)
-        cls.CA_CERT.write_text(ca_pem)
-
-        os.chmod(cls.CLIENT_CERT, 0o644)
-        os.chmod(cls.CLIENT_KEY, 0o600)
-        os.chmod(cls.CA_CERT, 0o644)
-
-    @classmethod
-    def has_client_cert_key_and_ca(cls, cert_pem: str, key_pem: str, ca_pem: str) -> bool:
-        """Return whether the provided certificate material matches local files."""
-        if not cls.CLIENT_CERT.exists() or not cls.CLIENT_KEY.exists() or not cls.CA_CERT.exists():
-            return False
-
+    Raises:
+        PebbleConnectionError: if the remote container cannot be reached
+        RollingOpsFileSystemError: if there is a problem when writing the certificates
+    """
+    if not _exists():
+        return False
+    try:
         return (
-            cls.CLIENT_CERT.read_text() == cert_pem
-            and cls.CLIENT_KEY.read_text() == key_pem
-            and cls.CA_CERT.read_text() == ca_pem
+            CLIENT_CERT_PATH.read_text() == shared.certificate
+            and CLIENT_KEY_PATH.read_text() == shared.key
+            and CA_CERT_PATH.read_text() == shared.ca
+        )
+    except (FileNotFoundError, IsADirectoryError, PermissionError) as e:
+        raise RollingOpsFileSystemError('Failed to read certificates and key.') from e
+
+
+def generate(common_name: str) -> SharedCertificate:
+    """Generate a client CA and client certificate if they do not exist.
+
+    This method creates:
+    1. A CA private key and self-signed CA certificate.
+    2. A client private key.
+    3. A certificate signing request (CSR) using the provided common name.
+    4. A client certificate signed by the generated CA.
+
+    The generated files are written to disk and reused in future runs.
+    If the certificates already exist, this method does nothing.
+
+    Args:
+        common_name: Common Name (CN) used in the client certificate
+            subject. This value should not contain slashes.
+
+    Raises:
+        PebbleConnectionError: if the remote container cannot be reached
+        RollingOpsFileSystemError: if there is a problem when writing the certificates
+    """
+    if _exists():
+        return SharedCertificate(
+            certificate=CLIENT_CERT_PATH.read_text(),
+            key=CLIENT_KEY_PATH.read_text(),
+            ca=CA_CERT_PATH.read_text(),
         )
 
-    @classmethod
-    def generate(cls, common_name: str) -> tuple[str, str, str]:
-        """Generate a client CA and client certificate if they do not exist.
+    ca_key = PrivateKey.generate(key_size=KEY_SIZE)
+    ca_attributes = CertificateRequestAttributes(common_name='rollingops-client-ca', is_ca=True)
+    ca_crt = Certificate.generate_self_signed_ca(
+        attributes=ca_attributes,
+        private_key=ca_key,
+        validity=timedelta(days=VALIDITY_DAYS),
+    )
 
-        This method creates:
-        1. A CA private key and self-signed CA certificate.
-        2. A client private key.
-        3. A certificate signing request (CSR) using the provided common name.
-        4. A client certificate signed by the generated CA.
+    client_key = PrivateKey.generate(key_size=KEY_SIZE)
 
-        The generated files are written to disk and reused in future runs.
-        If the certificates already exist, this method does nothing.
+    csr_attributes = CertificateRequestAttributes(
+        common_name=common_name, add_unique_id_to_subject_name=False
+    )
+    csr = CertificateSigningRequest.generate(
+        attributes=csr_attributes,
+        private_key=client_key,
+    )
 
-        Args:
-            common_name: Common Name (CN) used in the client certificate
-                subject. This value should not contain slashes.
+    client_crt = Certificate.generate(
+        csr=csr,
+        ca=ca_crt,
+        ca_private_key=ca_key,
+        validity=timedelta(days=VALIDITY_DAYS),
+        is_ca=False,
+    )
 
-        Returns:
-            A tuple containing:
-            - The client certificate PEM string
-            - The client private key PEM string
-            - The client CA certificate PEM string
-        """
-        if cls._exists():
-            return cls.CLIENT_CERT.read_text(), cls.CLIENT_KEY.read_text(), cls.CA_CERT.read_text()
+    shared = SharedCertificate(
+        certificate=client_crt.raw,
+        key=client_key.raw,
+        ca=ca_crt.raw,
+    )
 
-        cls.BASE_DIR.mkdir(parents=True, exist_ok=True)
+    persist_client_cert_key_and_ca(shared)
+    return shared
 
-        ca_key = PrivateKey.generate(key_size=4096)
-        ca_attributes = CertificateRequestAttributes(
-            common_name='rollingops-client-ca', is_ca=True
-        )
-        ca_crt = Certificate.generate_self_signed_ca(
-            attributes=ca_attributes,
-            private_key=ca_key,
-            validity=timedelta(days=cls.VALIDITY_DAYS),
-        )
 
-        client_key = PrivateKey.generate(key_size=4096)
+def _exists() -> bool:
+    """Check whether the client certificates and CA certificate already exist.
 
-        csr_attributes = CertificateRequestAttributes(
-            common_name=common_name, add_unique_id_to_subject_name=False
-        )
-        csr = CertificateSigningRequest.generate(
-            attributes=csr_attributes,
-            private_key=client_key,
-        )
-
-        client_crt = Certificate.generate(
-            csr=csr,
-            ca=ca_crt,
-            ca_private_key=ca_key,
-            validity=timedelta(days=cls.VALIDITY_DAYS),
-            is_ca=False,
-        )
-
-        cls.CA_CERT.write_text(ca_crt.raw)
-        cls.CLIENT_KEY.write_text(client_key.raw)
-        cls.CLIENT_CERT.write_text(client_crt.raw)
-
-        os.chmod(cls.CLIENT_KEY, 0o600)
-        os.chmod(cls.CA_CERT, 0o644)
-        os.chmod(cls.CLIENT_CERT, 0o644)
-
-        return client_crt.raw, client_key.raw, ca_crt.raw
+    Raises:
+        PebbleConnectionError: if the remote container cannot be reached
+    """
+    return CA_CERT_PATH.exists() and CLIENT_KEY_PATH.exists() and CLIENT_CERT_PATH.exists()

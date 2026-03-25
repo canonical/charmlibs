@@ -14,23 +14,19 @@
 
 """The charmlibs.rollingops package."""
 
-from ._certificates import CertificatesManager
-from ._etcdctl import EtcdCtl
 from ._manager import EtcdRollingOpsManager
 from ._models import (
     OperationResult,
     RollingOpsEtcdNotConfiguredError,
+    RollingOpsInvalidLockRequestError,
     RollingOpsKeys,
 )
-from ._relations import SECRET_FIELD
 from ._version import __version__ as __version__
 
 __all__ = (
-    'SECRET_FIELD',
-    'CertificatesManager',
-    'EtcdCtl',
     'EtcdRollingOpsManager',
     'OperationResult',
     'RollingOpsEtcdNotConfiguredError',
+    'RollingOpsInvalidLockRequestError',
     'RollingOpsKeys',
 )

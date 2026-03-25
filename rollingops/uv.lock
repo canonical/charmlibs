@@ -83,10 +83,24 @@ wheels = [
 ]
 
 [[package]]
+name = "charmlibs-pathops"
+version = "1.2.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "ops" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/05/18/120f0635f449af7ef9e1a431b7f1c21eb4e09a39870f3862350853ba92a1/charmlibs_pathops-1.2.1.tar.gz", hash = "sha256:00fa50f95bb7fbfbe3d5507de94e583f7333f63ec6ef42a49600b641aabbcfd3", size = 21892, upload-time = "2026-02-06T00:34:03.882Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8d/57/b54e4fcb9c53085fde0bc6016232e0bb5f88cbf7a03ef78176848793b648/charmlibs_pathops-1.2.1-py3-none-any.whl", hash = "sha256:36dc4e5f76ae3eb89020df916c14e169f71ba856f71a430dab94b0b7948e9b10", size = 27005, upload-time = "2026-02-06T00:34:02.669Z" },
+]
+
+[[package]]
 name = "charmlibs-rollingops"
 source = { editable = "." }
 dependencies = [
     { name = "charmlibs-interfaces-tls-certificates" },
+    { name = "charmlibs-pathops" },
+    { name = "dpcharmlibs-interfaces" },
 ]
 
 [package.dev-dependencies]
@@ -99,7 +113,11 @@ unit = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "charmlibs-interfaces-tls-certificates", specifier = ">=1.8.1" }]
+requires-dist = [
+    { name = "charmlibs-interfaces-tls-certificates", specifier = ">=1.8.1" },
+    { name = "charmlibs-pathops", specifier = ">=1.2.1" },
+    { name = "dpcharmlibs-interfaces", specifier = "==1.0.0" },
+]
 
 [package.metadata.requires-dev]
 functional = []
@@ -161,6 +179,19 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/96/93/682d2b43c1d5f1406ed048f377c0fc9fc8f7b0447a478d5c65ab3d3a66eb/cryptography-46.0.5-cp38-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:ced80795227d70549a411a4ab66e8ce307899fad2220ce5ab2f296e687eacde9", size = 4667123, upload-time = "2026-02-10T19:18:15.886Z" },
     { url = "https://files.pythonhosted.org/packages/45/2d/9c5f2926cb5300a8eefc3f4f0b3f3df39db7f7ce40c8365444c49363cbda/cryptography-46.0.5-cp38-abi3-win32.whl", hash = "sha256:02f547fce831f5096c9a567fd41bc12ca8f11df260959ecc7c3202555cc47a72", size = 3010220, upload-time = "2026-02-10T19:18:17.361Z" },
     { url = "https://files.pythonhosted.org/packages/48/ef/0c2f4a8e31018a986949d34a01115dd057bf536905dca38897bacd21fac3/cryptography-46.0.5-cp38-abi3-win_amd64.whl", hash = "sha256:556e106ee01aa13484ce9b0239bca667be5004efb0aabbed28d353df86445595", size = 3467050, upload-time = "2026-02-10T19:18:18.899Z" },
+]
+
+[[package]]
+name = "dpcharmlibs-interfaces"
+version = "1.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "ops" },
+    { name = "pydantic" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/8c/41/4cfa520d62c0aa53804599bf74506184eadc7c1e4803616383ec6bd3ab39/dpcharmlibs_interfaces-1.0.0.tar.gz", hash = "sha256:a177653019781a7a165be52cf4293134ee58912cd93686082cdd82da347a3bed", size = 203809, upload-time = "2026-03-24T17:38:47.136Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a6/88/9dbe3ceeb571dfd5e203fa4382376e686e0781a047bf2fb91f755962e4d5/dpcharmlibs_interfaces-1.0.0-py3-none-any.whl", hash = "sha256:afff80be30e3ff8c31f68557946e9d5959247f1973cbc00e96da55b095f95a21", size = 36982, upload-time = "2026-03-24T17:38:45.81Z" },
 ]
 
 [[package]]

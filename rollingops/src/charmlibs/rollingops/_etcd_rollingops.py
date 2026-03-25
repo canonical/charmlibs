@@ -14,11 +14,8 @@
 
 
 import argparse
-import logging
 import subprocess
 import time
-
-logger = logging.getLogger(__name__)
 
 
 def main():

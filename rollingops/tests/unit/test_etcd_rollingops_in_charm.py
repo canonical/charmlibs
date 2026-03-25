@@ -20,8 +20,9 @@ from unittest.mock import MagicMock
 from ops.testing import Context, PeerRelation, Secret, State
 from tests.unit.conftest import RollingOpsCharm
 
-from charmlibs.rollingops import (
-    SECRET_FIELD,
+from charmlibs.rollingops._models import SharedCertificate
+from charmlibs.rollingops._relations import (
+    CERT_SECRET_FIELD,
 )
 
 
@@ -36,8 +37,8 @@ def test_leader_elected_creates_shared_secret_and_stores_id(
     state_out = ctx.run(ctx.on.leader_elected(), state_in)
 
     peer_out = next(r for r in state_out.relations if r.endpoint == 'restart')
-    assert SECRET_FIELD in peer_out.local_app_data
-    assert peer_out.local_app_data[SECRET_FIELD].startswith('secret:')
+    assert CERT_SECRET_FIELD in peer_out.local_app_data
+    assert peer_out.local_app_data[CERT_SECRET_FIELD].startswith('secret:')
 
     certificates_manager_patches['generate'].assert_called_once()
 
@@ -48,7 +49,7 @@ def test_leader_elected_does_not_regenerate_when_secret_already_exists(
     ctx: Context[RollingOpsCharm],
 ):
     peer_relation = PeerRelation(
-        endpoint='restart', local_app_data={SECRET_FIELD: 'secret:existing'}
+        endpoint='restart', local_app_data={CERT_SECRET_FIELD: 'secret:existing'}
     )
     secret = Secret(
         id='secret:existing',
@@ -65,7 +66,7 @@ def test_leader_elected_does_not_regenerate_when_secret_already_exists(
     state_out = ctx.run(ctx.on.leader_elected(), state_in)
 
     peer_out = next(r for r in state_out.relations if r.endpoint == 'restart')
-    assert peer_out.local_app_data[SECRET_FIELD] == 'secret:existing'
+    assert peer_out.local_app_data[CERT_SECRET_FIELD] == 'secret:existing'
     certificates_manager_patches['generate'].assert_not_called()
 
 
@@ -80,7 +81,7 @@ def test_non_leader_does_not_create_shared_secret(
     state_out = ctx.run(ctx.on.relation_changed(peer_relation, remote_unit=1), state_in)
 
     peer_out = next(r for r in state_out.relations if r.endpoint == 'restart')
-    assert SECRET_FIELD not in peer_out.local_app_data
+    assert CERT_SECRET_FIELD not in peer_out.local_app_data
     certificates_manager_patches['generate'].assert_not_called()
 
 
@@ -90,7 +91,7 @@ def test_relation_changed_syncs_local_certificate_from_secret(
     ctx: Context[RollingOpsCharm],
 ):
     peer_relation = PeerRelation(
-        endpoint='restart', local_app_data={SECRET_FIELD: 'secret:rollingops-cert'}
+        endpoint='restart', local_app_data={CERT_SECRET_FIELD: 'secret:rollingops-cert'}
     )
 
     secret = Secret(
@@ -106,5 +107,5 @@ def test_relation_changed_syncs_local_certificate_from_secret(
 
     ctx.run(ctx.on.relation_changed(peer_relation, remote_unit=1), state_in)
     certificates_manager_patches['persist'].assert_called_once_with(
-        'CERT_PEM', 'KEY_PEM', 'CA_PEM'
+        SharedCertificate(certificate='CERT_PEM', key='KEY_PEM', ca='CA_PEM')
     )

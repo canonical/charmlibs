@@ -18,12 +18,13 @@ import logging
 import os
 import signal
 import subprocess
-from pathlib import Path
 from sys import version_info
 
 from ops import Relation
 from ops.charm import CharmBase
 from ops.framework import Object
+
+from charmlibs import pathops
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +67,7 @@ class EtcdRollingOpsAsyncWorker(Object):
         new_env.pop('JUJU_CONTEXT_ID', None)
 
         for loc in new_env.get('PYTHONPATH', '').split(':'):
-            path = Path(loc)
+            path = pathops.LocalPath(loc)
             venv_path = (
                 path
                 / '..'

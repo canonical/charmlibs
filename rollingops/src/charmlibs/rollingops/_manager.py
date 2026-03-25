@@ -20,9 +20,10 @@ from ops import Relation
 from ops.charm import CharmBase, InstallEvent, RelationBrokenEvent, RelationDepartedEvent
 from ops.framework import EventBase, Object
 
-from charmlibs.rollingops._etcdctl import EtcdCtl
+from charmlibs.rollingops import _etcdctl as etcdctl
 from charmlibs.rollingops._models import (
     RollingOpsEtcdNotConfiguredError,
+    RollingOpsInvalidLockRequestError,
     RollingOpsKeys,
     RollingOpsNoEtcdRelationError,
 )
@@ -84,44 +85,66 @@ class EtcdRollingOpsManager(Object):
         charm.on.define_event('rollingops_lock_granted', RollingOpsLockGrantedEvent)
 
         self.framework.observe(
-            charm.on[self.peer_relation_name].relation_departed, self._on_relation_departed
+            charm.on[self.peer_relation_name].relation_departed, self._on_peer_relation_departed
         )
         self.framework.observe(
-            charm.on[self.etcd_relation_name].relation_broken, self._on_relation_broken
+            charm.on[self.etcd_relation_name].relation_broken, self._on_etcd_relation_broken
         )
         self.framework.observe(charm.on.rollingops_lock_granted, self._on_rollingop_granted)
         self.framework.observe(charm.on.install, self._on_install)
 
     @property
     def _peer_relation(self) -> Relation | None:
+        """Return the peer relation for this charm."""
         return self.model.get_relation(self.peer_relation_name)
 
     @property
     def _etcd_relation(self) -> Relation | None:
+        """Return the etcd relation for this charm."""
         return self.model.get_relation(self.etcd_relation_name)
 
     def _on_install(self, event: InstallEvent) -> None:
+        """Handle the install event by installing required system packages.
+
+        This hook ensures that the etcd client is available on the unit by
+        installing it via apt.
+
+        Raises:
+            subprocess.CalledProcessError: If package installation fails.
+        """
         subprocess.run(['apt-get', 'update'], check=True)
         subprocess.run(['apt-get', 'install', '-y', 'etcd-client'], check=True)
 
     def _on_rollingop_granted(self, event: RollingOpsLockGrantedEvent) -> None:
+        """Handle the event when a rolling operation lock is granted.
+
+        If etcd is not yet configured, the operation is skipped.
+        """
         if not self._peer_relation or not self._etcd_relation:
             return
         try:
-            EtcdCtl.ensure_initialized()
+            etcdctl.ensure_initialized()
         except RollingOpsEtcdNotConfiguredError:
             return
         logger.info('Received a rolling-op lock granted event.')
         self._on_run_with_lock()
 
-    def _on_relation_departed(self, event: RelationDepartedEvent) -> None:
-        """Stop the etcd worker process in the current unit."""
+    def _on_peer_relation_departed(self, event: RelationDepartedEvent) -> None:
+        """Handle a unit departing from the peer relation.
+
+        If the current unit is the one departing, stop the etcd worker
+        process to ensure a clean shutdown.
+        """
         unit = event.departing_unit
         if unit == self.model.unit:
             self.worker.stop()
 
-    def _on_relation_broken(self, event: RelationBrokenEvent) -> None:
-        """Stop the etcd worker process in the current unit."""
+    def _on_etcd_relation_broken(self, event: RelationBrokenEvent) -> None:
+        """Handle the etcd relation being fully removed.
+
+        This method stops the etcd worker process since the required
+        relation is no longer available.
+        """
         self.worker.stop()
 
     def request_async_lock(
@@ -130,24 +153,10 @@ class EtcdRollingOpsManager(Object):
         kwargs: dict[str, Any] | None = None,
         max_retry: int | None = None,
     ) -> None:
-        """Queue a rolling operation and trigger asynchronous lock acquisition.
+        """This is a dummy function.
 
-        This method creates a new operation representing a callback to execute
-        once the distributed lock is granted. The operation is appended to the
-        unit's pending operation queue stored in etcd.
-
-        If the operation is successfully enqueued, the background worker process
-        responsible for acquiring the distributed lock and processing operations
-        is started.
-
-        Args:
-            callback_id: Identifier of the registered callback to execute when
-                the lock is granted.
-            kwargs: Optional keyword arguments passed to the callback when
-                executed. Must be JSON-serializable.
-            max_retry: Maximum number of retries for the operation.
-                - None: retry indefinitely
-                - 0: do not retry on failure
+        Here we spawn a new process that will trigger a Juju hook.
+        This function will be completely removed remade in the next PR.
 
         Raises:
             ValueError: If the callback_id is not registered or invalid parameters
@@ -155,36 +164,28 @@ class EtcdRollingOpsManager(Object):
             RollingOpsEtcdNotConfiguredError: if etcd client has not been configured yet
         """
         if callback_id not in self.callback_targets:
-            raise ValueError(f'Unknown callback_id: {callback_id}')
+            raise RollingOpsInvalidLockRequestError(f'Unknown callback_id: {callback_id}')
 
-        etcd_relation = self.model.get_relation(self.etcd_relation_name)
-        if not etcd_relation:
+        if not self._etcd_relation:
             raise RollingOpsNoEtcdRelationError
 
-        EtcdCtl.ensure_initialized()
+        etcdctl.ensure_initialized()
 
         self.worker.start()
 
     def _on_run_with_lock(self) -> None:
-        """Execute the current operation while holding the distributed lock.
+        """This is a dummy function.
 
-        This method is triggered when the worker determines that the current
-        unit owns the distributed lock. The method retrieves the head operation
-        from the in-progress queue and executes its registered callback.
-
-        After execution, the operation is moved to the completed queue and its
-        updated state is persisted.
+        Here we try to reach etcd from each unit.
+        This function will be completely removed remade in the next PR.
         """
-        EtcdCtl.run(['put', self.keys.lock_key, self.keys.owner])
+        etcdctl.run(['put', self.keys.lock_key, self.keys.owner])
 
-        proc = EtcdCtl.run(['get', self.keys.lock_key, '--print-value-only'], check=False)
+        proc = etcdctl.run(['get', self.keys.lock_key, '--print-value-only'])
 
         if proc.returncode != 0:
+            logger.error('Unexpected response from etcd %s', proc)
             return
-
-        value = proc.stdout.strip()
-        if value != self.keys.owner:
-            logger.info('Callback not executed.')
 
         callback = self.callback_targets.get('_restart', '')
         callback(delay=1)

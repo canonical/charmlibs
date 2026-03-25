@@ -17,6 +17,8 @@ dynamic = ["version"]
 dependencies = [
     # "ops",
     "charmlibs-interfaces-tls-certificates>=1.8.1",
+    "charmlibs-pathops>=1.2.1",
+    "dpcharmlibs-interfaces==1.0.0"
 ]
 
 [dependency-groups]
@@ -56,12 +58,11 @@ src = ["src", "tests/unit", "tests/functional", "tests/integration"]  # correctl
 "tests/**/*" = [
     # "E501",  # line too long
 ]
-"src/charmlibs/rollingops/_dp_interfaces_v1.py" = ["ALL"]
 
 [tool.pyright]
 extends = "../pyproject.toml"
 include = ["src", "tests"]
-exclude = ["**/_dp_interfaces_v1.py", "tests/integration/.tmp/**"]
+exclude = ["tests/integration/.tmp/**"]
 pythonVersion = "3.12"  # check no python > 3.12 features are used
 
 [tool.charmlibs.functional]

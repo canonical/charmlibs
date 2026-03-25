@@ -17,7 +17,7 @@
 import logging
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import ClassVar
+from typing import ClassVar, NamedTuple
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +34,18 @@ class RollingOpsEtcdNotConfiguredError(Exception):
     """Raised if etcd client has not been configured yet (env file does not exist)."""
 
 
+class RollingOpsFileSystemError(Exception):
+    """Raised if there is a problem when interacting with the filesystem."""
+
+
+class RollingOpsInvalidLockRequestError(Exception):
+    """Raised if the lock request is invalid."""
+
+
+class RollingOpsDecodingError(Exception):
+    """Raised if json content cannot be processed."""
+
+
 class OperationResult(StrEnum):
     """Callback return values."""
 
@@ -42,12 +54,30 @@ class OperationResult(StrEnum):
     RETRY_HOLD = 'retry-hold'
 
 
+class SharedCertificate(NamedTuple):
+    """Represent the certificates shared within units of an app to connect to etcd."""
+
+    certificate: str
+    key: str
+    ca: str
+
+
+@dataclass(frozen=True)
+class EtcdConfig:
+    """Represent the etcd configuration."""
+
+    endpoints: str
+    cacert_path: str
+    cert_path: str
+    key_path: str
+
+
 @dataclass(frozen=True)
 class RollingOpsKeys:
     """Collection of etcd key prefixes used for rolling operations.
 
     Layout:
-        /rollingops/{cluster_id}/granted-unit
+        /rollingops/{cluster_id}/granted-unit/
         /rollingops/{cluster_id}/{owner}/pending/
         /rollingops/{cluster_id}/{owner}/inprogress/
         /rollingops/{cluster_id}/{owner}/completed/
@@ -68,27 +98,27 @@ class RollingOpsKeys:
     @property
     def _owner_prefix(self) -> str:
         """Etcd prefix for all the queues belonging to an owner."""
-        return f'{self.cluster_prefix}{self.owner}'
+        return f'{self.cluster_prefix}{self.owner}/'
 
     @property
     def lock_key(self) -> str:
         """Etcd key of the lock."""
-        return f'{self.cluster_prefix}granted-unit'
+        return f'{self.cluster_prefix}granted-unit/'
 
     @property
     def pending(self) -> str:
         """Prefix for operations waiting to be executed."""
-        return f'{self._owner_prefix}/pending/'
+        return f'{self._owner_prefix}pending/'
 
     @property
     def inprogress(self) -> str:
         """Prefix for operations currently being executed."""
-        return f'{self._owner_prefix}/inprogress/'
+        return f'{self._owner_prefix}inprogress/'
 
     @property
     def completed(self) -> str:
         """Prefix for operations that have finished execution."""
-        return f'{self._owner_prefix}/completed/'
+        return f'{self._owner_prefix}completed/'
 
     @classmethod
     def for_owner(cls, cluster_id: str, owner: str) -> 'RollingOpsKeys':

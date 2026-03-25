@@ -14,6 +14,7 @@
 
 """Fixtures for unit tests, typically mocking out parts of the external system."""
 
+import types
 from collections.abc import Generator
 from pathlib import Path
 from typing import Any
@@ -23,34 +24,46 @@ import ops
 import pytest
 from ops.testing import Context
 
+import charmlibs.rollingops._certificates as certificates
+import charmlibs.rollingops._etcdctl as etcdctl
 from charmlibs import rollingops
+from charmlibs.pathops import LocalPath
+from charmlibs.rollingops._models import SharedCertificate
 
 
 @pytest.fixture
-def temp_cert_manager(tmp_path: Path) -> type[rollingops.CertificatesManager]:
-    class TestCertificatesManager(rollingops.CertificatesManager):
-        BASE_DIR = tmp_path / 'tls'
-        CA_CERT = BASE_DIR / 'client-ca.pem'
-        CLIENT_KEY = BASE_DIR / 'client.key'
-        CLIENT_CERT = BASE_DIR / 'client.pem'
+def temp_certificates(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> types.ModuleType:
+    base_dir = LocalPath(str(tmp_path)) / 'tls'
+    ca_cert = base_dir / 'client-ca.pem'
+    client_key = base_dir / 'client.key'
+    client_cert = base_dir / 'client.pem'
 
-    TestCertificatesManager.BASE_DIR.mkdir(parents=True, exist_ok=True)
-    return TestCertificatesManager
+    monkeypatch.setattr(certificates, 'BASE_DIR', base_dir)
+    monkeypatch.setattr(certificates, 'CA_CERT_PATH', ca_cert)
+    monkeypatch.setattr(certificates, 'CLIENT_KEY_PATH', client_key)
+    monkeypatch.setattr(certificates, 'CLIENT_CERT_PATH', client_cert)
+
+    base_dir.mkdir(parents=True, exist_ok=True)
+    return certificates
 
 
 @pytest.fixture
-def temp_etcdctl(tmp_path: Path) -> type[rollingops.EtcdCtl]:
-    class TestEtcdCtl(rollingops.EtcdCtl):
-        BASE_DIR = tmp_path / 'etcd'
-        SERVER_CA = BASE_DIR / 'server-ca.pem'
-        ENV_FILE = BASE_DIR / 'etcdctl.env'
+def temp_etcdctl(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> types.ModuleType:
+    base_dir = LocalPath(str(tmp_path)) / 'etcd'
+    server_ca = base_dir / 'server-ca.pem'
+    env_file = base_dir / 'etcdctl.env'
 
-    return TestEtcdCtl
+    monkeypatch.setattr(etcdctl, 'BASE_DIR', base_dir)
+    monkeypatch.setattr(etcdctl, 'SERVER_CA_PATH', server_ca)
+    monkeypatch.setattr(etcdctl, 'CONFIG_FILE_PATH', env_file)
+
+    base_dir.mkdir(parents=True, exist_ok=True)
+    return etcdctl
 
 
 @pytest.fixture
 def etcdctl_patch() -> Generator[MagicMock, None, None]:
-    with patch('charmlibs.rollingops.EtcdCtl') as mock_etcdctl:
+    with patch('charmlibs.rollingops._certificates') as mock_etcdctl:
         yield mock_etcdctl
 
 
@@ -58,15 +71,15 @@ def etcdctl_patch() -> Generator[MagicMock, None, None]:
 def certificates_manager_patches() -> Generator[dict[str, MagicMock], None, None]:
     with (
         patch(
-            'charmlibs.rollingops.CertificatesManager._exists',
+            'charmlibs.rollingops._certificates._exists',
             return_value=False,
         ),
         patch(
-            'charmlibs.rollingops.CertificatesManager.generate',
-            return_value=('CERT_PEM', 'KEY_PEM', 'CA_PEM'),
+            'charmlibs.rollingops._certificates.generate',
+            return_value=SharedCertificate('CERT_PEM', 'KEY_PEM', 'CA_PEM'),
         ) as mock_generate,
         patch(
-            'charmlibs.rollingops.CertificatesManager.persist_client_cert_key_and_ca',
+            'charmlibs.rollingops._certificates.persist_client_cert_key_and_ca',
             return_value=None,
         ) as mock_persit,
     ):

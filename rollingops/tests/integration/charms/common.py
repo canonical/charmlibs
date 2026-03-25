@@ -21,12 +21,12 @@ import json
 import logging
 import time
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Any
 
 from ops import ActionEvent, CharmBase, Framework, InstallEvent
 from ops.model import ActiveStatus, MaintenanceStatus, WaitingStatus
 
+from charmlibs import pathops
 from charmlibs.rollingops import (
     EtcdRollingOpsManager,
     OperationResult,
@@ -34,7 +34,7 @@ from charmlibs.rollingops import (
 
 logger = logging.getLogger(__name__)
 
-TRACE_FILE = Path('/var/lib/charm-rolling-ops/transitions.log')
+TRACE_FILE = pathops.LocalPath('/var/lib/charm-rolling-ops/transitions.log')
 
 
 def _now_timestamp_str() -> str:
