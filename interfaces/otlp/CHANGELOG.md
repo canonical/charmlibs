@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.0]
 
 ### Added
+
 - Initial release of charmlibs.interfaces.otlp
 - `OtlpRequirer` for consuming OTLP endpoints from a provider relation
 - `OtlpProvider` for publishing OTLP endpoints to requirer relations
@@ -20,4 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Generic aggregator rules automatically included in every requirer's published rule set
 - Python 3.10+ compatibility
 
+## [0.2.0]
 
+### Updated
+
+- Replace the requirer's rule path interface with an interface accepting an object containing rules

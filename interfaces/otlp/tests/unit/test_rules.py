@@ -22,7 +22,10 @@ from conftest import (
     SINGLE_PROMQL_RECORD,
 )
 
-MODEL = Model('foo-model', uuid='f4d59020-c8e7-4053-8044-a2c1e5591c7f')
+MODEL_NAME = 'foo-model'
+MODEL_UUID = 'f4d59020-c8e7-4053-8044-a2c1e5591c7f'
+MODEL_SHORT_UUID = 'f4d59020'
+MODEL = Model(MODEL_NAME, uuid=MODEL_UUID)
 
 
 def _decompress(rules: str | None) -> dict[str, Any]:
@@ -109,8 +112,8 @@ def test_metadata(otlp_requirer_ctx: testing.Context[ops.CharmBase]):
     for relation in list(state_out.relations):
         # THEN the requirer adds its own metadata to the databag
         assert json.loads(relation.local_app_data['metadata']) == {
-            'model': 'foo-model',
-            'model_uuid': 'f4d59020-c8e7-4053-8044-a2c1e5591c7f',
+            'model': MODEL_NAME,
+            'model_uuid': MODEL_UUID,
             'application': 'otlp-requirer',
             'unit': 'otlp-requirer/0',
             'charm_name': 'otlp-requirer',
@@ -122,8 +125,8 @@ def test_metadata(otlp_requirer_ctx: testing.Context[ops.CharmBase]):
     [
         {},
         {
-            'model': 'foo-model',
-            'model_uuid': 'f4d59020-c8e7-4053-8044-a2c1e5591c7f',
+            'model': MODEL_NAME,
+            'model_uuid': MODEL_UUID,
             'application': 'otlp-requirer',
             'charm_name': 'otlp-requirer',
             'unit': 'otlp-requirer/0',
@@ -164,21 +167,19 @@ def test_provider_rules(
             charm = metadata['charm_name'] if metadata else 'otlp-provider'
 
             # THEN the identifier is present
-            identifier = 'foo-model_f4d59020_' + app
+            identifier = f'{MODEL_NAME}_{MODEL_SHORT_UUID}_{app}'
             assert identifier in result
             groups = result[identifier].get('groups', [])
             assert groups
             for group in groups:
                 for rule in group.get('rules', []):
                     # AND the rules are labeled with the provider's topology
-                    assert rule['labels']['juju_model'] == 'foo-model'
-                    assert (
-                        rule['labels']['juju_model_uuid'] == 'f4d59020-c8e7-4053-8044-a2c1e5591c7f'
-                    )
-                    assert rule['labels']['juju_application'] == app
-                    assert rule['labels']['juju_charm'] == charm
+                    assert rule.get('labels', {}).get('juju_model') == MODEL_NAME
+                    assert rule.get('labels', {}).get('juju_model_uuid') == MODEL_UUID
+                    assert rule.get('labels', {}).get('juju_application') == app
+                    assert rule.get('labels', {}).get('juju_charm') == charm
 
                     # AND the expressions are labeled
-                    assert 'juju_model="foo-model"' in rule['expr']
-                    assert 'juju_model_uuid="f4d59020-c8e7-4053-8044-a2c1e5591c7f"' in rule['expr']
+                    assert f'juju_model="{MODEL_NAME}"' in rule['expr']
+                    assert f'juju_model_uuid="{MODEL_UUID}"' in rule['expr']
                     assert f'juju_application="{app}"' in rule['expr']

@@ -20,7 +20,7 @@ and
 `requirements <https://github.com/open-telemetry/opentelemetry-proto/blob/main/docs/requirements.md>`_
 of the project.
 
-This library provides a way for charms to share OTLP endpoint information and associated Loki and
+This library provides a way for charms to share OTLP endpoint information, and associated Loki and
 Prometheus rules. This library requires that the charm's workload already supports
 sending/receiving OTLP data and focuses on communicating those endpoints.
 
@@ -96,10 +96,10 @@ Endpoints with modern protocols are favoured over legacy ones.
 That means an endpoint supporting the `gRPC` protocol will be selected over one supporting `HTTP`.
 Unknown protocols will receive the lowest priority.
 
-The OtlpRequirer also publishes rules to related OtlpProvider charms with the ``publish()``
-method::
+The OtlpRequirer also publishes user-defined and generic (applied to all charms) rules to related
+OtlpProvider charms with the ``publish()`` method::
 
-    from charmlibs.interfaces.otlp import OtlpRequirer
+    from charmlibs.interfaces.otlp import OtlpRequirer, RulesStore
 
     class MyOtlpSender(CharmBase):
         def __init__(self, framework: ops.Framework):
@@ -107,14 +107,13 @@ method::
             self.framework.observe(self.on.update_status, self._publish_rules)
 
         def _publish_rules(self, _: ops.EventBase):
-            OtlpRequirer(
-                self,
-                loki_rules_path="./src/loki_alert_rules",
-                prometheus_rules_path="./src/prometheus_alert_rules",
-            ).publish()
-
-It is the charm's responsibility to manage the rules in the ``loki_rules_path`` and
-``prometheus_rules_path`` directories, which will be forwarded to the related OtlpProvider charms.
+            rules = (
+                RuleStore(JujuTopology.from_charm(self))
+                .add_logql(SINGLE_LOGQL_ALERT, group_name='test_logql_alert')
+                .add_promql(SINGLE_PROMQL_RECORD, group_name='test_promql_record')
+                .add_logql(OFFICIAL_LOGQL_RULES)
+            )
+            OtlpRequirer(self, rules=rules).publish()
 
 Relation Data Format
 ====================
@@ -135,14 +134,17 @@ key. Each provider may offer any number of OTLP endpoints::
         },
     ]
 
-The OtlpRequirer offers compressed rules in the relation databag under the ``rules`` key. The
-charm's metadata is included under the ``metadata`` key for the provider to know the source of the
-rules::
+The OtlpRequirer offers compressed rules in the relation databag under the ``rules`` key, which
+have this structure when decompressed::
 
     "rules": {
         "promql": {...},
         "logql": {...},
     }
+
+The charm's metadata is included under the ``metadata`` key for the provider to know the source of
+the rules::
+
     "metadata": {
         "model": "my-model",
         "model_uuid": "f4d59020-c8e7-4053-8044-a2c1e5591c7f",
@@ -156,6 +158,7 @@ from ._otlp import (
     OtlpEndpoint,
     OtlpProvider,
     OtlpRequirer,
+    RuleStore,
 )
 from ._version import __version__ as __version__
 
@@ -165,4 +168,5 @@ __all__ = [
     'OtlpEndpoint',
     'OtlpProvider',
     'OtlpRequirer',
+    'RuleStore',
 ]
