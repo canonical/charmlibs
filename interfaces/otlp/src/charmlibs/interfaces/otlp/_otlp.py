@@ -22,13 +22,19 @@ For user-facing documentation, see the package-level docstring in __init__.py.
 import copy
 import json
 import logging
+import re
 from collections import OrderedDict
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, Final, Literal
 
 from cosl.juju_topology import JujuTopology
-from cosl.rules import AlertRules, InjectResult, generic_alert_groups
+from cosl.rules import (
+    HOST_METRICS_MISSING_RULE_NAME,
+    AlertRules,
+    InjectResult,
+    generic_alert_groups,
+)
 from cosl.types import OfficialRuleFileFormat
 from cosl.utils import LZMABase64
 from ops import CharmBase
@@ -136,6 +142,11 @@ class OtlpRequirer:
             by this charm.
         prometheus_rules_path: The path to Prometheus alerting and recording
             rules provided by this charm.
+        peer_relation_name: Name of the peer relation containing units of this
+            charm.
+        generic_aggregator_rules: Whether this application is an aggregator
+            charm and should use generic aggregator rules. This requires that
+            the charm has a peers relation.
     """
 
     def __init__(
@@ -147,6 +158,8 @@ class OtlpRequirer:
         *,
         loki_rules_path: str | Path = DEFAULT_LOKI_RULES_RELATIVE_PATH,
         prometheus_rules_path: str | Path = DEFAULT_PROM_RULES_RELATIVE_PATH,
+        peer_relation_name: str,
+        generic_aggregator_rules=False,
     ):
         self._charm = charm
         self._relation_name = relation_name
@@ -159,6 +172,8 @@ class OtlpRequirer:
         self._topology = JujuTopology.from_charm(charm)
         self._loki_rules_path: str | Path = loki_rules_path
         self._prom_rules_path: str | Path = prometheus_rules_path
+        self._peer_relation_name = peer_relation_name
+        self._generic_aggregator_rules = generic_aggregator_rules
 
     def _filter_endpoints(self, endpoints: list[_OtlpEndpoint]) -> list[_OtlpEndpoint]:
         """Filter out unsupported OtlpEndpoints.
@@ -197,6 +212,62 @@ class OtlpRequirer:
         modern_score: Final = {'grpc': 2, 'http': 1}
         return max(endpoints, key=lambda e: modern_score.get(e.protocol, 0))
 
+    def _duplicate_rules_per_unit(
+        self,
+        alert_rules: dict[str, Any],
+        peer_unit_names: set[str],
+        rule_names_to_duplicate: list[str],
+        is_subordinate: bool = False,
+    ) -> dict[str, Any]:
+        """Duplicate alert rule per unit in peer_units list.
+
+        Args:
+            alert_rules: A dictionary where key = "groups" and value is a list
+                of rules.
+            peer_unit_names: A set of unit names (str) representing units of
+                this charm.
+            rule_names_to_duplicate: A list of alert rule names to be
+                duplicated.
+            is_subordinate: A boolean denoting whether the charm duplicating
+                alert rules is a subordinate or not. If yes, the severity of
+                the alerts in duplicate_keys needs to be set to critical.
+
+        Returns:
+            The updated alert rules with the rules specified in
+            rule_names_to_duplicate, duplicated per unit. The list is to be
+            assigned to the `groups` attribute of an object of type Rules.
+        """
+        updated_alert_rules = copy.deepcopy(alert_rules)
+
+        for group in updated_alert_rules.get("groups", {}):
+            new_rules = []
+            for rule in group["rules"]:
+                if rule.get("alert", "") not in rule_names_to_duplicate:
+                    new_rules.append(rule)
+                else:
+                    for name in peer_unit_names:
+                        juju_unit = name
+                        modified_rule = copy.deepcopy(rule)
+
+                        # Inject juju_unit alert label.
+                        modified_rule["labels"]["juju_unit"] = juju_unit
+
+                        # Inject juju_unit label matcher.
+                        modified_rule["expr"] = self._tool.inject_label_matchers(
+                            re.sub(r"%%juju_unit%%,?", "", modified_rule["expr"]),
+                            {"juju_unit": juju_unit},
+                        )
+
+                        # If the charm is a subordinate, the severity of the alerts need to be bumped to critical.
+                        modified_rule["labels"]["severity"] = (
+                            "critical" if is_subordinate else "warning"
+                        )
+
+                        new_rules.append(modified_rule)
+
+            group["rules"] = new_rules
+        return updated_alert_rules
+
     def publish(self):
         """Triggers programmatically the update of the relation data.
 
@@ -225,11 +296,32 @@ class OtlpRequirer:
         loki_rules = AlertRules(query_type='logql', topology=self._topology)
         prom_rules = AlertRules(query_type='promql', topology=self._topology)
 
-        # Add rules
-        prom_rules.add(
-            copy.deepcopy(generic_alert_groups.aggregator_rules),
-            group_name_prefix=self._topology.identifier,
-        )
+        # Add generic rules
+        if self._generic_aggregator_rules:
+            if not (peer_relations := self._charm.model.get_relation(self._peer_relation_name)):
+                logger.warning(
+                    'Generic aggregator rules were requested, but no peer relation was found. '
+                    'Please ensure this charm has a peer relation named "%s" to use generic '
+                    'aggregator rules.', self._peer_relation_name
+                )
+
+            unit_names = (
+                {unit.name for unit in peer_relations.units} if peer_relations else set()
+            ) | {self._charm.unit.name}
+            agg_rules = self._duplicate_rules_per_unit(
+                copy.deepcopy(generic_alert_groups.aggregator_rules),
+                unit_names,
+                rule_names_to_duplicate=[HOST_METRICS_MISSING_RULE_NAME],
+                is_subordinate=self._charm.meta.subordinate,
+            )
+            prom_rules.add(agg_rules, group_name_prefix=self._topology.identifier)
+        else:
+            prom_rules.add(
+                copy.deepcopy(generic_alert_groups.application_rules),
+                group_name_prefix=self._topology.identifier,
+            )
+
+        # Add rules from charm file paths
         loki_rules.add_path(self._loki_rules_path, recursive=True)
         prom_rules.add_path(self._prom_rules_path, recursive=True)
 
@@ -312,7 +404,7 @@ class OtlpProvider:
         for relation in self._charm.model.relations[self._relation_name]:
             relation.save(databag, self._charm.app)
 
-    def rules(self, query_type: Literal['logql', 'promql']) -> dict[str, dict[str, Any]]:
+    def rules(self, query_type: Literal['logql', 'promql']) -> dict[str, OfficialRuleFileFormat]:
         """Fetch rules for all relations of the desired query and rule types.
 
         This method returns all rules of the desired query and rule types
@@ -327,7 +419,7 @@ class OtlpProvider:
             a mapping of relation ID to a dictionary of alert rule groups
             following the OfficialRuleFileFormat from cos-lib.
         """
-        rules_map: dict[str, dict[str, Any]] = {}
+        rules_map: dict[str, OfficialRuleFileFormat] = {}
         # Instantiate AlertRules with topology to ensure that rules always have an identifier
         rules_obj = AlertRules(query_type, self._topology)
         for relation in self._charm.model.relations[self._relation_name]:

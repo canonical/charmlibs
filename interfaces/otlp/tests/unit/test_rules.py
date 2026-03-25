@@ -10,7 +10,7 @@ import ops
 import pytest
 from cosl.utils import LZMABase64
 from ops import testing
-from ops.testing import Model, Relation, State
+from ops.testing import Model, PeerRelation, Relation, State
 
 from charmlibs.interfaces.otlp._otlp import DEFAULT_PROVIDER_RELATION_NAME as RECEIVE
 from charmlibs.interfaces.otlp._otlp import DEFAULT_REQUIRER_RELATION_NAME as SEND
@@ -61,7 +61,7 @@ def test_rules_compression(otlp_requirer_ctx: testing.Context[ops.CharmBase]):
     # GIVEN a send-otlp relation
     state = State(relations=[Relation(SEND)], leader=True)
 
-    # WHEN any event executes the reconciler
+    # WHEN the update_status event is fired
     state_out = otlp_requirer_ctx.run(otlp_requirer_ctx.on.update_status(), state=state)
     for relation in list(state_out.relations):
         rules = relation.local_app_data.get('rules', None)
@@ -76,11 +76,16 @@ def test_rules_compression(otlp_requirer_ctx: testing.Context[ops.CharmBase]):
         assert set(_RulesModel.model_fields.keys()).issubset(decompressed.keys())
 
 
+# @pytest.mark.parametrize('is_aggregator', [True, False])
+@pytest.mark.parametrize('otlp_requirer_ctx', [True, False], indirect=True)
 def test_generic_rule_injection(otlp_requirer_ctx: testing.Context[ops.CharmBase]):
     # GIVEN a send-otlp relation
-    state = State(relations=[Relation(SEND)], leader=True, model=MODEL)
+    # TODO: GIVEN it is (or is not) an aggregator
+    # TODO: GIVEN it has (or has not) peers relation
+    peers = PeerRelation(endpoint="my-peers")
+    state = State(relations=[peers, Relation(SEND)], leader=True, model=MODEL)
 
-    # WHEN any event executes the reconciler
+    # WHEN the update_status event is fired
     state_out = otlp_requirer_ctx.run(otlp_requirer_ctx.on.update_status(), state=state)
     for relation in list(state_out.relations):
         # AND the rules in the databag are decompressed
@@ -99,7 +104,7 @@ def test_metadata(otlp_requirer_ctx: testing.Context[ops.CharmBase]):
     # GIVEN a send-otlp relation
     state = State(relations=[Relation(SEND)], leader=True, model=MODEL)
 
-    # WHEN any event executes the reconciler
+    # WHEN the update_status event is fired
     state_out = otlp_requirer_ctx.run(otlp_requirer_ctx.on.update_status(), state=state)
     for relation in list(state_out.relations):
         # THEN the requirer adds its own metadata to the databag

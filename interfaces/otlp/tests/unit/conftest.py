@@ -79,6 +79,8 @@ ALL_TELEMETRIES: Final[list[Literal['logs', 'metrics', 'traces']]] = ['logs', 'm
 
 
 class OtlpRequirerCharm(CharmBase):
+    generic_aggregator_rules: bool = False
+
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
         self.charm_root = self.charm_dir.absolute()
@@ -105,6 +107,7 @@ class OtlpRequirerCharm(CharmBase):
             ALL_TELEMETRIES,
             loki_rules_path=self.loki_rules_path,
             prometheus_rules_path=self.prometheus_rules_path,
+            generic_aggregator_rules=self.generic_aggregator_rules,
         ).publish()
 
 
@@ -128,11 +131,30 @@ def mock_hostname():
         yield
 
 
-@pytest.fixture
-def otlp_requirer_ctx() -> testing.Context[OtlpRequirerCharm]:
-    meta = {'name': 'otlp-requirer', 'requires': {'send-otlp': {'interface': 'otlp'}}}
-    return testing.Context(OtlpRequirerCharm, meta=meta)
+# @pytest.fixture
+# def otlp_requirer_ctx() -> testing.Context[OtlpRequirerCharm]:
+#     meta = {
+#         'name': 'otlp-requirer',
+#         'requires': {'send-otlp': {'interface': 'otlp'}},
+#         'peers': {'my-peers': {'interface': 'aggregator_peers'}},
+#     }
+#     return testing.Context(OtlpRequirerCharm, meta=meta)
 
+# TODO: Remove if not needed
+@pytest.fixture
+def otlp_requirer_ctx(request: pytest.FixtureRequest) -> testing.Context[OtlpRequirerCharm]:
+    meta = {
+        'name': 'otlp-requirer',
+        'requires': {'send-otlp': {'interface': 'otlp'}},
+        'peers': {'my-peers': {'interface': 'aggregator_peers'}},
+    }
+    generic_aggregator_rules: bool = getattr(request, 'param', False)
+    charm_cls = type(
+        'OtlpRequirerCharm',
+        (OtlpRequirerCharm,),
+        {'generic_aggregator_rules': generic_aggregator_rules},
+    )
+    return testing.Context(charm_cls, meta=meta)
 
 @pytest.fixture
 def otlp_provider_ctx() -> testing.Context[OtlpProviderCharm]:
