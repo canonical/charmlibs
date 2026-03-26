@@ -14,7 +14,7 @@
 
 import logging
 
-from data_platform_helpers.interfaces import (
+from dpcharmlibs.interfaces import (
     RequirerCommonModel,
     ResourceCreatedEvent,
     ResourceEndpointsChangedEvent,
