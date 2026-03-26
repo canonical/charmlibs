@@ -101,6 +101,7 @@ dependencies = [
     { name = "charmlibs-interfaces-tls-certificates" },
     { name = "charmlibs-pathops" },
     { name = "dpcharmlibs-interfaces" },
+    { name = "tenacity" },
 ]
 
 [package.dev-dependencies]
@@ -117,6 +118,7 @@ requires-dist = [
     { name = "charmlibs-interfaces-tls-certificates", specifier = ">=1.8.1" },
     { name = "charmlibs-pathops", specifier = ">=1.2.1" },
     { name = "dpcharmlibs-interfaces", specifier = "==1.0.0" },
+    { name = "tenacity" },
 ]
 
 [package.metadata.requires-dev]
