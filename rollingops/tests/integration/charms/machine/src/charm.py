@@ -15,6 +15,7 @@
 """Machine charm for testing."""
 
 import logging
+import subprocess
 
 import common
 import ops
@@ -28,10 +29,21 @@ class RollingOpsCharm(common.Charm):
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
         framework.observe(self.on.start, self._on_start)
+        framework.observe(self.on.install, self._on_install)
 
     def _on_start(self, event: ops.StartEvent):
         """Handle start event."""
         self.unit.status = ops.ActiveStatus()
+
+    def _on_install(self, event: ops.InstallEvent) -> None:
+        """Handle the install.
+
+        It install the charmed-etcd snap.
+
+        Raises:
+            subprocess.CalledProcessError: If package installation fails.
+        """
+        subprocess.run(['snap', 'install', 'charmed-etcd', '--channel=3.6/stable'], check=True)
 
 
 if __name__ == '__main__':  # pragma: nocover

@@ -20,6 +20,7 @@ from datetime import datetime
 from pathlib import Path
 
 import jubilant
+import pytest
 from tenacity import retry, stop_after_delay, wait_fixed
 
 TRACE_FILE = '/var/lib/charm-rolling-ops/transitions.log'
@@ -51,6 +52,7 @@ def test_deploy(juju: jubilant.Juju, app_name: str):
     assert app_name in juju.status().apps
 
 
+@pytest.mark.machine_only
 def test_restart_action_one_unit(juju: jubilant.Juju, app_name: str):
     """Verify that restart action runs through the expected workflow."""
 
@@ -96,6 +98,7 @@ def test_restart_action_one_unit(juju: jubilant.Juju, app_name: str):
     assert expected == restart_events
 
 
+@pytest.mark.machine_only
 def test_all_units_can_connect_to_etcd(juju: jubilant.Juju, app_name: str):
     juju.add_unit(app_name, num_units=2)
     juju.wait(
@@ -130,6 +133,7 @@ def test_all_units_can_connect_to_etcd(juju: jubilant.Juju, app_name: str):
         assert restart_events == expected
 
 
+@pytest.mark.machine_only
 def test_all_units_can_connect_to_etcd_multi_app(juju: jubilant.Juju, charm: Path, app_name: str):
     second_app = f'{app_name}-secondary'
 

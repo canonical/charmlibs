@@ -23,7 +23,7 @@ import time
 from datetime import UTC, datetime
 from typing import Any
 
-from ops import ActionEvent, CharmBase, Framework, InstallEvent
+from ops import ActionEvent, CharmBase, Framework
 from ops.model import ActiveStatus, MaintenanceStatus, WaitingStatus
 
 from charmlibs import pathops
@@ -61,7 +61,6 @@ class Charm(CharmBase):
             callback_targets=callback_targets,
         )
 
-        self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.restart_action, self._on_restart_action)
         self.framework.observe(self.on.failed_restart_action, self._on_failed_restart_action)
         self.framework.observe(self.on.deferred_restart_action, self._on_deferred_restart_action)
@@ -91,9 +90,6 @@ class Charm(CharmBase):
         self.model.unit.status = MaintenanceStatus('Rolling _deferred_restart operation failed')
         self._record_transition('_deferred_restart:retry_hold', delay=delay)
         return OperationResult.RETRY_HOLD
-
-    def _on_install(self, event: InstallEvent) -> None:
-        self.unit.status = ActiveStatus()
 
     def _on_restart_action(self, event: ActionEvent) -> None:
         delay = event.params.get('delay')
