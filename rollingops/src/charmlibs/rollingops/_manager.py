@@ -17,7 +17,13 @@ import subprocess
 from typing import Any
 
 from ops import Relation
-from ops.charm import CharmBase, InstallEvent, RelationBrokenEvent, RelationDepartedEvent
+from ops.charm import (
+    CharmBase,
+    InstallEvent,
+    RelationBrokenEvent,
+    RelationCreatedEvent,
+    RelationDepartedEvent,
+)
 from ops.framework import EventBase, Object
 
 from charmlibs.rollingops import _etcdctl as etcdctl
@@ -90,6 +96,9 @@ class EtcdRollingOpsManager(Object):
         self.framework.observe(
             charm.on[self.etcd_relation_name].relation_broken, self._on_etcd_relation_broken
         )
+        self.framework.observe(
+            charm.on[self.etcd_relation_name].relation_created, self._on_etcd_relation_created
+        )
         self.framework.observe(charm.on.rollingops_lock_granted, self._on_rollingop_granted)
         self.framework.observe(charm.on.install, self._on_install)
 
@@ -115,16 +124,28 @@ class EtcdRollingOpsManager(Object):
         subprocess.run(['apt-get', 'update'], check=True)
         subprocess.run(['apt-get', 'install', '-y', 'etcd-client'], check=True)
 
+    def _on_etcd_relation_created(self, event: RelationCreatedEvent) -> None:
+        """Check whether the snap-provided etcdctl command is available."""
+        if not etcdctl.is_etcdctl_installed():
+            logger.error(
+                'etcdctl is not installed. Please install the %s snap to provide %s.',
+                etcdctl.ETCD_SNAP_NAME,
+                etcdctl.ETCDCTL_CMD,
+            )
+            # TODO: fallback to peer relation implementation.
+
     def _on_rollingop_granted(self, event: RollingOpsLockGrantedEvent) -> None:
         """Handle the event when a rolling operation lock is granted.
 
         If etcd is not yet configured, the operation is skipped.
         """
         if not self._peer_relation or not self._etcd_relation:
+            # TODO: handle this case. Fallback to peer relation.
             return
         try:
             etcdctl.ensure_initialized()
         except RollingOpsEtcdNotConfiguredError:
+            # TODO: handle this case. Fallback to peer relation.
             return
         logger.info('Received a rolling-op lock granted event.')
         self._on_run_with_lock()

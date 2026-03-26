@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""etcd rolling ops."""
+"""etcd rolling ops. Spawns and manages the external rolling-ops worker process."""
 
 import logging
 import os
@@ -27,6 +27,8 @@ from ops.framework import Object
 from charmlibs import pathops
 
 logger = logging.getLogger(__name__)
+
+WORKER_PID_FIELD = 'etcd-rollingops-worker-pid'
 
 
 class EtcdRollingOpsAsyncWorker(Object):
@@ -49,14 +51,13 @@ class EtcdRollingOpsAsyncWorker(Object):
         if self._relation is None:
             return
 
-        pid_str = self._relation.data[self.model.unit].get('etcd-rollingops-worker-pid', '')
-        if pid_str:
+        if pid_str := self._relation.data[self.model.unit].get(WORKER_PID_FIELD):
             try:
                 pid = int(pid_str)
-            except ValueError:
-                pid = -1
+            except (ValueError, TypeError):
+                pid = None
 
-            if self._is_pid_alive(pid):
+            if pid is not None and self._is_pid_alive(pid):
                 logger.info(
                     'RollingOps worker already running with PID %s; not starting a new one.', pid
                 )
@@ -115,7 +116,7 @@ class EtcdRollingOpsAsyncWorker(Object):
             env=new_env,
         ).pid
 
-        self._relation.data[self.model.unit].update({'etcd-rollingops-worker-pid': str(pid)})
+        self._relation.data[self.model.unit].update({WORKER_PID_FIELD: str(pid)})
         logger.info('Started etcd rollingops worker process with PID %s', pid)
 
     def _is_pid_alive(self, pid: int) -> bool:
@@ -133,15 +134,36 @@ class EtcdRollingOpsAsyncWorker(Object):
         """Stop the running worker process if it exists."""
         if self._relation is None:
             return
-        pid_str = self._relation.data[self.model.unit].get('etcd-rollingops-worker-pid', '')
-        if not pid_str:
+
+        pid_str = self._relation.data[self.model.unit].get(WORKER_PID_FIELD, '')
+
+        try:
+            pid = int(pid_str)
+        except (TypeError, ValueError):
+            logger.info('Missing PID or invalid PID found in the databag.')
+            self._relation.data[self.model.unit].update({WORKER_PID_FIELD: ''})
             return
 
-        pid = int(pid_str)
         try:
-            os.kill(pid, signal.SIGINT)
-            logger.info('Stopped etcd rollingops worker process PID %s', pid)
+            os.kill(pid, signal.SIGTERM)
+            logger.info('Sent SIGTERM to etcd rollingops worker process PID %s.', pid)
+        except ProcessLookupError:
+            logger.info('Process PID %s is already gone.', pid)
+        except PermissionError:
+            logger.warning('No permission to stop etcd rollingops worker process PID %s.', pid)
+            return
         except OSError:
-            logger.info('Failed to stop etcd rollingops worker process PID %s', pid)
+            logger.warning('SIGTERM failed for PID %s, attempting SIGKILL', pid)
+            try:
+                os.kill(pid, signal.SIGKILL)
+                logger.info('Sent SIGKILL to etcd rollingops worker process PID %s', pid)
+            except ProcessLookupError:
+                logger.info('Process PID %s exited before SIGKILL', pid)
+            except PermissionError:
+                logger.warning('No permission to SIGKILL process PID %s', pid)
+                return
+            except OSError:
+                logger.warning('Failed to SIGKILL process PID %s', pid)
+                return
 
-        self._relation.data[self.model.unit].update({'etcd-rollingops-worker-pid': ''})
+        self._relation.data[self.model.unit].update({WORKER_PID_FIELD: ''})

@@ -21,6 +21,7 @@ convenience functions for executing commands and retrieving structured results.
 
 import json
 import os
+import shutil
 import subprocess
 from dataclasses import asdict
 
@@ -34,7 +35,14 @@ from charmlibs.rollingops._models import (
 
 BASE_DIR = pathops.LocalPath('/var/lib/rollingops/etcd')
 SERVER_CA_PATH = BASE_DIR / 'server-ca.pem'
-CONFIG_FILE_PATH = BASE_DIR / 'etcdctl.env'
+CONFIG_FILE_PATH = BASE_DIR / 'etcdctl.json'
+ETCD_SNAP_NAME = 'charmed-etcd'
+ETCDCTL_CMD = f'{ETCD_SNAP_NAME}.etcdctl'
+
+
+def is_etcdctl_installed() -> bool:
+    """Return whether the snap-provided etcdctl command is available."""
+    return shutil.which(ETCDCTL_CMD) is not None
 
 
 def write_trusted_server_ca(tls_ca_pem: str) -> None:
@@ -93,14 +101,14 @@ def _load_config() -> EtcdConfig:
     """Load etcd configuration from disk.
 
     Raises:
-        RollingOpsEtcdNotConfiguredError: If the environment file does not exist.
+        RollingOpsEtcdNotConfiguredError: If the config file does not exist.
         RollingOpsFileSystemError: if we faile to read the etcd configuration file or
             file cannot be deserialized.
         PebbleConnectionError: if the remote container cannot be reached
     """
     if not with_pebble_retry(lambda: CONFIG_FILE_PATH.exists()):
         raise RollingOpsEtcdNotConfiguredError(
-            f'etcdctl env file does not exist: {CONFIG_FILE_PATH}'
+            f'etcdctl config file does not exist: {CONFIG_FILE_PATH}'
         )
 
     try:
@@ -121,8 +129,8 @@ def load_env() -> dict[str, str]:
 
     Raises:
         RollingOpsEtcdNotConfiguredError: If the environment file does not exist.
-        RollingOpsFileSystemError: if we faile to read the etcd configuration file or
-            file cannot be deserialized.
+        RollingOpsFileSystemError: if we fail to read the etcd configuration file or
+            the file cannot be deserialized.
         PebbleConnectionError: if the remote container cannot be reached
     """
     config = _load_config()
@@ -142,16 +150,22 @@ def ensure_initialized():
     """Checks whether the etcd config file for etcdctl is setup.
 
     Raises:
-        RollingOpsEtcdNotConfiguredError: if the etcd config file does not exist.
+        RollingOpsEtcdNotConfiguredError: if the etcd config file does not exist, etcd
+            server CA does not exist or etcdctl is not installed.
         PebbleConnectionError: if the remote container cannot be reached.
     """
     if not with_pebble_retry(lambda: CONFIG_FILE_PATH.exists()):
         raise RollingOpsEtcdNotConfiguredError(
-            f'etcdctl env file does not exist: {CONFIG_FILE_PATH}'
+            f'etcdctl config file does not exist: {CONFIG_FILE_PATH}'
         )
     if not with_pebble_retry(lambda: SERVER_CA_PATH.exists()):
         raise RollingOpsEtcdNotConfiguredError(
             f'etcdctl server CA file does not exist: {SERVER_CA_PATH}'
+        )
+    if not is_etcdctl_installed():
+        raise RollingOpsEtcdNotConfiguredError(
+            f'etcdctl is not installed. Please install the {ETCD_SNAP_NAME} snap '
+            f'to provide {ETCDCTL_CMD}.'
         )
 
 
@@ -169,23 +183,22 @@ def cleanup() -> None:
         raise RollingOpsFileSystemError('Failed to remove etcd config file and CA.') from e
 
 
-def run(
-    args: list[str], check: bool = True, capture: bool = True
-) -> subprocess.CompletedProcess[str]:
+def run(args: list[str]) -> subprocess.CompletedProcess[str]:
     """Execute an etcdctl command.
 
     Args:
         args: List of arguments to pass to etcdctl.
-        check: If True, raise an exception on non-zero exit status.
-        capture: Whether to capture stdout and stderr.
 
     Returns:
         A CompletedProcess object containing the result.
 
     Raises:
         RollingOpsEtcdNotConfiguredError: if the etcd config file does not exist.
-        PebbleConnectionError: if the remote container cannot be reached
+        PebbleConnectionError: if the remote container cannot be reached.
+        CalledProcessError: if the command execution failed.
+        TimeoutExpired: if the command execution timed out.
     """
     ensure_initialized()
-    cmd = ['etcdctl', *args]
-    return subprocess.run(cmd, env=load_env(), check=check, text=True, capture_output=capture)
+    cmd = [ETCDCTL_CMD, *args]
+    # TODO: decide where to handle CalledProcessError and TimeoutExpired.
+    return subprocess.run(cmd, env=load_env(), check=True, text=True, capture_output=True)

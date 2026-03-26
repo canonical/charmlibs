@@ -21,12 +21,12 @@ from charmlibs.rollingops._models import RollingOpsKeys
 def test_rollingopskeys_paths() -> None:
     keys = RollingOpsKeys.for_owner('cluster-a', 'unit-1')
 
-    assert keys.cluster_prefix == '/rollingops/cluster-a/'
-    assert keys._owner_prefix == '/rollingops/cluster-a/unit-1/'
-    assert keys.lock_key == '/rollingops/cluster-a/granted-unit/'
-    assert keys.pending == '/rollingops/cluster-a/unit-1/pending/'
-    assert keys.inprogress == '/rollingops/cluster-a/unit-1/inprogress/'
-    assert keys.completed == '/rollingops/cluster-a/unit-1/completed/'
+    assert keys.cluster_prefix == '/rollingops/default/cluster-a/'
+    assert keys._owner_prefix == '/rollingops/default/cluster-a/unit-1/'
+    assert keys.lock_key == '/rollingops/default/cluster-a/granted-unit/'
+    assert keys.pending == '/rollingops/default/cluster-a/unit-1/pending/'
+    assert keys.inprogress == '/rollingops/default/cluster-a/unit-1/inprogress/'
+    assert keys.completed == '/rollingops/default/cluster-a/unit-1/completed/'
 
 
 def test_rollingopskeys_lock_key_is_shared_within_cluster() -> None:

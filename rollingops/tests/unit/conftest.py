@@ -51,7 +51,7 @@ def temp_certificates(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> types.
 def temp_etcdctl(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> types.ModuleType:
     base_dir = LocalPath(str(tmp_path)) / 'etcd'
     server_ca = base_dir / 'server-ca.pem'
-    env_file = base_dir / 'etcdctl.env'
+    env_file = base_dir / 'etcdctl.json'
 
     monkeypatch.setattr(etcdctl, 'BASE_DIR', base_dir)
     monkeypatch.setattr(etcdctl, 'SERVER_CA_PATH', server_ca)

@@ -95,10 +95,10 @@ class RollingOpsKeys:
     """Collection of etcd key prefixes used for rolling operations.
 
     Layout:
-        /rollingops/{cluster_id}/granted-unit/
-        /rollingops/{cluster_id}/{owner}/pending/
-        /rollingops/{cluster_id}/{owner}/inprogress/
-        /rollingops/{cluster_id}/{owner}/completed/
+        /rollingops/{lock_name}/{cluster_id}/granted-unit/
+        /rollingops/{lock_name}/{cluster_id}/{owner}/pending/
+        /rollingops/{lock_name}/{cluster_id}/{owner}/inprogress/
+        /rollingops/{lock_name}/{cluster_id}/{owner}/completed/
 
     The distributed lock key is cluster-scoped
     """
@@ -107,11 +107,12 @@ class RollingOpsKeys:
 
     cluster_id: str
     owner: str
+    lock_name: str = 'default'
 
     @property
     def cluster_prefix(self) -> str:
         """Etcd prefix corresponding to the cluster namespace."""
-        return f'{self.ROOT}/{self.cluster_id}/'
+        return f'{self.ROOT}/{self.lock_name}/{self.cluster_id}/'
 
     @property
     def _owner_prefix(self) -> str:

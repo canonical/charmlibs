@@ -98,7 +98,6 @@ def generate(common_name: str) -> SharedCertificate:
     Args:
         common_name: Common Name (CN) used in the client certificate
             subject. This value should not contain slashes.
-        sans_dns: Name of the unit creating the certificate.
 
     Raises:
         PebbleConnectionError: if the remote container cannot be reached
