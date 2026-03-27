@@ -214,10 +214,10 @@ class OtlpRequirer:
             endpoints.
         telemetries: The telemetries to filter for in the provider's OTLP
             endpoints.
-        aggregator_peer_relation_name: Name of the peer relation containing
-            units of this charm. The charm must have a peer relation with this
-            name and should be an aggregator. When provided, generic aggregator
-            rules are used instead of application-level rules.
+        aggregator_peer_relation_name: Name of the peers relation of this
+            charm. This should only be set IFF the charm is an aggregator AND
+            it has a peer relation with this name. When provided, generic
+            aggregator rules are used instead of application-level rules.
         rules: Rules of different types e.g., logql or promql, that the
             requirer will publish for the provider.
     """
