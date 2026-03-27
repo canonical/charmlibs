@@ -83,9 +83,7 @@ def test_new_endpoint_key_is_ignored_by_databag_model():
                 ]),
             },
             _OtlpEndpoint(
-                protocol='http',
-                endpoint='http://host:4317',
-                telemetries=['logs', 'traces'],
+                protocol='http', endpoint='http://host:4317', telemetries=['logs', 'traces']
             ),
         ),
         (
@@ -140,13 +138,11 @@ def test_send_otlp_invalid_databag(
             {
                 123: _OtlpEndpoint(
                     protocol='http',
-                    endpoint='http://provider-123.endpoint:4318',
+                    endpoint='http://provider-123:4318',
                     telemetries=['logs', 'metrics'],
                 ),
                 456: _OtlpEndpoint(
-                    protocol='grpc',
-                    endpoint='http://provider-456.endpoint:4317',
-                    telemetries=['traces'],
+                    protocol='grpc', endpoint='http://provider-456:4317', telemetries=['traces']
                 ),
             },
         ),
@@ -155,9 +151,7 @@ def test_send_otlp_invalid_databag(
             ALL_TELEMETRIES,
             {
                 456: _OtlpEndpoint(
-                    protocol='grpc',
-                    endpoint='http://provider-456.endpoint:4317',
-                    telemetries=['traces'],
+                    protocol='grpc', endpoint='http://provider-456:4317', telemetries=['traces']
                 )
             },
         ),
@@ -166,14 +160,10 @@ def test_send_otlp_invalid_databag(
             ['metrics'],
             {
                 123: _OtlpEndpoint(
-                    protocol='http',
-                    endpoint='http://provider-123.endpoint:4318',
-                    telemetries=['metrics'],
+                    protocol='http', endpoint='http://provider-123:4318', telemetries=['metrics']
                 ),
                 456: _OtlpEndpoint(
-                    protocol='http',
-                    endpoint='http://provider-456.endpoint:4318',
-                    telemetries=['metrics'],
+                    protocol='http', endpoint='http://provider-456:4318', telemetries=['metrics']
                 ),
             },
         ),
@@ -191,7 +181,7 @@ def test_send_otlp_with_varying_requirer_support(
         'endpoints': json.dumps([
             {
                 'protocol': 'http',
-                'endpoint': 'http://provider-123.endpoint:4318',
+                'endpoint': 'http://provider-123:4318',
                 'telemetries': ['logs', 'metrics'],
                 'insecure': False,
             }
@@ -201,13 +191,13 @@ def test_send_otlp_with_varying_requirer_support(
         'endpoints': json.dumps([
             {
                 'protocol': 'grpc',
-                'endpoint': 'http://provider-456.endpoint:4317',
+                'endpoint': 'http://provider-456:4317',
                 'telemetries': ['traces'],
                 'insecure': False,
             },
             {
                 'protocol': 'http',
-                'endpoint': 'http://provider-456.endpoint:4318',
+                'endpoint': 'http://provider-456:4318',
                 'telemetries': ['metrics'],
                 'insecure': False,
             },
@@ -236,7 +226,7 @@ def test_send_otlp(otlp_requirer_ctx: testing.Context[ops.CharmBase]):
         'endpoints': json.dumps([
             {
                 'protocol': 'http',
-                'endpoint': 'http://provider-123.endpoint:4318',
+                'endpoint': 'http://provider-123:4318',
                 'telemetries': ['logs', 'metrics'],
                 'insecure': False,
             }
@@ -246,13 +236,13 @@ def test_send_otlp(otlp_requirer_ctx: testing.Context[ops.CharmBase]):
         'endpoints': json.dumps([
             {
                 'protocol': 'grpc',
-                'endpoint': 'http://provider-456.endpoint:4317',
+                'endpoint': 'http://provider-456:4317',
                 'telemetries': ['traces'],
                 'insecure': False,
             },
             {
                 'protocol': 'http',
-                'endpoint': 'http://provider-456.endpoint:4318',
+                'endpoint': 'http://provider-456:4318',
                 'telemetries': ['metrics'],
                 'insecure': False,
             },
@@ -261,14 +251,10 @@ def test_send_otlp(otlp_requirer_ctx: testing.Context[ops.CharmBase]):
 
     expected_endpoints = {
         456: _OtlpEndpoint(
-            protocol='http',
-            endpoint='http://provider-456.endpoint:4318',
-            telemetries=['metrics'],
+            protocol='http', endpoint='http://provider-456:4318', telemetries=['metrics']
         ),
         123: _OtlpEndpoint(
-            protocol='http',
-            endpoint='http://provider-123.endpoint:4318',
-            telemetries=['logs', 'metrics'],
+            protocol='http', endpoint='http://provider-123:4318', telemetries=['logs', 'metrics']
         ),
     }
 
@@ -328,14 +314,10 @@ def test_receive_otlp(otlp_provider_ctx: testing.Context[ops.CharmBase]):
         (
             [
                 _OtlpEndpoint(
-                    protocol='http',
-                    endpoint='http://host:4318',
-                    telemetries=['metrics'],
+                    protocol='http', endpoint='http://host:4318', telemetries=['metrics']
                 ),
                 _OtlpEndpoint(
-                    protocol='grpc',
-                    endpoint='http://host:4317',
-                    telemetries=['metrics'],
+                    protocol='grpc', endpoint='http://host:4317', telemetries=['metrics']
                 ),
             ],
             'grpc',
@@ -344,9 +326,7 @@ def test_receive_otlp(otlp_provider_ctx: testing.Context[ops.CharmBase]):
         (
             [
                 _OtlpEndpoint(
-                    protocol='http',
-                    endpoint='http://host:4318',
-                    telemetries=['metrics'],
+                    protocol='http', endpoint='http://host:4318', telemetries=['metrics']
                 ),
             ],
             'http',
@@ -355,9 +335,7 @@ def test_receive_otlp(otlp_provider_ctx: testing.Context[ops.CharmBase]):
         (
             [
                 _OtlpEndpoint(
-                    protocol='grpc',
-                    endpoint='http://host:4317',
-                    telemetries=['metrics'],
+                    protocol='grpc', endpoint='http://host:4317', telemetries=['metrics']
                 ),
             ],
             'grpc',
@@ -366,14 +344,10 @@ def test_receive_otlp(otlp_provider_ctx: testing.Context[ops.CharmBase]):
         (
             [
                 _OtlpEndpoint(
-                    protocol='http',
-                    endpoint='http://host:4318',
-                    telemetries=['metrics'],
+                    protocol='http', endpoint='http://host:4318', telemetries=['metrics']
                 ),
                 _OtlpEndpoint(
-                    protocol='new',
-                    endpoint='http://host:4316',
-                    telemetries=['metrics'],
+                    protocol='new', endpoint='http://host:4316', telemetries=['metrics']
                 ),
             ],
             'http',
@@ -396,3 +370,6 @@ def test_favor_modern_endpoints(
 
     # THEN the most modern one is chosen
     assert result.protocol == expected_protocol
+
+
+def test_insecure_
