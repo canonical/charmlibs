@@ -115,10 +115,7 @@ class OtlpProviderCharm(CharmBase):
 
     def _publish_endpoints(self, _: ops.EventBase) -> None:
         OtlpProvider(self).add_endpoint(
-            protocol='http',
-            endpoint=f'{socket.getfqdn()}:4318',
-            telemetries=['metrics'],
-            insecure=True,
+            protocol='http', endpoint=f'{socket.getfqdn()}:4318', telemetries=['metrics']
         ).publish()
 
 

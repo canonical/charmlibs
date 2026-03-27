@@ -157,7 +157,8 @@ class OtlpEndpoint(BaseModel):
         description='Telemetry signal types accepted by this endpoint.'
     )
     insecure: bool = Field(
-        description='Whether this endpoint requires an insecure connection (e.g. no TLS).'
+        description='Whether this endpoint requires an insecure connection (e.g. no TLS).',
+        default=False,
     )
 
 
