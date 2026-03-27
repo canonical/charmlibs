@@ -113,7 +113,6 @@ def generate(common_name: str) -> SharedCertificate:
     ca_key = PrivateKey.generate(key_size=KEY_SIZE)
     ca_attributes = CertificateRequestAttributes(
         common_name=common_name,
-        sans_dns=[common_name],
         is_ca=True,
         add_unique_id_to_subject_name=False,
     )
@@ -126,7 +125,7 @@ def generate(common_name: str) -> SharedCertificate:
     client_key = PrivateKey.generate(key_size=KEY_SIZE)
 
     csr_attributes = CertificateRequestAttributes(
-        common_name=common_name, sans_dns=[common_name], add_unique_id_to_subject_name=False
+        common_name=common_name, add_unique_id_to_subject_name=False
     )
     csr = CertificateSigningRequest.generate(
         attributes=csr_attributes,
