@@ -4,7 +4,7 @@
 """Feature: Rules aggregation and labeling."""
 
 import json
-from typing import Any, cast
+from typing import Any
 
 import ops
 import pytest
@@ -92,11 +92,10 @@ def test_duplicate_rules_per_unit(
 ):
     with otlp_requirer_ctx(otlp_requirer_ctx.on.update_status(), state=State(leader=True)) as mgr:
         # GIVEN any charm
-        charm_any = cast('Any', mgr.charm)
         # WHEN the OtlpRequirer is initialized
         # * generic aggregator rules are desired
         # * no peer relation name is provided
-        result = OtlpRequirer(charm_any)._duplicate_rules_per_unit(
+        result = OtlpRequirer(mgr.charm)._duplicate_rules_per_unit(
             alert_rules={
                 'groups': [
                     {
@@ -240,9 +239,8 @@ def test_provider_rules(
     state = State(leader=True, relations=[receiver], model=MODEL)
     with otlp_provider_ctx(otlp_provider_ctx.on.update_status(), state=state) as mgr:
         # WHEN the provider aggregates the rules from the databag
-        charm_any = cast('Any', mgr.charm)
-        logql = OtlpProvider(charm_any, RECEIVE).rules('logql')
-        promql = OtlpProvider(charm_any, RECEIVE).rules('promql')
+        logql = OtlpProvider(mgr.charm, RECEIVE).rules('logql')
+        promql = OtlpProvider(mgr.charm, RECEIVE).rules('promql')
         assert logql
         assert promql
         for result in [logql, promql]:
