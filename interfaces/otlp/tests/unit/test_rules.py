@@ -8,14 +8,21 @@ from typing import Any, cast
 
 import ops
 import pytest
+from cosl.rules import HOST_METRICS_MISSING_RULE_NAME
 from cosl.utils import LZMABase64
 from ops import testing
-from ops.testing import Model, Relation, State
+from ops.testing import Model, PeerRelation, Relation, State
 
 from charmlibs.interfaces.otlp._otlp import DEFAULT_PROVIDER_RELATION_NAME as RECEIVE
 from charmlibs.interfaces.otlp._otlp import DEFAULT_REQUIRER_RELATION_NAME as SEND
-from charmlibs.interfaces.otlp._otlp import OtlpProvider, _OtlpRequirerAppData, _RulesModel
+from charmlibs.interfaces.otlp._otlp import (
+    OtlpProvider,
+    OtlpRequirer,
+    _OtlpRequirerAppData,
+    _RulesModel,
+)
 from conftest import (
+    PEERS_ENDPOINT,
     SINGLE_LOGQL_ALERT,
     SINGLE_LOGQL_RECORD,
     SINGLE_PROMQL_ALERT,
@@ -64,7 +71,7 @@ def test_rules_compression(otlp_requirer_ctx: testing.Context[ops.CharmBase]):
     # GIVEN a send-otlp relation
     state = State(relations=[Relation(SEND)], leader=True)
 
-    # WHEN any event executes the reconciler
+    # WHEN the update_status event is fired
     state_out = otlp_requirer_ctx.run(otlp_requirer_ctx.on.update_status(), state=state)
     for relation in list(state_out.relations):
         rules = relation.local_app_data.get('rules', None)
@@ -79,30 +86,111 @@ def test_rules_compression(otlp_requirer_ctx: testing.Context[ops.CharmBase]):
         assert set(_RulesModel.model_fields.keys()).issubset(decompressed.keys())
 
 
-def test_generic_rule_injection(otlp_requirer_ctx: testing.Context[ops.CharmBase]):
-    # GIVEN a send-otlp relation
-    state = State(relations=[Relation(SEND)], leader=True, model=MODEL)
+@pytest.mark.parametrize('subordinate', [True, False])
+def test_duplicate_rules_per_unit(
+    otlp_requirer_ctx: testing.Context[ops.CharmBase], subordinate: bool
+):
+    with otlp_requirer_ctx(otlp_requirer_ctx.on.update_status(), state=State(leader=True)) as mgr:
+        # GIVEN any charm
+        charm_any = cast('Any', mgr.charm)
+        # WHEN the OtlpRequirer is initialized
+        # * generic aggregator rules are desired
+        # * no peer relation name is provided
+        result = OtlpRequirer(charm_any)._duplicate_rules_per_unit(
+            alert_rules={
+                'groups': [
+                    {
+                        'name': 'AggregatorHostHealth',
+                        'rules': [
+                            {
+                                'alert': HOST_METRICS_MISSING_RULE_NAME,
+                                'expr': 'absent(up)',
+                                'labels': {'severity': 'warning'},
+                            },
+                            {
+                                'alert': 'AggregatorMetricsMissing',
+                                'expr': 'absent(up)',
+                                'labels': {'severity': 'critical'},
+                            },
+                        ],
+                    }
+                ]
+            },
+            peer_unit_names={'unit/0', 'unit/1'},
+            rule_names_to_duplicate=[HOST_METRICS_MISSING_RULE_NAME],
+            is_subordinate=subordinate,
+        )
+        # THEN the rules are duplicated per unit, with juju_unit in the expr and labels
+        groups = result.get('groups', [])
+        for group in groups:
+            rules = group.get('rules', [])
+            severity = 'critical' if subordinate else 'warning'
+            assert rules == [
+                {
+                    'alert': HOST_METRICS_MISSING_RULE_NAME,
+                    'expr': 'absent(up{juju_unit="unit/0"})',
+                    'labels': {'severity': severity, 'juju_unit': 'unit/0'},
+                },
+                {
+                    'alert': HOST_METRICS_MISSING_RULE_NAME,
+                    'expr': 'absent(up{juju_unit="unit/1"})',
+                    'labels': {'severity': severity, 'juju_unit': 'unit/1'},
+                },
+                {
+                    'alert': 'AggregatorMetricsMissing',
+                    'expr': 'absent(up)',
+                    'labels': {'severity': 'critical'},
+                },
+            ]
 
-    # WHEN any event executes the reconciler
+
+@pytest.mark.parametrize(
+    'otlp_requirer_ctx,is_aggregator',
+    [
+        pytest.param(True, True, id='aggregator'),
+        pytest.param(False, False, id='non-aggregator'),
+    ],
+    indirect=['otlp_requirer_ctx'],
+)
+def test_generic_rule_injection(
+    otlp_requirer_ctx: testing.Context[ops.CharmBase], is_aggregator: bool
+):
+    # GIVEN a send-otlp relation
+    # * a peers relation
+    peers = PeerRelation(endpoint=PEERS_ENDPOINT)
+    state = State(relations=[peers, Relation(SEND)], leader=True, model=MODEL)
+
+    # WHEN the update_status event is fired
     state_out = otlp_requirer_ctx.run(otlp_requirer_ctx.on.update_status(), state=state)
     for relation in list(state_out.relations):
+        if relation.endpoint != SEND:
+            continue
+
+        # THEN if the charm is an aggregator, generic rules are injected into the databag
         # AND the rules in the databag are decompressed
         decompressed = _decompress(relation.local_app_data.get('rules'))
         assert decompressed
-        logql_groups = decompressed.get('logql', {}).get('groups', [])
         promql_groups = decompressed.get('promql', {}).get('groups', [])
-        assert logql_groups
         assert promql_groups
 
         # THEN the generic promql rule is in the databag
-        assert any('AggregatorHostHealth' in g.get('name') for g in promql_groups)
+        base_rule_name = f'{MODEL_NAME.replace("-", "_")}_{MODEL_SHORT_UUID}_otlp_requirer'
+        agg_rule = f'{base_rule_name}_AggregatorHostHealth_rules'
+        app_rule = f'{base_rule_name}_HostHealth_rules'
+        promql_group_names = [g.get('name') for g in promql_groups]
+        if is_aggregator:
+            assert agg_rule in promql_group_names
+            assert app_rule not in promql_group_names
+        else:
+            assert app_rule in promql_group_names
+            assert agg_rule not in promql_group_names
 
 
 def test_metadata(otlp_requirer_ctx: testing.Context[ops.CharmBase]):
     # GIVEN a send-otlp relation
     state = State(relations=[Relation(SEND)], leader=True, model=MODEL)
 
-    # WHEN any event executes the reconciler
+    # WHEN the update_status event is fired
     state_out = otlp_requirer_ctx.run(otlp_requirer_ctx.on.update_status(), state=state)
     for relation in list(state_out.relations):
         # THEN the requirer adds its own metadata to the databag

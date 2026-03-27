@@ -19,12 +19,13 @@ from __future__ import annotations
 import logging
 import socket
 from copy import deepcopy
-from typing import Final, Literal
+from typing import Literal
 from unittest.mock import patch
 
 import ops
 import pytest
 from cosl.juju_topology import JujuTopology
+from cosl.types import AlertingRuleFormat, OfficialRuleFileFormat, RecordingRuleFormat
 from ops import testing
 from ops.charm import CharmBase
 
@@ -33,53 +34,56 @@ from helpers import patch_cos_tool_path
 
 logger = logging.getLogger(__name__)
 
+PEERS_ENDPOINT = 'my-peers'
 LOKI_RULES_DEST_PATH = 'loki_alert_rules'
 METRICS_RULES_DEST_PATH = 'prometheus_alert_rules'
-SINGLE_LOGQL_ALERT: Final = {
-    'alert': 'HighLogVolume',
-    'expr': 'count_over_time({job=~".+"}[30s]) > 100',
-    'labels': {'severity': 'high'},
-}
-SINGLE_LOGQL_RECORD: Final = {
-    'record': 'log:error_rate:rate5m',
-    'expr': 'sum by (service) (rate({job=~".+"} | json | level="error" [5m]))',
-    'labels': {'severity': 'high'},
-}
-SINGLE_PROMQL_ALERT: Final = {
-    'alert': 'Workload Missing',
-    'expr': 'up{job=~".+"} == 0',
-    'for': '0m',
-    'labels': {'severity': 'critical'},
-}
-SINGLE_PROMQL_RECORD: Final = {
-    'record': 'code:prometheus_http_requests_total:sum',
-    'expr': 'sum by (code) (prometheus_http_requests_total{job=~".+"})',
-    'labels': {'severity': 'high'},
-}
-OFFICIAL_LOGQL_RULES: Final = {
-    'groups': [
+SINGLE_LOGQL_ALERT = AlertingRuleFormat(
+    alert='HighLogVolume',
+    expr='count_over_time({job=~".+"}[30s]) > 100',
+    labels={'severity': 'high'},
+)
+SINGLE_LOGQL_RECORD = RecordingRuleFormat(
+    record='log:error_rate:rate5m',
+    expr='sum by (service) (rate({job=~".+"} | json | level="error" [5m]))',
+    labels={'severity': 'high'},
+)
+SINGLE_PROMQL_ALERT = AlertingRuleFormat(
+    alert='Workload Missing',
+    expr='up{job=~".+"} == 0',
+    for_='0m',
+    labels={'severity': 'critical'},
+)
+SINGLE_PROMQL_RECORD = RecordingRuleFormat(
+    record='code:prometheus_http_requests_total:sum',
+    expr='sum by (code) (prometheus_http_requests_total{job=~".+"})',
+    labels={'severity': 'high'},
+)
+OFFICIAL_LOGQL_RULES = OfficialRuleFileFormat(
+    groups=[
         {
             'name': 'test_logql',
             'rules': [SINGLE_LOGQL_ALERT, SINGLE_LOGQL_RECORD],
         },
     ]
-}
-OFFICIAL_PROMQL_RULES: Final = {
-    'groups': [
+)
+OFFICIAL_PROMQL_RULES = OfficialRuleFileFormat(
+    groups=[
         {
             'name': 'test_promql',
             'rules': [SINGLE_PROMQL_ALERT, SINGLE_PROMQL_RECORD],
         },
     ]
-}
-ALL_PROTOCOLS: Final[list[Literal['grpc', 'http']]] = ['grpc', 'http']
-ALL_TELEMETRIES: Final[list[Literal['logs', 'metrics', 'traces']]] = ['logs', 'metrics', 'traces']
+)
+ALL_PROTOCOLS: list[Literal['grpc', 'http']] = ['grpc', 'http']
+ALL_TELEMETRIES: list[Literal['logs', 'metrics', 'traces']] = ['logs', 'metrics', 'traces']
 
 
 # --- Tester charms ---
 
 
 class OtlpRequirerCharm(CharmBase):
+    _aggregator_peer_relation_name: str | None = None
+
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
         self.framework.observe(self.on.update_status, self._publish_rules)
@@ -96,7 +100,11 @@ class OtlpRequirerCharm(CharmBase):
                 .add_promql(deepcopy(OFFICIAL_PROMQL_RULES))
             )
         OtlpRequirer(
-            self, protocols=ALL_PROTOCOLS, telemetries=ALL_TELEMETRIES, rules=rules
+            self,
+            protocols=ALL_PROTOCOLS,
+            telemetries=ALL_TELEMETRIES,
+            aggregator_peer_relation_name=self._aggregator_peer_relation_name,
+            rules=rules,
         ).publish()
 
 
@@ -124,9 +132,21 @@ def mock_hostname():
 
 
 @pytest.fixture
-def otlp_requirer_ctx() -> testing.Context[OtlpRequirerCharm]:
-    meta = {'name': 'otlp-requirer', 'requires': {'send-otlp': {'interface': 'otlp'}}}
-    return testing.Context(OtlpRequirerCharm, meta=meta)
+def otlp_requirer_ctx(request: pytest.FixtureRequest) -> testing.Context[OtlpRequirerCharm]:
+    meta = {
+        'name': 'otlp-requirer',
+        'requires': {'send-otlp': {'interface': 'otlp'}},
+        'peers': {PEERS_ENDPOINT: {'interface': 'aggregator_peers'}},
+    }
+    # We want to be able to test generic aggregator rules injection and the application rules
+    # injection case, which is toggled by an aggregator peer relation name input.
+    generic_aggregator_rules: bool = getattr(request, 'param', False)
+    charm_cls = type(
+        'OtlpRequirerCharm',
+        (OtlpRequirerCharm,),
+        {'_aggregator_peer_relation_name': PEERS_ENDPOINT if generic_aggregator_rules else None},
+    )
+    return testing.Context(charm_cls, meta=meta)
 
 
 @pytest.fixture

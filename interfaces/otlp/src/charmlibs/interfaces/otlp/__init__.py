@@ -115,6 +115,13 @@ OtlpProvider charms with the ``publish()`` method::
             )
             OtlpRequirer(self, rules=rules).publish()
 
+Generic rules are sourced from `cosl.rules.generic_alert_groups <https://github.com/canonical/cos-lib/blob/main/src/cosl/rules.py>`_.
+If the charm is an aggregator e.g., opentelemetry-collector, the type of generic rules to be
+injected into the charm's RuleStore should reflect that. This is configurable by setting the
+``aggregator_peer_relation_name`` with the name of the charm's peer relation::
+
+    OtlpRequirer(..., aggregator_peer_relation_name="my-peers").publish()
+
 Relation Data Format
 ====================
 

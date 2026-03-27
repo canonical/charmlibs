@@ -22,6 +22,7 @@ For user-facing documentation, see the package-level docstring in __init__.py.
 import copy
 import json
 import logging
+import re
 from collections import OrderedDict
 from collections.abc import Sequence
 from dataclasses import dataclass, field
@@ -29,8 +30,13 @@ from pathlib import Path
 from typing import Any, Final, Literal
 
 from cosl.juju_topology import JujuTopology
-from cosl.rules import InjectResult, Rules, generic_alert_groups
-from cosl.types import OfficialRuleFileFormat
+from cosl.rules import (
+    HOST_METRICS_MISSING_RULE_NAME,
+    InjectResult,
+    Rules,
+    generic_alert_groups,
+)
+from cosl.types import OfficialRuleFileFormat, SingleRuleFormat
 from cosl.utils import LZMABase64
 from ops import CharmBase
 from pydantic import (
@@ -64,29 +70,63 @@ class RuleStore:
 
     def add_logql(
         self,
-        rule_dict: dict[str, Any],
+        rule_dict: OfficialRuleFileFormat | SingleRuleFormat,
         *,
         group_name: str | None = None,
         group_name_prefix: str | None = None,
     ) -> 'RuleStore':
+        """Add rules from dict to the existing LogQL ruleset.
+
+        Args:
+            rule_dict: a single-rule or official-rule YAML dict
+            group_name: a custom group name, used only if the new rule is of single-rule format
+            group_name_prefix: a custom group name prefix, used only if the new rule is of
+                single-rule format
+        """
         self.logql.add(rule_dict, group_name=group_name, group_name_prefix=group_name_prefix)
         return self
 
     def add_logql_path(self, dir_path: str | Path, *, recursive: bool = False) -> 'RuleStore':
+        """Add LogQL rules from a dir path.
+
+        All rules from files are aggregated into a data structure representing a single rule file.
+        All group names are augmented with juju topology.
+
+        Args:
+            dir_path: either a rules file or a dir of rules files.
+            recursive: whether to read files recursively or not (no impact if `path` is a file).
+        """
         self.logql.add_path(dir_path, recursive=recursive)
         return self
 
     def add_promql(
         self,
-        rule_dict: dict[str, Any],
+        rule_dict: OfficialRuleFileFormat | SingleRuleFormat,
         *,
         group_name: str | None = None,
         group_name_prefix: str | None = None,
     ) -> 'RuleStore':
+        """Add rules from dict to the existing PromQL ruleset.
+
+        Args:
+            rule_dict: a single-rule or official-rule YAML dict
+            group_name: a custom group name, used only if the new rule is of single-rule format
+            group_name_prefix: a custom group name prefix, used only if the new rule is of
+                single-rule format
+        """
         self.promql.add(rule_dict, group_name=group_name, group_name_prefix=group_name_prefix)
         return self
 
     def add_promql_path(self, dir_path: str | Path, *, recursive: bool = False) -> 'RuleStore':
+        """Add PromQL rules from a dir path.
+
+        All rules from files are aggregated into a data structure representing a single rule file.
+        All group names are augmented with juju topology.
+
+        Args:
+            dir_path: either a rules file or a dir of rules files.
+            recursive: whether to read files recursively or not (no impact if `path` is a file).
+        """
         self.promql.add_path(dir_path, recursive=recursive)
         return self
 
@@ -177,6 +217,10 @@ class OtlpRequirer:
             endpoints.
         telemetries: The telemetries to filter for in the provider's OTLP
             endpoints.
+        aggregator_peer_relation_name: Name of the peers relation of this
+            charm. This should only be set IFF the charm is an aggregator AND
+            it has a peer relation with this name. When provided, generic
+            aggregator rules are used instead of application-level rules.
         rules: Rules of different types e.g., logql or promql, that the
             requirer will publish for the provider.
     """
@@ -188,6 +232,7 @@ class OtlpRequirer:
         protocols: Sequence[Literal['http', 'grpc']] | None = None,
         telemetries: Sequence[Literal['logs', 'metrics', 'traces']] | None = None,
         *,
+        aggregator_peer_relation_name: str | None = None,
         rules: RuleStore | None = None,
     ):
         self._charm = charm
@@ -199,6 +244,7 @@ class OtlpRequirer:
         self._telemetries: list[Literal['logs', 'metrics', 'traces']] = (
             list(telemetries) if telemetries is not None else []
         )
+        self._aggregator_peer_relation_name = aggregator_peer_relation_name
         self._rules = rules if rules is not None else RuleStore(self._topology)
 
     def _filter_endpoints(self, endpoints: list[_OtlpEndpoint]) -> list[_OtlpEndpoint]:
@@ -238,6 +284,80 @@ class OtlpRequirer:
         modern_score: Final = {'grpc': 2, 'http': 1}
         return max(endpoints, key=lambda e: modern_score.get(e.protocol, 0))
 
+    def _duplicate_rules_per_unit(
+        self,
+        alert_rules: OfficialRuleFileFormat,
+        rule_names_to_duplicate: list[str],
+        peer_unit_names: set[str],
+        is_subordinate: bool = False,
+    ) -> OfficialRuleFileFormat:
+        """Duplicate alert rule per unit in peer_units list.
+
+        Args:
+            alert_rules: A dictionary of rules in OfficialRuleFileFormat.
+            rule_names_to_duplicate: A list of rule names to be duplicated.
+            peer_unit_names: A set of charm unit names to duplicate rules for.
+            is_subordinate: A boolean denoting whether the charm duplicating
+                alert rules is a subordinate or not. If yes, the severity of
+                the alerts in duplicate_keys needs to be set to critical.
+
+        Returns:
+            The updated rules with those specified in rule_names_to_duplicate,
+            duplicated per unit in OfficialRuleFileFormat.
+        """
+        updated_alert_rules = copy.deepcopy(alert_rules)
+        for group in updated_alert_rules.get('groups', {}):
+            new_rules: list[SingleRuleFormat] = []
+            for rule in group.get('rules', []):
+                if rule.get('alert', '') not in rule_names_to_duplicate:
+                    new_rules.append(rule)
+                else:
+                    for juju_unit in sorted(peer_unit_names):
+                        rule_copy = copy.deepcopy(rule)
+                        rule_copy.get('labels', {})['juju_unit'] = juju_unit
+                        rule_copy['expr'] = self._rules.promql.tool.inject_label_matchers(
+                            expression=re.sub(r'%%juju_unit%%,?', '', rule_copy['expr']),
+                            topology={'juju_unit': juju_unit},
+                        )
+                        # If the charm is a subordinate, the severity of the alerts need to be
+                        # bumped to critical.
+                        rule_copy.get('labels', {})['severity'] = (
+                            'critical' if is_subordinate else 'warning'
+                        )
+                        new_rules.append(rule_copy)
+            group['rules'] = new_rules
+        return updated_alert_rules
+
+    def _inject_generic_rules(self):
+        """Inject generic rules into the charm's RuleStore."""
+        if self._aggregator_peer_relation_name:
+            if not (
+                peer_relations := self._charm.model.get_relation(
+                    self._aggregator_peer_relation_name
+                )
+            ):
+                logger.warning(
+                    'Generic aggregator rules were requested, but no peer relation was found. '
+                    'Ensure this charm has a peer relation named "%s" to use generic aggregator '
+                    'rules.',
+                    self._aggregator_peer_relation_name,
+                )
+            unit_names: set[str] = {self._charm.unit.name}
+            if peer_relations:
+                unit_names |= {unit.name for unit in peer_relations.units}
+            agg_rules = self._duplicate_rules_per_unit(
+                generic_alert_groups.aggregator_rules,
+                rule_names_to_duplicate=[HOST_METRICS_MISSING_RULE_NAME],
+                peer_unit_names=unit_names,
+                is_subordinate=self._charm.meta.subordinate,
+            )
+            self._rules.add_promql(agg_rules, group_name_prefix=self._topology.identifier)
+        else:
+            self._rules.add_promql(
+                generic_alert_groups.application_rules,
+                group_name_prefix=self._topology.identifier,
+            )
+
     def publish(self):
         """Triggers programmatically the update of the relation data.
 
@@ -249,10 +369,8 @@ class OtlpRequirer:
             # Only the leader unit can write to app data.
             return
 
-        self._rules.add_promql(
-            copy.deepcopy(generic_alert_groups.aggregator_rules),
-            group_name_prefix=self._topology.identifier,
-        )
+        # Add generic rules
+        self._inject_generic_rules()
 
         # Publish to databag
         databag = _OtlpRequirerAppData.model_validate({
@@ -369,7 +487,9 @@ class OtlpProvider:
                 continue
 
             # Get rules for the desired query type
-            rules_for_type: dict[str, Any] | None = getattr(requirer.rules, query_type, None)
+            rules_for_type: OfficialRuleFileFormat | None = getattr(
+                requirer.rules, query_type, None
+            )
             if not rules_for_type:
                 continue
 
