@@ -115,6 +115,14 @@ OtlpProvider charms with the ``publish()`` method::
             )
             OtlpRequirer(self, rules=rules).publish()
 
+If the charm is an aggregator e.g., opentelemetry-collectors, the type of generic rules to be
+injected into the charm's RuleStore should reflect that, which is configurable by setting the
+``_aggregator_peer_relation_name`` with the name of the charm's peer relation::
+
+    from charmlibs.interfaces.otlp import OtlpRequirer
+
+    OtlpRequirer(..., aggregator_peer_relation_name="my-peers").publish()
+
 Relation Data Format
 ====================
 

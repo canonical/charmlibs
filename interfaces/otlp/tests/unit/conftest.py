@@ -135,6 +135,8 @@ def otlp_requirer_ctx(request: pytest.FixtureRequest) -> testing.Context[OtlpReq
         'requires': {'send-otlp': {'interface': 'otlp'}},
         'peers': {PEERS_ENDPOINT: {'interface': 'aggregator_peers'}},
     }
+    # We want to be able to test generic aggregator rules injection and the application rules
+    # injection case, which is toggled by an aggregator peer relation name input.
     generic_aggregator_rules: bool = getattr(request, 'param', False)
     charm_cls = type(
         'OtlpRequirerCharm',
