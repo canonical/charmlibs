@@ -86,28 +86,6 @@ def test_rules_compression(otlp_requirer_ctx: testing.Context[ops.CharmBase]):
         assert set(_RulesModel.model_fields.keys()).issubset(decompressed.keys())
 
 
-def test_generic_rule_requires_peer_relation(otlp_requirer_ctx: testing.Context[ops.CharmBase]):
-    with otlp_requirer_ctx(otlp_requirer_ctx.on.update_status(), state=State(leader=True)) as mgr:
-        # GIVEN any charm
-        charm_any = cast('Any', mgr.charm)
-
-        # WHEN the OtlpRequirer is initialized
-        # * no peer relation name is provided
-        OtlpRequirer(
-            charm_any,
-            peer_relation_name=None,
-        )
-        # THEN no errors are raised (application-level rules are used)
-
-        # WHEN the OtlpRequirer is initialized
-        # * a valid peer relation name is provided
-        OtlpRequirer(
-            charm_any,
-            peer_relation_name=PEERS_ENDPOINT,
-        )
-        # THEN no errors are raised (aggregator rules are used)
-
-
 @pytest.mark.parametrize('subordinate', [True, False])
 def test_duplicate_rules_per_unit(
     otlp_requirer_ctx: testing.Context[ops.CharmBase], subordinate: bool

@@ -82,7 +82,7 @@ ALL_TELEMETRIES: list[Literal['logs', 'metrics', 'traces']] = ['logs', 'metrics'
 
 
 class OtlpRequirerCharm(CharmBase):
-    _peer_relation_name: str | None = None
+    _aggregator_peer_relation_name: str | None = None
 
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
@@ -103,7 +103,7 @@ class OtlpRequirerCharm(CharmBase):
             self,
             protocols=ALL_PROTOCOLS,
             telemetries=ALL_TELEMETRIES,
-            peer_relation_name=self._peer_relation_name,
+            aggregator_peer_relation_name=self._aggregator_peer_relation_name,
             rules=rules,
         ).publish()
 
@@ -139,7 +139,7 @@ def otlp_requirer_ctx(request: pytest.FixtureRequest) -> testing.Context[OtlpReq
     charm_cls = type(
         'OtlpRequirerCharm',
         (OtlpRequirerCharm,),
-        {'_peer_relation_name': PEERS_ENDPOINT if generic_aggregator_rules else None},
+        {'_aggregator_peer_relation_name': PEERS_ENDPOINT if generic_aggregator_rules else None},
     )
     return testing.Context(charm_cls, meta=meta)
 

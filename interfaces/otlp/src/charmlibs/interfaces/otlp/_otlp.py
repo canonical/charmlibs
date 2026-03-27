@@ -214,10 +214,10 @@ class OtlpRequirer:
             endpoints.
         telemetries: The telemetries to filter for in the provider's OTLP
             endpoints.
-        peer_relation_name: Name of the peer relation containing units of this
-            charm. When provided, generic aggregator rules are used instead of
-            application-level rules. The charm must have a peers relation with
-            this name.
+        aggregator_peer_relation_name: Name of the peer relation containing
+            units of this charm. The charm must have a peer relation with this
+            name and should be an aggregator. When provided, generic aggregator
+            rules are used instead of application-level rules.
         rules: Rules of different types e.g., logql or promql, that the
             requirer will publish for the provider.
     """
@@ -229,7 +229,7 @@ class OtlpRequirer:
         protocols: Sequence[Literal['http', 'grpc']] | None = None,
         telemetries: Sequence[Literal['logs', 'metrics', 'traces']] | None = None,
         *,
-        peer_relation_name: str | None = None,
+        aggregator_peer_relation_name: str | None = None,
         rules: RuleStore | None = None,
     ):
         self._charm = charm
@@ -241,8 +241,7 @@ class OtlpRequirer:
         self._telemetries: list[Literal['logs', 'metrics', 'traces']] = (
             list(telemetries) if telemetries is not None else []
         )
-        self._topology = JujuTopology.from_charm(charm)
-        self._peer_relation_name = peer_relation_name
+        self._aggregator_peer_relation_name = aggregator_peer_relation_name
         self._rules = rules if rules is not None else RuleStore(self._topology)
 
     def _filter_endpoints(self, endpoints: list[_OtlpEndpoint]) -> list[_OtlpEndpoint]:
@@ -328,13 +327,17 @@ class OtlpRequirer:
 
     def _inject_generic_rules(self):
         """Inject generic rules into the charm's RuleStore."""
-        if self._peer_relation_name:
-            if not (peer_relations := self._charm.model.get_relation(self._peer_relation_name)):
+        if self._aggregator_peer_relation_name:
+            if not (
+                peer_relations := self._charm.model.get_relation(
+                    self._aggregator_peer_relation_name
+                )
+            ):
                 logger.warning(
                     'Generic aggregator rules were requested, but no peer relation was found. '
                     'Ensure this charm has a peer relation named "%s" to use generic aggregator '
                     'rules.',
-                    self._peer_relation_name,
+                    self._aggregator_peer_relation_name,
                 )
             unit_names: set[str] = {self._charm.unit.name}
             if peer_relations:
