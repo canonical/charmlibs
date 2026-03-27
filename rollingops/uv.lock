@@ -69,6 +69,18 @@ wheels = [
 ]
 
 [[package]]
+name = "charmlibs-apt"
+version = "1.0.0.post0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "opentelemetry-api" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/fd/58/33e87779fdbcf62a3b34e3444d7175c1168b4b2726cc29c98849c09ac086/charmlibs_apt-1.0.0.post0.tar.gz", hash = "sha256:9c2e0b3c1f553ebcaae99c9aad72e15383aec56677a8dd3f6479dc6f084189a6", size = 31942, upload-time = "2025-10-15T02:40:29.521Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/dd/92/4db19cd8bc94db51a115f7a2e3c46d96b991ca7ebe27207beac9a6570bc6/charmlibs_apt-1.0.0.post0-py3-none-any.whl", hash = "sha256:958e84719eb1feff539f058dc6c7af648c53c88b9ebe7c6157ec8d2bdf5fbfc6", size = 19287, upload-time = "2025-10-15T02:40:27.756Z" },
+]
+
+[[package]]
 name = "charmlibs-interfaces-tls-certificates"
 version = "1.8.1"
 source = { registry = "https://pypi.org/simple" }
@@ -106,6 +118,7 @@ dependencies = [
 
 [package.dev-dependencies]
 integration = [
+    { name = "charmlibs-apt" },
     { name = "jubilant" },
     { name = "tenacity" },
 ]
@@ -124,6 +137,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 functional = []
 integration = [
+    { name = "charmlibs-apt" },
     { name = "jubilant" },
     { name = "tenacity" },
 ]

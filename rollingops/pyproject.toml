@@ -34,6 +34,7 @@ functional = [  # installed for `just functional rollingops`
 integration = [  # installed for `just integration rollingops`
     "jubilant",
     "tenacity",
+    "charmlibs-apt",
 ]
 
 [project.urls]

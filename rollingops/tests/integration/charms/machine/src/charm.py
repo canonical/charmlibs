@@ -15,10 +15,11 @@
 """Machine charm for testing."""
 
 import logging
-import subprocess
 
 import common
 import ops
+
+from charmlibs import apt
 
 logger = logging.getLogger(__name__)
 
@@ -36,15 +37,12 @@ class RollingOpsCharm(common.Charm):
         self.unit.status = ops.ActiveStatus()
 
     def _on_install(self, event: ops.InstallEvent) -> None:
-        """Handle the install.
-
-        It install the charmed-etcd snap.
-
-        Raises:
-            subprocess.CalledProcessError: If package installation fails.
-        """
-        subprocess.run(['apt-get', 'update'], check=True)
-        subprocess.run(['apt-get', 'install', '-y', 'etcd-client'], check=True)
+        """Handle the install. Install the etcd-client."""
+        try:
+            apt.update()
+            apt.add_package('etcd-client')
+        except apt.PackageError as e:
+            logger.error('could not install package. Reason: %s', e.message)
 
 
 if __name__ == '__main__':  # pragma: nocover
