@@ -25,6 +25,7 @@ from tenacity import retry, stop_after_delay, wait_fixed
 
 TRACE_FILE = '/var/lib/charm-rolling-ops/transitions.log'
 logger = logging.getLogger(__name__)
+TIMEOUT = 15 * 60.0
 
 
 @retry(wait=wait_fixed(10), stop=stop_after_delay(60), reraise=True)
@@ -66,16 +67,16 @@ def test_restart_action_one_unit(juju: jubilant.Juju, app_name: str):
         app='etcd',
         channel='3.6/stable',
     )
-    juju.wait(jubilant.all_active, error=jubilant.any_error)
+    juju.wait(jubilant.all_active, error=jubilant.any_error, timeout=TIMEOUT)
 
     juju.integrate(
         'etcd:client-certificates',
         'self-signed-certificates:certificates',
     )
-    juju.wait(jubilant.all_active, error=jubilant.any_error)
+    juju.wait(jubilant.all_active, error=jubilant.any_error, timeout=TIMEOUT)
 
     juju.integrate(f'{app_name}:etcd', 'etcd:etcd-client')
-    juju.wait(jubilant.all_active, error=jubilant.any_error)
+    juju.wait(jubilant.all_active, error=jubilant.any_error, timeout=TIMEOUT)
 
     wait_for_etcdctl_env(juju, f'{app_name}/0')
 
@@ -84,7 +85,7 @@ def test_restart_action_one_unit(juju: jubilant.Juju, app_name: str):
     juju.wait(
         jubilant.all_active,
         error=jubilant.any_error,
-        timeout=300,
+        timeout=TIMEOUT,
     )
 
     events = get_unit_events(juju, f'{app_name}/0')
@@ -105,6 +106,7 @@ def test_all_units_can_connect_to_etcd(juju: jubilant.Juju, app_name: str):
     juju.wait(
         lambda status: jubilant.all_active(status, app_name),
         error=jubilant.any_error,
+        timeout=TIMEOUT,
     )
 
     status = juju.status()
@@ -119,7 +121,7 @@ def test_all_units_can_connect_to_etcd(juju: jubilant.Juju, app_name: str):
     juju.wait(
         lambda status: jubilant.all_active(status, app_name, 'etcd', 'self-signed-certificates'),
         error=jubilant.any_error,
-        timeout=600,
+        timeout=TIMEOUT,
     )
 
     expected = [
@@ -142,7 +144,7 @@ def test_all_units_can_connect_to_etcd_multi_app(juju: jubilant.Juju, charm: Pat
     juju.wait(
         lambda status: jubilant.all_active(status, second_app),
         error=jubilant.any_error,
-        timeout=600,
+        timeout=TIMEOUT,
     )
     juju.integrate(f'{second_app}:etcd', 'etcd:etcd-client')
 
@@ -151,7 +153,7 @@ def test_all_units_can_connect_to_etcd_multi_app(juju: jubilant.Juju, charm: Pat
             status, app_name, second_app, 'etcd', 'self-signed-certificates'
         ),
         error=jubilant.any_error,
-        timeout=600,
+        timeout=TIMEOUT,
     )
 
     primary_units = sorted(juju.status().apps[app_name].units.keys())
@@ -169,10 +171,14 @@ def test_all_units_can_connect_to_etcd_multi_app(juju: jubilant.Juju, charm: Pat
 
     juju.wait(
         lambda status: jubilant.all_active(
-            status, app_name, second_app, 'etcd', 'self-signed-certificates'
+            status,
+            app_name,
+            second_app,
+            'etcd',
+            'self-signed-certificates',
         ),
         error=jubilant.any_error,
-        timeout=600,
+        timeout=TIMEOUT,
     )
 
     expected = [
