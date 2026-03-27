@@ -68,7 +68,7 @@ def juju(
         if request.session.testsfailed:
             logger.info('Collecting Juju logs ...')
             time.sleep(0.5)  # Wait for Juju to process logs.
-            log = juju.debug_log(limit=10000)
+            log = juju.debug_log(limit=0)
             print(log, end='', file=sys.stderr)
 
 
