@@ -370,6 +370,3 @@ def test_favor_modern_endpoints(
 
     # THEN the most modern one is chosen
     assert result.protocol == expected_protocol
-
-
-def test_insecure_
