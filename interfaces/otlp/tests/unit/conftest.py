@@ -19,12 +19,13 @@ from __future__ import annotations
 import logging
 import socket
 from copy import deepcopy
-from typing import Final, Literal
+from typing import Literal
 from unittest.mock import patch
 
 import ops
 import pytest
 from cosl.juju_topology import JujuTopology
+from cosl.types import AlertingRuleFormat, OfficialRuleFileFormat, RecordingRuleFormat
 from ops import testing
 from ops.charm import CharmBase
 
@@ -36,45 +37,45 @@ logger = logging.getLogger(__name__)
 PEERS_ENDPOINT = 'my-peers'
 LOKI_RULES_DEST_PATH = 'loki_alert_rules'
 METRICS_RULES_DEST_PATH = 'prometheus_alert_rules'
-SINGLE_LOGQL_ALERT: Final = {
-    'alert': 'HighLogVolume',
-    'expr': 'count_over_time({job=~".+"}[30s]) > 100',
-    'labels': {'severity': 'high'},
-}
-SINGLE_LOGQL_RECORD: Final = {
-    'record': 'log:error_rate:rate5m',
-    'expr': 'sum by (service) (rate({job=~".+"} | json | level="error" [5m]))',
-    'labels': {'severity': 'high'},
-}
-SINGLE_PROMQL_ALERT: Final = {
-    'alert': 'Workload Missing',
-    'expr': 'up{job=~".+"} == 0',
-    'for': '0m',
-    'labels': {'severity': 'critical'},
-}
-SINGLE_PROMQL_RECORD: Final = {
-    'record': 'code:prometheus_http_requests_total:sum',
-    'expr': 'sum by (code) (prometheus_http_requests_total{job=~".+"})',
-    'labels': {'severity': 'high'},
-}
-OFFICIAL_LOGQL_RULES: Final = {
-    'groups': [
+SINGLE_LOGQL_ALERT = AlertingRuleFormat(
+    alert='HighLogVolume',
+    expr='count_over_time({job=~".+"}[30s]) > 100',
+    labels={'severity': 'high'},
+)
+SINGLE_LOGQL_RECORD = RecordingRuleFormat(
+    record='log:error_rate:rate5m',
+    expr='sum by (service) (rate({job=~".+"} | json | level="error" [5m]))',
+    labels={'severity': 'high'},
+)
+SINGLE_PROMQL_ALERT = AlertingRuleFormat(
+    alert='Workload Missing',
+    expr='up{job=~".+"} == 0',
+    for_='0m',
+    labels={'severity': 'critical'},
+)
+SINGLE_PROMQL_RECORD = RecordingRuleFormat(
+    record='code:prometheus_http_requests_total:sum',
+    expr='sum by (code) (prometheus_http_requests_total{job=~".+"})',
+    labels={'severity': 'high'},
+)
+OFFICIAL_LOGQL_RULES = OfficialRuleFileFormat(
+    groups=[
         {
             'name': 'test_logql',
             'rules': [SINGLE_LOGQL_ALERT, SINGLE_LOGQL_RECORD],
         },
     ]
-}
-OFFICIAL_PROMQL_RULES: Final = {
-    'groups': [
+)
+OFFICIAL_PROMQL_RULES = OfficialRuleFileFormat(
+    groups=[
         {
             'name': 'test_promql',
             'rules': [SINGLE_PROMQL_ALERT, SINGLE_PROMQL_RECORD],
         },
     ]
-}
-ALL_PROTOCOLS: Final[list[Literal['grpc', 'http']]] = ['grpc', 'http']
-ALL_TELEMETRIES: Final[list[Literal['logs', 'metrics', 'traces']]] = ['logs', 'metrics', 'traces']
+)
+ALL_PROTOCOLS: list[Literal['grpc', 'http']] = ['grpc', 'http']
+ALL_TELEMETRIES: list[Literal['logs', 'metrics', 'traces']] = ['logs', 'metrics', 'traces']
 
 
 # --- Tester charms ---

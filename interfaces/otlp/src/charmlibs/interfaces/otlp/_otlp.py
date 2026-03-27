@@ -36,7 +36,7 @@ from cosl.rules import (
     Rules,
     generic_alert_groups,
 )
-from cosl.types import OfficialRuleFileFormat, OfficialRuleFileItem, SingleRuleFormat
+from cosl.types import OfficialRuleFileFormat, SingleRuleFormat
 from cosl.utils import LZMABase64
 from ops import CharmBase
 from pydantic import (
@@ -70,7 +70,7 @@ class RuleStore:
 
     def add_logql(
         self,
-        rule_dict: OfficialRuleFileItem | OfficialRuleFileFormat | dict[str, Any],
+        rule_dict: OfficialRuleFileFormat | SingleRuleFormat,
         *,
         group_name: str | None = None,
         group_name_prefix: str | None = None,
@@ -101,7 +101,7 @@ class RuleStore:
 
     def add_promql(
         self,
-        rule_dict: OfficialRuleFileItem | OfficialRuleFileFormat | dict[str, Any],
+        rule_dict: OfficialRuleFileFormat | SingleRuleFormat,
         *,
         group_name: str | None = None,
         group_name_prefix: str | None = None,
@@ -310,7 +310,7 @@ class OtlpRequirer:
                 if rule.get('alert', '') not in rule_names_to_duplicate:
                     new_rules.append(rule)
                 else:
-                    for juju_unit in peer_unit_names:
+                    for juju_unit in sorted(peer_unit_names):
                         rule_copy = copy.deepcopy(rule)
                         rule_copy.get('labels', {})['juju_unit'] = juju_unit
                         rule_copy['expr'] = self._rules.promql.tool.inject_label_matchers(
@@ -478,7 +478,9 @@ class OtlpProvider:
                 continue
 
             # Get rules for the desired query type
-            rules_for_type: dict[str, Any] | None = getattr(requirer.rules, query_type, None)
+            rules_for_type: OfficialRuleFileFormat | None = getattr(
+                requirer.rules, query_type, None
+            )
             if not rules_for_type:
                 continue
 
