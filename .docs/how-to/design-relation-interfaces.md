@@ -127,15 +127,15 @@ Each URL field must be documented and tested for consistency and precision:
 
 A sample checklist:
 
-- [ ] is this a base URL, an endpoint, a full URL, an opaque identifier, or an application-specific URI or string
-- [ ] limits for the URL as a whole, such as max length or allowed alphabet
-- [ ] is the scheme required, optional or not allowed; what schemes are allowed
-- [ ] is the userinfo required, optional or not allowed; what elements of userinfo are allowed
-- [ ] is the host required, optional or not allowed; what kind of values: domain names, IPv4 addresses, and/or IPv6 addresses
-- [ ] is the port required, optional or not allowed; what range of values
-- [ ] is the path required, optional or not allowed; any restrictions on the path, such as max length
-- [ ] is the query required, optional or not allowed; any restrictions on keys, expected treatment for duplicate keys
-- [ ] is the fragment required, optional or not allowed; any restrictions, such as max length
+- is this a base URL, an endpoint, a full URL, an opaque identifier, or an application-specific URI or string
+- limits for the URL as a whole, such as max length or allowed alphabet
+- is the scheme required, optional or not allowed; what schemes are allowed
+- is the userinfo required, optional or not allowed; what elements of userinfo are allowed
+- is the host required, optional or not allowed; what kind of values: domain names, IPv4 addresses, and/or IPv6 addresses
+- is the port required, optional or not allowed; what range of values
+- is the path required, optional or not allowed; any restrictions on the path, such as max length
+- is the query required, optional or not allowed; any restrictions on keys, expected treatment for duplicate keys
+- is the fragment required, optional or not allowed; any restrictions, such as max length
 
 ### Semantic grouping
 
