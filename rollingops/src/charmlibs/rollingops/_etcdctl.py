@@ -20,6 +20,7 @@ convenience functions for executing commands and retrieving structured results.
 """
 
 import json
+import logging
 import os
 import shutil
 import subprocess
@@ -33,11 +34,12 @@ from charmlibs.rollingops._models import (
     with_pebble_retry,
 )
 
+logger = logging.getLogger(__name__)
+
 BASE_DIR = pathops.LocalPath('/var/lib/rollingops/etcd')
 SERVER_CA_PATH = BASE_DIR / 'server-ca.pem'
 CONFIG_FILE_PATH = BASE_DIR / 'etcdctl.json'
-ETCD_SNAP_NAME = 'charmed-etcd'
-ETCDCTL_CMD = f'{ETCD_SNAP_NAME}.etcdctl'
+ETCDCTL_CMD = 'etcdctl'
 
 
 def is_etcdctl_installed() -> bool:
@@ -163,10 +165,7 @@ def ensure_initialized():
             f'etcdctl server CA file does not exist: {SERVER_CA_PATH}'
         )
     if not is_etcdctl_installed():
-        raise RollingOpsEtcdNotConfiguredError(
-            f'etcdctl is not installed. Please install the {ETCD_SNAP_NAME} snap '
-            f'to provide {ETCDCTL_CMD}.'
-        )
+        raise RollingOpsEtcdNotConfiguredError(f'{ETCDCTL_CMD} is not installed.')
 
 
 def cleanup() -> None:
@@ -183,22 +182,31 @@ def cleanup() -> None:
         raise RollingOpsFileSystemError('Failed to remove etcd config file and CA.') from e
 
 
-def run(args: list[str]) -> subprocess.CompletedProcess[str]:
+def run(args: list[str]) -> str | None:
     """Execute an etcdctl command.
 
     Args:
         args: List of arguments to pass to etcdctl.
 
     Returns:
-        A CompletedProcess object containing the result.
+        The stdout of the command, stripped, or None if execution failed.
 
     Raises:
         RollingOpsEtcdNotConfiguredError: if the etcd config file does not exist.
         PebbleConnectionError: if the remote container cannot be reached.
-        CalledProcessError: if the command execution failed.
-        TimeoutExpired: if the command execution timed out.
     """
     ensure_initialized()
     cmd = [ETCDCTL_CMD, *args]
-    # TODO: decide where to handle CalledProcessError and TimeoutExpired.
-    return subprocess.run(cmd, env=load_env(), check=True, text=True, capture_output=True)
+
+    try:
+        result = subprocess.run(
+            cmd, env=load_env(), check=True, text=True, capture_output=True
+        ).stdout.strip()
+    except subprocess.CalledProcessError as e:
+        logger.error('etcdctl command failed: returncode: %s, error: %s', e.returncode, e.stderr)
+        return None
+    except subprocess.TimeoutExpired as e:
+        logger.error('Timed out running etcdctl: %s', e.stderr)
+        return None
+
+    return result

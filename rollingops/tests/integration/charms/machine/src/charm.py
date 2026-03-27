@@ -43,7 +43,8 @@ class RollingOpsCharm(common.Charm):
         Raises:
             subprocess.CalledProcessError: If package installation fails.
         """
-        subprocess.run(['snap', 'install', 'charmed-etcd', '--channel=3.6/stable'], check=True)
+        subprocess.run(['apt-get', 'update'], check=True)
+        subprocess.run(['apt-get', 'install', '-y', 'etcd-client'], check=True)
 
 
 if __name__ == '__main__':  # pragma: nocover
