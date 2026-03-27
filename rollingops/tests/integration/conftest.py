@@ -63,12 +63,12 @@ def juju(
     with jubilant.temp_model(keep=keep_models) as juju:
         juju.model_config({'logging-config': '<root>=INFO;unit=DEBUG'})
         _deploy(juju, charm=charm, app_name=app_name)
-        juju.wait(jubilant.all_active)
+        juju.wait(jubilant.all_active, timeout=15 * 60.0)
         yield juju
         if request.session.testsfailed:
             logger.info('Collecting Juju logs ...')
             time.sleep(0.5)  # Wait for Juju to process logs.
-            log = juju.debug_log(limit=1000)
+            log = juju.debug_log(limit=10000)
             print(log, end='', file=sys.stderr)
 
 
