@@ -66,6 +66,7 @@ def test_restart_action_one_unit(juju: jubilant.Juju, app_name: str):
         app='etcd',
         channel='3.6/stable',
     )
+    juju.wait(jubilant.all_active, error=jubilant.any_error)
 
     juju.integrate(
         'etcd:client-certificates',

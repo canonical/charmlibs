@@ -20,6 +20,14 @@ containers:
   workload:
     resource: workload
 
+peers:
+  restart:
+      interface: rolling_op
+
+requires:
+  etcd:
+    interface: etcd_client
+
 resources:
   workload:
     type: oci-image
