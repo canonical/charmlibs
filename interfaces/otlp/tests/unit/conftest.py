@@ -18,21 +18,63 @@ from __future__ import annotations
 
 import logging
 import socket
-from typing import cast
+from copy import deepcopy
+from typing import Final, Literal
 from unittest.mock import patch
 
 import ops
 import pytest
+from cosl.juju_topology import JujuTopology
 from ops import testing
 from ops.charm import CharmBase
 
-from charmlibs.interfaces.otlp import OtlpProvider, OtlpRequirer
-from helpers import add_alerts, patch_cos_tool_path
+from charmlibs.interfaces.otlp import OtlpProvider, OtlpRequirer, RuleStore
+from helpers import patch_cos_tool_path
 
 logger = logging.getLogger(__name__)
 
 LOKI_RULES_DEST_PATH = 'loki_alert_rules'
 METRICS_RULES_DEST_PATH = 'prometheus_alert_rules'
+SINGLE_LOGQL_ALERT: Final = {
+    'alert': 'HighLogVolume',
+    'expr': 'count_over_time({job=~".+"}[30s]) > 100',
+    'labels': {'severity': 'high'},
+}
+SINGLE_LOGQL_RECORD: Final = {
+    'record': 'log:error_rate:rate5m',
+    'expr': 'sum by (service) (rate({job=~".+"} | json | level="error" [5m]))',
+    'labels': {'severity': 'high'},
+}
+SINGLE_PROMQL_ALERT: Final = {
+    'alert': 'Workload Missing',
+    'expr': 'up{job=~".+"} == 0',
+    'for': '0m',
+    'labels': {'severity': 'critical'},
+}
+SINGLE_PROMQL_RECORD: Final = {
+    'record': 'code:prometheus_http_requests_total:sum',
+    'expr': 'sum by (code) (prometheus_http_requests_total{job=~".+"})',
+    'labels': {'severity': 'high'},
+}
+OFFICIAL_LOGQL_RULES: Final = {
+    'groups': [
+        {
+            'name': 'test_logql',
+            'rules': [SINGLE_LOGQL_ALERT, SINGLE_LOGQL_RECORD],
+        },
+    ]
+}
+OFFICIAL_PROMQL_RULES: Final = {
+    'groups': [
+        {
+            'name': 'test_promql',
+            'rules': [SINGLE_PROMQL_ALERT, SINGLE_PROMQL_RECORD],
+        },
+    ]
+}
+ALL_PROTOCOLS: Final[list[Literal['grpc', 'http']]] = ['grpc', 'http']
+ALL_TELEMETRIES: Final[list[Literal['logs', 'metrics', 'traces']]] = ['logs', 'metrics', 'traces']
+
 
 # --- Tester charms ---
 
@@ -40,60 +82,33 @@ METRICS_RULES_DEST_PATH = 'prometheus_alert_rules'
 class OtlpRequirerCharm(CharmBase):
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
-        self.otlp_requirer = OtlpRequirer(
-            self, protocols=['http', 'grpc'], telemetries=['metrics', 'logs']
-        )
-        self.framework.observe(self.on.update_status, self._on_update_status)
+        self.framework.observe(self.on.update_status, self._publish_rules)
 
-    def _on_update_status(self, event: ops.EventBase) -> None:
-        self.otlp_requirer.publish()
+    def _publish_rules(self, _: ops.EventBase) -> None:
+        with patch_cos_tool_path():
+            rules = (
+                RuleStore(JujuTopology.from_charm(self))
+                .add_logql(deepcopy(SINGLE_LOGQL_ALERT), group_name='test_logql_alert')
+                .add_logql(deepcopy(SINGLE_LOGQL_RECORD), group_name='test_logql_record')
+                .add_promql(deepcopy(SINGLE_PROMQL_ALERT), group_name='test_promql_alert')
+                .add_promql(deepcopy(SINGLE_PROMQL_RECORD), group_name='test_promql_record')
+                .add_logql(deepcopy(OFFICIAL_LOGQL_RULES))
+                .add_promql(deepcopy(OFFICIAL_PROMQL_RULES))
+            )
+        OtlpRequirer(
+            self, protocols=ALL_PROTOCOLS, telemetries=ALL_TELEMETRIES, rules=rules
+        ).publish()
 
 
 class OtlpProviderCharm(CharmBase):
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
-        self.otlp_provider = OtlpProvider(self)
-        self.framework.observe(self.on.update_status, self._on_update_status)
+        self.framework.observe(self.on.update_status, self._publish_endpoints)
 
-    def _on_update_status(self, event: ops.EventBase) -> None:
-        self.otlp_provider.add_endpoint(
+    def _publish_endpoints(self, _: ops.EventBase) -> None:
+        OtlpProvider(self).add_endpoint(
             protocol='http', endpoint=f'{socket.getfqdn()}:4318', telemetries=['metrics']
-        )
-        self.otlp_provider.publish()
-
-
-class OtlpDualCharm(CharmBase):
-    def __init__(self, framework: ops.Framework):
-        super().__init__(framework)
-        self.charm_root = self.charm_dir.absolute()
-        self.otlp_requirer = OtlpRequirer(
-            self,
-            protocols=['http', 'grpc'],
-            telemetries=['metrics', 'logs'],
-            loki_rules_path=self.charm_root.joinpath(*LOKI_RULES_DEST_PATH.split('/')),
-            prometheus_rules_path=self.charm_root.joinpath(*METRICS_RULES_DEST_PATH.split('/')),
-        )
-        self.otlp_provider = OtlpProvider(self)
-        self.framework.observe(self.on.update_status, self._on_update_status)
-
-    def _on_update_status(self, event: ops.EventBase) -> None:
-        forward_alert_rules = cast('bool', self.config.get('forward_alert_rules'))
-        self.otlp_provider.add_endpoint(
-            protocol='http', endpoint=f'{socket.getfqdn()}:4318', telemetries=['metrics']
-        )
-
-        with patch_cos_tool_path():
-            add_alerts(
-                alerts=self.otlp_provider.rules('logql') if forward_alert_rules else {},
-                dest_path=self.charm_root.joinpath(*LOKI_RULES_DEST_PATH.split('/')),
-            )
-            add_alerts(
-                alerts=self.otlp_provider.rules('promql') if forward_alert_rules else {},
-                dest_path=self.charm_root.joinpath(*METRICS_RULES_DEST_PATH.split('/')),
-            )
-
-        self.otlp_provider.publish()
-        self.otlp_requirer.publish()
+        ).publish()
 
 
 # --- Fixtures ---
@@ -115,21 +130,3 @@ def otlp_requirer_ctx() -> testing.Context[OtlpRequirerCharm]:
 def otlp_provider_ctx() -> testing.Context[OtlpProviderCharm]:
     meta = {'name': 'otlp-provider', 'provides': {'receive-otlp': {'interface': 'otlp'}}}
     return testing.Context(OtlpProviderCharm, meta=meta)
-
-
-@pytest.fixture
-def otlp_dual_ctx() -> testing.Context[OtlpDualCharm]:
-    meta = {
-        'name': 'otlp-dual',
-        'requires': {'send-otlp': {'interface': 'otlp'}},
-        'provides': {'receive-otlp': {'interface': 'otlp'}},
-    }
-    config = {
-        'options': {
-            'forward_alert_rules': {
-                'type': 'boolean',
-                'default': True,
-            },
-        },
-    }
-    return testing.Context(OtlpDualCharm, meta=meta, config=config)
