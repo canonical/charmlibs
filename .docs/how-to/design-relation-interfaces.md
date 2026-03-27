@@ -3,6 +3,8 @@
 
 When designing a schema for a new interface, observe the following rules.[^op083]
 
+## Introduction
+
 ### Why we design interfaces up front
 
 Relation data outlives a single charm revision: either side of the relation may be upgraded first, and upgrade itself is not atomic.
