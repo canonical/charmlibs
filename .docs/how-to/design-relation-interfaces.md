@@ -1,13 +1,32 @@
 (design-relation-interfaces)=
 # How to design relation interfaces
 
-When designing a schema for a new interface, observe the following rules.
+When designing a schema for a new interface, observe the following rules.[^op083]
 
-[TBD] Why we design interfaces up front.
+### Why we design interfaces up front
 
-[TBD] Why wire format and charm-facing API are different.
+Relation data outlives a single charm revision: either side of the relation may be upgraded first, and upgrade itself is not atomic.
+Plan for interface to evolve to avoid breaking changes and downtime during application upgrades.
 
-[TBD] Library API for delta and holistic charms.
+### Why wire format and charm-facing API are different
+
+The databag format is long-lived contract, while the charm-facing API is easier to change.
+Please keep the two separate from the start.
+
+Additionally, the ergonomics of using multiple libraries in a charm require specific API patterns.
+When interface evolves, some version of a library has to support both old and new schema, which should not leak to the charms.
+
+### Library API for delta and holistic charms
+
+The ideal charm library API shape is different for delta and holistic charms. Specifically, the comparison between current relation data takes place in the library for a delta charm (against old relation data), and in the charm (againts the workload) in a holistic charm.
+
+### Process
+
+First, decide what data bits should appear in the databag in the first place.
+
+Then, design the JSON representaion for these bits with provisions for backwards and forwards compatibility.
+
+### Conventions
 
 Using newer Pydantic, prefer the `MISSING` sentinel value over the more traditional `None`.
 
@@ -20,6 +39,12 @@ foo: str | None = None
 ```
 
 ## Databag schema
+
+The only changes allowed on a published interface are:
+
+- adding a new field (top level or nested)
+- removing a field (ideally on major version bump)
+- with extra caution: tweaking field validators; or extending or narrowing an enum range
 
 ### Fixed field types
 
@@ -389,3 +414,5 @@ assert state_out.unit_status == ops.testing.BlockedStatus(
     "foo not ready: host must be a domain name"
 )
 ```
+
+[^op083]: OP083 - Relation Interface Design
