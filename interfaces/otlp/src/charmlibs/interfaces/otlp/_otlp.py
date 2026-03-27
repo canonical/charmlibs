@@ -32,11 +32,11 @@ from typing import Any, Final, Literal
 from cosl.juju_topology import JujuTopology
 from cosl.rules import (
     HOST_METRICS_MISSING_RULE_NAME,
-    Rules,
     InjectResult,
+    Rules,
     generic_alert_groups,
 )
-from cosl.types import OfficialRuleFileFormat
+from cosl.types import OfficialRuleFileFormat, OfficialRuleFileItem, SingleRuleFormat
 from cosl.utils import LZMABase64
 from ops import CharmBase
 from pydantic import (
@@ -70,7 +70,7 @@ class RuleStore:
 
     def add_logql(
         self,
-        rule_dict: dict[str, Any],
+        rule_dict: OfficialRuleFileItem | OfficialRuleFileFormat | dict[str, Any],
         *,
         group_name: str | None = None,
         group_name_prefix: str | None = None,
@@ -80,7 +80,8 @@ class RuleStore:
         Args:
             rule_dict: a single-rule or official-rule YAML dict
             group_name: a custom group name, used only if the new rule is of single-rule format
-            group_name_prefix: a custom group name prefix, used only if the new rule is of single-rule format
+            group_name_prefix: a custom group name prefix, used only if the new rule is of
+                single-rule format
         """
         self.logql.add(rule_dict, group_name=group_name, group_name_prefix=group_name_prefix)
         return self
@@ -100,7 +101,7 @@ class RuleStore:
 
     def add_promql(
         self,
-        rule_dict: dict[str, Any],
+        rule_dict: OfficialRuleFileItem | OfficialRuleFileFormat | dict[str, Any],
         *,
         group_name: str | None = None,
         group_name_prefix: str | None = None,
@@ -110,7 +111,8 @@ class RuleStore:
         Args:
             rule_dict: a single-rule or official-rule YAML dict
             group_name: a custom group name, used only if the new rule is of single-rule format
-            group_name_prefix: a custom group name prefix, used only if the new rule is of single-rule format
+            group_name_prefix: a custom group name prefix, used only if the new rule is of
+                single-rule format
         """
         self.promql.add(rule_dict, group_name=group_name, group_name_prefix=group_name_prefix)
         return self
@@ -213,10 +215,9 @@ class OtlpRequirer:
         telemetries: The telemetries to filter for in the provider's OTLP
             endpoints.
         peer_relation_name: Name of the peer relation containing units of this
-            charm.
-        generic_aggregator_rules: Whether this application is an aggregator
-            charm and should use generic aggregator rules. This requires that
-            the charm has a peers relation.
+            charm. When provided, generic aggregator rules are used instead of
+            application-level rules. The charm must have a peers relation with
+            this name.
         rules: Rules of different types e.g., logql or promql, that the
             requirer will publish for the provider.
     """
@@ -228,8 +229,7 @@ class OtlpRequirer:
         protocols: Sequence[Literal['http', 'grpc']] | None = None,
         telemetries: Sequence[Literal['logs', 'metrics', 'traces']] | None = None,
         *,
-        peer_relation_name: str,
-        generic_aggregator_rules=False,
+        peer_relation_name: str | None = None,
         rules: RuleStore | None = None,
     ):
         self._charm = charm
@@ -243,7 +243,6 @@ class OtlpRequirer:
         )
         self._topology = JujuTopology.from_charm(charm)
         self._peer_relation_name = peer_relation_name
-        self._generic_aggregator_rules = generic_aggregator_rules
         self._rules = rules if rules is not None else RuleStore(self._topology)
 
     def _filter_endpoints(self, endpoints: list[_OtlpEndpoint]) -> list[_OtlpEndpoint]:
@@ -285,59 +284,73 @@ class OtlpRequirer:
 
     def _duplicate_rules_per_unit(
         self,
-        alert_rules: dict[str, Any],
-        peer_unit_names: set[str],
+        alert_rules: OfficialRuleFileFormat,
         rule_names_to_duplicate: list[str],
+        peer_unit_names: set[str],
         is_subordinate: bool = False,
-    ) -> dict[str, Any]:
+    ) -> OfficialRuleFileFormat:
         """Duplicate alert rule per unit in peer_units list.
 
         Args:
-            alert_rules: A dictionary where key = "groups" and value is a list
-                of rules.
-            peer_unit_names: A set of unit names (str) representing units of
-                this charm.
-            rule_names_to_duplicate: A list of alert rule names to be
-                duplicated.
+            alert_rules: A dictionary of rules in OfficialRuleFileFormat.
+            rule_names_to_duplicate: A list of rule names to be duplicated.
+            peer_unit_names: A set of charm unit names to duplicate rules for.
             is_subordinate: A boolean denoting whether the charm duplicating
                 alert rules is a subordinate or not. If yes, the severity of
                 the alerts in duplicate_keys needs to be set to critical.
 
         Returns:
-            The updated alert rules with the rules specified in
-            rule_names_to_duplicate, duplicated per unit. The list is to be
-            assigned to the `groups` attribute of an object of type Rules.
+            The updated rules with those specified in rule_names_to_duplicate,
+            duplicated per unit in OfficialRuleFileFormat.
         """
         updated_alert_rules = copy.deepcopy(alert_rules)
-
-        for group in updated_alert_rules.get("groups", {}):
-            new_rules = []
-            for rule in group["rules"]:
-                if rule.get("alert", "") not in rule_names_to_duplicate:
+        for group in updated_alert_rules.get('groups', {}):
+            new_rules: list[SingleRuleFormat] = []
+            for rule in group.get('rules', []):
+                if rule.get('alert', '') not in rule_names_to_duplicate:
                     new_rules.append(rule)
                 else:
-                    for name in peer_unit_names:
-                        juju_unit = name
-                        modified_rule = copy.deepcopy(rule)
-
-                        # Inject juju_unit alert label.
-                        modified_rule["labels"]["juju_unit"] = juju_unit
-
-                        # Inject juju_unit label matcher.
-                        modified_rule["expr"] = self._tool.inject_label_matchers(
-                            re.sub(r"%%juju_unit%%,?", "", modified_rule["expr"]),
-                            {"juju_unit": juju_unit},
+                    for juju_unit in peer_unit_names:
+                        rule_copy = copy.deepcopy(rule)
+                        rule_copy.get('labels', {})['juju_unit'] = juju_unit
+                        rule_copy['expr'] = self._rules.promql.tool.inject_label_matchers(
+                            expression=re.sub(r'%%juju_unit%%,?', '', rule_copy['expr']),
+                            topology={'juju_unit': juju_unit},
                         )
-
-                        # If the charm is a subordinate, the severity of the alerts need to be bumped to critical.
-                        modified_rule["labels"]["severity"] = (
-                            "critical" if is_subordinate else "warning"
+                        # If the charm is a subordinate, the severity of the alerts need to be
+                        # bumped to critical.
+                        rule_copy.get('labels', {})['severity'] = (
+                            'critical' if is_subordinate else 'warning'
                         )
-
-                        new_rules.append(modified_rule)
-
-            group["rules"] = new_rules
+                        new_rules.append(rule_copy)
+            group['rules'] = new_rules
         return updated_alert_rules
+
+    def _inject_generic_rules(self):
+        """Inject generic rules into the charm's RuleStore."""
+        if self._peer_relation_name:
+            if not (peer_relations := self._charm.model.get_relation(self._peer_relation_name)):
+                logger.warning(
+                    'Generic aggregator rules were requested, but no peer relation was found. '
+                    'Ensure this charm has a peer relation named "%s" to use generic aggregator '
+                    'rules.',
+                    self._peer_relation_name,
+                )
+            unit_names: set[str] = {self._charm.unit.name}
+            if peer_relations:
+                unit_names |= {unit.name for unit in peer_relations.units}
+            agg_rules = self._duplicate_rules_per_unit(
+                generic_alert_groups.aggregator_rules,
+                rule_names_to_duplicate=[HOST_METRICS_MISSING_RULE_NAME],
+                peer_unit_names=unit_names,
+                is_subordinate=self._charm.meta.subordinate,
+            )
+            self._rules.add_promql(agg_rules, group_name_prefix=self._topology.identifier)
+        else:
+            self._rules.add_promql(
+                generic_alert_groups.application_rules,
+                group_name_prefix=self._topology.identifier,
+            )
 
     def publish(self):
         """Triggers programmatically the update of the relation data.
@@ -351,29 +364,7 @@ class OtlpRequirer:
             return
 
         # Add generic rules
-        if self._generic_aggregator_rules:
-            if not (peer_relations := self._charm.model.get_relation(self._peer_relation_name)):
-                logger.warning(
-                    'Generic aggregator rules were requested, but no peer relation was found. '
-                    'Please ensure this charm has a peer relation named "%s" to use generic '
-                    'aggregator rules.', self._peer_relation_name
-                )
-
-            unit_names = (
-                {unit.name for unit in peer_relations.units} if peer_relations else set()
-            ) | {self._charm.unit.name}
-            agg_rules = self._duplicate_rules_per_unit(
-                copy.deepcopy(generic_alert_groups.aggregator_rules),
-                unit_names,
-                rule_names_to_duplicate=[HOST_METRICS_MISSING_RULE_NAME],
-                is_subordinate=self._charm.meta.subordinate,
-            )
-            self._rules.add_promql(agg_rules, group_name_prefix=self._topology.identifier)
-        else:
-            self._rules.add_promql(
-                copy.deepcopy(generic_alert_groups.application_rules),
-                group_name_prefix=self._topology.identifier,
-            )
+        self._inject_generic_rules()
 
         # Publish to databag
         databag = _OtlpRequirerAppData.model_validate({

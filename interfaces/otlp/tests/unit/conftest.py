@@ -33,6 +33,7 @@ from helpers import patch_cos_tool_path
 
 logger = logging.getLogger(__name__)
 
+PEERS_ENDPOINT = 'my-peers'
 LOKI_RULES_DEST_PATH = 'loki_alert_rules'
 METRICS_RULES_DEST_PATH = 'prometheus_alert_rules'
 SINGLE_LOGQL_ALERT: Final = {
@@ -80,7 +81,7 @@ ALL_TELEMETRIES: Final[list[Literal['logs', 'metrics', 'traces']]] = ['logs', 'm
 
 
 class OtlpRequirerCharm(CharmBase):
-    generic_aggregator_rules: bool = False
+    _peer_relation_name: str | None = None
 
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
@@ -101,8 +102,8 @@ class OtlpRequirerCharm(CharmBase):
             self,
             protocols=ALL_PROTOCOLS,
             telemetries=ALL_TELEMETRIES,
+            peer_relation_name=self._peer_relation_name,
             rules=rules,
-            generic_aggregator_rules=self.generic_aggregator_rules,
         ).publish()
 
 
@@ -126,30 +127,21 @@ def mock_hostname():
         yield
 
 
-# @pytest.fixture
-# def otlp_requirer_ctx() -> testing.Context[OtlpRequirerCharm]:
-#     meta = {
-#         'name': 'otlp-requirer',
-#         'requires': {'send-otlp': {'interface': 'otlp'}},
-#         'peers': {'my-peers': {'interface': 'aggregator_peers'}},
-#     }
-#     return testing.Context(OtlpRequirerCharm, meta=meta)
-
-# TODO: Remove if not needed
 @pytest.fixture
 def otlp_requirer_ctx(request: pytest.FixtureRequest) -> testing.Context[OtlpRequirerCharm]:
     meta = {
         'name': 'otlp-requirer',
         'requires': {'send-otlp': {'interface': 'otlp'}},
-        'peers': {'my-peers': {'interface': 'aggregator_peers'}},
+        'peers': {PEERS_ENDPOINT: {'interface': 'aggregator_peers'}},
     }
     generic_aggregator_rules: bool = getattr(request, 'param', False)
     charm_cls = type(
         'OtlpRequirerCharm',
         (OtlpRequirerCharm,),
-        {'generic_aggregator_rules': generic_aggregator_rules},
+        {'_peer_relation_name': PEERS_ENDPOINT if generic_aggregator_rules else None},
     )
     return testing.Context(charm_cls, meta=meta)
+
 
 @pytest.fixture
 def otlp_provider_ctx() -> testing.Context[OtlpProviderCharm]:
