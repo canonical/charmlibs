@@ -40,6 +40,9 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Setup tmate session
+        uses: canonical/action-tmate@main
+
       - name: Install uv
         uses: astral-sh/setup-uv@v7
 

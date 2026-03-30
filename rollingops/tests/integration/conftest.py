@@ -19,7 +19,6 @@ import os
 import pathlib
 import sys
 import time
-import typing
 from collections.abc import Iterator
 
 import jubilant
@@ -59,8 +58,8 @@ def juju(
 
     This adds command line parameter ``--keep-models`` (see help for details).
     """
-    keep_models = typing.cast('bool', request.config.getoption('--keep-models'))
-    with jubilant.temp_model(keep=keep_models) as juju:
+    # keep_models = typing.cast('bool', request.config.getoption('--keep-models'))
+    with jubilant.temp_model(keep=True) as juju:
         juju.model_config({'logging-config': '<root>=INFO;unit=DEBUG'})
         _deploy(juju, charm=charm, app_name=app_name)
         juju.wait(jubilant.all_active, timeout=15 * 60.0)
