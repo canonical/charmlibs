@@ -239,18 +239,16 @@ def test_provider_rules(
     state = State(leader=True, relations=[receiver], model=MODEL)
     with otlp_provider_ctx(otlp_provider_ctx.on.update_status(), state=state) as mgr:
         # WHEN the provider aggregates the rules from the databag
-        logql = OtlpProvider(mgr.charm, RECEIVE).rules('logql')
-        promql = OtlpProvider(mgr.charm, RECEIVE).rules('promql')
+        rule_store = OtlpProvider(mgr.charm, RECEIVE).rules[receiver.id]
+        logql = rule_store.logql.as_dict()
+        promql = rule_store.promql.as_dict()
+        # THEN LogQL and PromQL rules exist in the RuleStore
         assert logql
         assert promql
         for result in [logql, promql]:
             app = metadata['application'] if metadata else 'otlp-provider'
             charm = metadata['charm_name'] if metadata else 'otlp-provider'
-
-            # THEN the identifier is present
-            identifier = f'{MODEL_NAME}_{MODEL_SHORT_UUID}_{app}'
-            assert identifier in result
-            groups = result[identifier].get('groups', [])
+            groups = result.get('groups', [])
             assert groups
             for group in groups:
                 for rule in group.get('rules', []):

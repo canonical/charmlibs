@@ -42,8 +42,7 @@ class MyOtlpServer(CharmBase):
         ).publish()
 
     def _access_rules(self, event):
-        OtlpProvider(self).rules("promql")
-        OtlpProvider(self).rules("logql")
+        OtlpProvider(self).rules  # {relation_id: RuleStore}
 ```
 
 ### Requirer Side

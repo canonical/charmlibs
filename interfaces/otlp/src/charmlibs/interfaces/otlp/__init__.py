@@ -66,8 +66,7 @@ the ``rules()`` method::
             self.framework.observe(self.on.update_status, self._access_rules)
 
         def _access_rules(self, event):
-            OtlpProvider(self).rules("promql")
-            OtlpProvider(self).rules("logql")
+            OtlpProvider(self).rules  # {relation_id: RuleStore}
 
 Requirer Side (Charms requiring OTLP endpoints)
 -----------------------------------------------

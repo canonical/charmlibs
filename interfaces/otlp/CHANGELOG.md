@@ -33,3 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Added an `insecure` field to the OtlpEndpoint(s) in the databag to communicate TLS, required for some gRPC applications
+
+## [0.4.0]
+
+### Updated
+
+- `OtlpProvider.rules` now returns a mapping of relation ID to a RuleStore object
