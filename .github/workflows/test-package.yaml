@@ -39,6 +39,11 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
+        with:
+          detached: true
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7

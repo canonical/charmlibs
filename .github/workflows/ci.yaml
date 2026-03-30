@@ -31,10 +31,6 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
-        with:
-          detached: true
       - name: Calculate reference for git diff
         id: ref
         if: github.event_name == 'pull_request'
