@@ -20,6 +20,7 @@ from ._models import (
     RollingOpsEtcdNotConfiguredError,
     RollingOpsInvalidLockRequestError,
 )
+from ._base_manager import RollingOpsManager
 from ._version import __version__ as __version__
 
 __all__ = (
@@ -27,4 +28,5 @@ __all__ = (
     'OperationResult',
     'RollingOpsEtcdNotConfiguredError',
     'RollingOpsInvalidLockRequestError',
+    'RollingOpsManager',
 )

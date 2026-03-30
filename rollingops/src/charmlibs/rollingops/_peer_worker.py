@@ -110,7 +110,6 @@ class PeerRollingOpsAsyncWorker(Object):
         self._app_data.update({'rollingops-worker-pid': str(pid)})
         logger.info('Started RollingOps worker process with PID %s', pid)
 
-
     def stop(self) -> None:
         """Stop the running worker process if it exists."""
         if self._relation is None:

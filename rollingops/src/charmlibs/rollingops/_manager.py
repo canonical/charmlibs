@@ -37,10 +37,6 @@ from charmlibs.rollingops._worker import EtcdRollingOpsAsyncWorker
 logger = logging.getLogger(__name__)
 
 
-class RollingOpsLockGrantedEvent(EventBase):
-    """Custom event emitted when the background worker grants the lock."""
-
-
 class EtcdRollingOpsManager(Object):
     """Rolling ops manager for clusters."""
 
@@ -61,7 +57,7 @@ class EtcdRollingOpsManager(Object):
             cluster_id: unique identifier for the cluster
             callback_targets: mapping from callback_id -> callable.
         """
-        super().__init__(charm, 'rolling-ops-manager')
+        super().__init__(charm, 'etcd-rolling-ops-manager')
         self._charm = charm
         self.peer_relation_name = peer_relation_name
         self.etcd_relation_name = etcd_relation_name
@@ -85,8 +81,6 @@ class EtcdRollingOpsManager(Object):
             cluster_id=self.keys.cluster_prefix,
             shared_certificates=self.shared_certificates,
         )
-
-        charm.on.define_event('rollingops_lock_granted', RollingOpsLockGrantedEvent)
 
         self.framework.observe(
             charm.on[self.peer_relation_name].relation_departed, self._on_peer_relation_departed
@@ -115,7 +109,7 @@ class EtcdRollingOpsManager(Object):
             logger.error('%s is not installed', etcdctl.ETCDCTL_CMD)
             # TODO: fallback to peer relation implementation.
 
-    def _on_rollingop_granted(self, event: RollingOpsLockGrantedEvent) -> None:
+    def _on_rollingop_granted(self, event) -> None:
         """Handle the event when a rolling operation lock is granted.
 
         If etcd is not yet configured, the operation is skipped.
