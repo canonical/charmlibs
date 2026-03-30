@@ -20,7 +20,7 @@ and
 `requirements <https://github.com/open-telemetry/opentelemetry-proto/blob/main/docs/requirements.md>`_
 of the project.
 
-This library provides a way for charms to share OTLP endpoint information and associated Loki and
+This library provides a way for charms to share OTLP endpoint information, and associated Loki and
 Prometheus rules. This library requires that the charm's workload already supports
 sending/receiving OTLP data and focuses on communicating those endpoints.
 
@@ -38,21 +38,18 @@ To provide OTLP endpoints, use the ``OtlpProvider`` class. Configure and send en
     class MyOtlpServer(CharmBase):
         def __init__(self, *args):
             super().__init__(*args)
-            self.otlp_provider = OtlpProvider(self)
-            self.framework.observe(self.on.ingress_ready, self._on_ingress_ready)
+            self.framework.observe(self.on.ingress_ready, self._publish_endpoints)
 
-        def _on_ingress_ready(self, event):
-            self.otlp_provider.add_endpoint(
+        def _publish_endpoints(self, event):
+            OtlpProvider(self).add_endpoint(
                 protocol="grpc",
                 endpoint="https://my-app.ingress:4317",
                 telemetries=["logs", "metrics"],
-            )
-            self.otlp_provider.add_endpoint(
+            ).add_endpoint(
                 protocol="http",
                 endpoint="https://my-app.ingress:4318",
                 telemetries=["traces"],
-            )
-            self.otlp_provider.publish()
+            ).publish()
 
 Providers add endpoints explicitly; nothing is auto-published by default. Make sure to add
 endpoints and publish them after the charm's endpoint details have been updated e.g., ingress or
@@ -61,9 +58,16 @@ TLS changes.
 The OtlpProvider also consumes rules from related OtlpRequirer charms, which can be retrieved with
 the ``rules()`` method::
 
-    # snip ...
-    promql_rules = self.otlp_provider.rules("promql")
-    logql_rules = self.otlp_provider.rules("logql")
+    from charmlibs.interfaces.otlp import OtlpProvider
+
+    class MyOtlpServer(CharmBase):
+        def __init__(self, *args):
+            super().__init__(*args)
+            self.framework.observe(self.on.update_status, self._access_rules)
+
+        def _access_rules(self, event):
+            OtlpProvider(self).rules("promql")
+            OtlpProvider(self).rules("logql")
 
 Requirer Side (Charms requiring OTLP endpoints)
 -----------------------------------------------
@@ -74,19 +78,16 @@ subset of protocols and telemetries, which can be configured at instantiation::
     from charmlibs.interfaces.otlp import OtlpRequirer
 
     class MyOtlpSender(CharmBase):
-        def __init__(self, *args):
-            super().__init__(*args)
-            self.otlp_requirer = OtlpRequirer(
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            self.framework.observe(self.on.update_status, self._access_endpoints)
+
+        def _access_endpoints(self, _: ops.EventBase):
+            OtlpRequirer(
                 self,
                 protocols=["grpc", "http"],
                 telemetries=["logs", "metrics", "traces"],
-                loki_rules_path="./src/loki_alert_rules",
-                prometheus_rules_path="./src/prometheus_alert_rules",
-            )
-            self.framework.observe(self.on.update_status, self._reconcile)
-
-        def _reconcile(self, event):
-            supported_endpoints = self.otlp_requirer.endpoints
+            ).endpoints
 
 Given the defined, supported protocols and telemetries, the OtlpRequirer will filter out
 unsupported endpoints and prune unsupported telemetries. After filtering, requirer selection
@@ -95,14 +96,31 @@ Endpoints with modern protocols are favoured over legacy ones.
 That means an endpoint supporting the `gRPC` protocol will be selected over one supporting `HTTP`.
 Unknown protocols will receive the lowest priority.
 
-The OtlpRequirer also publishes rules to related OtlpProvider charms with the ``publish()``
-method::
+The OtlpRequirer also publishes user-defined and generic (applied to all charms) rules to related
+OtlpProvider charms with the ``publish()`` method::
 
-    # snip ...
-    self.otlp_requirer.publish()
+    from charmlibs.interfaces.otlp import OtlpRequirer, RulesStore
 
-It is the charm's responsibility to manage the rules in the ``loki_rules_path`` and
-``prometheus_rules_path`` directories, which will be forwarded to the related OtlpProvider charms.
+    class MyOtlpSender(CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            self.framework.observe(self.on.update_status, self._publish_rules)
+
+        def _publish_rules(self, _: ops.EventBase):
+            rules = (
+                RuleStore(JujuTopology.from_charm(self))
+                .add_logql(SINGLE_LOGQL_ALERT, group_name='test_logql_alert')
+                .add_promql(SINGLE_PROMQL_RECORD, group_name='test_promql_record')
+                .add_logql(OFFICIAL_LOGQL_RULES)
+            )
+            OtlpRequirer(self, rules=rules).publish()
+
+Generic rules are sourced from `cosl.rules.generic_alert_groups <https://github.com/canonical/cos-lib/blob/main/src/cosl/rules.py>`_.
+If the charm is an aggregator e.g., opentelemetry-collector, the type of generic rules to be
+injected into the charm's RuleStore should reflect that. This is configurable by setting the
+``aggregator_peer_relation_name`` with the name of the charm's peer relation::
+
+    OtlpRequirer(..., aggregator_peer_relation_name="my-peers").publish()
 
 Relation Data Format
 ====================
@@ -123,19 +141,22 @@ key. Each provider may offer any number of OTLP endpoints::
         },
     ]
 
-The OtlpRequirer offers compressed rules in the relation databag under the ``rules`` key. The
-charm's metadata is included under the ``metadata`` key for the provider to know the source of the
-rules::
+The OtlpRequirer offers compressed rules in the relation databag under the ``rules`` key, which
+have this structure when decompressed::
 
     "rules": {
         "promql": {...},
         "logql": {...},
     }
+
+The charm's metadata is included under the ``metadata`` key for the provider to know the source of
+the rules::
+
     "metadata": {
         "model": "my-model",
         "model_uuid": "f4d59020-c8e7-4053-8044-a2c1e5591c7f",
         "application": "my-app",
-        "charm": "my-charm",
+        "charm_name": "my-charm",
         "unit": "my-charm/0",
     }
 """
@@ -144,6 +165,7 @@ from ._otlp import (
     OtlpEndpoint,
     OtlpProvider,
     OtlpRequirer,
+    RuleStore,
 )
 from ._version import __version__ as __version__
 
@@ -153,4 +175,5 @@ __all__ = [
     'OtlpEndpoint',
     'OtlpProvider',
     'OtlpRequirer',
+    'RuleStore',
 ]
