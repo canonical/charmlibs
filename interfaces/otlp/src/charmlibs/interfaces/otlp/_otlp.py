@@ -125,7 +125,6 @@ class RuleStore:
         self.promql.add_path(dir_path, recursive=recursive)
         return self
 
-    # TODO: Add a test for this
     def combine(self, other: 'RuleStore') -> 'RuleStore':
         """Combine rules from another RuleStore with this RuleStore."""
         if other_logql := other.logql.as_dict():
@@ -497,9 +496,9 @@ class OtlpProvider:
             promql_result = rules.promql.inject_and_validate_rules(
                 requirer.rules.promql, requirer.metadata
             )
-            if not logql_result.errmsg:
+            if logql_result.rules and not logql_result.errmsg:
                 rules.logql.add(logql_result.rules)
-            if not promql_result.errmsg:
+            if promql_result.rules and not promql_result.errmsg:
                 rules.promql.add(promql_result.rules)
             for errmsg in [logql_result.errmsg, promql_result.errmsg]:
                 if errmsg and self._charm.unit.is_leader():
