@@ -56,7 +56,7 @@ endpoints and publish them after the charm's endpoint details have been updated 
 TLS changes.
 
 The OtlpProvider also consumes rules from related OtlpRequirer charms, which can be retrieved with
-the ``rules()`` method::
+the ``rules`` property::
 
     from charmlibs.interfaces.otlp import OtlpProvider
 
