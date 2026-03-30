@@ -20,7 +20,7 @@ from typing import Any
 
 import pytest
 
-from charmlibs.rollingops.peer_models import (
+from charmlibs.rollingops._peer_models import (
     Operation,
     OperationQueue,
     RollingOpsDecodingError,

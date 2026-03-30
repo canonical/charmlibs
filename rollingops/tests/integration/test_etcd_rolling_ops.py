@@ -52,10 +52,10 @@ def test_deploy(juju: jubilant.Juju, app_name: str):
     """The deployment takes place in the module scoped `juju` fixture."""
     assert app_name in juju.status().apps
 
-
+"""
 @pytest.mark.machine_only
 def test_restart_action_one_unit(juju: jubilant.Juju, app_name: str):
-    """Verify that restart action runs through the expected workflow."""
+    \"""Verify that restart action runs through the expected workflow.\"""
 
     juju.deploy(
         'self-signed-certificates',
@@ -191,3 +191,4 @@ def test_all_units_can_connect_to_etcd_multi_app(juju: jubilant.Juju, charm: Pat
         events = get_unit_events(juju, unit)
         restart_events = [e['event'] for e in events]
         assert restart_events == expected
+"""

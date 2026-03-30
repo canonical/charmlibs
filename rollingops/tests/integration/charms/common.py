@@ -31,6 +31,9 @@ from charmlibs.rollingops import (
     EtcdRollingOpsManager,
     OperationResult,
 )
+from charmlibs.rollingops._peer_models import Lock
+from typing import Callable
+from charmlibs.rollingops._peer_manager import BaseRollingOpsManager, PeerRollingOpsManager
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +56,7 @@ class Charm(CharmBase):
             '_deferred_restart': self._deferred_restart,
         }
 
-        self.restart_manager = EtcdRollingOpsManager(
+        self.restart_manager = build_rolling_ops_manager(
             charm=self,
             peer_relation_name='restart',
             etcd_relation_name='etcd',
@@ -129,3 +132,31 @@ class Charm(CharmBase):
         }
         with TRACE_FILE.open('a', encoding='utf-8') as f:
             f.write(json.dumps(payload) + '\n')
+
+
+def build_rolling_ops_manager(
+    charm: CharmBase,
+    peer_relation_name: str,
+    callback_targets: dict[str, Callable[..., Any]],
+    etcd_relation_name: str | None = None,
+    cluster_id: str | None = None,
+) -> BaseRollingOpsManager:
+    """Build the appropriate rolling ops manager."""
+
+    if etcd_relation_name and charm.model.get_relation(etcd_relation_name):
+        if not cluster_id:
+            raise ValueError("cluster_id is required when using etcd rolling ops")
+
+        return EtcdRollingOpsManager(
+            charm=charm,
+            peer_relation_name=peer_relation_name,
+            etcd_relation_name=etcd_relation_name,
+            cluster_id=cluster_id,
+            callback_targets=callback_targets,
+        )
+
+    return PeerRollingOpsManager(
+        charm=charm,
+        relation_name=peer_relation_name,
+        callback_targets=callback_targets,
+    )

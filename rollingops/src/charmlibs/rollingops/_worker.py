@@ -35,7 +35,7 @@ class EtcdRollingOpsAsyncWorker(Object):
     """Spawns and manages the external rolling-ops worker process."""
 
     def __init__(self, charm: CharmBase, peer_relation_name: str, owner: str):
-        super().__init__(charm, 'etcd-ollingops-async-worker')
+        super().__init__(charm, 'etcd-rollingops-async-worker')
         self._charm = charm
         self._peer_relation_name = peer_relation_name
         self._run_cmd = '/usr/bin/juju-exec'

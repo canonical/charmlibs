@@ -21,7 +21,7 @@ import sys
 import time
 import typing
 from collections.abc import Iterator
-
+import typing
 import jubilant
 import pytest
 

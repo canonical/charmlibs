@@ -30,8 +30,8 @@ import charmlibs.rollingops._etcdctl as etcdctl
 from charmlibs import rollingops
 from charmlibs.pathops import LocalPath
 from charmlibs.rollingops._models import SharedCertificate
-from charmlibs.rollingops.peer_manager import PeerRollingOpsManager
-from charmlibs.rollingops.peer_models import OperationResult
+from charmlibs.rollingops._peer_manager import PeerRollingOpsManager
+from charmlibs.rollingops._peer_models import OperationResult
 
 
 @pytest.fixture

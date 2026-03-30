@@ -160,7 +160,7 @@ from ops.charm import (
 )
 from ops.framework import EventBase, Object
 
-from charmlibs.rollingops.peer_models import (
+from charmlibs.rollingops._peer_models import (
     Lock,
     LockIterator,
     OperationResult,
@@ -170,7 +170,7 @@ from charmlibs.rollingops.peer_models import (
     pick_oldest_completed,
     pick_oldest_request,
 )
-from charmlibs.rollingops.peer_worker import RollingOpsAsyncWorker
+from charmlibs.rollingops._peer_worker import PeerRollingOpsAsyncWorker
 
 logger = logging.getLogger(__name__)
 
@@ -178,6 +178,29 @@ logger = logging.getLogger(__name__)
 class RollingOpsLockGrantedEvent(EventBase):
     """Custom event emitted when the background worker grants the lock."""
 
+
+
+class BaseRollingOpsManager(Object):
+    """Common interface for rolling ops managers."""
+
+    def __init__(
+        self,
+        charm: CharmBase,
+        relation_name: str,
+        callback_targets: dict[str, Callable[..., Any]],
+    ):
+        super().__init__(charm, relation_name)
+        self.charm = charm
+        self.relation_name = relation_name
+        self.callback_targets = callback_targets
+
+    @property
+    def relation_exists(self) -> bool:
+        return self.model.get_relation(self.relation_name) is not None
+
+    def emit_callback(self, callback_id: str, *args: Any, **kwargs: Any) -> Any:
+        callback = self.callback_targets[callback_id]
+        return callback(*args, **kwargs)
 
 class PeerRollingOpsManager(Object):
     """Emitters and handlers for rolling ops."""
@@ -197,7 +220,7 @@ class PeerRollingOpsManager(Object):
         self.relation_name = relation_name
         self.callback_targets = callback_targets
         self.charm_dir = charm.charm_dir
-        self.worker = RollingOpsAsyncWorker(charm, relation_name=relation_name)
+        self.worker = PeerRollingOpsAsyncWorker(charm, relation_name=relation_name)
 
         charm.on.define_event('rollingops_lock_granted', RollingOpsLockGrantedEvent)
 
@@ -454,3 +477,5 @@ class PeerRollingOpsManager(Object):
             case _:
                 logger.info('Finished %s. Lock will be released.', operation.callback_id)
                 lock.complete()
+
+        

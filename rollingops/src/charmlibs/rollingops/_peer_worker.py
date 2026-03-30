@@ -30,14 +30,15 @@ from ops.framework import Object
 logger = logging.getLogger(__name__)
 
 
-class RollingOpsAsyncWorker(Object):
+class PeerRollingOpsAsyncWorker(Object):
     """Spawns and manages the external rolling-ops worker process."""
 
     def __init__(self, charm: CharmBase, relation_name: str):
-        super().__init__(charm, 'rollingops-async-worker')
+        super().__init__(charm, 'peer-rollingops-async-worker')
         self._charm = charm
         self._peers_name = relation_name
         self._run_cmd = '/usr/bin/juju-exec'
+        self._charm_dir = charm.charm_dir
 
     @property
     def _relation(self) -> Relation | None:
@@ -73,7 +74,20 @@ class RollingOpsAsyncWorker(Object):
                 new_env['PYTHONPATH'] = f'{venv_path.resolve()}:{new_env["PYTHONPATH"]}'
                 break
 
-        worker = self._charm.charm_dir / 'lib/charms/rolling_ops/v1' / 'rollingops.py'
+        worker = (
+            self._charm_dir
+            / 'venv'
+            / 'lib'
+            / f'python{version_info.major}.{version_info.minor}'
+            / 'site-packages'
+            / 'charmlibs'
+            / 'rollingops'
+            / '_peer_rollingops.py'
+        )
+
+        # These files must stay open for the lifetime of the worker process.
+        log_out = open('/var/log/peer_rollingops_worker.log', 'a')  # noqa: SIM115
+        log_err = open('/var/log/peer_rollingops_worker.err', 'a')  # noqa: SIM115
 
         pid = subprocess.Popen(
             [
@@ -85,16 +99,17 @@ class RollingOpsAsyncWorker(Object):
                 '--unit-name',
                 self._charm.model.unit.name,
                 '--charm-dir',
-                str(self._charm.charm_dir),
+                str(self._charm_dir),
             ],
-            cwd=str(self._charm.charm_dir),
-            stdout=open('/var/log/rollingops_worker.log', 'a'),  # noqa: SIM115
-            stderr=subprocess.STDOUT,
+            cwd=str(self._charm_dir),
+            stdout=log_out,
+            stderr=log_err,
             env=new_env,
         ).pid
 
         self._app_data.update({'rollingops-worker-pid': str(pid)})
         logger.info('Started RollingOps worker process with PID %s', pid)
+
 
     def stop(self) -> None:
         """Stop the running worker process if it exists."""

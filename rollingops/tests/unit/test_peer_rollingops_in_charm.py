@@ -23,7 +23,7 @@ from ops.testing import Context, PeerRelation, State
 from scenario import RawDataBagContents
 from tests.unit.conftest import PeerRollingOpsCharm
 
-from charmlibs.rollingops.peer_models import (
+from charmlibs.rollingops._peer_models import (
     LockIntent,
     OperationQueue,
     RollingOpsInvalidLockRequestError,

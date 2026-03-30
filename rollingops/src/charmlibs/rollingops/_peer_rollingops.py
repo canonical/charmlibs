@@ -28,9 +28,14 @@ def main():
     args = parser.parse_args()
 
     # Sleep so that the leader unit can properly leave the hook and start a new one
+    print("ENTERING DISPAtCHING")
     time.sleep(10)
     dispatch_sub_cmd = (
         f'JUJU_DISPATCH_PATH=hooks/rollingops_lock_granted {args.charm_dir}/dispatch'
     )
     res = subprocess.run([args.run_cmd, '-u', args.unit_name, dispatch_sub_cmd])
     res.check_returncode()
+    print(res)
+
+if __name__ == '__main__':
+    main()
