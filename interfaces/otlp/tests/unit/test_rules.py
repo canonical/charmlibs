@@ -266,9 +266,6 @@ def test_provider_rules(
                     assert f'juju_application="{app}"' in rule['expr']
 
 
-# --- RuleStore.combine tests ---
-
-
 def _make_store() -> RuleStore:
     return RuleStore(
         JujuTopology(
