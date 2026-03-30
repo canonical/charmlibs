@@ -209,7 +209,7 @@ jobs:
 
       - name: Prepare Juju for machine
         if: ${{ matrix.substrate == 'machine' }}
-        run: sudo concierge prepare --verbose --juju-channel=3/stable --charmcraft-channel=3.x/stable -p machine
+        run: sudo concierge prepare --verbose --juju-channel=3.6/beta  --charmcraft-channel=3.x/stable -p machine
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
