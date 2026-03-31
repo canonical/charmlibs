@@ -153,6 +153,15 @@ class EtcdRollingOpsManager(Object):
         Here we spawn a new process that will trigger a Juju hook.
         This function will be completely remade in the next PR.
 
+        Args:
+            callback_id: Identifier of the registered callback to execute when
+                the lock is granted.
+            kwargs: Optional keyword arguments passed to the callback when
+                executed. Must be JSON-serializable.
+            max_retry: Maximum number of retries for the operation.
+                - None: retry indefinitely
+                - 0: do not retry on failure
+
         Raises:
             RollingOpsInvalidLockRequestError: If the callback_id is not registered or
                 invalid parameters were provided.
