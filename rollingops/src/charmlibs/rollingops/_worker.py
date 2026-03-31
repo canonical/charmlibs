@@ -72,32 +72,27 @@ class EtcdRollingOpsAsyncWorker(Object):
         new_env = os.environ.copy()
         new_env.pop('JUJU_CONTEXT_ID', None)
 
-        python_version = f'python{version_info.major}.{version_info.minor}'
+        venv_path = (
+            self._charm_dir
+            / 'venv'
+            / 'lib'
+            / f'python{version_info.major}.{version_info.minor}'
+            / 'site-packages'
+        )
+        if not with_pebble_retry(lambda: venv_path.exists()):
+            raise RollingOpsCharmLibMissingError(
+                f'Expected virtualenv site-packages not found: {venv_path}'
+            )
 
         for loc in new_env.get('PYTHONPATH', '').split(':'):
             path = pathops.LocalPath(loc)
 
             if path.stem != 'lib':
                 continue
-            venv_path = path / '..' / 'venv' / 'lib' / python_version / 'site-packages'
-            if not with_pebble_retry(lambda venv_path=venv_path: venv_path.exists()):
-                raise RollingOpsCharmLibMissingError(
-                    f'Expected virtualenv site-packages not found: {venv_path}'
-                )
-
             new_env['PYTHONPATH'] = f'{venv_path.resolve()}:{new_env["PYTHONPATH"]}'
             break
 
-        worker = (
-            self._charm_dir
-            / 'venv'
-            / 'lib'
-            / python_version
-            / 'site-packages'
-            / 'charmlibs'
-            / 'rollingops'
-            / '_etcd_rollingops.py'
-        )
+        worker = venv_path / 'charmlibs' / 'rollingops' / '_etcd_rollingops.py'
         if not with_pebble_retry(lambda: worker.exists()):
             raise RollingOpsCharmLibMissingError(f'Worker script not found: {worker}')
 
