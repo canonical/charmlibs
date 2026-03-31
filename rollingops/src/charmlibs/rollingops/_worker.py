@@ -25,6 +25,7 @@ from ops.charm import CharmBase
 from ops.framework import Object
 
 from charmlibs import pathops
+from charmlibs.rollingops._models import RollingOpsCharmLibMissingError, with_pebble_retry
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +48,11 @@ class EtcdRollingOpsAsyncWorker(Object):
         return self.model.get_relation(self._peer_relation_name)
 
     def start(self) -> None:
-        """Start a new worker process."""
+        """Start a new worker process.
+
+        Raises:
+            RollingOpsCharmLibMissingError: if the lib files cannot be found.
+        """
         if self._relation is None:
             return
 
@@ -67,30 +72,34 @@ class EtcdRollingOpsAsyncWorker(Object):
         new_env = os.environ.copy()
         new_env.pop('JUJU_CONTEXT_ID', None)
 
+        python_version = f'python{version_info.major}.{version_info.minor}'
+
         for loc in new_env.get('PYTHONPATH', '').split(':'):
             path = pathops.LocalPath(loc)
-            venv_path = (
-                path
-                / '..'
-                / 'venv'
-                / 'lib'
-                / f'python{version_info.major}.{version_info.minor}'
-                / 'site-packages'
-            )
-            if path.stem == 'lib':
-                new_env['PYTHONPATH'] = f'{venv_path.resolve()}:{new_env["PYTHONPATH"]}'
-                break
+
+            if path.stem != 'lib':
+                continue
+            venv_path = path / '..' / 'venv' / 'lib' / python_version / 'site-packages'
+            if not with_pebble_retry(lambda venv_path=venv_path: venv_path.exists()):
+                raise RollingOpsCharmLibMissingError(
+                    f'Expected virtualenv site-packages not found: {venv_path}'
+                )
+
+            new_env['PYTHONPATH'] = f'{venv_path.resolve()}:{new_env["PYTHONPATH"]}'
+            break
 
         worker = (
             self._charm_dir
             / 'venv'
             / 'lib'
-            / f'python{version_info.major}.{version_info.minor}'
+            / python_version
             / 'site-packages'
             / 'charmlibs'
             / 'rollingops'
             / '_etcd_rollingops.py'
         )
+        if not with_pebble_retry(lambda: worker.exists()):
+            raise RollingOpsCharmLibMissingError(f'Worker script not found: {worker}')
 
         # These files must stay open for the lifetime of the worker process.
         log_out = open('/var/log/etcd_rollingops_worker.log', 'a')  # noqa: SIM115

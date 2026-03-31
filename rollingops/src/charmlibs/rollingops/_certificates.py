@@ -30,6 +30,7 @@ from charmlibs.interfaces.tls_certificates import (
     CertificateRequestAttributes,
     CertificateSigningRequest,
     PrivateKey,
+    TLSCertificatesError,
 )
 from charmlibs.rollingops._models import (
     RollingOpsFileSystemError,
@@ -55,10 +56,8 @@ def persist_client_cert_key_and_ca(shared: SharedCertificate) -> None:
     if _has_client_cert_key_and_ca(shared):
         return
     try:
-        _mkdir_with_retry(BASE_DIR)
-        _write_text_with_retry(path=CLIENT_CERT_PATH, content=shared.certificate, mode=0o644)
-        _write_text_with_retry(path=CLIENT_KEY_PATH, content=shared.key, mode=0o600)
-        _write_text_with_retry(path=CA_CERT_PATH, content=shared.ca, mode=0o644)
+        with_pebble_retry(lambda: BASE_DIR.mkdir(parents=True, exist_ok=True))
+        shared.write_to_paths(CLIENT_CERT_PATH, CLIENT_KEY_PATH, CA_CERT_PATH)
 
     except (FileNotFoundError, LookupError, NotADirectoryError, PermissionError) as e:
         raise RollingOpsFileSystemError('Failed to persist client certificates and key.') from e
@@ -74,12 +73,20 @@ def _has_client_cert_key_and_ca(shared: SharedCertificate) -> bool:
     if not _exists():
         return False
     try:
-        return (
-            _read_text_with_retry(CLIENT_CERT_PATH) == shared.certificate
-            and _read_text_with_retry(CLIENT_KEY_PATH) == shared.key
-            and _read_text_with_retry(CA_CERT_PATH) == shared.ca
+        stored = SharedCertificate.from_paths(
+            CLIENT_CERT_PATH,
+            CLIENT_KEY_PATH,
+            CA_CERT_PATH,
         )
-    except (FileNotFoundError, IsADirectoryError, PermissionError) as e:
+        return stored == shared
+
+    except (
+        FileNotFoundError,
+        IsADirectoryError,
+        PermissionError,
+        TLSCertificatesError,
+        ValueError,
+    ) as e:
         raise RollingOpsFileSystemError('Failed to read certificates and key.') from e
 
 
@@ -104,10 +111,10 @@ def generate(common_name: str) -> SharedCertificate:
         RollingOpsFileSystemError: if there is a problem when writing the certificates
     """
     if _exists():
-        return SharedCertificate(
-            certificate=_read_text_with_retry(CLIENT_CERT_PATH),
-            key=_read_text_with_retry(CLIENT_KEY_PATH),
-            ca=_read_text_with_retry(CA_CERT_PATH),
+        return SharedCertificate.from_paths(
+            CLIENT_CERT_PATH,
+            CLIENT_KEY_PATH,
+            CA_CERT_PATH,
         )
 
     ca_key = PrivateKey.generate(key_size=KEY_SIZE)
@@ -141,9 +148,9 @@ def generate(common_name: str) -> SharedCertificate:
     )
 
     shared = SharedCertificate(
-        certificate=client_crt.raw,
-        key=client_key.raw,
-        ca=ca_crt.raw,
+        certificate=client_crt,
+        key=client_key,
+        ca=ca_crt,
     )
 
     persist_client_cert_key_and_ca(shared)
@@ -157,71 +164,7 @@ def _exists() -> bool:
         PebbleConnectionError: if the remote container cannot be reached
     """
     return (
-        _exists_with_retry(CA_CERT_PATH)
-        and _exists_with_retry(CLIENT_KEY_PATH)
-        and _exists_with_retry(CLIENT_CERT_PATH)
+        with_pebble_retry(lambda: CA_CERT_PATH.exists())
+        and with_pebble_retry(lambda: CLIENT_KEY_PATH.exists())
+        and with_pebble_retry(lambda: CLIENT_CERT_PATH.exists())
     )
-
-
-def _exists_with_retry(path: pathops.LocalPath) -> bool:
-    """Check whether a path exists, retrying on transient Pebble errors.
-
-    Args:
-        path: The path to check.
-
-    Returns:
-        True if the path exists, False otherwise.
-
-    Raises:
-        PebbleConnectionError: If the remote container cannot be reached after retries.
-    """
-    return with_pebble_retry(lambda: path.exists())
-
-
-def _read_text_with_retry(path: pathops.LocalPath) -> str:
-    """Read the content of a file, retrying on transient Pebble errors.
-
-    Args:
-        path: The file path to read.
-
-    Returns:
-        The file content as a string.
-
-    Raises:
-        PebbleConnectionError: If the remote container cannot be reached
-            after retries.
-        FileNotFoundError: If the file does not exist.
-        PermissionError: If the file cannot be accessed.
-    """
-    return with_pebble_retry(lambda: path.read_text())
-
-
-def _write_text_with_retry(path: pathops.LocalPath, content: str, mode: int) -> None:
-    """Write text to a file, retrying on transient Pebble errors.
-
-    Args:
-        path: The file path to write to.
-        content: The text content to write.
-        mode: File permission mode to apply (e.g. 0o600).
-
-    Raises:
-        PebbleConnectionError: If the remote container cannot be reached
-            after retries.
-        PermissionError: If the file cannot be written.
-        NotADirectoryError: If the parent path is invalid.
-    """
-    with_pebble_retry(lambda: path.write_text(content, mode=mode))
-
-
-def _mkdir_with_retry(path: pathops.LocalPath) -> None:
-    """Create a directory, retrying on transient Pebble errors.
-
-    Args:
-        path: The directory path to create.
-
-    Raises:
-        PebbleConnectionError: If the remote container cannot be reached
-            after retries.
-        PermissionError: If the directory cannot be created.
-    """
-    with_pebble_retry(lambda: path.mkdir(parents=True, exist_ok=True))

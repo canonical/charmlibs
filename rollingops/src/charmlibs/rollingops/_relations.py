@@ -31,6 +31,7 @@ from ops.charm import (
 )
 from ops.framework import Object
 
+from charmlibs.interfaces.tls_certificates import Certificate, TLSCertificatesError
 from charmlibs.rollingops import _certificates as certificates
 from charmlibs.rollingops import _etcdctl as etcdctl
 from charmlibs.rollingops._models import RollingOpsInvalidSecretContentError, SharedCertificate
@@ -115,9 +116,9 @@ class SharedClientCertificateManager(Object):
 
         secret = self.model.app.add_secret(
             content={
-                CLIENT_CERT_FIELD: shared.certificate,
-                CLIENT_KEY_FIELD: shared.key,
-                CLIENT_CA_FIELD: shared.ca,
+                CLIENT_CERT_FIELD: shared.certificate.raw,
+                CLIENT_KEY_FIELD: shared.key.raw,
+                CLIENT_CA_FIELD: shared.ca.raw,
             },
             label=CERT_SECRET_LABEL,
         )
@@ -145,23 +146,28 @@ class SharedClientCertificateManager(Object):
 
         secret = self.model.get_secret(id=secret_id)
         content = secret.get_content(refresh=True)
-        shared_certificate = SharedCertificate(
-            certificate=content.get(CLIENT_CERT_FIELD, ''),
-            key=content.get(CLIENT_KEY_FIELD, ''),
-            ca=content.get(CLIENT_CA_FIELD, ''),
-        )
-        if (
-            not shared_certificate.certificate
-            or not shared_certificate.key
-            or not shared_certificate.ca
-        ):
+
+        certificate = content.get(CLIENT_CERT_FIELD, '')
+        key = content.get(CLIENT_KEY_FIELD, '')
+        ca = content.get(CLIENT_CA_FIELD, '')
+
+        if not certificate or not key or not ca:
             raise RollingOpsInvalidSecretContentError(
                 'Invalid secret content: expected non-empty values for '
                 f"'{CLIENT_CERT_FIELD}', '{CLIENT_KEY_FIELD}', and '{CLIENT_CA_FIELD}'. "
                 'Missing or empty values are not allowed.'
             )
 
-        return shared_certificate
+        try:
+            return SharedCertificate.from_strings(
+                certificate=certificate,
+                key=key,
+                ca=ca,
+            )
+        except (TLSCertificatesError, ValueError) as e:
+            raise RollingOpsInvalidSecretContentError(
+                'Invalid secret content: certificate material could not be parsed.'
+            ) from e
 
     def sync_to_local_files(self) -> None:
         """Persist shared certificate locally if available."""
@@ -172,7 +178,7 @@ class SharedClientCertificateManager(Object):
 
         certificates.persist_client_cert_key_and_ca(shared)
 
-    def get_local_request_cert(self) -> str | None:
+    def get_local_request_cert(self) -> Certificate | None:
         """Return the cert to place in relation requests."""
         shared = self.get_shared_certificate_from_peer_relation()
         return None if shared is None else shared.certificate
@@ -268,9 +274,10 @@ class EtcdRequiresV1(Object):
 
     def client_requests(self) -> list[RequirerCommonModel]:
         """Return the client requests for the etcd requirer interface."""
+        cert = self.shared_certificates.get_local_request_cert()
         return [
             RequirerCommonModel(
                 resource=self.cluster_id,
-                mtls_cert=self.shared_certificates.get_local_request_cert(),
+                mtls_cert=None if cert is None else cert.raw,
             )
         ]

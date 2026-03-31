@@ -25,9 +25,11 @@ import os
 import shutil
 import subprocess
 from dataclasses import asdict
+from functools import lru_cache
 
 from charmlibs import pathops
 from charmlibs.rollingops._models import (
+    CERT_MODE,
     EtcdConfig,
     RollingOpsEtcdNotConfiguredError,
     RollingOpsFileSystemError,
@@ -42,6 +44,7 @@ CONFIG_FILE_PATH = BASE_DIR / 'etcdctl.json'
 ETCDCTL_CMD = 'etcdctl'
 
 
+@lru_cache(maxsize=1)
 def is_etcdctl_installed() -> bool:
     """Return whether the snap-provided etcdctl command is available."""
     return shutil.which(ETCDCTL_CMD) is not None
@@ -59,7 +62,7 @@ def write_trusted_server_ca(tls_ca_pem: str) -> None:
     """
     try:
         with_pebble_retry(lambda: BASE_DIR.mkdir(parents=True, exist_ok=True))
-        with_pebble_retry(lambda: SERVER_CA_PATH.write_text(tls_ca_pem, mode=0o644))
+        with_pebble_retry(lambda: SERVER_CA_PATH.write_text(tls_ca_pem, mode=CERT_MODE))
     except (FileNotFoundError, LookupError, NotADirectoryError, PermissionError) as e:
         raise RollingOpsFileSystemError('Failed to persist etcd trusted CA certificate.') from e
 
@@ -182,7 +185,7 @@ def cleanup() -> None:
         raise RollingOpsFileSystemError('Failed to remove etcd config file and CA.') from e
 
 
-def run(args: list[str]) -> str | None:
+def run(*args: str) -> str | None:
     """Execute an etcdctl command.
 
     Args:
