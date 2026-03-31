@@ -19,7 +19,12 @@ import time
 
 import jubilant
 
-from tests.integration.utils import get_leader_unit_name, get_unit_events, parse_ts, remove_transition_file
+from tests.integration.utils import (
+    get_leader_unit_name,
+    get_unit_events,
+    parse_ts,
+    remove_transition_file,
+)
 
 logger = logging.getLogger(__name__)
 TIMEOUT = 15 * 60.0

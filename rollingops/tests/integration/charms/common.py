@@ -20,7 +20,6 @@ This file is symlinked alongside src/charm.py by these charms.
 import json
 import logging
 import time
-from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
 
@@ -29,8 +28,8 @@ from ops.model import ActiveStatus, MaintenanceStatus, WaitingStatus
 
 from charmlibs import pathops
 from charmlibs.rollingops import (
-    RollingOpsManager,
     OperationResult,
+    RollingOpsManager,
 )
 
 logger = logging.getLogger(__name__)

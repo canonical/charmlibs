@@ -91,7 +91,6 @@ class EtcdRollingOpsManager(Object):
         self.framework.observe(
             charm.on[self.etcd_relation_name].relation_created, self._on_etcd_relation_created
         )
-        self.framework.observe(charm.on.rollingops_lock_granted, self._on_rollingop_granted)
 
     @property
     def _peer_relation(self) -> Relation | None:
@@ -109,7 +108,7 @@ class EtcdRollingOpsManager(Object):
             logger.error('%s is not installed', etcdctl.ETCDCTL_CMD)
             # TODO: fallback to peer relation implementation.
 
-    def _on_rollingop_granted(self, event) -> None:
+    def _on_rollingops_lock_granted(self, event: EventBase) -> None:
         """Handle the event when a rolling operation lock is granted.
 
         If etcd is not yet configured, the operation is skipped.
@@ -188,5 +187,6 @@ class EtcdRollingOpsManager(Object):
             logger.error('Unexpected response from etcd.')
             return
 
+        logger.info('Executing callback under the etcd lock context.')
         callback = self.callback_targets.get('_restart', '')
         callback(delay=1)

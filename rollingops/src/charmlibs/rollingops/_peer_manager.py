@@ -175,7 +175,6 @@ from charmlibs.rollingops._peer_worker import PeerRollingOpsAsyncWorker
 logger = logging.getLogger(__name__)
 
 
-
 class PeerRollingOpsManager(Object):
     """Emitters and handlers for rolling ops."""
 
@@ -203,7 +202,6 @@ class PeerRollingOpsManager(Object):
             charm.on[self.relation_name].relation_departed, self._on_relation_departed
         )
         self.framework.observe(charm.on.leader_elected, self._process_locks)
-        self.framework.observe(charm.on.rollingops_lock_granted, self._on_rollingops_lock_granted)
         self.framework.observe(charm.on.update_status, self._on_rollingops_lock_granted)
 
     @property
@@ -211,7 +209,7 @@ class PeerRollingOpsManager(Object):
         """Returns the peer relation used to manage locks."""
         return self.model.get_relation(self.relation_name)
 
-    def _on_rollingops_lock_granted(self, event) -> None:
+    def _on_rollingops_lock_granted(self, event: EventBase) -> None:
         """Handler of the custom hook rollingops_lock_granted.
 
         The custom hook is triggered by a background process.
