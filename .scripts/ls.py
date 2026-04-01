@@ -159,6 +159,8 @@ def _ls(
             dirs = _changed_only(root, dirs, ref=old_ref)
             if only_if_version_changed:
                 dirs = _get_changed_versions_only(category, root, dirs, ref=old_ref)
+        if category == 'packages':
+            dirs.extend([t for p in dirs if _is_package(t := p / 'testing')])
         # Calculate only the information needed.
         infos: list[Info] = []
         for path in dirs:
