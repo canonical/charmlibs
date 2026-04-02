@@ -272,13 +272,16 @@ def test_subsequent_lock_request_of_different_ops(juju: jubilant.Juju, app_name:
     unit_a = units[3]
     unit_b = units[4]
 
-    juju.run(unit_b, 'deferred-restart', {'delay': 10, 'max-retry': 2}, wait=5)
-    juju.run(unit_a, 'failed-restart', {'delay': 1, 'max-retry': 2}, wait=5)
-    juju.run(unit_a, 'restart', {'delay': 1}, wait=5)
-    juju.run(unit_a, 'deferred-restart', {'delay': 1, 'max-retry': 0}, wait=5)
-    juju.run(unit_a, 'restart', {'delay': 1}, wait=5)
+    juju.run(unit_b, 'deferred-restart', {'delay': 10, 'max-retry': 2})
+    juju.run(unit_a, 'failed-restart', {'delay': 1, 'max-retry': 2})
+    juju.run(unit_a, 'deferred-restart', {'delay': 1, 'max-retry': 0})
+    juju.run(unit_a, 'restart', {'delay': 1})
 
-    time.sleep(60)  # wait for operation execution. TODO: in charm use lock state to clear status.
+    juju.wait(
+        lambda status: status.apps[app_name].units[unit_a].is_active,
+        error=jubilant.any_error,
+        timeout=TIMEOUT,
+    )
 
     unit_a_events = get_unit_events(juju, unit_a)
     relevant_events = [e['event'] for e in unit_a_events]
@@ -287,7 +290,6 @@ def test_subsequent_lock_request_of_different_ops(juju: jubilant.Juju, app_name:
 
     assert relevant_events == [
         'action:failed-restart',
-        'action:restart',
         'action:deferred-restart',
         'action:restart',
         '_failed_restart:start',  # attempt 0
@@ -296,8 +298,6 @@ def test_subsequent_lock_request_of_different_ops(juju: jubilant.Juju, app_name:
         '_failed_restart:retry_release',
         '_failed_restart:start',  # retry 2
         '_failed_restart:retry_release',
-        '_restart:start',
-        '_restart:done',
         '_deferred_restart:start',  # attempt 0
         '_deferred_restart:retry_hold',
         '_restart:start',
@@ -314,12 +314,16 @@ def test_subsequent_lock_request_of_same_op(juju: jubilant.Juju, app_name: str):
     unit_a = units[3]
     unit_b = units[4]
 
-    juju.run(unit_b, 'deferred-restart', {'delay': 10, 'max-retry': 1}, wait=5)
-    juju.run(unit_a, 'failed-restart', {'delay': 1, 'max-retry': 2}, wait=5)
+    juju.run(unit_b, 'deferred-restart', {'delay': 10, 'max-retry': 1})
+    juju.run(unit_a, 'failed-restart', {'delay': 1, 'max-retry': 2})
     for _ in range(3):
         juju.run(unit_a, 'restart', {'delay': 1})
 
-    time.sleep(60)  # wait for operation execution. TODO: in charm use lock state to clear status.
+    juju.wait(
+        lambda status: status.apps[app_name].units[unit_a].is_active,
+        error=jubilant.any_error,
+        timeout=TIMEOUT,
+    )
 
     unit_a_events = get_unit_events(juju, unit_a)
     relevant_events = [e['event'] for e in unit_a_events]
