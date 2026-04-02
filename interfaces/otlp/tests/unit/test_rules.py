@@ -1,78 +1,40 @@
 # Copyright 2026 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-"""Feature: Rules aggregation and forwarding."""
+"""Feature: Rules aggregation and labeling."""
 
 import json
 from typing import Any
 
 import ops
 import pytest
+from cosl.juju_topology import JujuTopology
+from cosl.rules import HOST_METRICS_MISSING_RULE_NAME
 from cosl.utils import LZMABase64
 from ops import testing
-from ops.testing import Model, Relation, State
+from ops.testing import Model, PeerRelation, Relation, State
 
-from charmlibs.interfaces.otlp._otlp import OtlpRequirerAppData, _RulesModel
+from charmlibs.interfaces.otlp._otlp import DEFAULT_PROVIDER_RELATION_NAME as RECEIVE
+from charmlibs.interfaces.otlp._otlp import DEFAULT_REQUIRER_RELATION_NAME as SEND
+from charmlibs.interfaces.otlp._otlp import (
+    OtlpProvider,
+    OtlpRequirer,
+    RuleStore,
+    _OtlpRequirerAppData,
+    _RulesModel,
+)
+from conftest import (
+    PEERS_ENDPOINT,
+    SINGLE_LOGQL_ALERT,
+    SINGLE_LOGQL_RECORD,
+    SINGLE_PROMQL_ALERT,
+    SINGLE_PROMQL_RECORD,
+)
 
-MODEL = Model('otelcol', uuid='f4d59020-c8e7-4053-8044-a2c1e5591c7f')
-OTELCOL_LABELS = {
-    'juju_model': 'otelcol',
-    'juju_model_uuid': 'f4d59020-c8e7-4053-8044-a2c1e5591c7f',
-    'juju_application': 'opentelemetry-collector-k8s',
-    'juju_charm': 'opentelemetry-collector-k8s',
-}
-LOGQL_ALERT = {
-    'name': 'otelcol_f4d59020_charm_x_foo_alerts',
-    'rules': [
-        {
-            'alert': 'HighLogVolume',
-            'expr': 'count_over_time({job=~".+"}[30s]) > 100',
-            'labels': {'severity': 'high'},
-        },
-    ],
-}
-LOGQL_RECORD = {
-    'name': 'otelcol_f4d59020_charm_x_foobar_alerts',
-    'rules': [
-        {
-            'record': 'log:error_rate:rate5m',
-            'expr': 'sum by (service) (rate({job=~".+"} | json | level="error" [5m]))',
-            'labels': {'severity': 'high'},
-        }
-    ],
-}
-PROMQL_ALERT = {
-    'name': 'otelcol_f4d59020_charm_x_bar_alerts',
-    'rules': [
-        {
-            'alert': 'Workload Missing',
-            'expr': 'up{job=~".+"} == 0',
-            'for': '0m',
-            'labels': {'severity': 'critical'},
-        },
-    ],
-}
-PROMQL_RECORD = {
-    'name': 'otelcol_f4d59020_charm_x_barfoo_alerts',
-    'rules': [
-        {
-            'record': 'code:prometheus_http_requests_total:sum',
-            'expr': 'sum by (code) (prometheus_http_requests_total{job=~".+"})',
-            'labels': {'severity': 'high'},
-        }
-    ],
-}
-ALL_RULES = {
-    'logql': {'groups': [LOGQL_ALERT, LOGQL_RECORD]},
-    'promql': {'groups': [PROMQL_ALERT, PROMQL_RECORD]},
-}
-METADATA = {
-    'model': 'otelcol',
-    'model_uuid': 'f4d59020-c8e7-4053-8044-a2c1e5591c7f',
-    'application': 'opentelemetry-collector-k8s',
-    'charm': 'opentelemetry-collector-k8s',
-    'unit': 'opentelemetry-collector-k8s/0',
-}
+MODEL_NAME = 'foo-model'
+MODEL_UUID = 'f4d59020-c8e7-4053-8044-a2c1e5591c7f'
+MODEL_SHORT_UUID = 'f4d59020'
+MODEL = Model(MODEL_NAME, uuid=MODEL_UUID)
 
 
 def _decompress(rules: str | None) -> dict[str, Any]:
@@ -81,14 +43,14 @@ def _decompress(rules: str | None) -> dict[str, Any]:
     return json.loads(LZMABase64.decompress(rules))
 
 
-def test_new_rule_is_ignored_by_databag_model() -> None:
+def test_new_rule_is_ignored_by_databag_model():
     # GIVEN the requirer offers a new rule type
     # * the provider does not support this new rule type
     # WHEN validating the requirer databag model, which the provider uses to access rules
     # THEN the validation succeeds
-    requirer_databag = OtlpRequirerAppData.model_validate({
+    requirer_databag = _OtlpRequirerAppData.model_validate({
         'rules': {'promql': {}, 'new_rule': {}},
-        'metadata': METADATA,
+        'metadata': {},
     })
     assert requirer_databag
     assert isinstance(requirer_databag.rules, _RulesModel)
@@ -96,35 +58,24 @@ def test_new_rule_is_ignored_by_databag_model() -> None:
     assert 'new_rule' not in requirer_databag.rules.model_dump()
 
 
-def test_missing_rule_type_defaults() -> None:
-    # GIVEN the requirer offers a new rule type
-    # * the provider does not support this new rule type
-    # WHEN validating the requirer databag model, which the provider uses to access rules
+def test_missing_rule_type_defaults():
+    # GIVEN no rules or metadata is provided
+    # WHEN validating the requirer databag model
     # THEN the validation succeeds
-    requirer_databag = OtlpRequirerAppData.model_validate({'rules': {}, 'metadata': METADATA})
+    requirer_databag = _OtlpRequirerAppData.model_validate({'rules': {}, 'metadata': {}})
     assert requirer_databag
     assert isinstance(requirer_databag.rules, _RulesModel)
-    # AND the new rule type is ignored
-    assert 'promql' in requirer_databag.rules.model_dump()
-    assert 'logql' in requirer_databag.rules.model_dump()
+    # AND the rule model is created
+    assert requirer_databag.rules.model_dump().keys() == _RulesModel.model_fields.keys()
 
 
-def test_rules_compression(otlp_dual_ctx: testing.Context[ops.CharmBase]) -> None:
-    # GIVEN receive-otlp and send-otlp relations
-    databag: dict[str, str] = {
-        'rules': json.dumps(ALL_RULES, sort_keys=True),
-        'metadata': json.dumps(METADATA),
-    }
-    receiver = Relation('receive-otlp', remote_app_data=databag)
-    sender = Relation('send-otlp', remote_app_data={'endpoints': '[]'})
-    state = State(relations=[receiver, sender], leader=True, model=MODEL)
+def test_rules_compression(otlp_requirer_ctx: testing.Context[ops.CharmBase]):
+    # GIVEN a send-otlp relation
+    state = State(relations=[Relation(SEND)], leader=True)
 
-    # WHEN any event executes the reconciler
-    state_out = otlp_dual_ctx.run(otlp_dual_ctx.on.update_status(), state=state)
-
+    # WHEN the update_status event is fired
+    state_out = otlp_requirer_ctx.run(otlp_requirer_ctx.on.update_status(), state=state)
     for relation in list(state_out.relations):
-        if relation.endpoint != 'send-otlp':
-            continue
         rules = relation.local_app_data.get('rules', None)
         assert rules is not None
 
@@ -134,86 +85,288 @@ def test_rules_compression(otlp_dual_ctx: testing.Context[ops.CharmBase]) -> Non
         decompressed = _decompress(json.loads(rules))
         assert decompressed
         assert isinstance(decompressed, dict)
-        assert set(ALL_RULES.keys()).issubset(decompressed.keys())
+        assert set(_RulesModel.model_fields.keys()).issubset(decompressed.keys())
 
 
-@pytest.mark.parametrize(
-    'forwarding_enabled, rules, expected_group_counts',
-    [
-        # format , databag_groups, generic_groups, total
-        # logql  , (2)           , (0)           , (2)
-        # promql , (2)           , (1)           , (3)
-        (
-            True,
-            {
-                'logql': {'groups': [LOGQL_ALERT, LOGQL_RECORD]},
-                'promql': {'groups': [PROMQL_ALERT, PROMQL_RECORD]},
+@pytest.mark.parametrize('subordinate', [True, False])
+def test_duplicate_rules_per_unit(
+    otlp_requirer_ctx: testing.Context[ops.CharmBase], subordinate: bool
+):
+    with otlp_requirer_ctx(otlp_requirer_ctx.on.update_status(), state=State(leader=True)) as mgr:
+        # GIVEN any charm
+        # WHEN the OtlpRequirer is initialized
+        # * generic aggregator rules are desired
+        # * no peer relation name is provided
+        result = OtlpRequirer(mgr.charm)._duplicate_rules_per_unit(
+            alert_rules={
+                'groups': [
+                    {
+                        'name': 'AggregatorHostHealth',
+                        'rules': [
+                            {
+                                'alert': HOST_METRICS_MISSING_RULE_NAME,
+                                'expr': 'absent(up)',
+                                'labels': {'severity': 'warning'},
+                            },
+                            {
+                                'alert': 'AggregatorMetricsMissing',
+                                'expr': 'absent(up)',
+                                'labels': {'severity': 'critical'},
+                            },
+                        ],
+                    }
+                ]
             },
-            {'logql': 2, 'promql': 3},
-        ),
-        # format , databag_groups, generic_groups, total
-        # logql  , (0)           , (0)           , (0)
-        # promql , (2)           , (1)           , (3)
-        (
-            True,
-            {'logql': {}, 'promql': {'groups': [PROMQL_ALERT, PROMQL_RECORD]}},
-            {'logql': 0, 'promql': 3},
-        ),
-        # format , databag_groups, generic_groups, total
-        # logql  , (2)           , (0)           , (2)
-        # promql , (0)           , (1)           , (1)
-        (
-            True,
-            {'logql': {'groups': [LOGQL_ALERT, LOGQL_RECORD]}, 'promql': {}},
-            {'logql': 2, 'promql': 1},
-        ),
-    ],
-)
+            peer_unit_names={'unit/0', 'unit/1'},
+            rule_names_to_duplicate=[HOST_METRICS_MISSING_RULE_NAME],
+            is_subordinate=subordinate,
+        )
+        # THEN the rules are duplicated per unit, with juju_unit in the expr and labels
+        groups = result.get('groups', [])
+        for group in groups:
+            rules = group.get('rules', [])
+            severity = 'critical' if subordinate else 'warning'
+            assert rules == [
+                {
+                    'alert': HOST_METRICS_MISSING_RULE_NAME,
+                    'expr': 'absent(up{juju_unit="unit/0"})',
+                    'labels': {'severity': severity, 'juju_unit': 'unit/0'},
+                },
+                {
+                    'alert': HOST_METRICS_MISSING_RULE_NAME,
+                    'expr': 'absent(up{juju_unit="unit/1"})',
+                    'labels': {'severity': severity, 'juju_unit': 'unit/1'},
+                },
+                {
+                    'alert': 'AggregatorMetricsMissing',
+                    'expr': 'absent(up)',
+                    'labels': {'severity': 'critical'},
+                },
+            ]
+
+
 @pytest.mark.parametrize(
-    'metadata',
-    [METADATA, {}],
-    ids=['with_metadata', 'without_metadata'],
+    'otlp_requirer_ctx,is_aggregator',
+    [
+        pytest.param(True, True, id='aggregator'),
+        pytest.param(False, False, id='non-aggregator'),
+    ],
+    indirect=['otlp_requirer_ctx'],
 )
-def test_forwarding_otlp_rule_counts(
-    otlp_dual_ctx: testing.Context[ops.CharmBase],
-    forwarding_enabled: bool,
-    rules: dict[str, Any],
-    expected_group_counts: dict[str, int],
-    metadata: dict[str, Any],
-) -> None:
-    # GIVEN forwarding of rules is enabled
-    # * a receive-otlp with rules in the databag
-    # * two send-otlp relations
-    databag = {'rules': json.dumps(rules), 'metadata': json.dumps(metadata)}
-    receiver = Relation('receive-otlp', remote_app_data=databag)
-    sender_1 = Relation('send-otlp', remote_app_data={'endpoints': '[]'})
-    sender_2 = Relation('send-otlp', remote_app_data={'endpoints': '[]'})
-    state = State(
-        relations=[receiver, sender_1, sender_2],
-        leader=True,
-        model=MODEL,
-        config={'forward_alert_rules': forwarding_enabled},
-    )
+def test_generic_rule_injection(
+    otlp_requirer_ctx: testing.Context[ops.CharmBase], is_aggregator: bool
+):
+    # GIVEN a send-otlp relation
+    # * a peers relation
+    peers = PeerRelation(endpoint=PEERS_ENDPOINT)
+    state = State(relations=[peers, Relation(SEND)], leader=True, model=MODEL)
 
-    # WHEN any event executes the reconciler
-    state_out = otlp_dual_ctx.run(otlp_dual_ctx.on.update_status(), state=state)
-
+    # WHEN the update_status event is fired
+    state_out = otlp_requirer_ctx.run(otlp_requirer_ctx.on.update_status(), state=state)
     for relation in list(state_out.relations):
-        if relation.endpoint != 'send-otlp':
+        if relation.endpoint != SEND:
             continue
 
+        # THEN if the charm is an aggregator, generic rules are injected into the databag
+        # AND the rules in the databag are decompressed
         decompressed = _decompress(relation.local_app_data.get('rules'))
         assert decompressed
-        requirer_databag: OtlpRequirerAppData = OtlpRequirerAppData.model_validate({
-            'rules': decompressed,
-            'metadata': {},
-        })
+        promql_groups = decompressed.get('promql', {}).get('groups', [])
+        assert promql_groups
 
-        # THEN all expected rules exist in the databag
-        # * databag_groups are included/forwarded
-        assert (
-            len(requirer_databag.rules.logql.get('groups', [])) == expected_group_counts['logql']
+        # THEN the generic promql rule is in the databag
+        base_rule_name = f'{MODEL_NAME.replace("-", "_")}_{MODEL_SHORT_UUID}_otlp_requirer'
+        agg_rule = f'{base_rule_name}_AggregatorHostHealth_rules'
+        app_rule = f'{base_rule_name}_HostHealth_rules'
+        promql_group_names = [g.get('name') for g in promql_groups]
+        if is_aggregator:
+            assert agg_rule in promql_group_names
+            assert app_rule not in promql_group_names
+        else:
+            assert app_rule in promql_group_names
+            assert agg_rule not in promql_group_names
+
+
+def test_metadata(otlp_requirer_ctx: testing.Context[ops.CharmBase]):
+    # GIVEN a send-otlp relation
+    state = State(relations=[Relation(SEND)], leader=True, model=MODEL)
+
+    # WHEN the update_status event is fired
+    state_out = otlp_requirer_ctx.run(otlp_requirer_ctx.on.update_status(), state=state)
+    for relation in list(state_out.relations):
+        # THEN the requirer adds its own metadata to the databag
+        assert json.loads(relation.local_app_data['metadata']) == {
+            'model': MODEL_NAME,
+            'model_uuid': MODEL_UUID,
+            'application': 'otlp-requirer',
+            'unit': 'otlp-requirer/0',
+            'charm_name': 'otlp-requirer',
+        }
+
+
+@pytest.mark.parametrize(
+    'metadata',
+    [
+        {},
+        {
+            'model': MODEL_NAME,
+            'model_uuid': MODEL_UUID,
+            'application': 'otlp-requirer',
+            'charm_name': 'otlp-requirer',
+            'unit': 'otlp-requirer/0',
+        },
+    ],
+)
+def test_provider_rules(
+    otlp_provider_ctx: testing.Context[ops.CharmBase], metadata: dict[str, Any]
+):
+    # GIVEN a requirer offers unlabeled rules (of various types) in the databag
+    rules = {
+        'logql': {
+            'groups': [
+                {'name': 'test_logql_alert', 'rules': [SINGLE_LOGQL_ALERT]},
+                {'name': 'test_logql_record', 'rules': [SINGLE_LOGQL_RECORD]},
+            ]
+        },
+        'promql': {
+            'groups': [
+                {'name': 'test_promql_alert', 'rules': [SINGLE_PROMQL_ALERT]},
+                {'name': 'test_promql_record', 'rules': [SINGLE_PROMQL_RECORD]},
+            ]
+        },
+    }
+    receiver = Relation(
+        RECEIVE, remote_app_data={'rules': json.dumps(rules), 'metadata': json.dumps(metadata)}
+    )
+    state = State(leader=True, relations=[receiver], model=MODEL)
+    with otlp_provider_ctx(otlp_provider_ctx.on.update_status(), state=state) as mgr:
+        # WHEN the provider aggregates the rules from the databag
+        rule_store = OtlpProvider(mgr.charm, RECEIVE).rules[receiver.id]
+        logql = rule_store.logql.as_dict()
+        promql = rule_store.promql.as_dict()
+        # THEN LogQL and PromQL rules exist in the RuleStore
+        assert logql
+        assert promql
+        for result in [logql, promql]:
+            app = metadata['application'] if metadata else 'otlp-provider'
+            charm = metadata['charm_name'] if metadata else 'otlp-provider'
+            groups = result.get('groups', [])
+            assert groups
+            for group in groups:
+                for rule in group.get('rules', []):
+                    # AND the rules are labeled with the provider's topology
+                    assert rule.get('labels', {}).get('juju_model') == MODEL_NAME
+                    assert rule.get('labels', {}).get('juju_model_uuid') == MODEL_UUID
+                    assert rule.get('labels', {}).get('juju_application') == app
+                    assert rule.get('labels', {}).get('juju_charm') == charm
+
+                    # AND the expressions are labeled
+                    assert f'juju_model="{MODEL_NAME}"' in rule['expr']
+                    assert f'juju_model_uuid="{MODEL_UUID}"' in rule['expr']
+                    assert f'juju_application="{app}"' in rule['expr']
+
+
+def _make_store() -> RuleStore:
+    return RuleStore(
+        JujuTopology(
+            model=MODEL_NAME,
+            model_uuid=MODEL_UUID,
+            application='test-app',
+            unit='test-app/0',
+            charm_name='test-charm',
         )
-        assert (
-            len(requirer_databag.rules.promql.get('groups', [])) == expected_group_counts['promql']
-        )
+    )
+
+
+def test_rulestore_combine_logql_only_into_empty():
+    # GIVEN a RuleStore with LogQL rules
+    source = _make_store().add_logql(SINGLE_LOGQL_ALERT, group_name='logql_group')
+    # AND a target RuleStore with no rules
+    target = _make_store()
+
+    # WHEN combined
+    target.combine(source)
+
+    # THEN the target now contains the LogQL rules
+    assert target.logql.as_dict().get('groups')
+    # AND no PromQL rules were added
+    assert not target.promql.as_dict().get('groups')
+
+
+def test_rulestore_combine_promql_only_into_empty():
+    # GIVEN a RuleStore with PromQL rules
+    source = _make_store().add_promql(SINGLE_PROMQL_ALERT, group_name='promql_group')
+    # AND a target RuleStore with no rules
+    target = _make_store()
+
+    # WHEN combined
+    target.combine(source)
+
+    # THEN the target now contains the PromQL rules
+    assert target.promql.as_dict().get('groups')
+    # AND no LogQL rules were added
+    assert not target.logql.as_dict().get('groups')
+
+
+def test_rulestore_combine_both_rule_types():
+    # GIVEN a RuleStore with both LogQL and PromQL rules
+    source = (
+        _make_store()
+        .add_logql(SINGLE_LOGQL_ALERT, group_name='logql_group')
+        .add_promql(SINGLE_PROMQL_ALERT, group_name='promql_group')
+    )
+    # AND a target RuleStore with no rules
+    target = _make_store()
+
+    # WHEN combined
+    target.combine(source)
+
+    # THEN both rule types are present in the target
+    assert target.logql.as_dict().get('groups')
+    assert target.promql.as_dict().get('groups')
+
+
+def test_rulestore_combine_merges_with_existing_rules():
+    # GIVEN a target RuleStore that already has a LogQL rule
+    target = _make_store().add_logql(SINGLE_LOGQL_RECORD, group_name='existing_group')
+    # AND a source RuleStore with a different LogQL rule
+    source = _make_store().add_logql(SINGLE_LOGQL_ALERT, group_name='new_group')
+
+    # WHEN combined
+    target.combine(source)
+
+    # THEN the target contains rules from both
+    groups = target.logql.as_dict().get('groups', [])
+    group_names = [g['name'] for g in groups]
+    assert any('existing_group' in name for name in group_names)
+    assert any('new_group' in name for name in group_names)
+
+
+def test_rulestore_combine_empty_source_does_not_clear_target():
+    # GIVEN a target RuleStore with LogQL and PromQL rules
+    target = (
+        _make_store()
+        .add_logql(SINGLE_LOGQL_ALERT, group_name='logql_group')
+        .add_promql(SINGLE_PROMQL_ALERT, group_name='promql_group')
+    )
+    # AND an empty source RuleStore
+    source = _make_store()
+
+    # WHEN combined
+    target.combine(source)
+
+    # THEN the target rules are unchanged
+    assert target.logql.as_dict().get('groups')
+    assert target.promql.as_dict().get('groups')
+
+
+def test_rulestore_combine_returns_self():
+    # GIVEN two RuleStores
+    target = _make_store()
+    source = _make_store().add_promql(SINGLE_PROMQL_ALERT, group_name='promql_group')
+
+    # WHEN combined
+    result = target.combine(source)
+
+    # THEN combine returns the target (self) for chaining
+    assert result is target

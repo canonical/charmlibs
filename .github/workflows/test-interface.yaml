@@ -62,11 +62,16 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@v7
       - name: Run interface tests
+        env:
+          VERSION: ${{ matrix.version }}
+          ROLE: ${{ matrix.role }}
+          CHARM_NAME: ${{ matrix.charm_name }}
+          ENDPOINT: ${{ matrix.endpoint }}
         run: |
           set -xueo pipefail
           .scripts/run-interface-tests.py \
             "$INTERFACE" \
-            ${{ matrix.version }} \
-            ${{ matrix.role }} \
-            ${{ matrix.charm_name }} \
-            ${{ matrix.endpoint }}
+            "$VERSION" \
+            "$ROLE" \
+            "$CHARM_NAME" \
+            "$ENDPOINT"

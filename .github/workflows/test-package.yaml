@@ -25,12 +25,16 @@ on:
 
 permissions: {}
 
+env:
+  PACKAGE: ${{ inputs.package }}
+
 jobs:
   init:
     runs-on: ubuntu-latest
     outputs:
       tests: ${{ steps.tests.outputs.tests }}
       python: ${{ steps.python.outputs.versions }}
+      min_python_version: ${{ steps.python.outputs.min_version }}
       functional-matrix: ${{ steps.functional.outputs.matrix }}
       integration-substrates: ${{ steps.integration-substrates.outputs.substrates }}
       integration-tags: ${{ steps.integration-tags.outputs.tags }}
@@ -53,14 +57,14 @@ jobs:
 
       - name: Check which Python versions this package supports
         id: python
-        run: uv run --no-project --script .github/get-supported-python-versions.py ${{ inputs.package }}
+        run: uv run --no-project --script .github/get-supported-python-versions.py "$PACKAGE"
 
       - name: Check which test suites this package has
         id: tests
         run: |
           tests=()
           for test in unit functional integration; do
-            if [ -d ${{ inputs.package }}/tests/$test ]; then
+            if [ -d "$PACKAGE/tests/$test" ]; then
               tests+=($test)
             fi
           done
@@ -71,7 +75,7 @@ jobs:
       - name: Check requirements for functional tests
         id: functional
         if: contains(fromJson(steps.tests.outputs.tests), 'functional')
-        run: uv run --no-project --script .github/get-functional-test-matrix.py ${{ inputs.package }}
+        run: uv run --no-project --script .github/get-functional-test-matrix.py "$PACKAGE"
 
       - name: Check substrates needed for integration tests
         id: integration-substrates
@@ -102,7 +106,7 @@ jobs:
         shell: python
         run: |
           import json, os, pathlib, tomllib
-          pyproject_toml = tomllib.loads(pathlib.Path('${{ inputs.package }}', 'pyproject.toml').read_text())
+          pyproject_toml = tomllib.loads(pathlib.Path(os.environ['PACKAGE'], 'pyproject.toml').read_text())
           tags = pyproject_toml.get('tool', {}).get('charmlibs', {}).get('integration', {}).get('tags') or ['']
           line = f'tags={json.dumps(tags)}'
           print(line)
@@ -126,7 +130,9 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Run static analysis and other checks
-        run: uvx --from rust-just just python=${{ matrix.python }} lint ${{ inputs.package }}
+        env:
+          PYTHON: ${{ matrix.python }}
+        run: uvx --from rust-just just python="$PYTHON" lint "$PACKAGE"
 
   unit:
     needs: init
@@ -145,7 +151,9 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Run unit tests
-        run: uvx --from rust-just just python=${{ matrix.python }} unit ${{ inputs.package }}
+        env:
+          PYTHON: ${{ matrix.python }}
+        run: uvx --from rust-just just python="$PYTHON" unit "$PACKAGE"
 
   functional:
     needs: init
@@ -168,18 +176,21 @@ jobs:
 
       - name: Install Pebble
         if: matrix.pebble != 'no-pebble'
-        run: go install github.com/canonical/pebble/cmd/${{ matrix.pebble }}
+        env:
+          PEBBLE: ${{ matrix.pebble }}
+          GOTOOLCHAIN: auto
+        run: go install "github.com/canonical/pebble/cmd/$PEBBLE"
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
 
       - name: Run functional tests
         if: matrix.sudo == 'no-sudo'
-        run: uvx --from rust-just just python=python3 functional ${{ inputs.package }}
+        run: uvx --from rust-just just python=python3 functional "$PACKAGE"
 
       - name: Run functional tests with sudo
         if: matrix.sudo != 'no-sudo'
-        run: sudo env "PATH=$PATH" uvx --from rust-just just python=python3 functional ${{ inputs.package }}
+        run: sudo env "PATH=$PATH" uvx --from rust-just just python=python3 functional "$PACKAGE"
 
   integration:
     needs: init
@@ -215,7 +226,14 @@ jobs:
 
       - name: Pack charms
         if: ${{ hashFiles(format('{0}/tests/integration/pack.sh', inputs.package)) != '' }}
-        run: uvx --from rust-just just tag='${{ matrix.tag }}' pack-${{ matrix.substrate }} ${{ inputs.package }}
+        env:
+          TAG: ${{ matrix.tag }}
+          SUBSTRATE: ${{ matrix.substrate }}
+        run: uvx --from rust-just just tag="$TAG" "pack-$SUBSTRATE" "$PACKAGE"
 
       - name: Run Juju integration tests
-        run: uvx --from rust-just just tag='${{ matrix.tag }}' integration-${{ matrix.substrate }} ${{ inputs.package }}
+        env:
+          PYTHON: ${{ needs.init.outputs.min_python_version }}
+          RECIPE: integration-${{ matrix.substrate }}
+          TAG: ${{ matrix.tag }}
+        run: uvx --from rust-just just python="$PYTHON" tag="$TAG" "$RECIPE" "$PACKAGE"

@@ -34,22 +34,31 @@ jobs:
       - name: Calculate reference for git diff
         id: ref
         if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: |
           set -xueo pipefail
-          echo "result=$(git merge-base origin/${{ github.event.pull_request.base.ref }} HEAD)" >> "$GITHUB_OUTPUT"
+          echo "result=$(git merge-base origin/$BASE_REF HEAD)" >> "$GITHUB_OUTPUT"
       - uses: astral-sh/setup-uv@v7
       - name: Collect changed packages
         id: packages
-        run: .github/get-changed.py packages ${{ steps.ref.outputs.result }}
+        env:
+          REF_RESULT: ${{ steps.ref.outputs.result }}
+        run: .github/get-changed.py packages $REF_RESULT
       - name: Collect changed interfaces
         id: interfaces
-        run: .github/get-changed.py interfaces ${{ steps.ref.outputs.result }} --name-only
+        env:
+          REF_RESULT: ${{ steps.ref.outputs.result }}
+        run: .github/get-changed.py interfaces $REF_RESULT --name-only
       - name: Collect packages that would be published on merge
         id: publish
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_RESULT: ${{ steps.ref.outputs.result }}
         run: |
           set -xueo pipefail
-          if [ ${{ github.event_name }} = 'pull_request' ]; then
-            PACKAGES=$(.scripts/ls.py packages ${{ steps.ref.outputs.result }} --exclude-examples --exclude-placeholders --only-if-version-changed)
+          if [ "$EVENT_NAME" = 'pull_request' ]; then
+            PACKAGES=$(.scripts/ls.py packages $REF_RESULT --exclude-examples --exclude-placeholders --only-if-version-changed)
           else
             PACKAGES='[]'
           fi
@@ -74,8 +83,10 @@ jobs:
     steps:
       - name: Fail if any tests failed
         if: ${{ needs.package.result != 'success' && needs.package.result != 'skipped' }}
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
         run: |
-          echo '${{ toJSON(needs) }}' | jq  # logging
+          echo "$NEEDS_JSON" | jq  # logging
           exit 1
 
   interface:
@@ -96,8 +107,10 @@ jobs:
     steps:
       - name: Fail if any interface tests failed
         if: ${{ needs.interface.result != 'success' && needs.interface.result != 'skipped' }}
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
         run: |
-          echo '${{ toJSON(needs) }}' | jq  # logging
+          echo "$NEEDS_JSON" | jq  # logging
           exit 1
 
   interfaces-json-up-to-date:
@@ -161,9 +174,12 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Ensure CHANGELOG.md has been updated
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PACKAGE: ${{ matrix.package }}
         run: |
           set -xueo pipefail
-          if git diff --name-only ${{ github.event.pull_request.base.sha }} | grep -q '^${{ matrix.package }}/CHANGELOG.md$'; then
+          if git diff --name-only "$BASE_SHA" | grep -q "^${PACKAGE}/CHANGELOG.md$"; then
             : 'CHANGELOG.md updated :)'
           else
             : 'CHANGELOG.md must be updated before merging :('
@@ -177,8 +193,10 @@ jobs:
     steps:
       - name: Fail if any required changelogs are not updated
         if: ${{ needs.changelog-updated.result != 'success' && needs.changelog-updated.result != 'skipped' }}
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
         run: |
-          echo '${{ toJSON(needs) }}' | jq  # logging
+          echo "$NEEDS_JSON" | jq  # logging
           exit 1
 
   zizmor:
