@@ -16,7 +16,27 @@
 
 from typing import Any
 
+from tests.unit.conftest import VALID_CA_CERT_PEM, VALID_CLIENT_CERT_PEM, VALID_CLIENT_KEY_PEM
+
+from charmlibs.interfaces.tls_certificates import (
+    Certificate,
+    PrivateKey,
+)
 from charmlibs.rollingops._models import SharedCertificate
+
+
+def make_shared_certificate() -> SharedCertificate:
+    return SharedCertificate(
+        certificate=Certificate.from_string(VALID_CLIENT_CERT_PEM),
+        key=PrivateKey.from_string(VALID_CLIENT_KEY_PEM),
+        ca=Certificate.from_string(VALID_CA_CERT_PEM),
+    )
+
+
+def test_certs():
+    Certificate.from_string(VALID_CA_CERT_PEM)
+    PrivateKey.from_string(VALID_CLIENT_KEY_PEM)
+    Certificate.from_string(VALID_CLIENT_CERT_PEM)
 
 
 def test_certificates_manager_exists_returns_false_when_no_files(
@@ -54,62 +74,65 @@ def test_certificates_manager_exists_returns_true_when_all_files_exist(
 def test_certificates_manager_persist_client_cert_and_key_writes_files(
     temp_certificates: Any,
 ) -> None:
-    shared_certificate = SharedCertificate('cert-pem', 'key-pem', 'ca-pem')
+    shared_certificate = make_shared_certificate()
     temp_certificates.persist_client_cert_key_and_ca(shared_certificate)
 
-    assert temp_certificates.CLIENT_CERT_PATH.read_text() == 'cert-pem'
-    assert temp_certificates.CLIENT_KEY_PATH.read_text() == 'key-pem'
+    assert temp_certificates.CLIENT_CERT_PATH.read_text() == shared_certificate.certificate.raw
+    assert temp_certificates.CLIENT_KEY_PATH.read_text() == shared_certificate.key.raw
+    assert temp_certificates.CA_CERT_PATH.read_text() == shared_certificate.ca.raw
 
 
 def test_certificates_manager_has_client_cert_and_key_returns_false_when_files_missing(
     temp_certificates: Any,
 ) -> None:
-    shared_certificate = SharedCertificate('cert-pem', 'key-pem', 'ca-pem')
+    shared_certificate = make_shared_certificate()
     assert temp_certificates._has_client_cert_key_and_ca(shared_certificate) is False
 
 
 def test_certificates_manager_has_client_cert_and_key_returns_true_when_material_matches(
     temp_certificates: Any,
 ) -> None:
-    temp_certificates.CLIENT_CERT_PATH.write_text('cert-pem')
-    temp_certificates.CLIENT_KEY_PATH.write_text('key-pem')
-    temp_certificates.CA_CERT_PATH.write_text('ca-pem')
+    temp_certificates.CLIENT_CERT_PATH.write_text(VALID_CLIENT_CERT_PEM)
+    temp_certificates.CLIENT_KEY_PATH.write_text(VALID_CLIENT_KEY_PEM)
+    temp_certificates.CA_CERT_PATH.write_text(VALID_CA_CERT_PEM)
 
-    shared_certificate = SharedCertificate('cert-pem', 'key-pem', 'ca-pem')
+    shared_certificate = make_shared_certificate()
     assert temp_certificates._has_client_cert_key_and_ca(shared_certificate) is True
 
 
 def test_certificates_manager_has_client_cert_and_key_returns_false_when_material_differs(
     temp_certificates: Any,
 ) -> None:
-    temp_certificates.CLIENT_CERT_PATH.write_text('cert-pem')
-    temp_certificates.CLIENT_KEY_PATH.write_text('key-pem')
-    temp_certificates.CA_CERT_PATH.write_text('ca-pem')
+    temp_certificates.CLIENT_CERT_PATH.write_text(VALID_CLIENT_CERT_PEM)
+    temp_certificates.CLIENT_KEY_PATH.write_text(VALID_CLIENT_KEY_PEM)
+    temp_certificates.CA_CERT_PATH.write_text(VALID_CA_CERT_PEM)
 
-    shared_certificate1 = SharedCertificate('other-cert', 'key-pem', 'ca-pem')
-    shared_certificate2 = SharedCertificate('cert-pem', 'other-key', 'ca-pem')
-    shared_certificate3 = SharedCertificate('cert-pem', 'key-pem', 'other-pem')
-    assert temp_certificates._has_client_cert_key_and_ca(shared_certificate1) is False
-    assert temp_certificates._has_client_cert_key_and_ca(shared_certificate2) is False
-    assert temp_certificates._has_client_cert_key_and_ca(shared_certificate3) is False
+    other_shared_certificate = SharedCertificate(
+        certificate=Certificate.from_string(VALID_CA_CERT_PEM),
+        key=PrivateKey.from_string(VALID_CLIENT_KEY_PEM),
+        ca=Certificate.from_string(VALID_CLIENT_CERT_PEM),
+    )
+    assert temp_certificates._has_client_cert_key_and_ca(other_shared_certificate) is False
 
 
 def test_certificates_manager_generate_does_nothing_when_files_already_exist(
     temp_certificates: Any,
 ) -> None:
-    temp_certificates.CA_CERT_PATH.write_text('existing-ca-cert')
-    temp_certificates.CLIENT_KEY_PATH.write_text('existing-client-key')
-    temp_certificates.CLIENT_CERT_PATH.write_text('existing-client-cert')
+    temp_certificates.CLIENT_CERT_PATH.write_text(VALID_CLIENT_CERT_PEM)
+    temp_certificates.CLIENT_KEY_PATH.write_text(VALID_CLIENT_KEY_PEM)
+    temp_certificates.CA_CERT_PATH.write_text(VALID_CA_CERT_PEM)
+    old_certificates = make_shared_certificate()
 
-    shared = temp_certificates.generate(common_name='unit-1')
+    new_certificates = temp_certificates.generate(common_name='unit-1')
 
-    assert temp_certificates.CA_CERT_PATH.read_text() == 'existing-ca-cert'
-    assert temp_certificates.CLIENT_KEY_PATH.read_text() == 'existing-client-key'
-    assert temp_certificates.CLIENT_CERT_PATH.read_text() == 'existing-client-cert'
+    written = SharedCertificate.from_strings(
+        certificate=temp_certificates.CLIENT_CERT_PATH.read_text(),
+        key=temp_certificates.CLIENT_KEY_PATH.read_text(),
+        ca=temp_certificates.CA_CERT_PATH.read_text(),
+    )
+    assert written == old_certificates
 
-    assert shared.ca == 'existing-ca-cert'
-    assert shared.key == 'existing-client-key'
-    assert shared.certificate == 'existing-client-cert'
+    assert new_certificates == old_certificates
 
 
 def test_certificates_manager_generate_creates_all_files(
@@ -124,6 +147,6 @@ def test_certificates_manager_generate_creates_all_files(
     )
     assert temp_certificates.CLIENT_CERT_PATH.read_text().startswith('-----BEGIN CERTIFICATE-----')
 
-    assert temp_certificates.CA_CERT_PATH.read_text() == shared.ca
-    assert temp_certificates.CLIENT_KEY_PATH.read_text() == shared.key
-    assert temp_certificates.CLIENT_CERT_PATH.read_text() == shared.certificate
+    assert temp_certificates.CA_CERT_PATH.read_text() == shared.ca.raw
+    assert temp_certificates.CLIENT_KEY_PATH.read_text() == shared.key.raw
+    assert temp_certificates.CLIENT_CERT_PATH.read_text() == shared.certificate.raw

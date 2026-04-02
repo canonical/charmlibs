@@ -47,7 +47,7 @@ def _main() -> None:
         })
     elif event_name == 'workflow_dispatch':
         _output({
-            'include': json.dumps([{'package': [event['inputs']['package']], 'tag': ''}]),
+            'include': json.dumps([{'package': event['inputs']['package'], 'tag': ''}]),
             'skip-juju': event['inputs']['skip-juju'],
             'repository-url': 'https://test.pypi.org/legacy/',
         })

@@ -19,7 +19,10 @@ import logging
 import common
 import ops
 
+from charmlibs.rollingops._etcdctl import is_etcdctl_installed
+
 logger = logging.getLogger(__name__)
+
 
 CONTAINER = 'workload'
 
@@ -34,6 +37,8 @@ class RollingOpsCharm(common.Charm):
     def _on_pebble_ready(self, event: ops.PebbleReadyEvent):
         """Handle pebble-ready event."""
         self.unit.status = ops.ActiveStatus()
+        is_installed = is_etcdctl_installed()
+        logger.info('etcdctl is installed %d', is_installed)
 
 
 if __name__ == '__main__':  # pragma: nocover

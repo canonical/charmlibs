@@ -14,14 +14,22 @@
 #
 # Learn more about testing at: https://juju.is/docs/sdk/testing
 
-
 from unittest.mock import MagicMock
 
 import pytest
 from ops.testing import Context, PeerRelation, Secret, State
 from scenario.errors import UncaughtCharmError
-from tests.unit.conftest import RollingOpsCharm
+from tests.unit.conftest import (
+    VALID_CA_CERT_PEM,
+    VALID_CLIENT_CERT_PEM,
+    VALID_CLIENT_KEY_PEM,
+    RollingOpsCharm,
+)
 
+from charmlibs.interfaces.tls_certificates import (
+    Certificate,
+    PrivateKey,
+)
 from charmlibs.rollingops._models import RollingOpsInvalidSecretContentError, SharedCertificate
 from charmlibs.rollingops._relations import (
     CERT_SECRET_FIELD,
@@ -57,9 +65,9 @@ def test_leader_elected_does_not_regenerate_when_secret_already_exists(
         id='secret:existing',
         owner='app',
         tracked_content={
-            'client-cert': 'CERT_PEM',
-            'client-key': 'KEY_PEM',
-            'client-ca': 'CA_PEM',
+            'client-cert': VALID_CLIENT_CERT_PEM,
+            'client-key': VALID_CLIENT_KEY_PEM,
+            'client-ca': VALID_CA_CERT_PEM,
         },
     )
 
@@ -99,18 +107,20 @@ def test_relation_changed_syncs_local_certificate_from_secret(
     secret = Secret(
         id='secret:rollingops-cert',
         tracked_content={
-            'client-cert': 'CERT_PEM',
-            'client-key': 'KEY_PEM',
-            'client-ca': 'CA_PEM',
+            'client-cert': VALID_CLIENT_CERT_PEM,
+            'client-key': VALID_CLIENT_KEY_PEM,
+            'client-ca': VALID_CA_CERT_PEM,
         },
     )
 
     state_in = State(leader=False, relations={peer_relation}, secrets=[secret])
-
-    ctx.run(ctx.on.relation_changed(peer_relation, remote_unit=1), state_in)
-    certificates_manager_patches['persist'].assert_called_once_with(
-        SharedCertificate(certificate='CERT_PEM', key='KEY_PEM', ca='CA_PEM')
+    expected_shared = SharedCertificate(
+        certificate=Certificate.from_string(VALID_CLIENT_CERT_PEM),
+        key=PrivateKey.from_string(VALID_CLIENT_KEY_PEM),
+        ca=Certificate.from_string(VALID_CA_CERT_PEM),
     )
+    ctx.run(ctx.on.relation_changed(peer_relation, remote_unit=1), state_in)
+    certificates_manager_patches['persist'].assert_called_once_with(expected_shared)
 
 
 def test_invalid_certificate_secret_content_raises(

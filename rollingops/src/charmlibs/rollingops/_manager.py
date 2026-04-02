@@ -168,6 +168,7 @@ class EtcdRollingOpsManager(Object):
             RollingOpsNoEtcdRelationError: if the etcd relation does not exist
             RollingOpsEtcdNotConfiguredError: if etcd client has not been configured yet
             PebbleConnectionError: if the remote container cannot be reached.
+            RollingOpsCharmLibMissingError: if the charm libs cannot be found.
         """
         if callback_id not in self.callback_targets:
             raise RollingOpsInvalidLockRequestError(f'Unknown callback_id: {callback_id}')
@@ -188,9 +189,9 @@ class EtcdRollingOpsManager(Object):
         This function will be completely remade in the next PR.
         """
         # TODO: implement the actual execution under lock
-        etcdctl.run(['put', self.keys.lock_key, self.keys.owner])
+        etcdctl.run('put', self.keys.lock_key, self.keys.owner)
 
-        result = etcdctl.run(['get', self.keys.lock_key, '--print-value-only'])
+        result = etcdctl.run('get', self.keys.lock_key, '--print-value-only')
 
         if result is None:
             logger.error('Unexpected response from etcd.')
