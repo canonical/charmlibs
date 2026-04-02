@@ -24,15 +24,17 @@ from ops.charm import (
 )
 from ops.framework import EventBase, Object
 
-from charmlibs.rollingops import _etcdctl as etcdctl
-from charmlibs.rollingops._models import (
+from charmlibs.rollingops.common._exceptions import (
     RollingOpsEtcdNotConfiguredError,
     RollingOpsInvalidLockRequestError,
-    RollingOpsKeys,
     RollingOpsNoEtcdRelationError,
 )
-from charmlibs.rollingops._relations import EtcdRequiresV1, SharedClientCertificateManager
-from charmlibs.rollingops._worker import EtcdRollingOpsAsyncWorker
+from charmlibs.rollingops.common._models import OperationResult
+from charmlibs.rollingops.etcd import _etcdctl as etcdctl
+from charmlibs.rollingops.etcd._etcd import EtcdLock, EtcdOperationQueue
+from charmlibs.rollingops.etcd._models import EtcdOperation, RollingOpsKeys
+from charmlibs.rollingops.etcd._relations import EtcdRequiresV1, SharedClientCertificateManager
+from charmlibs.rollingops.etcd._worker import EtcdRollingOpsAsyncWorker
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +68,7 @@ class EtcdRollingOpsManager(Object):
 
         owner = f'{self.model.uuid}-{self.model.unit.name}'.replace('/', '-')
         self.worker = EtcdRollingOpsAsyncWorker(
-            charm, peer_relation_name=peer_relation_name, owner=owner
+            charm, peer_relation_name=peer_relation_name, owner=owner, cluster_id=cluster_id
         )
         self.keys = RollingOpsKeys.for_owner(cluster_id, owner)
 
@@ -81,6 +83,11 @@ class EtcdRollingOpsManager(Object):
             cluster_id=self.keys.cluster_prefix,
             shared_certificates=self.shared_certificates,
         )
+
+        self.keys = RollingOpsKeys.for_owner(cluster_id=cluster_id, owner=owner)
+        self.lock = EtcdLock(lock_key=self.keys.lock_key, owner=owner)
+        self.pending_queue = EtcdOperationQueue(self.keys.pending, self.keys.lock_key, owner)
+        self.inprogress_queue = EtcdOperationQueue(self.keys.inprogress, self.keys.lock_key, owner)
 
         self.framework.observe(
             charm.on[self.peer_relation_name].relation_departed, self._on_peer_relation_departed
@@ -148,10 +155,15 @@ class EtcdRollingOpsManager(Object):
         kwargs: dict[str, Any] | None = None,
         max_retry: int | None = None,
     ) -> None:
-        """This is a dummy function.
+        """Queue a rolling operation and trigger asynchronous lock acquisition.
 
-        Here we spawn a new process that will trigger a Juju hook.
-        This function will be completely remade in the next PR.
+        This method creates a new operation representing a callback to execute
+        once the distributed lock is granted. The operation is appended to the
+        unit's pending operation queue stored in etcd.
+
+        If the operation is successfully enqueued, the background worker process
+        responsible for acquiring the distributed lock and processing operations
+        is started.
 
         Args:
             callback_id: Identifier of the registered callback to execute when
@@ -168,7 +180,6 @@ class EtcdRollingOpsManager(Object):
             RollingOpsNoEtcdRelationError: if the etcd relation does not exist
             RollingOpsEtcdNotConfiguredError: if etcd client has not been configured yet
             PebbleConnectionError: if the remote container cannot be reached.
-            RollingOpsCharmLibMissingError: if the charm libs cannot be found.
         """
         if callback_id not in self.callback_targets:
             raise RollingOpsInvalidLockRequestError(f'Unknown callback_id: {callback_id}')
@@ -178,24 +189,65 @@ class EtcdRollingOpsManager(Object):
 
         etcdctl.ensure_initialized()
 
-        # TODO: implement actual lock request
+        if kwargs is None:
+            kwargs = {}
 
-        self.worker.start()
+        operation = EtcdOperation.create(callback_id, kwargs, max_retry)
+        res = self.pending_queue.enqueue(operation)
+
+        if res:
+            self.worker.start()
+        else:
+            logger.info('Operation %s already exists in the queue.', operation.callback_id)
 
     def _on_run_with_lock(self) -> None:
-        """This is a dummy function.
+        """Execute the current operation while holding the distributed lock.
 
-        Here we try to reach etcd from each unit.
-        This function will be completely remade in the next PR.
+        This method is triggered when the worker determines that the current
+        unit owns the distributed lock. The method retrieves the head operation
+        from the in-progress queue and executes its registered callback.
+
+        After execution, the operation is moved to the completed queue and its
+        updated state is persisted.
         """
-        # TODO: implement the actual execution under lock
-        etcdctl.run('put', self.keys.lock_key, self.keys.owner)
-
-        result = etcdctl.run('get', self.keys.lock_key, '--print-value-only')
-
-        if result is None:
-            logger.error('Unexpected response from etcd.')
+        if not self.lock.is_held():
+            logger.info('Lock is not granted. Operation will not run.')
             return
 
-        callback = self.callback_targets.get('_restart', '')
-        callback(delay=1)
+        if not (operation := self.inprogress_queue.peek()):
+            logger.info('Lock granted but there is no operation to run.')
+            return
+
+        if not (callback := self.callback_targets.get(operation.callback_id)):
+            logger.warning(
+                'Operation %s target was not found. It cannot be executed.',
+                operation.callback_id,
+            )
+            return
+        logger.info(
+            'Executing callback_id=%s, attempt=%s', operation.callback_id, operation.attempt
+        )
+
+        try:
+            result = callback(**operation.kwargs)
+        except Exception as e:
+            logger.exception('Operation failed: %s: %s', operation.callback_id, e)
+            result = OperationResult.RETRY_RELEASE
+
+        match result:
+            case OperationResult.RETRY_HOLD:
+                logger.info(
+                    'Finished %s. Operation will be retried immediately.', operation.callback_id
+                )
+                operation.retry_hold()
+
+            case OperationResult.RETRY_RELEASE:
+                logger.info('Finished %s. Operation will be retried later.', operation.callback_id)
+                operation.retry_release()
+
+            case _:
+                logger.info('Finished %s. Lock will be released.', operation.callback_id)
+                operation.complete()
+
+        moved = self.inprogress_queue.move_operation(self.keys.completed, operation)
+        logger.info('moved %s', moved)

@@ -20,11 +20,8 @@ from typing import Any
 
 import pytest
 
-from charmlibs.rollingops._peer_models import (
-    Operation,
-    OperationQueue,
-    RollingOpsDecodingError,
-)
+from charmlibs.rollingops.common._exceptions import RollingOpsDecodingError
+from charmlibs.rollingops.peer._models import Operation, OperationQueue
 
 
 def _decode_queue_string(queue_str: str) -> list[dict[str, str]]:

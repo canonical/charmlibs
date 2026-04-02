@@ -30,10 +30,9 @@ from charmlibs.interfaces.tls_certificates import (
     Certificate,
     PrivateKey,
 )
-from charmlibs.rollingops._models import RollingOpsInvalidSecretContentError, SharedCertificate
-from charmlibs.rollingops._relations import (
-    CERT_SECRET_FIELD,
-)
+from charmlibs.rollingops.common._exceptions import RollingOpsInvalidSecretContentError
+from charmlibs.rollingops.etcd._models import SharedCertificate
+from charmlibs.rollingops.etcd._relations import CERT_SECRET_FIELD
 
 
 def test_leader_elected_creates_shared_secret_and_stores_id(

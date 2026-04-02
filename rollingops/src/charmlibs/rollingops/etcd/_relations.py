@@ -32,9 +32,10 @@ from ops.charm import (
 from ops.framework import Object
 
 from charmlibs.interfaces.tls_certificates import Certificate, TLSCertificatesError
-from charmlibs.rollingops import _certificates as certificates
-from charmlibs.rollingops import _etcdctl as etcdctl
-from charmlibs.rollingops._models import RollingOpsInvalidSecretContentError, SharedCertificate
+from charmlibs.rollingops.common._exceptions import RollingOpsInvalidSecretContentError
+from charmlibs.rollingops.etcd import _certificates as certificates
+from charmlibs.rollingops.etcd import _etcdctl as etcdctl
+from charmlibs.rollingops.etcd._models import SharedCertificate
 
 logger = logging.getLogger(__name__)
 CERT_SECRET_FIELD = 'rollingops-client-secret-id'  # noqa: S105

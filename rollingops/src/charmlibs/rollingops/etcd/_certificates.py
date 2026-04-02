@@ -19,7 +19,7 @@ Authority (CA) and a client certificate/key pair used to authenticate
 with etcd via TLS. Certificates are generated only once and persisted
 under a local directory so they can be reused across charm executions.
 
-Certificates are valid for 20 years. They are not renewed or rotated.
+Certificates are valid for 50 years. They are not renewed or rotated.
 """
 
 from datetime import timedelta
@@ -32,11 +32,9 @@ from charmlibs.interfaces.tls_certificates import (
     PrivateKey,
     TLSCertificatesError,
 )
-from charmlibs.rollingops._models import (
-    RollingOpsFileSystemError,
-    SharedCertificate,
-    with_pebble_retry,
-)
+from charmlibs.rollingops.common._exceptions import RollingOpsFileSystemError
+from charmlibs.rollingops.common._models import with_pebble_retry
+from charmlibs.rollingops.etcd._models import SharedCertificate
 
 BASE_DIR = pathops.LocalPath('/var/lib/rollingops/tls')
 CA_CERT_PATH = BASE_DIR / 'client-ca.pem'

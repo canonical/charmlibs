@@ -82,7 +82,8 @@ class PeerRollingOpsAsyncWorker(Object):
             / 'site-packages'
             / 'charmlibs'
             / 'rollingops'
-            / '_peer_rollingops.py'
+            / 'peer'
+            / '_rollingops.py'
         )
 
         # These files must stay open for the lifetime of the worker process.

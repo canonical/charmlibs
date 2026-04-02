@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 TRACE_FILE = pathops.LocalPath('/var/lib/charm-rolling-ops/transitions.log')
 
 
-def _now_timestamp_str() -> str:
+def now_timestamp_str() -> str:
     """UTC timestamp as a string using ISO 8601 format."""
     return datetime.now(UTC).isoformat()
 
@@ -122,7 +122,7 @@ class Charm(CharmBase):
     def _record_transition(self, name: str, **data: Any) -> None:
         TRACE_FILE.parent.mkdir(parents=True, exist_ok=True)
         payload = {
-            'ts': _now_timestamp_str(),
+            'ts': now_timestamp_str(),
             'unit': self.model.unit.name,
             'event': name,
             **data,

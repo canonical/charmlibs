@@ -12,19 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""The charmlibs.rollingops package."""
-
-from ._rollingops_manager import RollingOpsManager
-from ._version import __version__ as __version__
-from .common._exceptions import (
-    RollingOpsEtcdNotConfiguredError,
-    RollingOpsInvalidLockRequestError,
-)
-from .common._models import OperationResult
-
-__all__ = (
-    'OperationResult',
-    'RollingOpsEtcdNotConfiguredError',
-    'RollingOpsInvalidLockRequestError',
-    'RollingOpsManager',
-)
+"""Common code used by peer and etcd rolling ops."""

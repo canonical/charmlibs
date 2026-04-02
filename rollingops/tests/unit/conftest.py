@@ -25,17 +25,17 @@ import pytest
 from ops import ActionEvent
 from ops.testing import Context
 
-import charmlibs.rollingops._certificates as certificates
-import charmlibs.rollingops._etcdctl as etcdctl
+import charmlibs.rollingops.etcd._certificates as certificates
+import charmlibs.rollingops.etcd._etcdctl as etcdctl
 from charmlibs.interfaces.tls_certificates import (
     Certificate,
     PrivateKey,
 )
 from charmlibs.pathops import LocalPath
-from charmlibs.rollingops._manager import EtcdRollingOpsManager
-from charmlibs.rollingops._models import SharedCertificate
-from charmlibs.rollingops._peer_manager import PeerRollingOpsManager
-from charmlibs.rollingops._peer_models import OperationResult
+from charmlibs.rollingops.common._models import OperationResult
+from charmlibs.rollingops.etcd._manager import EtcdRollingOpsManager
+from charmlibs.rollingops.etcd._models import SharedCertificate
+from charmlibs.rollingops.peer._manager import PeerRollingOpsManager
 
 VALID_CA_CERT_PEM = """-----BEGIN CERTIFICATE-----
       MIIC6DCCAdCgAwIBAgIUW42TU9LSjEZLMCclWrvSwAsgRtcwDQYJKoZIhvcNAQEL
@@ -136,7 +136,7 @@ def temp_etcdctl(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> types.Modul
 
 @pytest.fixture
 def etcdctl_patch() -> Generator[MagicMock, None, None]:
-    with patch('charmlibs.rollingops._certificates') as mock_etcdctl:
+    with patch('charmlibs.rollingops.etcd._certificates') as mock_etcdctl:
         yield mock_etcdctl
 
 
@@ -144,11 +144,11 @@ def etcdctl_patch() -> Generator[MagicMock, None, None]:
 def certificates_manager_patches() -> Generator[dict[str, MagicMock], None, None]:
     with (
         patch(
-            'charmlibs.rollingops._certificates._exists',
+            'charmlibs.rollingops.etcd._certificates._exists',
             return_value=False,
         ),
         patch(
-            'charmlibs.rollingops._certificates.generate',
+            'charmlibs.rollingops.etcd._certificates.generate',
             return_value=SharedCertificate(
                 certificate=Certificate.from_string(VALID_CLIENT_CERT_PEM),
                 key=PrivateKey.from_string(VALID_CLIENT_KEY_PEM),
@@ -156,7 +156,7 @@ def certificates_manager_patches() -> Generator[dict[str, MagicMock], None, None
             ),
         ) as mock_generate,
         patch(
-            'charmlibs.rollingops._certificates.persist_client_cert_key_and_ca',
+            'charmlibs.rollingops.etcd._certificates.persist_client_cert_key_and_ca',
             return_value=None,
         ) as mock_persit,
     ):

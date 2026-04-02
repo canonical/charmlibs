@@ -11,49 +11,25 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""peer rolling ops models."""
+"""Models for peer-relation rollingops."""
 
 import json
 import logging
 from collections.abc import Iterator
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
 from ops import Model, RelationDataContent, Unit
 
+from charmlibs.rollingops.common._exceptions import (
+    RollingOpsDecodingError,
+    RollingOpsNoRelationError,
+)
+from charmlibs.rollingops.common._models import now_timestamp, now_timestamp_str, parse_timestamp
+
 logger = logging.getLogger(__name__)
-
-
-def _now_timestamp_str() -> str:
-    """UTC timestamp as a string using ISO 8601 format."""
-    return datetime.now(UTC).isoformat()
-
-
-def _now_timestamp() -> datetime:
-    """UTC timestamp."""
-    return datetime.now(UTC)
-
-
-def _parse_timestamp(timestamp: str) -> datetime | None:
-    """Parse timestamp string. Return None on errors to avoid selecting invalid timestamps."""
-    try:
-        return datetime.fromisoformat(timestamp)
-    except Exception:
-        return None
-
-
-class RollingOpsNoRelationError(Exception):
-    """Raised if we are trying to process a lock, but do not appear to have a relation yet."""
-
-
-class RollingOpsDecodingError(Exception):
-    """Raised if the content of the databag cannot be processed."""
-
-
-class RollingOpsInvalidLockRequestError(Exception):
-    """Raised if the lock request is invalid."""
 
 
 @dataclass
@@ -116,7 +92,7 @@ class Operation:
         return cls(
             callback_id=callback_id,
             kwargs=kwargs,
-            requested_at=_now_timestamp(),
+            requested_at=now_timestamp(),
             max_retry=max_retry,
             attempt=0,
         )
@@ -157,7 +133,7 @@ class Operation:
 
             return cls(
                 callback_id=obj['callback_id'],
-                requested_at=_parse_timestamp(obj['requested_at']),  # type: ignore[reportArgumentType]
+                requested_at=parse_timestamp(obj['requested_at']),  # type: ignore[reportArgumentType]
                 max_retry=int(obj['max_retry']) if obj.get('max_retry') else None,
                 attempt=int(obj['attempt']),
                 kwargs=json.loads(obj['kwargs']) if obj.get('kwargs') else {},
@@ -270,14 +246,6 @@ class LockIntent(StrEnum):
     IDLE = 'idle'
 
 
-class OperationResult(StrEnum):
-    """Callback return values."""
-
-    RELEASE = 'release'
-    RETRY_RELEASE = 'retry-release'
-    RETRY_HOLD = 'retry-hold'
-
-
 class Lock:
     """State machine view over peer relation databags for a single unit.
 
@@ -352,7 +320,7 @@ class Lock:
             self.complete()
             return
         self._unit_data.update({
-            'executed_at': _now_timestamp_str(),
+            'executed_at': now_timestamp_str(),
             'state': intent,
         })
 
@@ -376,7 +344,7 @@ class Lock:
         self._unit_data.update({
             'state': next_state,
             'operations': queue.to_string(),
-            'executed_at': _now_timestamp_str(),
+            'executed_at': now_timestamp_str(),
         })
 
     def release(self) -> None:
@@ -387,7 +355,7 @@ class Lock:
         """Grant a lock to a unit."""
         self._app_data.update({
             'granted_unit': str(self.unit.name),
-            'granted_at': _now_timestamp_str(),
+            'granted_at': now_timestamp_str(),
         })
 
     def is_granted(self) -> bool:
@@ -451,7 +419,7 @@ class Lock:
     def get_last_completed(self) -> datetime | None:
         """Get the time the unit requested a retry of the head operation."""
         if timestamp_str := self._unit_data.get('executed_at', ''):
-            return _parse_timestamp(timestamp_str)
+            return parse_timestamp(timestamp_str)
         return None
 
     def get_requested_at(self) -> datetime | None:
@@ -462,8 +430,8 @@ class Lock:
 
     def _unit_executed_after_grant(self) -> bool:
         """Returns True if the unit executed its callback after the lock was granted."""
-        granted_at = _parse_timestamp(self._app_data.get('granted_at', ''))
-        executed_at = _parse_timestamp(self._unit_data.get('executed_at', ''))
+        granted_at = parse_timestamp(self._app_data.get('granted_at', ''))
+        executed_at = parse_timestamp(self._unit_data.get('executed_at', ''))
 
         if granted_at is None or executed_at is None:
             return False

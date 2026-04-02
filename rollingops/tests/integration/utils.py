@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Integration tests using real Juju and pre-packed charm(s)."""
+"""Utils for integration tests."""
 
 import json
 from datetime import datetime

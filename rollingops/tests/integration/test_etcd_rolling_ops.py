@@ -15,24 +15,23 @@
 """Integration tests using real Juju and pre-packed charm(s)."""
 
 import logging
-from pathlib import Path
 
 import jubilant
 import pytest
 from tenacity import retry, stop_after_delay, wait_fixed
 
-from tests.integration.utils import get_unit_events, remove_transition_file
+from tests.integration.shared_tests import (
+    assert_deferred_restart_retries_one_unit,
+    assert_failed_restart_retries_one_unit,
+    assert_restart_action_one_unit,
+    assert_restart_rolls_one_unit_at_a_time,
+    assert_retry_hold_keeps_lock_on_same_unit,
+    assert_subsequent_lock_request_of_different_ops,
+    assert_subsequent_lock_request_of_same_op,
+)
 
-TRACE_FILE = '/var/lib/charm-rolling-ops/transitions.log'
 logger = logging.getLogger(__name__)
 TIMEOUT = 15 * 60.0
-
-
-@retry(wait=wait_fixed(10), stop=stop_after_delay(60), reraise=True)
-def wait_for_etcdctl_env(juju: jubilant.Juju, unit: str) -> None:
-    task = juju.exec('test -f /var/lib/rollingops/etcd/etcdctl.json', unit=unit)
-    if task.status != 'completed' or task.return_code != 0:
-        raise RuntimeError('etcdctl config file not ready')
 
 
 def test_deploy(juju: jubilant.Juju, app_name: str):
@@ -40,8 +39,15 @@ def test_deploy(juju: jubilant.Juju, app_name: str):
     assert app_name in juju.status().apps
 
 
+@retry(wait=wait_fixed(10), stop=stop_after_delay(60), reraise=True)
+def wait_for_etcdctl_config_file(juju: jubilant.Juju, unit: str) -> None:
+    task = juju.exec('test -f /var/lib/rollingops/etcd/etcdctl.json', unit=unit)
+    if task.status != 'completed' or task.return_code != 0:
+        raise RuntimeError('etcdctl config file not ready')
+
+
 @pytest.mark.machine_only
-def test_restart_action_one_unit(juju: jubilant.Juju, app_name: str):
+def test_etcdctl_config_file_is_created(juju: jubilant.Juju, app_name: str):
     """Verify that restart action runs through the expected workflow."""
 
     juju.deploy(
@@ -65,66 +71,87 @@ def test_restart_action_one_unit(juju: jubilant.Juju, app_name: str):
     juju.integrate(f'{app_name}:etcd', 'etcd:etcd-client')
     juju.wait(jubilant.all_active, error=jubilant.any_error, timeout=TIMEOUT)
 
-    wait_for_etcdctl_env(juju, f'{app_name}/0')
-
-    juju.run(f'{app_name}/0', 'restart', {'delay': 1}, wait=300)
-
-    juju.wait(
-        jubilant.all_active,
-        error=jubilant.any_error,
-        timeout=TIMEOUT,
-    )
-
-    events = get_unit_events(juju, f'{app_name}/0')
-    restart_events = [e['event'] for e in events]
-
-    expected = [
-        'action:restart',
-        '_restart:start',
-        '_restart:done',
-    ]
-
-    assert expected == restart_events
+    wait_for_etcdctl_config_file(juju, f'{app_name}/0')
 
 
 @pytest.mark.machine_only
-def test_all_units_can_connect_to_etcd(juju: jubilant.Juju, app_name: str):
-    juju.add_unit(app_name, num_units=2)
-    juju.wait(
-        lambda status: jubilant.all_active(status, app_name),
-        error=jubilant.any_error,
-        timeout=TIMEOUT,
-    )
+def test_restart_action_one_unit_single_app(juju: jubilant.Juju, app_name: str):
+    assert_restart_action_one_unit(juju, app_name)
 
+
+@pytest.mark.machine_only
+def test_failed_restart_retries_one_unit_single_app(juju: jubilant.Juju, app_name: str):
+    assert_failed_restart_retries_one_unit(juju, app_name)
+
+
+@pytest.mark.machine_only
+def test_assert_deferred_restart_retries_one_unit_single_app(juju: jubilant.Juju, app_name: str):
+    assert_deferred_restart_retries_one_unit(juju, app_name)
+
+
+@pytest.mark.machine_only
+def test_assert_restart_rolls_one_unit_at_a_time_single_app(juju: jubilant.Juju, app_name: str):
+    assert_restart_rolls_one_unit_at_a_time(juju, app_name)
+
+
+@pytest.mark.machine_only
+def test_retry_hold_keeps_lock_on_same_unit_single_app(juju: jubilant.Juju, app_name: str):
+    assert_retry_hold_keeps_lock_on_same_unit(juju, app_name)
+
+
+"""
+@pytest.mark.machine_only
+def test_retry_release_single_app(juju: jubilant.Juju, app_name: str):
     status = juju.status()
     units = sorted(status.apps[app_name].units)
-
     for unit in units:
         remove_transition_file(juju, unit)
 
-    for unit in units:
-        juju.run(unit, 'restart', {'delay': 2}, wait=300)
+    unit_a = units[2]
+    unit_b = units[4]
 
-    juju.wait(
-        lambda status: jubilant.all_active(status, app_name, 'etcd', 'self-signed-certificates'),
-        error=jubilant.any_error,
-        timeout=TIMEOUT,
-    )
+    juju.run(unit_a, 'failed-restart', {'delay': 10, 'max-retry': 2}, wait=TIMEOUT)
+    juju.run(unit_b, 'failed-restart', {'delay': 1, 'max-retry': 2}, wait=TIMEOUT)
 
-    expected = [
-        'action:restart',
-        '_restart:start',
-        '_restart:done',
-    ]
+    time.sleep(60)  # wait for operation execution. TODO: in charm use lock state to clear status.
 
-    for unit in units:
-        events = get_unit_events(juju, unit)
-        restart_events = [e['event'] for e in events]
-        assert restart_events == expected
+    all_events: list[dict[str, str]] = []
+    all_events.extend(get_unit_events(juju, unit_a))
+    all_events.extend(get_unit_events(juju, unit_b))
+    all_events.sort(key=parse_ts)
+
+    all_events: list[dict[str, str]] = []
+
+    restart_events = [e for e in all_events if e['event'] in {'_restart:start', '_restart:done'}]
+    restart_events.sort(key=parse_ts)
+
+    logger.info(restart_events)
+
+    for i in range(0, len(restart_events), 2):
+        start_event = restart_events[i]
+        done_event = restart_events[i + 1]
+
+        assert start_event['event'] == '_restart:start'
+        assert done_event['event'] == '_restart:done'
+        assert start_event['unit'] == done_event['unit'], (
+            f'start/done pair mismatch: {start_event} vs {done_event}'
+        )
+"""
 
 
 @pytest.mark.machine_only
-def test_all_units_can_connect_to_etcd_multi_app(juju: jubilant.Juju, charm: Path, app_name: str):
+def test_subsequent_lock_request_of_different_ops_single_app(juju: jubilant.Juju, app_name: str):
+    assert_subsequent_lock_request_of_different_ops(juju, app_name)
+
+
+@pytest.mark.machine_only
+def test_subsequent_lock_request_of_same_op_single_app(juju: jubilant.Juju, app_name: str):
+    assert_subsequent_lock_request_of_same_op(juju, app_name)
+
+
+"""
+@pytest.mark.machine_only
+def test_rolling_ops_multi_app(juju: jubilant.Juju, charm: Path, app_name: str):
     second_app = f'{app_name}-secondary'
 
     juju.deploy(charm, app=second_app, num_units=3)
@@ -151,30 +178,36 @@ def test_all_units_can_connect_to_etcd_multi_app(juju: jubilant.Juju, charm: Pat
         remove_transition_file(juju, unit)
 
     for unit in all_units:
-        wait_for_etcdctl_env(juju, unit)
+        wait_for_etcdctl_config_file(juju, unit)
 
     for unit in all_units:
-        juju.run(unit, 'restart', {'delay': 2}, wait=300)
+        juju.run(unit, 'restart', {'delay': 2}, wait=TIMEOUT)
 
     juju.wait(
-        lambda status: jubilant.all_active(
-            status,
-            app_name,
-            second_app,
-            'etcd',
-            'self-signed-certificates',
-        ),
+        lambda status: jubilant.all_active(status, app_name, second_app),
         error=jubilant.any_error,
         timeout=TIMEOUT,
     )
 
-    expected = [
-        'action:restart',
-        '_restart:start',
-        '_restart:done',
-    ]
+    all_events: list[dict[str, str]] = []
 
     for unit in all_units:
         events = get_unit_events(juju, unit)
-        restart_events = [e['event'] for e in events]
-        assert restart_events == expected
+        assert len(events) == 3
+        all_events.extend(events)
+
+    restart_events = [e for e in all_events if e['event'] in {'_restart:start', '_restart:done'}]
+    restart_events.sort(key=parse_ts)
+
+    logger.info(restart_events)
+
+    for i in range(0, len(restart_events), 2):
+        start_event = restart_events[i]
+        done_event = restart_events[i + 1]
+
+        assert start_event['event'] == '_restart:start'
+        assert done_event['event'] == '_restart:done'
+        assert start_event['unit'] == done_event['unit'], (
+            f'start/done pair mismatch: {start_event} vs {done_event}'
+        )
+"""

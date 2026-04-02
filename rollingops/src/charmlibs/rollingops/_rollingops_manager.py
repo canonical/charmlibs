@@ -20,8 +20,8 @@ from typing import Any
 from ops import CharmBase, Object
 from ops.framework import EventBase
 
-from charmlibs.rollingops._manager import EtcdRollingOpsManager
-from charmlibs.rollingops._peer_manager import PeerRollingOpsManager
+from charmlibs.rollingops.etcd._manager import EtcdRollingOpsManager
+from charmlibs.rollingops.peer._manager import PeerRollingOpsManager
 
 logger = logging.getLogger(__name__)
 
@@ -69,9 +69,11 @@ class RollingOpsManager(Object):
         has_peer = self._has_relation(self.peer_relation_name)
 
         if has_etcd:
+            logger.info('Active manager is etcd.')
             return self.etcd_manager
 
         if has_peer:
+            logger.info('Active manager is peer.')
             return self.peer_manager
 
         raise RuntimeError('No active rollingops relation found.')

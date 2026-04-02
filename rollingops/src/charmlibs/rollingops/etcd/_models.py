@@ -14,72 +14,29 @@
 
 """etcd rolling ops models."""
 
-from collections.abc import Callable
-from dataclasses import dataclass
-from enum import StrEnum
-from typing import ClassVar, TypeVar
-
-from ops import pebble
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_fixed
+import json
+import logging
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any, ClassVar, TypeVar
 
 from charmlibs.interfaces.tls_certificates import Certificate, PrivateKey
-from charmlibs.pathops import LocalPath, PebbleConnectionError
+from charmlibs.pathops import LocalPath
+from charmlibs.rollingops.common._exceptions import RollingOpsDecodingError
+from charmlibs.rollingops.common._models import (
+    OperationResult,
+    now_timestamp,
+    parse_timestamp,
+    with_pebble_retry,
+)
+
+logger = logging.getLogger(__name__)
 
 T = TypeVar('T')
 
 
-class RollingOpsNoEtcdRelationError(Exception):
-    """Raised if we are trying to process a lock, but do not appear to have a relation yet."""
-
-
-class RollingOpsEtcdUnreachableError(Exception):
-    """Raised if etcd server is unreachable."""
-
-
-class RollingOpsEtcdNotConfiguredError(Exception):
-    """Raised if etcd client has not been configured yet (env file does not exist)."""
-
-
-class RollingOpsFileSystemError(Exception):
-    """Raised if there is a problem when interacting with the filesystem."""
-
-
-class RollingOpsInvalidLockRequestError(Exception):
-    """Raised if the lock request is invalid."""
-
-
-class RollingOpsDecodingError(Exception):
-    """Raised if json content cannot be processed."""
-
-
-class RollingOpsInvalidSecretContentError(Exception):
-    """Raised if the content of a secret is invalid."""
-
-
-class RollingOpsCharmLibMissingError(Exception):
-    """Raised if the path to the libraries cannot be resolved."""
-
-
 CERT_MODE = 0o644
 KEY_MODE = 0o600
-
-
-@retry(
-    retry=retry_if_exception_type((PebbleConnectionError, pebble.APIError, pebble.ChangeError)),
-    stop=stop_after_attempt(3),
-    wait=wait_fixed(10),
-    reraise=True,
-)
-def with_pebble_retry[T](func: Callable[[], T]) -> T:
-    return func()
-
-
-class OperationResult(StrEnum):
-    """Callback return values."""
-
-    RELEASE = 'release'
-    RETRY_RELEASE = 'retry-release'
-    RETRY_HOLD = 'retry-hold'
 
 
 @dataclass(frozen=True)
@@ -260,3 +217,173 @@ class RollingOpsKeys:
     def for_owner(cls, cluster_id: str, owner: str) -> 'RollingOpsKeys':
         """Create a set of keys for a given owner on a cluster."""
         return cls(cluster_id=cluster_id, owner=owner)
+
+
+@dataclass
+class EtcdOperation:
+    """A single queued operation."""
+
+    callback_id: str
+    requested_at: datetime
+    max_retry: int | None
+    attempt: int
+    result: OperationResult | None
+    kwargs: dict[str, Any] = field(default_factory=dict[str, Any])
+
+    @classmethod
+    def _validate_fields(
+        cls, callback_id: Any, kwargs: Any, requested_at: Any, max_retry: Any, attempt: Any
+    ) -> None:
+        """Validate the class attributes."""
+        if not isinstance(callback_id, str) or not callback_id.strip():
+            raise ValueError('callback_id must be a non-empty string')
+
+        if not isinstance(kwargs, dict):
+            raise ValueError('kwargs must be a dict')
+        try:
+            json.dumps(kwargs)
+        except TypeError as e:
+            raise ValueError(f'kwargs must be JSON-serializable: {e}') from e
+
+        if not isinstance(requested_at, datetime):
+            raise ValueError('requested_at must be a datetime')
+
+        if max_retry is not None:
+            if not isinstance(max_retry, int):
+                raise ValueError('max_retry must be an int')
+            if max_retry < 0:
+                raise ValueError('max_retry must be >= 0')
+
+        if not isinstance(attempt, int):
+            raise ValueError('attempt must be an int')
+        if attempt < 0:
+            raise ValueError('attempt must be >= 0')
+
+    def __post_init__(self) -> None:
+        """Validate the class attributes."""
+        self._validate_fields(
+            self.callback_id,
+            self.kwargs,
+            self.requested_at,
+            self.max_retry,
+            self.attempt,
+        )
+
+    @classmethod
+    def create(
+        cls,
+        callback_id: str,
+        kwargs: dict[str, Any],
+        max_retry: int | None = None,
+    ) -> 'EtcdOperation':
+        """Create a new operation from a callback id and kwargs."""
+        return cls(
+            callback_id=callback_id,
+            kwargs=kwargs,
+            requested_at=now_timestamp(),
+            max_retry=max_retry,
+            attempt=0,
+            result=None,
+        )
+
+    def _to_dict(self) -> dict[str, str]:
+        """Dict form (string-only values)."""
+        return {
+            'callback_id': self.callback_id,
+            'kwargs': self._kwargs_to_json(),
+            'requested_at': self.requested_at.isoformat(),
+            'max_retry': '' if self.max_retry is None else str(self.max_retry),
+            'attempt': str(self.attempt),
+            'result': '' if self.result is None else self.result,
+        }
+
+    def to_string(self) -> str:
+        """Serialize to a string suitable for a Juju databag."""
+        return json.dumps(self._to_dict(), separators=(',', ':'))
+
+    def increase_attempt(self) -> None:
+        """Increment the attempt counter."""
+        self.attempt += 1
+
+    def is_max_retry_reached(self) -> bool:
+        """Return True if attempt exceeds max_retry (unless max_retry is None)."""
+        if self.max_retry is None:
+            return False
+        return self.attempt > self.max_retry
+
+    def complete(self) -> None:
+        """Mark the operation as completed to indicate the lock should be released."""
+        self.increase_attempt()
+        self.result = OperationResult.RELEASE
+
+    def retry_release(self) -> None:
+        """Mark the operation for retry if it has not reached the max retry."""
+        self.increase_attempt()
+        if self.is_max_retry_reached():
+            logger.warning('Operation max retry reached. Dropping.')
+            self.result = OperationResult.RELEASE
+        else:
+            self.result = OperationResult.RETRY_RELEASE
+
+    def retry_hold(self) -> None:
+        """Mark the operation for retry if it has not reached the max retry."""
+        self.increase_attempt()
+        if self.is_max_retry_reached():
+            self.result = OperationResult.RELEASE
+            logger.warning('Operation max retry reached. Dropping.')
+        else:
+            self.result = OperationResult.RETRY_HOLD
+
+    @property
+    def op_id(self) -> str:
+        """Return the unique identifier for this operation."""
+        return f'{self.requested_at.isoformat()}-{self.callback_id}'
+
+    @classmethod
+    def from_string(cls, data: str) -> 'EtcdOperation':
+        """Deserialize from a Juju databag string.
+
+        Raises:
+            RollingOpsDecodingError: if data cannot be deserialized.
+        """
+        try:
+            obj = json.loads(data)
+        except json.JSONDecodeError as e:
+            logger.error('Failed to deserialize Operation from %s: %s', data, e)
+            raise RollingOpsDecodingError(
+                'Failed to deserialize data to create an Operation'
+            ) from e
+        return cls.from_dict(obj)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, str]) -> 'EtcdOperation':
+        """Create an Operation from its dict (etcd) representation."""
+        try:
+            return cls(
+                callback_id=data['callback_id'],
+                requested_at=parse_timestamp(data['requested_at']),  # type: ignore[reportArgumentType]
+                max_retry=int(data['max_retry']) if data.get('max_retry') else None,
+                attempt=int(data['attempt']),
+                kwargs=json.loads(data['kwargs']) if data.get('kwargs') else {},
+                result=OperationResult(data['result']) if data.get('result') else None,
+            )
+
+        except (json.JSONDecodeError, KeyError, TypeError, ValueError) as e:
+            logger.error('Failed to deserialize Operation from %s: %s', data, e)
+            raise RollingOpsDecodingError(
+                'Failed to deserialize data to create an Operation'
+            ) from e
+
+    def _kwargs_to_json(self) -> str:
+        """Deterministic JSON serialization for kwargs."""
+        return json.dumps(self.kwargs, sort_keys=True, separators=(',', ':'))
+
+    def __eq__(self, other: object) -> bool:
+        """Equal for the operation."""
+        if not isinstance(other, EtcdOperation):
+            return False
+        return self.callback_id == other.callback_id and self.kwargs == other.kwargs
+
+    def __hash__(self) -> int:
+        """Hash for the operation."""
+        return hash((self.callback_id, self._kwargs_to_json()))

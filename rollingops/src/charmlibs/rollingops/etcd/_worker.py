@@ -25,7 +25,8 @@ from ops.charm import CharmBase
 from ops.framework import Object
 
 from charmlibs import pathops
-from charmlibs.rollingops._models import RollingOpsCharmLibMissingError, with_pebble_retry
+from charmlibs.rollingops.common._exceptions import RollingOpsCharmLibMissingError
+from charmlibs.rollingops.common._models import with_pebble_retry
 
 logger = logging.getLogger(__name__)
 
@@ -35,13 +36,14 @@ WORKER_PID_FIELD = 'etcd-rollingops-worker-pid'
 class EtcdRollingOpsAsyncWorker(Object):
     """Spawns and manages the external rolling-ops worker process."""
 
-    def __init__(self, charm: CharmBase, peer_relation_name: str, owner: str):
+    def __init__(self, charm: CharmBase, peer_relation_name: str, owner: str, cluster_id: str):
         super().__init__(charm, 'etcd-rollingops-async-worker')
         self._charm = charm
         self._peer_relation_name = peer_relation_name
         self._run_cmd = '/usr/bin/juju-exec'
         self._owner = owner
         self._charm_dir = charm.charm_dir
+        self._cluster_id = cluster_id
 
     @property
     def _relation(self) -> Relation | None:
@@ -92,7 +94,7 @@ class EtcdRollingOpsAsyncWorker(Object):
             new_env['PYTHONPATH'] = f'{venv_path.resolve()}:{new_env["PYTHONPATH"]}'
             break
 
-        worker = venv_path / 'charmlibs' / 'rollingops' / '_etcd_rollingops.py'
+        worker = venv_path / 'charmlibs' / 'rollingops' / 'etcd' / '_rollingops.py'
         if not with_pebble_retry(lambda: worker.exists()):
             raise RollingOpsCharmLibMissingError(f'Worker script not found: {worker}')
 
@@ -113,6 +115,8 @@ class EtcdRollingOpsAsyncWorker(Object):
                 str(self._charm_dir),
                 '--owner',
                 self._owner,
+                '--cluster-id',
+                self._cluster_id,
             ],
             cwd=str(self._charm_dir),
             stdout=log_out,

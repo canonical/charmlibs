@@ -28,13 +28,12 @@ from dataclasses import asdict
 from functools import lru_cache
 
 from charmlibs import pathops
-from charmlibs.rollingops._models import (
-    CERT_MODE,
-    EtcdConfig,
+from charmlibs.rollingops.common._exceptions import (
     RollingOpsEtcdNotConfiguredError,
     RollingOpsFileSystemError,
-    with_pebble_retry,
 )
+from charmlibs.rollingops.common._models import with_pebble_retry
+from charmlibs.rollingops.etcd._models import CERT_MODE, EtcdConfig
 
 logger = logging.getLogger(__name__)
 
@@ -213,3 +212,97 @@ def run(*args: str) -> str | None:
         return None
 
     return result
+
+
+def _get_key_value(key_prefix: str, *extra_args: str) -> tuple[str, dict[str, str]] | None:
+    """Retrieve the first key and value under a given prefix.
+
+    Args:
+        key_prefix: Key prefix to search for.
+        extra_args: Arguments to the get command
+
+    Returns:
+        A tuple containing:
+        - The key string
+        - The parsed JSON value as a dictionary
+
+        Returns None if no key exists or the command fails.
+    """
+    res = run('get', key_prefix, '--prefix', *extra_args)
+
+    if res is None:
+        return None
+
+    out = res.splitlines()
+    if len(out) < 2:
+        return None
+
+    try:
+        value = json.loads(out[1])
+    except json.JSONDecodeError:
+        # raise?
+        return None
+
+    return out[0], value
+
+
+def get_first_key_value(key_prefix: str) -> tuple[str, dict[str, str]] | None:
+    """Retrieve the first key and value under a given prefix.
+
+    Args:
+        key_prefix: Key prefix to search for.
+
+    Returns:
+        A tuple containing:
+        - The key string
+        - The parsed JSON value as a dictionary
+
+        Returns None if no key exists or the command fails.
+    """
+    return _get_key_value(key_prefix, '--limit=1')
+
+
+def get_last_key_value(key_prefix: str) -> tuple[str, dict[str, str]] | None:
+    """Retrieve the last key and value under a given prefix.
+
+    Args:
+        key_prefix: Key prefix to search for.
+
+    Returns:
+        A tuple containing:
+        - The key string
+        - The parsed JSON value as a dictionary
+
+        Returns None if no key exists or the command fails.
+    """
+    return _get_key_value(
+        key_prefix,
+        '--sort-by=KEY',
+        '--order=DESCEND',
+        '--limit=1',
+    )
+
+
+def txn(txn: str) -> bool:
+    """Execute an etcd transaction.
+
+    The transaction string should follow the etcdctl transaction format
+    where comparison statements are followed by operations.
+
+    Args:
+        txn: The transaction specification passed to `etcdctl txn`.
+
+    Returns:
+        True if the transaction succeeded, otherwise False.
+    """
+    ensure_initialized()
+    res = subprocess.run(
+        ['bash', '-lc', f"printf %s '{txn}' | etcdctl txn"],  # re make
+        text=True,
+        env=load_env(),
+        capture_output=True,
+        check=False,
+    )  # catch errors
+
+    logger.debug('etcd txn result: %s', res.stdout)
+    return 'SUCCESS' in res.stdout

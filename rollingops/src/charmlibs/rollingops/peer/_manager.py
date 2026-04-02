@@ -160,17 +160,19 @@ from ops.charm import (
 )
 from ops.framework import EventBase, Object
 
-from charmlibs.rollingops._peer_models import (
-    Lock,
-    LockIterator,
-    OperationResult,
+from charmlibs.rollingops.common._exceptions import (
     RollingOpsDecodingError,
     RollingOpsInvalidLockRequestError,
     RollingOpsNoRelationError,
+)
+from charmlibs.rollingops.common._models import OperationResult
+from charmlibs.rollingops.peer._models import (
+    Lock,
+    LockIterator,
     pick_oldest_completed,
     pick_oldest_request,
 )
-from charmlibs.rollingops._peer_worker import PeerRollingOpsAsyncWorker
+from charmlibs.rollingops.peer._worker import PeerRollingOpsAsyncWorker
 
 logger = logging.getLogger(__name__)
 
