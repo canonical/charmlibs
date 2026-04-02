@@ -272,16 +272,13 @@ def test_subsequent_lock_request_of_different_ops(juju: jubilant.Juju, app_name:
     unit_a = units[3]
     unit_b = units[4]
 
-    unit_a_events = get_unit_events(juju, unit_a)
-    logger.info('unit_a_events %s', unit_a_events)
-
     juju.run(unit_b, 'deferred-restart', {'delay': 10, 'max-retry': 2}, wait=5)
     juju.run(unit_a, 'failed-restart', {'delay': 1, 'max-retry': 2}, wait=5)
     juju.run(unit_a, 'restart', {'delay': 1}, wait=5)
     juju.run(unit_a, 'deferred-restart', {'delay': 1, 'max-retry': 0}, wait=5)
     juju.run(unit_a, 'restart', {'delay': 1}, wait=5)
 
-    time.sleep(120)  # wait for operation execution. TODO: in charm use lock state to clear status.
+    time.sleep(60)  # wait for operation execution. TODO: in charm use lock state to clear status.
 
     unit_a_events = get_unit_events(juju, unit_a)
     relevant_events = [e['event'] for e in unit_a_events]
@@ -317,8 +314,6 @@ def test_subsequent_lock_request_of_same_op(juju: jubilant.Juju, app_name: str):
     unit_a = units[3]
     unit_b = units[4]
 
-    unit_a_events = get_unit_events(juju, unit_a)
-    logger.info('unit_a_events %s', unit_a_events)
     juju.run(unit_b, 'deferred-restart', {'delay': 10, 'max-retry': 1}, wait=5)
     juju.run(unit_a, 'failed-restart', {'delay': 1, 'max-retry': 2}, wait=5)
     for _ in range(3):
