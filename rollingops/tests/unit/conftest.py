@@ -22,17 +22,20 @@ from unittest.mock import MagicMock, patch
 
 import ops
 import pytest
+from ops import ActionEvent
 from ops.testing import Context
 
 import charmlibs.rollingops._certificates as certificates
 import charmlibs.rollingops._etcdctl as etcdctl
-from charmlibs import rollingops
 from charmlibs.interfaces.tls_certificates import (
     Certificate,
     PrivateKey,
 )
 from charmlibs.pathops import LocalPath
+from charmlibs.rollingops._manager import EtcdRollingOpsManager
 from charmlibs.rollingops._models import SharedCertificate
+from charmlibs.rollingops._peer_manager import PeerRollingOpsManager
+from charmlibs.rollingops._peer_models import OperationResult
 
 VALID_CA_CERT_PEM = """-----BEGIN CERTIFICATE-----
       MIIC6DCCAdCgAwIBAgIUW42TU9LSjEZLMCclWrvSwAsgRtcwDQYJKoZIhvcNAQEL
@@ -171,7 +174,7 @@ class RollingOpsCharm(ops.CharmBase):
             '_restart': self.restart,
         }
 
-        self.restart_manager = rollingops.EtcdRollingOpsManager(
+        self.restart_manager = EtcdRollingOpsManager(
             charm=self,
             peer_relation_name='restart',
             etcd_relation_name='etcd',
@@ -183,9 +186,65 @@ class RollingOpsCharm(ops.CharmBase):
         pass
 
 
+class PeerRollingOpsCharm(ops.CharmBase):
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+
+        callback_targets = {
+            '_restart': self._restart,
+            '_failed_restart': self._failed_restart,
+            '_deferred_restart': self._deferred_restart,
+        }
+
+        self.restart_manager = PeerRollingOpsManager(
+            charm=self,
+            relation_name='restart',
+            callback_targets=callback_targets,
+        )
+        self.framework.observe(self.on.restart_action, self._on_restart_action)
+        self.framework.observe(self.on.failed_restart_action, self._on_failed_restart_action)
+        self.framework.observe(self.on.deferred_restart_action, self._on_deferred_restart_action)
+
+    def _on_restart_action(self, event: ActionEvent) -> None:
+        delay = event.params.get('delay')
+        self.restart_manager.request_async_lock(callback_id='_restart', kwargs={'delay': delay})
+
+    def _on_failed_restart_action(self, event: ActionEvent) -> None:
+        delay = event.params.get('delay')
+        max_retry = event.params.get('max-retry', None)
+        self.restart_manager.request_async_lock(
+            callback_id='_failed_restart',
+            kwargs={'delay': delay},
+            max_retry=max_retry,
+        )
+
+    def _on_deferred_restart_action(self, event: ActionEvent) -> None:
+        delay = event.params.get('delay')
+        max_retry = event.params.get('max-retry', None)
+        self.restart_manager.request_async_lock(
+            callback_id='_deferred_restart',
+            kwargs={'delay': delay},
+            max_retry=max_retry,
+        )
+
+    def _restart(self) -> None:
+        pass
+
+    def _failed_restart(self, delay: int = 0) -> OperationResult:
+        return OperationResult.RETRY_RELEASE
+
+    def _deferred_restart(self, delay: int = 0) -> OperationResult:
+        return OperationResult.RETRY_HOLD
+
+
 @pytest.fixture
 def charm_test() -> type[RollingOpsCharm]:
     return RollingOpsCharm
+
+
+@pytest.fixture
+def peer_charm_test() -> type[PeerRollingOpsCharm]:
+    return PeerRollingOpsCharm
 
 
 meta: dict[str, Any] = {
@@ -202,7 +261,53 @@ meta: dict[str, Any] = {
     },
 }
 
+actions: dict[str, Any] = {
+    'restart': {
+        'description': 'Restarts the example service',
+        'params': {
+            'delay': {
+                'description': 'Introduce an artificial delay (for testing).',
+                'type': 'integer',
+                'default': 0,
+            },
+        },
+    },
+    'failed-restart': {
+        'description': 'Example restart with a custom callback function. Used in testing',
+        'params': {
+            'delay': {
+                'description': 'Introduce an artificial delay (for testing).',
+                'type': 'integer',
+                'default': 0,
+            },
+            'max-retry': {
+                'description': 'Number of times the operation should be retried.',
+                'type': 'integer',
+            },
+        },
+    },
+    'deferred-restart': {
+        'description': 'Example restart with a custom callback function. Used in testing',
+        'params': {
+            'delay': {
+                'description': 'Introduce an artificial delay (for testing).',
+                'type': 'integer',
+                'default': 0,
+            },
+            'max-retry': {
+                'description': 'Number of times the operation should be retried.',
+                'type': 'integer',
+            },
+        },
+    },
+}
+
 
 @pytest.fixture
 def ctx(charm_test: type[RollingOpsCharm]) -> Context[RollingOpsCharm]:
     return Context(charm_test, meta=meta)
+
+
+@pytest.fixture
+def peer_ctx(peer_charm_test: type[PeerRollingOpsCharm]) -> Context[PeerRollingOpsCharm]:
+    return Context(peer_charm_test, meta=meta, actions=actions)

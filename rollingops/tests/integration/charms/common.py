@@ -28,8 +28,8 @@ from ops.model import ActiveStatus, MaintenanceStatus, WaitingStatus
 
 from charmlibs import pathops
 from charmlibs.rollingops import (
-    EtcdRollingOpsManager,
     OperationResult,
+    RollingOpsManager,
 )
 
 logger = logging.getLogger(__name__)
@@ -53,7 +53,7 @@ class Charm(CharmBase):
             '_deferred_restart': self._deferred_restart,
         }
 
-        self.restart_manager = EtcdRollingOpsManager(
+        self.restart_manager = RollingOpsManager(
             charm=self,
             peer_relation_name='restart',
             etcd_relation_name='etcd',
