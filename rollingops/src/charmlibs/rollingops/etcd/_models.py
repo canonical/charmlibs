@@ -152,6 +152,14 @@ class EtcdConfig:
     key_path: str
 
 
+@dataclass
+class EtcdKV:
+    """A single etcd key-value entry."""
+
+    key: str
+    value: dict[str, str]
+
+
 @dataclass(frozen=True)
 class RollingOpsKeys:
     """Collection of etcd key prefixes used for rolling operations.

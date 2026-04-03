@@ -20,7 +20,8 @@ import subprocess
 import time
 
 import charmlibs.rollingops.etcd._etcdctl as etcdctl
-from charmlibs.rollingops.common._models import Operation
+from charmlibs.rollingops.common._models import Operation, OperationResult
+from charmlibs.rollingops.etcd._models import RollingOpsKeys
 
 logger = logging.getLogger(__name__)
 
@@ -39,8 +40,6 @@ class EtcdLease:
             ttl: Time-to-live of the lease in seconds.
         """
         res = etcdctl.run('lease', 'grant', str(ttl))
-        if res is None:  # handle error case
-            return
         # parse: "lease 694d9c9aeca3422a granted with TTL(1800s)"
         parts = res.split()
         self.id = parts[1]
@@ -51,7 +50,6 @@ class EtcdLease:
         """Revoke the current lease and stop the keep-alive process."""
         if self.id is not None:
             etcdctl.run('lease', 'revoke', self.id)
-            # handle error case
             self.id = None
             logger.info('Lease %s revoked.', self.id)
         self._stop_keepalive()
@@ -64,7 +62,7 @@ class EtcdLease:
             return
         etcdctl.ensure_initialized()
         self.keepalive_proc = subprocess.Popen(
-            ['etcdctl', 'lease', 'keep-alive', lease_id],
+            [etcdctl.ETCDCTL_CMD, 'lease', 'keep-alive', lease_id],
             env=etcdctl.load_env(),
             stdin=subprocess.PIPE,
             stdout=subprocess.DEVNULL,
@@ -144,10 +142,6 @@ class EtcdLock:
     def is_held(self) -> bool:
         """Check whether the lock is currently held by this owner."""
         res = etcdctl.run('get', self.lock_key, '--print-value-only')
-
-        if res is None:
-            return False
-
         return res == self.owner
 
 
@@ -167,19 +161,17 @@ class EtcdOperationQueue:
 
     def peek(self) -> Operation | None:
         """Return the first operation in the queue without removing it."""
-        kv = etcdctl.get_first_key_value(self.prefix)
+        kv = etcdctl.get_first_key_value_pair(self.prefix)
         if kv is None:
             return None
-        _, value = kv
-        return Operation.from_dict(value)
+        return Operation.from_dict(kv.value)
 
     def _peek_last(self) -> Operation | None:
         """Return the last operation in the queue without removing it."""
-        kv = etcdctl.get_last_key_value(self.prefix)
+        kv = etcdctl.get_last_key_value_pair(self.prefix)
         if kv is None:
             return None
-        _, value = kv
-        return Operation.from_dict(value)
+        return Operation.from_dict(kv.value)
 
     def move_head(self, to_queue_prefix: str) -> bool:
         """Move the first operation in the queue to another queue.
@@ -195,22 +187,21 @@ class EtcdOperationQueue:
         Returns:
             True if the operation was moved successfully, otherwise False.
         """
-        kv = etcdctl.get_first_key_value(self.prefix)
+        kv = etcdctl.get_first_key_value_pair(self.prefix)
         if kv is None:
             return False
-        key, value = kv
 
-        op_id = key.split('/')[-1]
+        op_id = kv.key.split('/')[-1]
         new_key = f'{to_queue_prefix}{op_id}'
-        data = json.dumps(value)
+        data = json.dumps(kv.value)
         value_escaped = data.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n')
 
         txn = f"""\
         value("{self.lock_key}") = "{self.owner}"
-        version("{key}") != "0"
+        version("{kv.key}") != "0"
 
         put "{new_key}" "{value_escaped}"
-        del "{key}"
+        del "{kv.key}"
 
 
         """
@@ -253,9 +244,9 @@ class EtcdOperationQueue:
         an operation is detected
         """
         while True:
-            if etcdctl.get_first_key_value(self.prefix) is not None:
+            if etcdctl.get_first_key_value_pair(self.prefix) is not None:
                 return
-            time.sleep(30)
+            time.sleep(10)
 
     def dequeue(self) -> bool:
         """Remove the first operation from the queue.
@@ -266,22 +257,21 @@ class EtcdOperationQueue:
         Returns:
             True if the operation was removed successfully, otherwise False.
         """
-        kv = etcdctl.get_first_key_value(self.prefix)
+        kv = etcdctl.get_first_key_value_pair(self.prefix)
         if kv is None:
             return False
-        key, _ = kv
 
         txn = f"""\
         value("{self.lock_key}") = "{self.owner}"
-        version("{key}") != "0"
+        version("{kv.key}") != "0"
 
-        del "{key}"
+        del "{kv.key}"
 
 
         """
         return etcdctl.txn(txn)
 
-    def enqueue(self, operation: Operation) -> bool:
+    def enqueue(self, operation: Operation) -> None:
         """Insert a new operation into the queue.
 
         The method avoids inserting duplicate operations by comparing
@@ -289,19 +279,158 @@ class EtcdOperationQueue:
 
         Args:
             operation: Operation to insert.
-
-        Returns:
-            True if the operation was inserted, or False if it was skipped
-            because it duplicates the most recent operation.
         """
         old_operation = self._peek_last()
 
         if old_operation is not None and operation == old_operation:
-            return False
+            logger.info(
+                'Operation %s not added to the queue. It already exists in the back of the queue.',
+                operation.callback_id,
+            )
 
         op_str = operation.to_string()
         key = f'{self.prefix}{operation.op_id}'
-        res = etcdctl.run('put', key, op_str)
-        if res is None:
-            return False
-        return True
+        etcdctl.run('put', key, op_str)
+
+
+class WorkerOperationStore:
+    """Background-worker view of etcd-backed rolling operations.
+
+    This class is used by the background process that coordinates lock
+    ownership and operation execution. It manages the lifecycle of queued
+    operations across the etcd-backed queue prefixes:
+
+    - pending: operations waiting to be claimed
+    - in-progress: operations currently being executed
+    - completed: operations that finished execution and await post-processing
+
+    It provides worker-oriented methods to:
+    - detect pending work
+    - claim the next operation for execution
+    - wait for completed operations
+    - requeue or delete completed operations
+    """
+
+    def __init__(self, keys: RollingOpsKeys, owner: str):
+        self._pending = EtcdOperationQueue(keys.pending, keys.lock_key, owner)
+        self._inprogress = EtcdOperationQueue(keys.inprogress, keys.lock_key, owner)
+        self._completed = EtcdOperationQueue(keys.completed, keys.lock_key, owner)
+
+    def has_pending(self) -> bool:
+        """Check whether there are pending operations.
+
+        Returns:
+            True if at least one operation exists in the pending queue,
+            otherwise False.
+        """
+        return self._pending.peek() is not None
+
+    def claim_next(self) -> bool:
+        """Move the next pending operation to the in-progress queue.
+
+        This operation is performed atomically and only succeeds if:
+        - the lock is still held by this owner
+        - the head of the pending queue has not changed
+
+        Returns:
+            True if the operation was successfully claimed,
+            otherwise False.
+        """
+        return self._pending.move_head(self._inprogress.prefix)
+
+    def wait_until_completed(self) -> None:
+        """Block until at least one operation appears in the completed queue.
+
+        This method polls the completed queue and returns once an operation
+        has been written there.
+        """
+        self._completed.watch()
+
+    def peek_completed(self) -> Operation | None:
+        """Return the first completed operation without removing it.
+
+        Returns:
+            The first operation in the completed queue, or None if the queue
+            is empty.
+        """
+        return self._completed.peek()
+
+    def requeue_completed(self) -> bool:
+        """Requeue the head completed operation back to the pending queue.
+
+        This is typically used when an operation needs to be retried
+        (e.g., RETRY_RELEASE or RETRY_HOLD semantics).
+
+        Returns:
+            True if the operation was successfully moved back to pending,
+            otherwise False.
+        """
+        return self._completed.move_head(self._pending.prefix)
+
+    def delete_completed(self) -> bool:
+        """Remove the head operation from the completed queue.
+
+        This is typically used when an operation has finished successfully
+        and does not need to be retried.
+
+        Returns:
+            True if the operation was successfully removed,
+            otherwise False.
+        """
+        return self._completed.dequeue()
+
+
+class ManagerOperationStore:
+    """Charm-facing interface for requesting and finalizing etcd-backed operations.
+
+    This class is used by the RollingOps manager running inside the charm.
+    It provides a narrow interface for interacting with the etcd-backed
+    operation queues without exposing the full queue topology.
+
+    The manager can use it to:
+    - request a new operation
+    - inspect the current in-progress operation
+    - finalize an operation after execution
+
+    Queue transitions and storage details remain encapsulated behind this API.
+    """
+
+    def __init__(self, keys: RollingOpsKeys, owner: str):
+        self._pending = EtcdOperationQueue(keys.pending, keys.lock_key, owner)
+        self._inprogress = EtcdOperationQueue(keys.inprogress, keys.lock_key, owner)
+        self._completed_prefix = keys.completed
+
+    def request(self, operation: Operation) -> None:
+        """Add a new operation to the pending queue.
+
+        Duplicate operations (same callback_id and kwargs as the last queued
+        operation) are not inserted.
+
+        Args:
+            operation: Operation to enqueue.
+        """
+        self._pending.enqueue(operation)
+
+    def finalize(self, operation: Operation, result: OperationResult) -> bool:
+        """Move an in-progress operation to the completed queue.
+
+        This should be called after the operation has been executed and its
+        result has been recorded.
+
+        Args:
+            operation: The operation currently in the in-progress queue.
+            result: Result of the executions.
+        """
+        match result:
+            case OperationResult.RETRY_HOLD:
+                operation.retry_hold()
+            case OperationResult.RETRY_RELEASE:
+                operation.retry_release()
+            case _:
+                operation.complete()
+
+        return self._inprogress.move_operation(self._completed_prefix, operation)
+
+    def peek_current(self) -> Operation | None:
+        """Peek the current in-progress operation."""
+        return self._inprogress.peek()

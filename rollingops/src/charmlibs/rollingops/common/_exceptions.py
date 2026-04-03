@@ -49,3 +49,19 @@ class RollingOpsCharmLibMissingError(Exception):
 
 class RollingOpsNoRelationError(Exception):
     """Raised if we are trying to process a lock, but do not appear to have a relation yet."""
+
+
+class RollingOpsEtcdctlError(Exception):
+    """Base exception for etcdctl command failures."""
+
+
+class RollingOpsEtcdctlRetryableError(RollingOpsEtcdctlError):
+    """A transient etcdctl failure that may succeed on retry."""
+
+
+class RollingOpsEtcdctlFatalError(RollingOpsEtcdctlError):
+    """A non-retryable etcdctl failure."""
+
+
+class RollingOpsEtcdctlParseError(RollingOpsEtcdctlError):
+    """Raised when etcdctl output cannot be parsed."""

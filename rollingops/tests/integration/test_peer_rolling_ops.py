@@ -65,11 +65,9 @@ def test_failed_restart_retries_one_unit(juju: jubilant.Juju, app_name: str):
     juju.wait(jubilant.all_active, error=jubilant.any_error, timeout=TIMEOUT)
 
     events = get_unit_events(juju, unit)
-    restart_events = [e['event'] for e in events]
+    restart_events = [e['event'] for e in events if not e['event'].startswith('action')]
 
     expected = [
-        'action:failed-restart',
-        'action:restart',
         '_failed_restart:start',  # attempt 0
         '_failed_restart:retry_release',
         '_failed_restart:start',  # retry 1
@@ -93,11 +91,9 @@ def test_assert_deferred_restart_retries_one_unit(juju: jubilant.Juju, app_name:
     juju.wait(jubilant.all_active, error=jubilant.any_error, timeout=TIMEOUT)
 
     events = get_unit_events(juju, unit)
-    restart_events = [e['event'] for e in events]
+    restart_events = [e['event'] for e in events if not e['event'].startswith('action')]
 
     expected = [
-        'action:deferred-restart',
-        'action:restart',
         '_deferred_restart:start',  # attempt 0
         '_deferred_restart:retry_hold',
         '_deferred_restart:start',  # retry 1

@@ -31,7 +31,7 @@ from charmlibs.rollingops.common._exceptions import (
 )
 from charmlibs.rollingops.common._models import Operation, OperationResult
 from charmlibs.rollingops.etcd import _etcdctl as etcdctl
-from charmlibs.rollingops.etcd._etcd import EtcdLock, EtcdOperationQueue
+from charmlibs.rollingops.etcd._etcd import EtcdLock, ManagerOperationStore
 from charmlibs.rollingops.etcd._models import RollingOpsKeys
 from charmlibs.rollingops.etcd._relations import EtcdRequiresV1, SharedClientCertificateManager
 from charmlibs.rollingops.etcd._worker import EtcdRollingOpsAsyncWorker
@@ -86,8 +86,7 @@ class EtcdRollingOpsManager(Object):
 
         self.keys = RollingOpsKeys.for_owner(cluster_id=cluster_id, owner=owner)
         self.lock = EtcdLock(lock_key=self.keys.lock_key, owner=owner)
-        self.pending_queue = EtcdOperationQueue(self.keys.pending, self.keys.lock_key, owner)
-        self.inprogress_queue = EtcdOperationQueue(self.keys.inprogress, self.keys.lock_key, owner)
+        self.operations = ManagerOperationStore(self.keys, owner)
 
         self.framework.observe(
             charm.on[self.peer_relation_name].relation_departed, self._on_peer_relation_departed
@@ -193,12 +192,8 @@ class EtcdRollingOpsManager(Object):
             kwargs = {}
 
         operation = Operation.create(callback_id, kwargs, max_retry)
-        res = self.pending_queue.enqueue(operation)
-
-        if res:
-            self.worker.start()
-        else:
-            logger.info('Operation %s already exists in the queue.', operation.callback_id)
+        self.operations.request(operation)
+        self.worker.start()
 
     def _on_run_with_lock(self) -> None:
         """Execute the current operation while holding the distributed lock.
@@ -214,7 +209,7 @@ class EtcdRollingOpsManager(Object):
             logger.info('Lock is not granted. Operation will not run.')
             return
 
-        if not (operation := self.inprogress_queue.peek()):
+        if not (operation := self.operations.peek_current()):
             logger.info('Lock granted but there is no operation to run.')
             return
 
@@ -239,15 +234,9 @@ class EtcdRollingOpsManager(Object):
                 logger.info(
                     'Finished %s. Operation will be retried immediately.', operation.callback_id
                 )
-                operation.retry_hold()
-
             case OperationResult.RETRY_RELEASE:
                 logger.info('Finished %s. Operation will be retried later.', operation.callback_id)
-                operation.retry_release()
-
             case _:
                 logger.info('Finished %s. Lock will be released.', operation.callback_id)
-                operation.complete()
 
-        moved = self.inprogress_queue.move_operation(self.keys.completed, operation)
-        logger.info('moved %s', moved)
+        self.operations.finalize(operation, result)
