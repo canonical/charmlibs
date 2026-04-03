@@ -21,7 +21,8 @@ from typing import Any
 import pytest
 
 from charmlibs.rollingops.common._exceptions import RollingOpsDecodingError
-from charmlibs.rollingops.peer._models import Operation, OperationQueue
+from charmlibs.rollingops.common._models import Operation
+from charmlibs.rollingops.peer._models import OperationQueue
 
 
 def _decode_queue_string(queue_str: str) -> list[dict[str, str]]:
@@ -43,7 +44,12 @@ def test_operation_create_sets_fields():
 def test_operation_to_string_contains_string_values_only():
     ts = datetime(2026, 2, 23, 12, 0, 0, 123456, tzinfo=UTC)
     op = Operation(
-        callback_id='cb', kwargs={'b': 2, 'a': 1}, requested_at=ts, max_retry=None, attempt=0
+        callback_id='cb',
+        kwargs={'b': 2, 'a': 1},
+        requested_at=ts,
+        max_retry=None,
+        attempt=0,
+        result=None,
     )
 
     s = op.to_string()
@@ -58,7 +64,12 @@ def test_operation_to_string_contains_string_values_only():
 def test_operation_to_string_contains_string_values_only_zero_max_retry():
     ts = datetime(2026, 2, 23, 12, 0, 0, 123456, tzinfo=UTC)
     op = Operation(
-        callback_id='cb', kwargs={'b': 2, 'a': 1}, requested_at=ts, max_retry=0, attempt=0
+        callback_id='cb',
+        kwargs={'b': 2, 'a': 1},
+        requested_at=ts,
+        max_retry=0,
+        attempt=0,
+        result=None,
     )
 
     s = op.to_string()
@@ -104,7 +115,12 @@ def test_operation_equality_and_hash_empty_arguments():
 def test_operation_to_string_and_from_string():
     ts = datetime(2026, 2, 23, 12, 0, 0, 0, tzinfo=UTC)
     op1 = Operation(
-        callback_id='cb', kwargs={'x': 1, 'y': 'z'}, requested_at=ts, max_retry=5, attempt=0
+        callback_id='cb',
+        kwargs={'x': 1, 'y': 'z'},
+        requested_at=ts,
+        max_retry=5,
+        attempt=0,
+        result=None,
     )
 
     s = op1.to_string()

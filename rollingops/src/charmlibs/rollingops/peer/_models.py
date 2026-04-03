@@ -16,7 +16,6 @@
 import json
 import logging
 from collections.abc import Iterator
-from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
 from typing import Any
@@ -27,137 +26,9 @@ from charmlibs.rollingops.common._exceptions import (
     RollingOpsDecodingError,
     RollingOpsNoRelationError,
 )
-from charmlibs.rollingops.common._models import now_timestamp, now_timestamp_str, parse_timestamp
+from charmlibs.rollingops.common._models import Operation, now_timestamp_str, parse_timestamp
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class Operation:
-    """A single queued operation."""
-
-    callback_id: str
-    requested_at: datetime
-    max_retry: int | None
-    attempt: int
-    kwargs: dict[str, Any] = field(default_factory=dict[str, Any])
-
-    @classmethod
-    def _validate_fields(
-        cls, callback_id: Any, kwargs: Any, requested_at: Any, max_retry: Any, attempt: Any
-    ) -> None:
-        """Validate the class attributes."""
-        if not isinstance(callback_id, str) or not callback_id.strip():
-            raise ValueError('callback_id must be a non-empty string')
-
-        if not isinstance(kwargs, dict):
-            raise ValueError('kwargs must be a dict')
-        try:
-            json.dumps(kwargs)
-        except TypeError as e:
-            raise ValueError(f'kwargs must be JSON-serializable: {e}') from e
-
-        if not isinstance(requested_at, datetime):
-            raise ValueError('requested_at must be a datetime')
-
-        if max_retry is not None:
-            if not isinstance(max_retry, int):
-                raise ValueError('max_retry must be an int')
-            if max_retry < 0:
-                raise ValueError('max_retry must be >= 0')
-
-        if not isinstance(attempt, int):
-            raise ValueError('attempt must be an int')
-        if attempt < 0:
-            raise ValueError('attempt must be >= 0')
-
-    def __post_init__(self) -> None:
-        """Validate the class attributes."""
-        self._validate_fields(
-            self.callback_id,
-            self.kwargs,
-            self.requested_at,
-            self.max_retry,
-            self.attempt,
-        )
-
-    @classmethod
-    def create(
-        cls,
-        callback_id: str,
-        kwargs: dict[str, Any],
-        max_retry: int | None = None,
-    ) -> 'Operation':
-        """Create a new operation from a callback id and kwargs."""
-        return cls(
-            callback_id=callback_id,
-            kwargs=kwargs,
-            requested_at=now_timestamp(),
-            max_retry=max_retry,
-            attempt=0,
-        )
-
-    def _to_dict(self) -> dict[str, str]:
-        """Dict form (string-only values)."""
-        return {
-            'callback_id': self.callback_id,
-            'kwargs': self._kwargs_to_json(),
-            'requested_at': self.requested_at.isoformat(),
-            'max_retry': '' if self.max_retry is None else str(self.max_retry),
-            'attempt': str(self.attempt),
-        }
-
-    def to_string(self) -> str:
-        """Serialize to a string suitable for a Juju databag."""
-        return json.dumps(self._to_dict(), separators=(',', ':'))
-
-    def increase_attempt(self) -> None:
-        """Increment the attempt counter."""
-        self.attempt += 1
-
-    def is_max_retry_reached(self) -> bool:
-        """Return True if attempt exceeds max_retry (unless max_retry is None)."""
-        if self.max_retry is None:
-            return False
-        return self.attempt > self.max_retry
-
-    @classmethod
-    def from_string(cls, data: str) -> 'Operation':
-        """Deserialize from a Juju databag string.
-
-        Raises:
-            RollingOpsDecodingError: if data cannot be deserialized.
-        """
-        try:
-            obj = json.loads(data)
-
-            return cls(
-                callback_id=obj['callback_id'],
-                requested_at=parse_timestamp(obj['requested_at']),  # type: ignore[reportArgumentType]
-                max_retry=int(obj['max_retry']) if obj.get('max_retry') else None,
-                attempt=int(obj['attempt']),
-                kwargs=json.loads(obj['kwargs']) if obj.get('kwargs') else {},
-            )
-
-        except (json.JSONDecodeError, KeyError, TypeError, ValueError) as e:
-            logger.error('Failed to deserialize Operation from %s: %s', data, e)
-            raise RollingOpsDecodingError(
-                'Failed to deserialize data to create an Operation'
-            ) from e
-
-    def _kwargs_to_json(self) -> str:
-        """Deterministic JSON serialization for kwargs."""
-        return json.dumps(self.kwargs, sort_keys=True, separators=(',', ':'))
-
-    def __eq__(self, other: object) -> bool:
-        """Equal for the operation."""
-        if not isinstance(other, Operation):
-            return False
-        return self.callback_id == other.callback_id and self.kwargs == other.kwargs
-
-    def __hash__(self) -> int:
-        """Hash for the operation."""
-        return hash((self.callback_id, self._kwargs_to_json()))
 
 
 class OperationQueue:

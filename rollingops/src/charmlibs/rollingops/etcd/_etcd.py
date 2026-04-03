@@ -20,7 +20,7 @@ import subprocess
 import time
 
 import charmlibs.rollingops.etcd._etcdctl as etcdctl
-from charmlibs.rollingops.etcd._models import EtcdOperation
+from charmlibs.rollingops.common._models import Operation
 
 logger = logging.getLogger(__name__)
 
@@ -165,21 +165,21 @@ class EtcdOperationQueue:
         self.lock_key = lock_key
         self.owner = owner
 
-    def peek(self) -> EtcdOperation | None:
+    def peek(self) -> Operation | None:
         """Return the first operation in the queue without removing it."""
         kv = etcdctl.get_first_key_value(self.prefix)
         if kv is None:
             return None
         _, value = kv
-        return EtcdOperation.from_dict(value)
+        return Operation.from_dict(value)
 
-    def _peek_last(self) -> EtcdOperation | None:
+    def _peek_last(self) -> Operation | None:
         """Return the last operation in the queue without removing it."""
         kv = etcdctl.get_last_key_value(self.prefix)
         if kv is None:
             return None
         _, value = kv
-        return EtcdOperation.from_dict(value)
+        return Operation.from_dict(value)
 
     def move_head(self, to_queue_prefix: str) -> bool:
         """Move the first operation in the queue to another queue.
@@ -216,7 +216,7 @@ class EtcdOperationQueue:
         """
         return etcdctl.txn(txn)
 
-    def move_operation(self, to_queue_prefix: str, operation: EtcdOperation) -> bool:
+    def move_operation(self, to_queue_prefix: str, operation: Operation) -> bool:
         """Move a specific operation from this queue to another queue.
 
         The operation is identified using its operation ID and moved
@@ -281,7 +281,7 @@ class EtcdOperationQueue:
         """
         return etcdctl.txn(txn)
 
-    def enqueue(self, operation: EtcdOperation) -> bool:
+    def enqueue(self, operation: Operation) -> bool:
         """Insert a new operation into the queue.
 
         The method avoids inserting duplicate operations by comparing

@@ -29,10 +29,10 @@ from charmlibs.rollingops.common._exceptions import (
     RollingOpsInvalidLockRequestError,
     RollingOpsNoEtcdRelationError,
 )
-from charmlibs.rollingops.common._models import OperationResult
+from charmlibs.rollingops.common._models import Operation, OperationResult
 from charmlibs.rollingops.etcd import _etcdctl as etcdctl
 from charmlibs.rollingops.etcd._etcd import EtcdLock, EtcdOperationQueue
-from charmlibs.rollingops.etcd._models import EtcdOperation, RollingOpsKeys
+from charmlibs.rollingops.etcd._models import RollingOpsKeys
 from charmlibs.rollingops.etcd._relations import EtcdRequiresV1, SharedClientCertificateManager
 from charmlibs.rollingops.etcd._worker import EtcdRollingOpsAsyncWorker
 
@@ -192,7 +192,7 @@ class EtcdRollingOpsManager(Object):
         if kwargs is None:
             kwargs = {}
 
-        operation = EtcdOperation.create(callback_id, kwargs, max_retry)
+        operation = Operation.create(callback_id, kwargs, max_retry)
         res = self.pending_queue.enqueue(operation)
 
         if res:
