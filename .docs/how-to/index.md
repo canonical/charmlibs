@@ -3,6 +3,7 @@
 ```{toctree}
 :maxdepth: 1
 
+Design relation interfaces <design-relation-interfaces>
 Manage charm libraries <manage-libraries>
 Distribute charm libraries <python-package>
 Migrate to the charmlibs monorepo <migrate>
