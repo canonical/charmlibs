@@ -1,0 +1,49 @@
+# common charmcraft.yaml file symlinked by these charms
+# k8s charms can define containers + resources in metadata.yaml
+
+name: test
+type: charm
+summary: A small charm for use in integration tests.
+description: A small charm for use in integration tests.
+
+base: ubuntu@24.04
+platforms:
+  amd64:
+
+parts:
+  charm:
+    source: .
+    plugin: uv
+    build-snaps: [astral-uv]
+
+  etcdctl:
+    plugin: make
+    source: https://git.launchpad.net/etcd
+    source-type: git
+    source-tag: lp-v3.6.7
+    build-snaps:
+      - go/latest/stable
+    override-build: |
+      set -eux
+      make build
+      install -Dm755 bin/etcdctl "${CRAFT_PART_INSTALL}/usr/bin/etcdctl"
+    prime:
+      - usr/bin/etcdctl
+
+containers:
+  workload:
+    resource: workload
+
+peers:
+  restart:
+      interface: rolling_op
+
+requires:
+  etcd:
+    interface: etcd_client
+
+resources:
+  workload:
+    type: oci-image
+    description: OCI image for the 'workload' container.
+    upstream-source: some-repo/some-image:some-tag
