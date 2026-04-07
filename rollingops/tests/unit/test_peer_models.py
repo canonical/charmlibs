@@ -261,48 +261,55 @@ def test_queue_empty_behaviour():
 
 def test_queue_enqueue_and_fifo_order():
     q = OperationQueue()
-    q.enqueue_lock_request('a', {'i': 1})
-    q.enqueue_lock_request('b', {'i': 2})
+    op1 = Operation.create('a', {'x': 2})
+    op2 = Operation.create('b', {'i': 2})
+    q.enqueue(op1)
+    q.enqueue(op2)
 
     assert len(q) == 2
     op = q.peek()
     assert op is not None
-    assert op.callback_id == 'a'
+    assert op == op1
 
     first = q.dequeue()
     assert first is not None
-    assert first.callback_id == 'a'
+    assert first == op1
     assert len(q) == 1
     op = q.peek()
     assert op is not None
-    assert op.callback_id == 'b'
+    assert op == op2
 
     second = q.dequeue()
     assert second is not None
-    assert second.callback_id == 'b'
+    assert second == op2
     assert q.empty is True
 
 
 def test_queue_deduplicates_only_against_last_item():
     q = OperationQueue()
+    op1 = Operation.create('a', {'x': 2})
+    op2 = Operation.create('a', {'x': 2})
+    op3 = Operation.create('a', {'x': 4})
 
-    q.enqueue_lock_request('restart', {'x': 1})
+    q.enqueue(op1)
     assert len(q) == 1
 
-    q.enqueue_lock_request('restart', {'x': 1})
+    q.enqueue(op2)
     assert len(q) == 1
 
-    q.enqueue_lock_request('restart', {'x': 2})
+    q.enqueue(op3)
     assert len(q) == 2
 
-    q.enqueue_lock_request('restart', {'x': 1})
+    q.enqueue(op2)
     assert len(q) == 3
 
 
 def test_queue_to_string_and_from_string():
     q1 = OperationQueue()
-    q1.enqueue_lock_request('a', {'x': 1}, max_retry=5)
-    q1.enqueue_lock_request('b', {'y': 'z'}, max_retry=None)
+    op1 = Operation.create('a', {'x': 1}, max_retry=5)
+    op2 = Operation.create('b', {'y': 'z'}, max_retry=None)
+    q1.enqueue(op1)
+    q1.enqueue(op2)
 
     encoded = q1.to_string()
     q2 = OperationQueue.from_string(encoded)
@@ -310,15 +317,15 @@ def test_queue_to_string_and_from_string():
     assert len(q2) == 2
     op = q2.peek()
     assert op is not None
-    assert op.callback_id == 'a'
+    assert op == op1
 
     op = q2.dequeue()
     assert op is not None
-    assert op.callback_id == 'a'
+    assert op == op1
 
     op = q2.dequeue()
     assert op is not None
-    assert op.callback_id == 'b'
+    assert op == op2
     assert q2.empty
 
 
@@ -340,7 +347,8 @@ def test_queue_from_string_rejects_invalid_jason():
 
 def test_queue_encoding_is_list_of_operation_strings():
     q = OperationQueue()
-    q.enqueue_lock_request('a', {'x': 1})
+    op1 = Operation.create('a', {'x': 1})
+    q.enqueue(op1)
     s = q.to_string()
 
     decoded = json.loads(s)

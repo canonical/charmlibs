@@ -292,6 +292,9 @@ class EtcdOperationQueue:
         key = f'{self.prefix}{operation.op_id}'
         etcdctl.run('put', key, op_str)
 
+    def clear(self) -> None:
+        etcdctl.run('del', self.prefix, '--prefix')
+
 
 class WorkerOperationStore:
     """Background-worker view of etcd-backed rolling operations.
@@ -398,7 +401,7 @@ class ManagerOperationStore:
     def __init__(self, keys: RollingOpsKeys, owner: str):
         self._pending = EtcdOperationQueue(keys.pending, keys.lock_key, owner)
         self._inprogress = EtcdOperationQueue(keys.inprogress, keys.lock_key, owner)
-        self._completed_prefix = keys.completed
+        self._completed = EtcdOperationQueue(keys.completed, keys.lock_key, owner)
 
     def request(self, operation: Operation) -> None:
         """Add a new operation to the pending queue.
@@ -429,8 +432,13 @@ class ManagerOperationStore:
             case _:
                 operation.complete()
 
-        return self._inprogress.move_operation(self._completed_prefix, operation)
+        return self._inprogress.move_operation(self._completed.prefix, operation)
 
     def peek_current(self) -> Operation | None:
         """Peek the current in-progress operation."""
         return self._inprogress.peek()
+
+    def clean_up(self) -> None:
+        self._inprogress.clear()
+        self._pending.clear()
+        self._completed.clear()

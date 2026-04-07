@@ -19,21 +19,31 @@ import subprocess
 import time
 
 
+def _dispatch_hook(unit_name: str, charm_dir: str, hook_name: str) -> None:
+    """Dispatch a custom Juju hook."""
+    run_cmd = '/usr/bin/juju-exec'
+    dispatch_sub_cmd = f'JUJU_DISPATCH_PATH=hooks/{hook_name} {charm_dir}/dispatch'
+    res = subprocess.run([run_cmd, '-u', unit_name, dispatch_sub_cmd], check=False)
+    res.check_returncode()
+
+
+def _dispatch_lock_granted(unit_name: str, charm_dir: str) -> None:
+    """Dispatch the rollingops_lock_granted hook."""
+    hook_name = 'rollingops_lock_granted'
+    _dispatch_hook(unit_name, charm_dir, hook_name)
+
+
 def main():
     """Juju hook event dispatcher."""
     parser = argparse.ArgumentParser()
-    parser.add_argument('--run-cmd', required=True)
     parser.add_argument('--unit-name', required=True)
     parser.add_argument('--charm-dir', required=True)
     args = parser.parse_args()
 
     # Sleep so that the leader unit can properly leave the hook and start a new one
     time.sleep(10)
-    dispatch_sub_cmd = (
-        f'JUJU_DISPATCH_PATH=hooks/rollingops_lock_granted {args.charm_dir}/dispatch'
-    )
-    res = subprocess.run([args.run_cmd, '-u', args.unit_name, dispatch_sub_cmd])
-    res.check_returncode()
+
+    _dispatch_lock_granted(args.unit_name, args.charm_dir)
 
 
 if __name__ == '__main__':

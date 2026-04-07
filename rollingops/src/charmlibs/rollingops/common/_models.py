@@ -22,11 +22,14 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any, TypeVar
 
-from ops import pebble
+from ops import Model, Unit, pebble
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_fixed
 
 from charmlibs.pathops import PebbleConnectionError
-from charmlibs.rollingops.common._exceptions import RollingOpsDecodingError
+from charmlibs.rollingops.common._exceptions import (
+    RollingOpsDecodingError,
+    RollingOpsNoRelationError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +71,122 @@ class OperationResult(StrEnum):
     RELEASE = 'release'
     RETRY_RELEASE = 'retry-release'
     RETRY_HOLD = 'retry-hold'
+
+
+class ProcessingBackend(StrEnum):
+    """Backend responsible for processing a unit's queue."""
+
+    PEER = 'peer'
+    ETCD = 'etcd'
+
+
+class RunWithLockStatus(StrEnum):
+    NOT_GRANTED = 'not_granted'
+    NO_OPERATION = 'no_operation'
+    MISSING_CALLBACK = 'missing_callback'
+    EXECUTED = 'executed'
+
+
+@dataclass
+class RunWithLockOutcome:
+    """Outcome of attempting to execute the current operation under a lock."""
+
+    status: RunWithLockStatus
+    op_id: str | None = None
+    result: OperationResult | None = None
+
+    @property
+    def executed(self) -> bool:
+        return self.status == RunWithLockStatus.EXECUTED
+
+
+@dataclass
+class BackendState:
+    """Unit-scoped backend ownership and recovery state."""
+
+    processing_backend: str = ProcessingBackend.PEER
+    etcd_cleanup_needed: str = 'false'
+
+    @property
+    def cleanup_needed(self) -> bool:
+        """Return whether stale etcd state must be cleaned before reuse."""
+        return self.etcd_cleanup_needed == 'true'
+
+    @cleanup_needed.setter
+    def cleanup_needed(self, value: bool) -> None:
+        """Persist whether stale etcd state cleanup is required."""
+        self.etcd_cleanup_needed = 'true' if value else 'false'
+
+    @property
+    def backend(self) -> ProcessingBackend:
+        """Return which backend owns execution for this unit's queue."""
+        if not self.processing_backend:
+            return ProcessingBackend.PEER
+        return ProcessingBackend(self.processing_backend)
+
+    @backend.setter
+    def backend(self, value: ProcessingBackend) -> None:
+        """Persist the backend owner."""
+        self.processing_backend = value
+
+
+class UnitBackendState:
+    """Manage backend ownership and fallback state for one unit queue."""
+
+    def __init__(self, model: Model, relation_name: str, unit: Unit):
+        relation = model.get_relation(relation_name)
+        if relation is None:
+            raise RollingOpsNoRelationError()
+
+        self._relation = relation
+        self.unit = unit
+
+    def _load(self) -> BackendState:
+        return self._relation.load(BackendState, self.unit, decoder=lambda s: s)
+
+    def _save(self, data: BackendState) -> None:
+        self._relation.save(data, self.unit, encoder=str)
+
+    @property
+    def backend(self) -> ProcessingBackend:
+        """Return which backend owns execution for this unit's queue."""
+        return self._load().backend
+
+    def set_backend(self, backend: ProcessingBackend) -> None:
+        """Set which backend owns execution for this unit's queue."""
+        data = self._load()
+        data.backend = backend
+        self._save(data)
+
+    @property
+    def cleanup_needed(self) -> bool:
+        """Return whether etcd cleanup is required before etcd can be reused."""
+        return self._load().cleanup_needed
+
+    def set_cleanup_needed(self, value: bool) -> None:
+        """Persist whether etcd cleanup is required."""
+        data = self._load()
+        data.cleanup_needed = value
+        self._save(data)
+
+    def fallback_to_peer(self) -> None:
+        """Switch this unit's queue to peer processing and mark etcd cleanup needed."""
+        data = self._load()
+        data.backend = ProcessingBackend.PEER
+        data.cleanup_needed = True
+        self._save(data)
+
+    def clear_fallback(self) -> None:
+        """Clear the etcd cleanup-needed flag."""
+        self.set_cleanup_needed(False)
+
+    def is_peer_managed(self) -> bool:
+        """Return whether the peer backend should process this unit's queue."""
+        return self.backend == ProcessingBackend.PEER
+
+    def is_etcd_managed(self) -> bool:
+        """Return whether the etcd backend should process this unit's queue."""
+        return self.backend == ProcessingBackend.ETCD
 
 
 @dataclass

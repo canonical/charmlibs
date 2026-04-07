@@ -13,8 +13,10 @@
 # limitations under the License.
 
 import argparse
+import logging
 import subprocess
 import time
+from logging.handlers import RotatingFileHandler
 
 from charmlibs.rollingops.common._models import OperationResult
 from charmlibs.rollingops.etcd._etcd import (
@@ -24,22 +26,63 @@ from charmlibs.rollingops.etcd._etcd import (
 )
 from charmlibs.rollingops.etcd._models import RollingOpsKeys
 
+logger = logging.getLogger(__name__)
 
-def _dispatch_lock_granted(run_cmd: str, unit_name: str, charm_dir: str) -> None:
-    """Dispatch the rollingops_lock_granted hook."""
-    dispatch_sub_cmd = f'JUJU_DISPATCH_PATH=hooks/rollingops_lock_granted {charm_dir}/dispatch'
+
+def setup_logging(log_file: str) -> None:
+    handler = RotatingFileHandler(
+        log_file,
+        maxBytes=10 * 1024 * 1024,  # 10 MB
+        backupCount=3,
+    )
+
+    formatter = logging.Formatter(
+        '%(asctime)s [%(levelname)s] [%(process)d] %(name)s: %(message)s'
+    )
+    handler.setFormatter(formatter)
+
+    root = logging.getLogger()
+    root.setLevel(logging.INFO)
+    root.addHandler(handler)
+
+
+def _dispatch_hook(unit_name: str, charm_dir: str, hook_name: str) -> None:
+    """Dispatch a custom Juju hook."""
+    run_cmd = '/usr/bin/juju-exec'
+    dispatch_sub_cmd = f'JUJU_DISPATCH_PATH=hooks/{hook_name} {charm_dir}/dispatch'
     res = subprocess.run([run_cmd, '-u', unit_name, dispatch_sub_cmd], check=False)
     res.check_returncode()
+    logger.info('%s hook dispatched.', hook_name)
+
+
+def _dispatch_lock_granted(unit_name: str, charm_dir: str) -> None:
+    """Dispatch the rollingops_lock_granted hook."""
+    hook_name = 'rollingops_lock_granted'
+    _dispatch_hook(unit_name, charm_dir, hook_name)
+
+
+def _dispatch_etcd_failed(unit_name: str, charm_dir: str) -> None:
+    """Dispatch the rollingops_etcd_failed hook."""
+    hook_name = 'rollingops_etcd_failed'
+    _dispatch_hook(unit_name, charm_dir, hook_name)
 
 
 def main():
+    setup_logging('/var/log/etcd_rollingops_worker.log')
+
     parser = argparse.ArgumentParser()
-    parser.add_argument('--run-cmd', required=True)
     parser.add_argument('--unit-name', required=True)
     parser.add_argument('--charm-dir', required=True)
     parser.add_argument('--owner', required=True)
     parser.add_argument('--cluster-id', required=True)
     args = parser.parse_args()
+
+    logger.info(
+        'Worker starting (unit=%s owner=%s cluster=%s)',
+        args.unit_name,
+        args.owner,
+        args.cluster_id,
+    )
 
     lock_lease_ttl = 60
     acquire_retry_sleep = 15
@@ -51,58 +94,85 @@ def main():
     lease = EtcdLease()
     operations = WorkerOperationStore(keys, args.owner)
 
-    while True:
-        if not operations.has_pending():
-            time.sleep(acquire_retry_sleep)
-            continue
-
-        if not lock.is_held():
-            if lease.id is None:
-                lease.grant(lock_lease_ttl)
-
-            lease_id = lease.id
-            if lease_id is None:
+    try:
+        while True:
+            if not operations.has_pending():
                 time.sleep(acquire_retry_sleep)
                 continue
 
-            if not lock.try_acquire(lease_id):
+            if not lock.is_held():
+                if lease.id is None:
+                    lease.grant(lock_lease_ttl)
+                    logger.info('Lease %s granted.', lease.id)
+
+                lease_id = lease.id
+                if lease_id is None:
+                    time.sleep(acquire_retry_sleep)
+                    continue
+
+                logger.info('Try to get lock started')
+                if not lock.try_acquire(lease_id):
+                    time.sleep(acquire_retry_sleep)
+                    continue
+
+                logger.info('Lock granted')
+
+            if not operations.claim_next():
                 time.sleep(acquire_retry_sleep)
                 continue
 
-            print('Lock granted')
+            _dispatch_lock_granted(args.unit_name, args.charm_dir)
 
-        if not operations.claim_next():
-            time.sleep(acquire_retry_sleep)
-            continue
-
-        print('dispatch hook')
-        _dispatch_lock_granted(args.run_cmd, args.unit_name, args.charm_dir)
-
-        operations.wait_until_completed()
-        operation = operations.peek_completed()
-        if operation is None:
-            print('completed queue watch returned no operation')
-            time.sleep(acquire_retry_sleep)
-            continue
-
-        match operation.result:
-            case OperationResult.RETRY_HOLD:
-                operations.requeue_completed()
+            logger.info('Waiting for operation to be finished.')
+            operations.wait_until_completed()
+            operation = operations.peek_completed()
+            if operation is None:
+                logger.info('Completed queue watch returned no operation.')
+                time.sleep(acquire_retry_sleep)
                 continue
 
-            case OperationResult.RETRY_RELEASE:
-                operations.requeue_completed()
+            logger.info('Operation %s completed with %s', operation.callback_id, operation.result)
+            match operation.result:
+                case OperationResult.RETRY_HOLD:
+                    operations.requeue_completed()
+                    continue
 
-            case _:
-                operations.delete_completed()
+                case OperationResult.RETRY_RELEASE:
+                    operations.requeue_completed()
 
-        lease.revoke()
-        lock.release()
+                case _:
+                    operations.delete_completed()
 
-        if not operations.has_pending():
-            break
+            lease.revoke()
+            logger.info('Lease revoked.')
+            lock.release()
+            logger.info('Lock released.')
 
-        time.sleep(acquire_retry_sleep)
+            if not operations.has_pending():
+                logger.info('No more operations in the queue.')
+                break
+
+            time.sleep(acquire_retry_sleep)
+    except Exception as e:
+        logger.exception('Fatal etcd worker error: %s', e)
+
+        try:
+            _dispatch_etcd_failed(args.unit_name, args.charm_dir)
+        except Exception:
+            logger.exception('Failed to dispatch rollingops_etcd_failed hook.')
+
+    finally:
+        try:
+            lease.revoke()
+        except Exception:
+            logger.exception('Failed to revoke lease during worker shutdown.')
+
+        try:
+            lock.release()
+        except Exception:
+            logger.exception('Failed to release lock during worker shutdown.')
+
+        logger.info('Exit.')
 
 
 if __name__ == '__main__':

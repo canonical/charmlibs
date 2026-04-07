@@ -24,7 +24,7 @@ from scenario import RawDataBagContents
 from tests.unit.conftest import PeerRollingOpsCharm
 
 from charmlibs.rollingops.common._exceptions import RollingOpsInvalidLockRequestError
-from charmlibs.rollingops.common._models import now_timestamp_str
+from charmlibs.rollingops.common._models import Operation, now_timestamp_str
 from charmlibs.rollingops.peer._models import LockIntent, OperationQueue
 
 logger = logging.getLogger(__name__)
@@ -42,7 +42,8 @@ def _make_operation_queue(
     callback_id: str, kwargs: dict[str, Any], max_retry: int | None
 ) -> OperationQueue:
     q = OperationQueue()
-    q.enqueue_lock_request(callback_id=callback_id, kwargs=kwargs, max_retry=max_retry)
+    op1 = Operation.create(callback_id=callback_id, kwargs=kwargs, max_retry=max_retry)
+    q.enqueue(op1)
     return q
 
 
@@ -238,8 +239,11 @@ def test_successful_operation_leaves_state_request_when_more_ops_remain(
     local_unit_name = f'{peer_ctx.app_name}/0'
     remote_unit_name = f'{peer_ctx.app_name}/1'
     queue = OperationQueue()
-    queue.enqueue_lock_request(callback_id='_restart', kwargs={}, max_retry=None)
-    queue.enqueue_lock_request(callback_id='_failed_restart', kwargs={}, max_retry=None)
+    op1 = Operation.create(callback_id='_restart', kwargs={}, max_retry=None)
+    op2 = Operation.create(callback_id='_failed_restart', kwargs={}, max_retry=None)
+
+    queue.enqueue(op1)
+    queue.enqueue(op2)
 
     peer = PeerRelation(
         endpoint='restart',
@@ -320,7 +324,8 @@ def test_lock_retry_drops_when_max_retry_reached(
     local_unit_name = f'{peer_ctx.app_name}/0'
 
     queue = OperationQueue()
-    queue.enqueue_lock_request(callback_id=callback_id, kwargs={}, max_retry=3)
+    op1 = Operation.create(callback_id=callback_id, kwargs={}, max_retry=3)
+    queue.enqueue(op1)
     op = queue.peek()
     assert op is not None
     op.increase_attempt()
@@ -421,10 +426,12 @@ def test_schedule_picks_retry_hold(peer_ctx: Context[PeerRollingOpsCharm]):
 
 def test_schedule_picks_oldest_requested_at_among_requests(peer_ctx: Context[PeerRollingOpsCharm]):
     old_queue = OperationQueue()
-    old_queue.enqueue_lock_request(callback_id='restart', kwargs={}, max_retry=2)
+    old_op = Operation.create(callback_id='restart', kwargs={}, max_retry=2)
+    old_queue.enqueue(old_op)
 
     new_queue = OperationQueue()
-    new_queue.enqueue_lock_request(callback_id='restart', kwargs={}, max_retry=2)
+    new_op = Operation.create(callback_id='restart', kwargs={}, max_retry=2)
+    new_queue.enqueue(new_op)
 
     peer = PeerRelation(
         endpoint='restart',

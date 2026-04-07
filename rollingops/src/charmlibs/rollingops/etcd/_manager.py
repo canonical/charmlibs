@@ -15,21 +15,28 @@
 import logging
 from typing import Any
 
-from ops import Relation
+from ops import Object, Relation
 from ops.charm import (
     CharmBase,
     RelationBrokenEvent,
     RelationCreatedEvent,
     RelationDepartedEvent,
 )
-from ops.framework import EventBase, Object
+from ops.framework import EventBase
 
+from charmlibs.pathops import PebbleConnectionError
 from charmlibs.rollingops.common._exceptions import (
     RollingOpsEtcdNotConfiguredError,
     RollingOpsInvalidLockRequestError,
     RollingOpsNoEtcdRelationError,
 )
-from charmlibs.rollingops.common._models import Operation, OperationResult
+from charmlibs.rollingops.common._models import (
+    Operation,
+    OperationResult,
+    RunWithLockOutcome,
+    RunWithLockStatus,
+    UnitBackendState,
+)
 from charmlibs.rollingops.etcd import _etcdctl as etcdctl
 from charmlibs.rollingops.etcd._etcd import EtcdLock, ManagerOperationStore
 from charmlibs.rollingops.etcd._models import RollingOpsKeys
@@ -64,7 +71,6 @@ class EtcdRollingOpsManager(Object):
         self.peer_relation_name = peer_relation_name
         self.etcd_relation_name = etcd_relation_name
         self.callback_targets = callback_targets
-        self.charm_dir = charm.charm_dir
 
         owner = f'{self.model.uuid}-{self.model.unit.name}'.replace('/', '-')
         self.worker = EtcdRollingOpsAsyncWorker(
@@ -108,10 +114,44 @@ class EtcdRollingOpsManager(Object):
         """Return the etcd relation for this charm."""
         return self.model.get_relation(self.etcd_relation_name)
 
+    def is_available(self) -> bool:
+        """Return whether etcd can currently be used."""
+        if not self._etcd_relation:
+            return False
+        try:
+            etcdctl.ensure_initialized()
+        except (PebbleConnectionError, RollingOpsEtcdNotConfiguredError):
+            return False
+        return True
+
+    def enqueue_operation(self, operation: Operation) -> None:
+        """Store an operation in etcd."""
+        if not self._etcd_relation:
+            raise RollingOpsNoEtcdRelationError
+
+        etcdctl.ensure_initialized()
+
+        backend_state = UnitBackendState(self.model, self.peer_relation_name, self.model.unit)
+        if backend_state.cleanup_needed:
+            self.operations.clean_up()
+            backend_state.clear_fallback()
+
+        self.operations.request(operation)
+
+    def clean_up_operations(self) -> None:
+        if not self._etcd_relation:
+            return
+
+        etcdctl.ensure_initialized()
+        self.operations.clean_up()
+
+    def ensure_processing(self):
+        self.worker.start()
+
     def _on_etcd_relation_created(self, event: RelationCreatedEvent) -> None:
-        """Check whether the snap-provided etcdctl command is available."""
+        """Check whether the etcdctl command is available."""
         if not etcdctl.is_etcdctl_installed():
-            logger.error('%s is not installed', etcdctl.ETCDCTL_CMD)
+            logger.error('%s is not installed.', etcdctl.ETCDCTL_CMD)
             # TODO: fallback to peer relation implementation.
 
     def _on_rollingops_lock_granted(self, event: EventBase) -> None:
@@ -195,7 +235,7 @@ class EtcdRollingOpsManager(Object):
         self.operations.request(operation)
         self.worker.start()
 
-    def _on_run_with_lock(self) -> None:
+    def _on_run_with_lock(self) -> RunWithLockOutcome:
         """Execute the current operation while holding the distributed lock.
 
         This method is triggered when the worker determines that the current
@@ -207,18 +247,21 @@ class EtcdRollingOpsManager(Object):
         """
         if not self.lock.is_held():
             logger.info('Lock is not granted. Operation will not run.')
-            return
+            return RunWithLockOutcome(status=RunWithLockStatus.NOT_GRANTED)
 
         if not (operation := self.operations.peek_current()):
             logger.info('Lock granted but there is no operation to run.')
-            return
+            return RunWithLockOutcome(status=RunWithLockStatus.NO_OPERATION)
 
         if not (callback := self.callback_targets.get(operation.callback_id)):
             logger.warning(
                 'Operation %s target was not found. It cannot be executed.',
                 operation.callback_id,
             )
-            return
+            return RunWithLockOutcome(
+                status=RunWithLockStatus.MISSING_CALLBACK,
+                op_id=operation.op_id,
+            )
         logger.info(
             'Executing callback_id=%s, attempt=%s', operation.callback_id, operation.attempt
         )
@@ -240,3 +283,8 @@ class EtcdRollingOpsManager(Object):
                 logger.info('Finished %s. Lock will be released.', operation.callback_id)
 
         self.operations.finalize(operation, result)
+        return RunWithLockOutcome(
+            status=RunWithLockStatus.EXECUTED,
+            op_id=operation.op_id,
+            result=result,
+        )

@@ -152,23 +152,24 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
-from ops import Relation
+from ops import Object, Relation, Unit
 from ops.charm import (
     CharmBase,
     RelationChangedEvent,
     RelationDepartedEvent,
 )
-from ops.framework import EventBase, Object
+from ops.framework import EventBase
 
 from charmlibs.rollingops.common._exceptions import (
     RollingOpsDecodingError,
     RollingOpsInvalidLockRequestError,
     RollingOpsNoRelationError,
 )
-from charmlibs.rollingops.common._models import OperationResult
+from charmlibs.rollingops.common._models import Operation, OperationResult
 from charmlibs.rollingops.peer._models import (
-    Lock,
-    LockIterator,
+    PeerAppLock,
+    PeerUnitOperations,
+    iter_peer_units,
     pick_oldest_completed,
     pick_oldest_request,
 )
@@ -194,7 +195,6 @@ class PeerRollingOpsManager(Object):
         self._charm = charm
         self.relation_name = relation_name
         self.callback_targets = callback_targets
-        self.charm_dir = charm.charm_dir
         self.worker = PeerRollingOpsAsyncWorker(charm, relation_name=relation_name)
 
         self.framework.observe(
@@ -211,6 +211,32 @@ class PeerRollingOpsManager(Object):
         """Returns the peer relation used to manage locks."""
         return self.model.get_relation(self.relation_name)
 
+    def _lock(self) -> PeerAppLock:
+        return PeerAppLock(self.model, self.relation_name)
+
+    def _operations(self, unit: Unit) -> PeerUnitOperations:
+        return PeerUnitOperations(self.model, self.relation_name, unit)
+
+    def enqueue_operation(self, operation: Operation) -> None:
+        try:
+            self._operations(self.model.unit).request(operation)
+        except (RollingOpsDecodingError, ValueError) as e:
+            logger.error('Failed to create operation: %s', e)
+            raise RollingOpsInvalidLockRequestError('Failed to create the lock request') from e
+        except RollingOpsNoRelationError as e:
+            logger.debug('No %s peer relation yet.', self.relation_name)
+            raise e
+
+    def is_available(self) -> bool:
+        return self._relation is not None
+
+    def ensure_processing(self) -> None:
+        if self.model.unit.is_leader():
+            self._process_locks()
+
+    def has_pending_work(self) -> bool:
+        return self._operations(self.model.unit).has_pending_work()
+
     def _on_rollingops_lock_granted(self, event: EventBase) -> None:
         """Handler of the custom hook rollingops_lock_granted.
 
@@ -219,8 +245,9 @@ class PeerRollingOpsManager(Object):
         if not self._relation:
             return
         logger.info('Received a rolling-ops lock granted event.')
-        lock = Lock(self.model, self.relation_name, self.model.unit)
-        if lock.should_run():
+        lock = self._lock()
+        operations = self._operations(self.model.unit)
+        if operations.should_run(lock):
             self._on_run_with_lock()
             self._process_locks()
 
@@ -232,8 +259,8 @@ class PeerRollingOpsManager(Object):
         if not self.model.unit.is_leader():
             return
         if unit := event.departing_unit:
-            lock = Lock(self.model, self.relation_name, unit)
-            if lock.is_granted():
+            lock = self._lock()
+            if lock.is_granted(unit.name):
                 lock.release()
                 self._process_locks()
 
@@ -243,8 +270,9 @@ class PeerRollingOpsManager(Object):
             self._process_locks()
             return
 
-        lock = Lock(self.model, self.relation_name, self.model.unit)
-        if lock.should_run():
+        lock = self._lock()
+        operations = self._operations(self.model.unit)
+        if operations.should_run(lock):
             self._on_run_with_lock()
 
     def _valid_peer_unit_names(self) -> set[str]:
@@ -260,7 +288,9 @@ class PeerRollingOpsManager(Object):
         if not self._relation:
             return
 
-        if not (granted_unit := self._relation.data[self.model.app].get('granted_unit', '')):
+        lock = self._lock()
+        granted_unit = lock.granted_unit
+        if not granted_unit:
             return
 
         valid_units = self._valid_peer_unit_names()
@@ -269,7 +299,7 @@ class PeerRollingOpsManager(Object):
                 'granted_unit=%s is not in current peer units; releasing stale grant.',
                 granted_unit,
             )
-            self._relation.data[self.model.app].update({'granted_unit': '', 'granted_at': ''})
+            lock.release()
 
     def _process_locks(self, _: EventBase | None = None) -> None:
         """Process locks.
@@ -280,21 +310,28 @@ class PeerRollingOpsManager(Object):
         if not self.model.unit.is_leader():
             return
 
-        for lock in LockIterator(self.model, self.relation_name):
-            if lock.should_release():
+        lock = self._lock()
+
+        for unit in iter_peer_units(self.model, self.relation_name):
+            operations = self._operations(unit)
+            if not operations.is_peer_managed():
+                continue
+            if operations.should_release(lock):
                 lock.release()
                 break
 
         self._release_stale_grant()
-        granted_unit = self._relation.data[self.model.app].get('granted_unit', '')  # type: ignore[reportOptionalMemberAccess]
 
-        if granted_unit:
-            logger.info('Current granted_unit=%s. No new unit will be scheduled.', granted_unit)
+        if lock.granted_unit:
+            logger.info(
+                'Current granted_unit=%s. No new unit will be scheduled.',
+                lock.granted_unit,
+            )
             return
 
-        self._schedule()
+        self._schedule(lock)
 
-    def _schedule(self) -> None:
+    def _schedule(self, lock: PeerAppLock) -> None:
         """Select and grant the next lock based on priority and queue state.
 
         This method iterates over all locks associated with the relation and
@@ -311,17 +348,23 @@ class PeerRollingOpsManager(Object):
         """
         logger.info('Starting scheduling.')
 
-        pending_requests: list[Lock] = []
-        pending_retries: list[Lock] = []
+        pending_requests: list[PeerUnitOperations] = []
+        pending_retries: list[PeerUnitOperations] = []
 
-        for lock in LockIterator(self.model, self.relation_name):
-            if lock.is_retry_hold():
-                self._grant_lock(lock)
+        for unit in iter_peer_units(self.model, self.relation_name):
+            operations = self._operations(unit)
+
+            if not operations.is_peer_managed():
+                continue
+
+            if operations.is_retry_hold():
+                self._grant_lock(lock, operations)
                 return
-            if lock.is_waiting():
-                pending_requests.append(lock)
-            elif lock.is_waiting_retry():
-                pending_retries.append(lock)
+
+            if operations.is_waiting():
+                pending_requests.append(operations)
+            elif operations.is_waiting_retry():
+                pending_retries.append(operations)
 
         selected = None
         if pending_requests:
@@ -329,13 +372,13 @@ class PeerRollingOpsManager(Object):
         elif pending_retries:
             selected = pick_oldest_completed(pending_retries)
 
-        if not selected:
+        if selected is None:
             logger.info('No pending lock requests. Lock was not granted to any unit.')
             return
 
-        self._grant_lock(selected)
+        self._grant_lock(lock, selected)
 
-    def _grant_lock(self, selected: Lock) -> None:
+    def _grant_lock(self, lock: PeerAppLock, operations: PeerUnitOperations) -> None:
         """Grant the lock to the selected unit.
 
         If the lock is granted to the leader unit:
@@ -343,14 +386,17 @@ class PeerRollingOpsManager(Object):
             - Otherwise, the callback is run immediately
 
         Args:
-            selected: The lock instance to grant.
+            lock: The lock instance to grant.
+            operations: operations.
         """
-        selected.grant()
-        logger.info('Lock granted to unit=%s.', selected.unit.name)
-        if selected.unit == self.model.unit:
-            if selected.is_retry():
+        lock.grant(operations.unit.name)
+        logger.info('Lock granted to unit=%s.', operations.unit.name)
+
+        if operations.unit.name == self.model.unit.name:
+            if operations.is_retry(lock):
                 self.worker.start()
                 return
+
             self._on_run_with_lock()
             self._process_locks()
 
@@ -388,11 +434,12 @@ class PeerRollingOpsManager(Object):
         try:
             if kwargs is None:
                 kwargs = {}
-            lock = Lock(self.model, self.relation_name, self.model.unit)
-            lock.request(callback_id, kwargs, max_retry)
+            operation = Operation.create(callback_id, kwargs, max_retry)
+            operations = self._operations(self.model.unit)
+            operations.request(operation)
 
         except (RollingOpsDecodingError, ValueError) as e:
-            logger.error('Failed operation: %s', e)
+            logger.error('Failed to create operation: %s', e)
             raise RollingOpsInvalidLockRequestError('Failed to create the lock request') from e
         except RollingOpsNoRelationError as e:
             logger.debug('No %s peer relation yet.', self.relation_name)
@@ -409,15 +456,16 @@ class PeerRollingOpsManager(Object):
         - Otherwise, the operation's callback is looked up by `callback_id` and
             invoked with the operation kwargs.
         """
-        lock = Lock(self.model, self.relation_name, self.model.unit)
+        lock = self._lock()
+        operations = self._operations(self.model.unit)
 
-        if not lock.is_granted():
+        if not lock.is_granted(self.model.unit.name):
             logger.debug('Lock is not granted. Operation will not run.')
             return
 
-        if not (operation := lock.get_current_operation()):
+        if not (operation := operations.get_current()):
             logger.debug('There is no operation to run.')
-            lock.complete()
+            operations.finish(OperationResult.RELEASE)
             return
 
         if not (callback := self.callback_targets.get(operation.callback_id)):
@@ -435,17 +483,12 @@ class PeerRollingOpsManager(Object):
             logger.exception('Operation failed: %s: %s', operation.callback_id, e)
             result = OperationResult.RETRY_RELEASE
 
-        match result:
-            case OperationResult.RETRY_HOLD:
-                logger.info(
-                    'Finished %s. Operation will be retried immediately.', operation.callback_id
-                )
-                lock.retry_hold()
+        operations.finish(result)
 
-            case OperationResult.RETRY_RELEASE:
-                logger.info('Finished %s. Operation will be retried later.', operation.callback_id)
-                lock.retry_release()
+    def mirror_result(self, op_id: str, result: OperationResult) -> None:
+        """Apply the execution result to the mirrored peer queue.
 
-            case _:
-                logger.info('Finished %s. Lock will be released.', operation.callback_id)
-                lock.complete()
+        This keeps the peer standby queue aligned with the backend that
+        actually executed the operation.
+        """
+        self._operations(self.model.unit).mirror_finish(op_id, result)

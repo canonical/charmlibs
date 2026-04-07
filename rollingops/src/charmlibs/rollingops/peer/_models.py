@@ -16,17 +16,24 @@
 import json
 import logging
 from collections.abc import Iterator
+from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
-from typing import Any
 
-from ops import Model, RelationDataContent, Unit
+from ops import Model, Unit
 
 from charmlibs.rollingops.common._exceptions import (
     RollingOpsDecodingError,
     RollingOpsNoRelationError,
 )
-from charmlibs.rollingops.common._models import Operation, now_timestamp_str, parse_timestamp
+from charmlibs.rollingops.common._models import (
+    Operation,
+    OperationResult,
+    ProcessingBackend,
+    UnitBackendState,
+    now_timestamp,
+    parse_timestamp,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -64,12 +71,8 @@ class OperationQueue:
             return
         self.operations[0].increase_attempt()
 
-    def enqueue_lock_request(
-        self, callback_id: str, kwargs: dict[str, Any], max_retry: int | None = None
-    ) -> None:
-        """Append operation only if it is not equal to the last enqueued operation."""
-        operation = Operation.create(callback_id, kwargs, max_retry=max_retry)
-
+    def enqueue(self, operation: Operation) -> None:
+        """Append operation only if it is not equal to the tail operation."""
         last_operation = self._peek_last()
         if last_operation is not None and last_operation == operation:
             return
@@ -117,244 +120,356 @@ class LockIntent(StrEnum):
     IDLE = 'idle'
 
 
-class Lock:
-    """State machine view over peer relation databags for a single unit.
+@dataclass
+class PeerAppData:
+    """Application-scoped peer relation data."""
 
-    This class is the only component that should directly read/write the peer relation
-    databags for lock state, queue state, and grant state.
+    granted_unit: str = ''
+    granted_at: str = ''
 
-    Important:
-      - All relation databag values are strings.
-      - This class updates both unit databags and app databags, which triggers
-        relation-changed events.
-    """
+    @property
+    def granted_at_dt(self) -> datetime | None:
+        """Return the grant timestamp as a datetime, if present."""
+        return parse_timestamp(self.granted_at)
+
+    @granted_at_dt.setter
+    def granted_at_dt(self, value: datetime | None) -> None:
+        """Store the grant timestamp from a datetime."""
+        self.granted_at = value.isoformat() if value is not None else ''
+
+
+@dataclass
+class PeerUnitData:
+    """Unit-scoped peer relation data."""
+
+    state: str = ''
+    operations: str = ''
+    executed_at: str = ''
+
+    @property
+    def intent(self) -> LockIntent:
+        """Return the unit state as a LockIntent."""
+        return LockIntent(self.state) if self.state else LockIntent.IDLE
+
+    @intent.setter
+    def intent(self, value: LockIntent) -> None:
+        """Store the unit state from a LockIntent."""
+        self.state = value
+
+    @property
+    def queue(self) -> OperationQueue:
+        """Return the stored operation queue."""
+        return OperationQueue.from_string(self.operations)
+
+    @queue.setter
+    def queue(self, value: OperationQueue) -> None:
+        """Store the operation queue."""
+        self.operations = value.to_string()
+
+    @property
+    def executed_at_dt(self) -> datetime | None:
+        """Return the execution timestamp as a datetime, if present."""
+        return parse_timestamp(self.executed_at)
+
+    @executed_at_dt.setter
+    def executed_at_dt(self, value: datetime | None) -> None:
+        """Store the execution timestamp from a datetime."""
+        self.executed_at = value.isoformat() if value is not None else ''
+
+
+class PeerAppLock:
+    """Application-scoped distributed lock state."""
+
+    def __init__(self, model: Model, relation_name: str):
+        relation = model.get_relation(relation_name)
+        if relation is None:
+            raise RollingOpsNoRelationError()
+
+        self._relation = relation
+        self._app = model.app
+
+    def _load(self) -> PeerAppData:
+        return self._relation.load(PeerAppData, self._app, decoder=lambda s: s)
+
+    def _save(self, data: PeerAppData) -> None:
+        self._relation.save(data, self._app, encoder=str)
+
+    @property
+    def granted_unit(self) -> str:
+        """Return the unit name currently holding the grant, if any."""
+        return self._load().granted_unit
+
+    @property
+    def granted_at(self) -> datetime | None:
+        """Return the timestamp when the grant was issued, if any."""
+        return self._load().granted_at_dt
+
+    def grant(self, unit_name: str) -> None:
+        """Grant the lock to the provided unit."""
+        data = self._load()
+        data.granted_unit = unit_name
+        data.granted_at_dt = now_timestamp()
+        self._save(data)
+
+    def release(self) -> None:
+        """Clear the current grant."""
+        data = self._load()
+        data.granted_unit = ''
+        data.granted_at_dt = None
+        self._save(data)
+
+    def is_granted(self, unit_name: str) -> bool:
+        """Return whether the provided unit currently holds the grant."""
+        return self.granted_unit == unit_name
+
+
+class PeerUnitOperations:
+    """Unit-scoped queued operations and execution state."""
 
     def __init__(self, model: Model, relation_name: str, unit: Unit):
-        if not model.get_relation(relation_name):
-            # TODO: defer caller in this case (probably just fired too soon).
+        relation = model.get_relation(relation_name)
+        if relation is None:
             raise RollingOpsNoRelationError()
-        self.relation = model.get_relation(relation_name)
+
+        self._relation = relation
         self.unit = unit
-        self.app = model.app
+        self._backend_state = UnitBackendState(model, relation_name, unit)
+
+    def _load(self) -> PeerUnitData:
+        return self._relation.load(PeerUnitData, self.unit, decoder=lambda s: s)
+
+    def _save(self, data: PeerUnitData) -> None:
+        self._relation.save(data, self.unit, encoder=str)
 
     @property
-    def _app_data(self) -> RelationDataContent:
-        return self.relation.data[self.app]  # type: ignore[reportOptionalMemberAccess]
+    def backend(self) -> ProcessingBackend:
+        """Return which backend owns execution for this unit's queue."""
+        return self._backend_state.backend
+
+    def is_peer_managed(self) -> bool:
+        """Return whether the peer backend should process this unit's queue."""
+        return self._backend_state.is_peer_managed()
+
+    def is_etcd_managed(self) -> bool:
+        """Return whether the etcd backend should process this unit's queue."""
+        return self._backend_state.is_etcd_managed()
 
     @property
-    def _unit_data(self) -> RelationDataContent:
-        return self.relation.data[self.unit]  # type: ignore[reportOptionalMemberAccess]
+    def intent(self) -> LockIntent:
+        """Return the current unit intent."""
+        return self._load().intent
 
     @property
-    def _operations(self) -> OperationQueue:
-        return OperationQueue.from_string(self._unit_data.get('operations', ''))
+    def executed_at(self) -> datetime | None:
+        """Return the last execution timestamp for this unit."""
+        return self._load().executed_at_dt
 
-    @property
-    def _state(self) -> str:
-        return self._unit_data.get('state', '')
+    def get_current(self) -> Operation | None:
+        """Return the head operation, if any."""
+        return self._load().queue.peek()
 
-    def request(
-        self, callback_id: str, kwargs: dict[str, Any], max_retry: int | None = None
-    ) -> None:
-        """Enqueue an operation and mark this unit as requesting the lock.
+    def has_pending_work(self) -> bool:
+        """Return whether this unit still has queued work."""
+        return self.get_current() is not None
 
-        Args:
-          callback_id: identifies which callback to execute.
-          kwargs: dict of callback kwargs.
-          max_retry: None -> unlimited retries, else explicit integer.
-        """
-        queue = self._operations
+    def request(self, operation: Operation) -> None:
+        """Enqueue an operation and mark this unit as requesting the lock."""
+        data = self._load()
+        queue = data.queue
 
         previous_length = len(queue)
-        queue.enqueue_lock_request(callback_id, kwargs, max_retry)
-        if previous_length == len(queue):
+        queue.enqueue(operation)
+        added = len(queue) != previous_length
+        if not added:
             logger.info(
                 'Operation %s not added to the queue. It already exists in the back of the queue.',
-                callback_id,
+                operation.callback_id,
             )
             return
 
+        data.queue = queue
         if len(queue) == 1:
-            self._unit_data.update({'state': LockIntent.REQUEST})
+            data.intent = LockIntent.REQUEST
+        self._save(data)
+        logger.info('Operation %s added to the queue.', operation.callback_id)
 
-        self._unit_data.update({'operations': queue.to_string()})
-        logger.info('Operation %s added to the queue.', callback_id)
+    def finish(self, result: OperationResult) -> None:
+        """Persist the result of executing the current operation."""
+        data = self._load()
+        self._apply_result_to_data(data, result)
+        self._save(data)
 
-    def _set_retry(self, intent: LockIntent) -> None:
-        """Mark the given retry intent on the head operation.
+    def _apply_result_to_data(
+        self,
+        data: PeerUnitData,
+        result: OperationResult,
+    ) -> None:
+        queue = data.queue
+        operation = queue.peek()
 
-        If max_retry is reached, the head operation is dropped via complete().
-        """
-        self._increase_attempt()
-        if self._is_max_retry_reached():
-            logger.warning('Operation max retry reached. Dropping.')
-            self.complete()
+        if operation is None:
+            data.intent = LockIntent.IDLE
+            data.executed_at_dt = now_timestamp()
             return
-        self._unit_data.update({
-            'executed_at': now_timestamp_str(),
-            'state': intent,
-        })
 
-    def retry_release(self) -> None:
-        """Indicate that the operation should be retried but the lock should be released."""
-        self._set_retry(LockIntent.RETRY_RELEASE)
+        if result == OperationResult.RETRY_HOLD:
+            queue.increase_attempt()
+            operation = queue.peek()
+            if operation is None or operation.is_max_retry_reached():
+                logger.warning('Operation max retry reached. Dropping.')
+                queue.dequeue()
+                data.intent = LockIntent.REQUEST if queue.peek() else LockIntent.IDLE
+            else:
+                data.intent = LockIntent.RETRY_HOLD
 
-    def retry_hold(self) -> None:
-        """Indicate that the operation should be retried but the lock should be kept."""
-        self._set_retry(LockIntent.RETRY_HOLD)
+        elif result == OperationResult.RETRY_RELEASE:
+            queue.increase_attempt()
+            operation = queue.peek()
+            if operation is None or operation.is_max_retry_reached():
+                logger.warning('Operation max retry reached. Dropping.')
+                queue.dequeue()
+                data.intent = LockIntent.REQUEST if queue.peek() else LockIntent.IDLE
+            else:
+                data.intent = LockIntent.RETRY_RELEASE
 
-    def complete(self) -> None:
-        """Mark the head operation as completed successfully, pop it from the queue.
+        else:
+            queue.dequeue()
+            data.intent = LockIntent.REQUEST if queue.peek() else LockIntent.IDLE
 
-        Update unit state depending on whether more operations remain.
-        """
-        queue = self._operations
-        queue.dequeue()
-        next_state = LockIntent.REQUEST if queue.peek() else LockIntent.IDLE
+        data.queue = queue
+        data.executed_at_dt = now_timestamp()
 
-        self._unit_data.update({
-            'state': next_state,
-            'operations': queue.to_string(),
-            'executed_at': now_timestamp_str(),
-        })
+    def should_run(self, lock: PeerAppLock) -> bool:
+        """Return whether this unit should execute now."""
+        return (
+            self.is_peer_managed()
+            and lock.is_granted(self.unit.name)
+            and not self._executed_after_grant(lock)
+        )
 
-    def release(self) -> None:
-        """Clear the application-level grant."""
-        self._app_data.update({'granted_unit': '', 'granted_at': ''})
-
-    def grant(self) -> None:
-        """Grant a lock to a unit."""
-        self._app_data.update({
-            'granted_unit': str(self.unit.name),
-            'granted_at': now_timestamp_str(),
-        })
-
-    def is_granted(self) -> bool:
-        """Return True if the unit holds the lock."""
-        granted_unit = self._app_data.get('granted_unit', '')
-        return granted_unit == str(self.unit.name)
-
-    def should_run(self) -> bool:
-        """Return True if the lock has been granted to the unit and it is time to run."""
-        return self.is_granted() and not self._unit_executed_after_grant()
-
-    def should_release(self) -> bool:
-        """Return True if the unit finished executing the callback and should be released."""
-        return self.is_completed() or self._unit_executed_after_grant()
+    def should_release(self, lock: PeerAppLock) -> bool:
+        """Return whether this unit should release the lock."""
+        return (self.is_peer_managed() and self.is_completed(lock)) or self._executed_after_grant(
+            lock
+        )
 
     def is_waiting(self) -> bool:
-        """Return True if this unit is waiting for a lock to be granted."""
-        return self._state == LockIntent.REQUEST and not self.is_granted()
-
-    def is_completed(self) -> bool:
-        """Return True if this unit is completed callback but still has the grant.
-
-        Transitional state in which the unit is waiting for the leader to release the lock.
-        """
-        return self._state == LockIntent.IDLE and self.is_granted()
-
-    def is_retry(self) -> bool:
-        """Return True if this unit requested retry but still has the grant.
-
-        Transitional state in which the unit is waiting for the leader to release the lock.
-        """
-        unit_intent = self._state
-        return (
-            unit_intent == LockIntent.RETRY_RELEASE or unit_intent == LockIntent.RETRY_HOLD
-        ) and self.is_granted()
+        """Return whether this unit is waiting for a fresh grant."""
+        return self.is_peer_managed() and self.intent == LockIntent.REQUEST
 
     def is_waiting_retry(self) -> bool:
-        """Return True if the unit requested retry and is waiting for lock to be granted."""
-        return self._state == LockIntent.RETRY_RELEASE and not self.is_granted()
+        """Return whether this unit is waiting for a retry after releasing."""
+        return self.is_peer_managed() and self.intent == LockIntent.RETRY_RELEASE
 
     def is_retry_hold(self) -> bool:
-        """Return True if the unit requested retry and wants to keep the lock."""
-        return self._state == LockIntent.RETRY_HOLD and not self.is_granted()
+        """Return whether this unit wants to retry while keeping priority."""
+        return self.is_peer_managed() and self.intent == LockIntent.RETRY_HOLD
 
-    def get_current_operation(self) -> Operation | None:
-        """Return the head operation for this unit, if any."""
-        return self._operations.peek()
+    def is_retry(self, lock: PeerAppLock) -> bool:
+        """Return whether this unit is in a retry state and currently granted."""
+        return (
+            self.is_peer_managed()
+            and self.intent
+            in {
+                LockIntent.RETRY_RELEASE,
+                LockIntent.RETRY_HOLD,
+            }
+            and lock.is_granted(self.unit.name)
+        )
 
-    def _is_max_retry_reached(self) -> bool:
-        """Return True if the head operation exceeded its max_retry (unless max_retry is None)."""
-        if not (operation := self.get_current_operation()):
-            return True
-        return operation.is_max_retry_reached()
+    def is_completed(self, lock: PeerAppLock) -> bool:
+        """Return whether this unit completed and still holds the grant."""
+        return (
+            self.is_peer_managed()
+            and self.intent == LockIntent.IDLE
+            and lock.is_granted(self.unit.name)
+        )
 
-    def _increase_attempt(self) -> None:
-        """Increment the attempt counter for the head operation and persist it."""
-        q = self._operations
-        q.increase_attempt()
-        self._unit_data.update({'operations': q.to_string()})
+    def requested_at(self) -> datetime | None:
+        """Return the timestamp of the current operation request, if any."""
+        operation = self.get_current()
+        return operation.requested_at if operation is not None else None
 
-    def get_last_completed(self) -> datetime | None:
-        """Get the time the unit requested a retry of the head operation."""
-        if timestamp_str := self._unit_data.get('executed_at', ''):
-            return parse_timestamp(timestamp_str)
-        return None
-
-    def get_requested_at(self) -> datetime | None:
-        """Get the time the head operation was requested at."""
-        if not (operation := self.get_current_operation()):
-            return None
-        return operation.requested_at
-
-    def _unit_executed_after_grant(self) -> bool:
-        """Returns True if the unit executed its callback after the lock was granted."""
-        granted_at = parse_timestamp(self._app_data.get('granted_at', ''))
-        executed_at = parse_timestamp(self._unit_data.get('executed_at', ''))
-
+    def _executed_after_grant(self, lock: PeerAppLock) -> bool:
+        """Return whether execution happened after the current grant."""
+        granted_at = lock.granted_at
+        executed_at = self.executed_at
         if granted_at is None or executed_at is None:
             return False
         return executed_at > granted_at
 
+    def mirror_finish(self, op_id: str, result: OperationResult) -> None:
+        """Apply an execution result to the mirrored peer queue.
 
-def pick_oldest_completed(locks: list[Lock]) -> Lock | None:
-    """Choose the retry lock with the oldest executed_at timestamp."""
+        This keeps the peer copy aligned with the backend that actually executed
+        the operation.
+
+        If the current mirrored head no longer matches the finalized operation,
+        this method does nothing.
+        """
+        data = self._load()
+        current = data.queue.peek()
+
+        if current is None:
+            logger.warning('Cannot mirror finalized operation: peer queue is empty.')
+            return
+
+        if current.op_id != op_id:
+            logger.warning(
+                'Cannot mirror finalized operation: peer head op_id=%s'
+                'does not match finalized op_id=%s.',
+                current.op_id,
+                op_id,
+            )
+            return
+
+        self._apply_result_to_data(data, result)
+        self._save(data)
+
+
+def iter_peer_units(model: Model, relation_name: str) -> Iterator[Unit]:
+    """Yield all units currently participating in the peer relation, including self."""
+    relation = model.get_relation(relation_name)
+    if relation is None:
+        raise RollingOpsNoRelationError()
+
+    units = set(relation.units)
+    units.add(model.unit)
+
+    yield from units
+
+
+def pick_oldest_completed(
+    operations_list: list[PeerUnitOperations],
+) -> PeerUnitOperations | None:
+    """Choose the retry candidate with the oldest executed_at timestamp."""
     selected = None
-    oldest_timestamp = None
+    oldest = None
 
-    for lock in locks:
-        timestamp = lock.get_last_completed()
-        if not timestamp:
+    for operations in operations_list:
+        timestamp = operations.executed_at
+        if timestamp is None:
             continue
-
-        if oldest_timestamp is None or timestamp < oldest_timestamp:
-            oldest_timestamp = timestamp
-            selected = lock
+        if oldest is None or timestamp < oldest:
+            oldest = timestamp
+            selected = operations
 
     return selected
 
 
-def pick_oldest_request(locks: list[Lock]) -> Lock | None:
-    """Choose the lock with the oldest head operation."""
+def pick_oldest_request(
+    operations_list: list[PeerUnitOperations],
+) -> PeerUnitOperations | None:
+    """Choose the request candidate with the oldest head operation."""
     selected = None
-    oldest_request = None
+    oldest = None
 
-    for lock in locks:
-        timestamp = lock.get_requested_at()
-        if not timestamp:
+    for operations in operations_list:
+        timestamp = operations.requested_at()
+        if timestamp is None:
             continue
-
-        if oldest_request is None or timestamp < oldest_request:
-            oldest_request = timestamp
-            selected = lock
+        if oldest is None or timestamp < oldest:
+            oldest = timestamp
+            selected = operations
 
     return selected
-
-
-class LockIterator:
-    """Iterator over Lock objects for each unit present on the peer relation."""
-
-    def __init__(self, model: Model, relation_name: str):
-        relation = model.relations[relation_name][0]
-        units = relation.units
-        units.add(model.unit)
-        self._model = model
-        self._units = units
-        self._relation_name = relation_name
-
-    def __iter__(self) -> Iterator[Lock]:
-        """Yields a lock for each unit we can find on the relation."""
-        for unit in self._units:
-            yield Lock(self._model, self._relation_name, unit=unit)

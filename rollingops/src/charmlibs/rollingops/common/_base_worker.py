@@ -140,8 +140,6 @@ class BaseRollingOpsAsyncWorker(Object):
         env = self._build_env()
 
         log_out = open(f'/var/log/{self._log_filename}.log', 'a')  # noqa: SIM115
-        log_err = open(f'/var/log/{self._log_filename}.err', 'a')  # noqa: SIM115
-
         pid = subprocess.Popen(
             [
                 '/usr/bin/python3',
@@ -157,7 +155,7 @@ class BaseRollingOpsAsyncWorker(Object):
             ],
             cwd=str(self._charm_dir),
             stdout=log_out,
-            stderr=log_err,
+            stderr=log_out,
             env=env,
         ).pid
 
