@@ -281,6 +281,7 @@ class EtcdRollingOpsManager(Object):
                 logger.info('Finished %s. Operation will be retried later.', operation.callback_id)
             case _:
                 logger.info('Finished %s. Lock will be released.', operation.callback_id)
+                result = OperationResult.RELEASE
 
         self.operations.finalize(operation, result)
         return RunWithLockOutcome(

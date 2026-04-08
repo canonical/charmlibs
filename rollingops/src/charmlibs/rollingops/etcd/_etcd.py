@@ -48,10 +48,11 @@ class EtcdLease:
 
     def revoke(self) -> None:
         """Revoke the current lease and stop the keep-alive process."""
+        lease_id = self.id
         if self.id is not None:
             etcdctl.run('lease', 'revoke', self.id)
             self.id = None
-            logger.info('Lease %s revoked.', self.id)
+            logger.info('Lease %s revoked.', lease_id)
         self._stop_keepalive()
 
     def _start_lease_keepalive(self) -> None:
@@ -75,6 +76,7 @@ class EtcdLease:
         """Terminate the keep-alive subprocess if it is running."""
         if self.keepalive_proc is None:
             return
+        pid = self.keepalive_proc.pid
         self.keepalive_proc.terminate()
         try:
             self.keepalive_proc.wait(timeout=2)
@@ -82,7 +84,7 @@ class EtcdLease:
             self.keepalive_proc.kill()
             self.keepalive_proc.wait(timeout=2)
         self.keepalive_proc = None
-        logger.info('Keepalive stopped for lease %s.', self.id)
+        logger.info('Keepalive %s stopped for lease.', pid)
 
 
 class EtcdLock:

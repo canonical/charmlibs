@@ -29,7 +29,6 @@ from charmlibs.rollingops.common._exceptions import (
 from charmlibs.rollingops.common._models import (
     Operation,
     OperationResult,
-    ProcessingBackend,
     UnitBackendState,
     now_timestamp,
     parse_timestamp,
@@ -241,18 +240,9 @@ class PeerUnitOperations:
     def _save(self, data: PeerUnitData) -> None:
         self._relation.save(data, self.unit, encoder=str)
 
-    @property
-    def backend(self) -> ProcessingBackend:
-        """Return which backend owns execution for this unit's queue."""
-        return self._backend_state.backend
-
     def is_peer_managed(self) -> bool:
         """Return whether the peer backend should process this unit's queue."""
         return self._backend_state.is_peer_managed()
-
-    def is_etcd_managed(self) -> bool:
-        """Return whether the etcd backend should process this unit's queue."""
-        return self._backend_state.is_etcd_managed()
 
     @property
     def intent(self) -> LockIntent:
@@ -416,7 +406,7 @@ class PeerUnitOperations:
 
         if current.op_id != op_id:
             logger.warning(
-                'Cannot mirror finalized operation: peer head op_id=%s'
+                'Cannot mirror finalized operation: peer head op_id=%s '
                 'does not match finalized op_id=%s.',
                 current.op_id,
                 op_id,

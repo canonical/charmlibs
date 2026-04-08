@@ -32,7 +32,6 @@ logger = logging.getLogger(__name__)
 class BaseRollingOpsAsyncWorker(Object):
     """Base class for external rolling-ops worker processes."""
 
-    _run_cmd = '/usr/bin/juju-exec'
     _pid_field: str
     _log_filename: str
 
@@ -145,8 +144,6 @@ class BaseRollingOpsAsyncWorker(Object):
                 '/usr/bin/python3',
                 '-u',
                 str(worker),
-                '--run-cmd',
-                self._run_cmd,
                 '--unit-name',
                 self.model.unit.name,
                 '--charm-dir',

@@ -103,19 +103,18 @@ def main():
             if not lock.is_held():
                 if lease.id is None:
                     lease.grant(lock_lease_ttl)
-                    logger.info('Lease %s granted.', lease.id)
 
                 lease_id = lease.id
                 if lease_id is None:
                     time.sleep(acquire_retry_sleep)
                     continue
 
-                logger.info('Try to get lock started')
+                logger.info('Try to get lock.')
                 if not lock.try_acquire(lease_id):
                     time.sleep(acquire_retry_sleep)
                     continue
 
-                logger.info('Lock granted')
+                logger.info('Lock granted.')
 
             if not operations.claim_next():
                 time.sleep(acquire_retry_sleep)

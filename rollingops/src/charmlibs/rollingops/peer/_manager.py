@@ -473,7 +473,7 @@ class PeerRollingOpsManager(Object):
                 'Operation %s target was not found. It cannot be executed.',
                 operation.callback_id,
             )
-            return
+            return  # lock is not released!!!!!
         logger.info(
             'Executing callback_id=%s, attempt=%s', operation.callback_id, operation.attempt
         )
