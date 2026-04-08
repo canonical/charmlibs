@@ -25,6 +25,8 @@ from charmlibs.rollingops.etcd._models import RollingOpsKeys
 
 logger = logging.getLogger(__name__)
 
+LOCK_LEASE_TTL = 60
+
 
 class EtcdLease:
     """Manage the lifecycle of an etcd lease and its keep-alive process."""
@@ -33,13 +35,9 @@ class EtcdLease:
         self.id: str | None = None
         self.keepalive_proc: subprocess.Popen[str] | None = None
 
-    def grant(self, ttl: int) -> None:
-        """Create a new lease and start the keep-alive process.
-
-        Args:
-            ttl: Time-to-live of the lease in seconds.
-        """
-        res = etcdctl.run('lease', 'grant', str(ttl))
+    def grant(self) -> None:
+        """Create a new lease and start the keep-alive process."""
+        res = etcdctl.run('lease', 'grant', str(LOCK_LEASE_TTL))
         # parse: "lease 694d9c9aeca3422a granted with TTL(1800s)"
         parts = res.split()
         self.id = parts[1]

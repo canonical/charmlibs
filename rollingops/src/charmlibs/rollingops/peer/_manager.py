@@ -164,8 +164,9 @@ from charmlibs.rollingops.common._exceptions import (
     RollingOpsDecodingError,
     RollingOpsInvalidLockRequestError,
     RollingOpsNoRelationError,
+    RollingOpsSyncLockNotImplementedError,
 )
-from charmlibs.rollingops.common._models import Operation, OperationResult
+from charmlibs.rollingops.common._models import Operation, OperationResult, RollingOpsStatus
 from charmlibs.rollingops.peer._models import (
     PeerAppLock,
     PeerUnitOperations,
@@ -226,9 +227,6 @@ class PeerRollingOpsManager(Object):
         except RollingOpsNoRelationError as e:
             logger.debug('No %s peer relation yet.', self.relation_name)
             raise e
-
-    def is_available(self) -> bool:
-        return self._relation is not None
 
     def ensure_processing(self) -> None:
         if self.model.unit.is_leader():
@@ -492,3 +490,25 @@ class PeerRollingOpsManager(Object):
         actually executed the operation.
         """
         self._operations(self.model.unit).mirror_finish(op_id, result)
+
+    def request_sync_lock(self, timeout: int) -> bool:
+        """Try to acquire the lock until timeout expires.
+
+        Args:
+            timeout: Maximum time in seconds to wait for the lock.
+
+        Raises:
+            RollingOpsSyncLockNotImplementedError
+        """
+        raise RollingOpsSyncLockNotImplementedError
+
+    def release_sync_lock(self) -> None:
+        """Release the lock and revoke the associated lease.
+
+        Raises:
+            RollingOpsSyncLockNotImplementedError
+        """
+        raise RollingOpsSyncLockNotImplementedError
+
+    def get_status(self) -> RollingOpsStatus:
+        return RollingOpsStatus.REQUEST

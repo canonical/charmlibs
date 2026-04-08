@@ -65,3 +65,11 @@ class RollingOpsEtcdctlFatalError(RollingOpsEtcdctlError):
 
 class RollingOpsEtcdctlParseError(RollingOpsEtcdctlError):
     """Raised when etcdctl output cannot be parsed."""
+
+
+class RollingOpsFailedToGetLockError(Exception):
+    """Raised when the attempt to get the lock fails."""
+
+
+class RollingOpsSyncLockNotImplementedError(Exception):
+    """Raised when the sync lock is not implemented."""

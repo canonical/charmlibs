@@ -29,10 +29,11 @@ from charmlibs.rollingops.common._exceptions import (
 from charmlibs.rollingops.common._models import (
     Operation,
     OperationResult,
+    ProcessingBackend,
+    RollingOpsStatus,
     UnitBackendState,
-    now_timestamp,
-    parse_timestamp,
 )
+from charmlibs.rollingops.common._utils import now_timestamp, parse_timestamp
 
 logger = logging.getLogger(__name__)
 
@@ -254,6 +255,10 @@ class PeerUnitOperations:
         """Return the last execution timestamp for this unit."""
         return self._load().executed_at_dt
 
+    @property
+    def queue(self) -> OperationQueue:
+        return self._load().queue
+
     def get_current(self) -> Operation | None:
         """Return the head operation, if any."""
         return self._load().queue.peek()
@@ -463,3 +468,10 @@ def pick_oldest_request(
             selected = operations
 
     return selected
+
+
+@dataclass
+class RollingOpsState:
+    status: RollingOpsStatus
+    processing_backend: ProcessingBackend | None
+    operations: OperationQueue

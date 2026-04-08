@@ -14,11 +14,10 @@
 
 import argparse
 import logging
-import subprocess
 import time
-from logging.handlers import RotatingFileHandler
 
 from charmlibs.rollingops.common._models import OperationResult
+from charmlibs.rollingops.common._utils import dispatch_hook, dispatch_lock_granted, setup_logging
 from charmlibs.rollingops.etcd._etcd import (
     EtcdLease,
     EtcdLock,
@@ -28,43 +27,13 @@ from charmlibs.rollingops.etcd._models import RollingOpsKeys
 
 logger = logging.getLogger(__name__)
 
-
-def setup_logging(log_file: str) -> None:
-    handler = RotatingFileHandler(
-        log_file,
-        maxBytes=10 * 1024 * 1024,  # 10 MB
-        backupCount=3,
-    )
-
-    formatter = logging.Formatter(
-        '%(asctime)s [%(levelname)s] [%(process)d] %(name)s: %(message)s'
-    )
-    handler.setFormatter(formatter)
-
-    root = logging.getLogger()
-    root.setLevel(logging.INFO)
-    root.addHandler(handler)
-
-
-def _dispatch_hook(unit_name: str, charm_dir: str, hook_name: str) -> None:
-    """Dispatch a custom Juju hook."""
-    run_cmd = '/usr/bin/juju-exec'
-    dispatch_sub_cmd = f'JUJU_DISPATCH_PATH=hooks/{hook_name} {charm_dir}/dispatch'
-    res = subprocess.run([run_cmd, '-u', unit_name, dispatch_sub_cmd], check=False)
-    res.check_returncode()
-    logger.info('%s hook dispatched.', hook_name)
-
-
-def _dispatch_lock_granted(unit_name: str, charm_dir: str) -> None:
-    """Dispatch the rollingops_lock_granted hook."""
-    hook_name = 'rollingops_lock_granted'
-    _dispatch_hook(unit_name, charm_dir, hook_name)
+RETRY_SLEEP = 15
 
 
 def _dispatch_etcd_failed(unit_name: str, charm_dir: str) -> None:
     """Dispatch the rollingops_etcd_failed hook."""
     hook_name = 'rollingops_etcd_failed'
-    _dispatch_hook(unit_name, charm_dir, hook_name)
+    dispatch_hook(unit_name, charm_dir, hook_name)
 
 
 def main():
@@ -84,10 +53,7 @@ def main():
         args.cluster_id,
     )
 
-    lock_lease_ttl = 60
-    acquire_retry_sleep = 15
-
-    time.sleep(10)
+    time.sleep(RETRY_SLEEP)
 
     keys = RollingOpsKeys.for_owner(args.cluster_id, args.owner)
     lock = EtcdLock(keys.lock_key, args.owner)
@@ -97,37 +63,37 @@ def main():
     try:
         while True:
             if not operations.has_pending():
-                time.sleep(acquire_retry_sleep)
+                time.sleep(RETRY_SLEEP)
                 continue
 
             if not lock.is_held():
                 if lease.id is None:
-                    lease.grant(lock_lease_ttl)
+                    lease.grant()
 
                 lease_id = lease.id
                 if lease_id is None:
-                    time.sleep(acquire_retry_sleep)
+                    time.sleep(RETRY_SLEEP)
                     continue
 
                 logger.info('Try to get lock.')
                 if not lock.try_acquire(lease_id):
-                    time.sleep(acquire_retry_sleep)
+                    time.sleep(RETRY_SLEEP)
                     continue
 
                 logger.info('Lock granted.')
 
             if not operations.claim_next():
-                time.sleep(acquire_retry_sleep)
+                time.sleep(RETRY_SLEEP)
                 continue
 
-            _dispatch_lock_granted(args.unit_name, args.charm_dir)
+            dispatch_lock_granted(args.unit_name, args.charm_dir)
 
             logger.info('Waiting for operation to be finished.')
             operations.wait_until_completed()
             operation = operations.peek_completed()
             if operation is None:
                 logger.info('Completed queue watch returned no operation.')
-                time.sleep(acquire_retry_sleep)
+                time.sleep(RETRY_SLEEP)
                 continue
 
             logger.info('Operation %s completed with %s', operation.callback_id, operation.result)
@@ -151,7 +117,7 @@ def main():
                 logger.info('No more operations in the queue.')
                 break
 
-            time.sleep(acquire_retry_sleep)
+            time.sleep(RETRY_SLEEP)
     except Exception as e:
         logger.exception('Fatal etcd worker error: %s', e)
 

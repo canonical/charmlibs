@@ -12,57 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Rolling ops models."""
+"""Rolling ops common models."""
 
 import json
 import logging
-from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime
 from enum import StrEnum
-from typing import Any, TypeVar
+from typing import Any
 
-from ops import Model, Unit, pebble
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_fixed
+from ops import Model, Unit
 
-from charmlibs.pathops import PebbleConnectionError
 from charmlibs.rollingops.common._exceptions import (
     RollingOpsDecodingError,
     RollingOpsNoRelationError,
 )
+from charmlibs.rollingops.common._utils import now_timestamp, parse_timestamp
 
 logger = logging.getLogger(__name__)
-
-
-T = TypeVar('T')
-
-
-@retry(
-    retry=retry_if_exception_type((PebbleConnectionError, pebble.APIError, pebble.ChangeError)),
-    stop=stop_after_attempt(3),
-    wait=wait_fixed(10),
-    reraise=True,
-)
-def with_pebble_retry[T](func: Callable[[], T]) -> T:
-    return func()
-
-
-def now_timestamp() -> datetime:
-    """UTC timestamp."""
-    return datetime.now(UTC)
-
-
-def now_timestamp_str() -> str:
-    """UTC timestamp as a string using ISO 8601 format."""
-    return datetime.now(UTC).isoformat()
-
-
-def parse_timestamp(timestamp: str) -> datetime | None:
-    """Parse timestamp string. Return None on errors to avoid selecting invalid timestamps."""
-    try:
-        return datetime.fromisoformat(timestamp)
-    except Exception:
-        return None
 
 
 class OperationResult(StrEnum):
@@ -85,6 +52,14 @@ class RunWithLockStatus(StrEnum):
     NO_OPERATION = 'no_operation'
     MISSING_CALLBACK = 'missing_callback'
     EXECUTED = 'executed'
+
+
+class RollingOpsStatus(StrEnum):
+    NOT_INITIALIZED = 'not-initialized'
+    REQUEST = 'request'
+    RETRY_RELEASE = 'retry-release'
+    RETRY_HOLD = 'retry-hold'
+    IDLE = 'idle'
 
 
 @dataclass
@@ -163,7 +138,7 @@ class UnitBackendState:
         """Return whether etcd cleanup is required before etcd can be reused."""
         return self._load().cleanup_needed
 
-    def set_cleanup_needed(self, value: bool) -> None:
+    def _set_cleanup_needed(self, value: bool) -> None:
         """Persist whether etcd cleanup is required."""
         data = self._load()
         data.cleanup_needed = value
@@ -178,7 +153,7 @@ class UnitBackendState:
 
     def clear_fallback(self) -> None:
         """Clear the etcd cleanup-needed flag."""
-        self.set_cleanup_needed(False)
+        self._set_cleanup_needed(False)
 
     def is_peer_managed(self) -> bool:
         """Return whether the peer backend should process this unit's queue."""

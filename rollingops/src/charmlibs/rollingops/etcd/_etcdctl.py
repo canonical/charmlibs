@@ -43,7 +43,7 @@ from charmlibs.rollingops.common._exceptions import (
     RollingOpsEtcdNotConfiguredError,
     RollingOpsFileSystemError,
 )
-from charmlibs.rollingops.common._models import with_pebble_retry
+from charmlibs.rollingops.common._utils import with_pebble_retry
 from charmlibs.rollingops.etcd._models import CERT_MODE, EtcdConfig, EtcdKV
 
 logger = logging.getLogger(__name__)

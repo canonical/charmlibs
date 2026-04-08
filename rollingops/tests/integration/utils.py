@@ -50,3 +50,10 @@ def get_leader_unit_name(juju: jubilant.Juju, app: str) -> str:
 
 def remove_transition_file(juju: jubilant.Juju, unit: str):
     juju.exec(f'rm -f {TRACE_FILE}', unit=unit)
+
+
+def is_empty_file(juju: jubilant.Juju, unit: str, path: str) -> bool:
+    task = juju.exec(f'test ! -s {path}', unit=unit)
+    if task.status != 'completed' or task.return_code != 0:
+        return False
+    return True

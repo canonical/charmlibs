@@ -109,15 +109,7 @@ def test_assert_deferred_restart_retries_one_unit(juju: jubilant.Juju, app_name:
 
 def test_assert_restart_rolls_one_unit_at_a_time(juju: jubilant.Juju, app_name: str):
     juju.add_unit(app=app_name, num_units=4)
-    juju.wait(  # TODO: wait for 5 units to be active
-        lambda status: (
-            app_name in status.apps
-            and len(status.apps[app_name].units) == 5
-            and sum(1 for u in status.apps[app_name].units.values() if u.is_active) >= 4
-        ),
-        error=jubilant.any_error,
-        timeout=TIMEOUT,
-    )
+    juju.wait(jubilant.all_active, error=jubilant.any_error, timeout=TIMEOUT)
 
     status = juju.status()
     units = sorted(status.apps[app_name].units)

@@ -33,10 +33,12 @@ from charmlibs.rollingops.common._exceptions import (
 from charmlibs.rollingops.common._models import (
     Operation,
     ProcessingBackend,
+    RollingOpsStatus,
     UnitBackendState,
 )
 from charmlibs.rollingops.etcd._manager import EtcdRollingOpsManager
 from charmlibs.rollingops.peer._manager import PeerRollingOpsManager
+from charmlibs.rollingops.peer._models import OperationQueue, PeerUnitOperations, RollingOpsState
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +91,7 @@ class RollingOpsManager(Object):
 
         self.framework.observe(charm.on.rollingops_lock_granted, self._on_rollingops_lock_granted)
         self.framework.observe(charm.on.rollingops_etcd_failed, self._on_rollingops_etcd_failed)
+        # manage update status for etcd
 
     @property
     def _peer_relation(self) -> Relation | None:
@@ -163,15 +166,13 @@ class RollingOpsManager(Object):
                 logger.warning(
                     'Failed to persist operation in etcd backend; falling back to peer: %s',
                     e,
-                )  # fallback ?
+                )
                 backend = ProcessingBackend.PEER
-
-        self._backend_state.set_backend(backend)
 
         if backend == ProcessingBackend.ETCD:
             self.etcd_manager.ensure_processing()
         else:
-            self.peer_manager.ensure_processing()
+            self._fallback_current_unit_to_peer()
 
     def _fallback_current_unit_to_peer(self) -> None:
         self._backend_state.fallback_to_peer()
@@ -213,3 +214,64 @@ class RollingOpsManager(Object):
         """Fall back to peer when the etcd worker reports a fatal failure."""
         logger.warning('Received rollingops_etcd_failed; falling back to peer backend.')
         self._fallback_current_unit_to_peer()
+
+    def request_sync_lock(self, timeout: int) -> bool:
+        """Try to acquire the lock until timeout expires.
+
+        Args:
+            timeout: Maximum time in seconds to wait for the lock.
+
+        Returns:
+            True if the lock was granted. False otherwise.
+        """
+        if self.etcd_manager.is_available():
+            try:
+                return self.etcd_manager.request_sync_lock(timeout)
+            except _ETCD_FALLBACK_EXCEPTIONS as e:
+                logger.exception(
+                    'Failed to request etcd sync lock; falling back to peer: %s',
+                    e,
+                )
+
+        return self.peer_manager.request_sync_lock(timeout)
+
+    def release_sync_lock(self) -> None:
+        """Release the lock and revoke the associated lease."""
+        if not self.etcd_manager.is_sync_lock_used():
+            self.peer_manager.release_sync_lock()
+            return
+        try:
+            self.etcd_manager.release_sync_lock()
+        except _ETCD_FALLBACK_EXCEPTIONS as e:
+            logger.exception(
+                'Failed to release sync lock: %s',
+                e,
+            )
+
+    @property
+    def state(self) -> RollingOpsState:
+        if self._peer_relation is None:
+            return RollingOpsState(
+                status=RollingOpsStatus.NOT_INITIALIZED,
+                processing_backend=None,
+                operations=OperationQueue(),
+            )
+
+        operations = PeerUnitOperations(self.model, self.peer_relation_name, self.model.unit)
+
+        status = self.peer_manager.get_status()
+        if self._backend_state.is_etcd_managed():
+            try:
+                status = self.etcd_manager.get_status()
+            except _ETCD_FALLBACK_EXCEPTIONS as e:
+                logger.exception(
+                    'Failed to release sync lock: %s',
+                    e,
+                )
+                self._fallback_current_unit_to_peer()
+
+        return RollingOpsState(
+            status=status,
+            processing_backend=self._backend_state.backend,
+            operations=operations.queue,
+        )

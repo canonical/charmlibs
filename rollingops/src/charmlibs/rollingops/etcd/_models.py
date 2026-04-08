@@ -19,9 +19,7 @@ from typing import ClassVar
 
 from charmlibs.interfaces.tls_certificates import Certificate, PrivateKey
 from charmlibs.pathops import LocalPath
-from charmlibs.rollingops.common._models import (
-    with_pebble_retry,
-)
+from charmlibs.rollingops.common._utils import with_pebble_retry
 
 CERT_MODE = 0o644
 KEY_MODE = 0o600

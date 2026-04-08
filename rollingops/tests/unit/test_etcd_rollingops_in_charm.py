@@ -18,6 +18,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from ops.testing import Context, PeerRelation, Secret, State
+from scenario import RawDataBagContents
 from scenario.errors import UncaughtCharmError
 from tests.unit.conftest import (
     VALID_CA_CERT_PEM,
@@ -31,8 +32,14 @@ from charmlibs.interfaces.tls_certificates import (
     PrivateKey,
 )
 from charmlibs.rollingops.common._exceptions import RollingOpsInvalidSecretContentError
+from charmlibs.rollingops.common._models import ProcessingBackend
 from charmlibs.rollingops.etcd._models import SharedCertificate
 from charmlibs.rollingops.etcd._relations import CERT_SECRET_FIELD
+from charmlibs.rollingops.peer._models import LockIntent, OperationQueue
+
+
+def _unit_databag(state: State, peer: PeerRelation) -> RawDataBagContents:
+    return state.get_relation(peer.id).local_unit_data
 
 
 def test_leader_elected_creates_shared_secret_and_stores_id(
@@ -144,3 +151,30 @@ def test_invalid_certificate_secret_content_raises(
     with pytest.raises(UncaughtCharmError) as exc_info:
         ctx.run(ctx.on.relation_changed(peer_relation, remote_unit=1), state_in)
         assert isinstance(exc_info.value.__cause__, RollingOpsInvalidSecretContentError)
+
+
+def test_on_restart_action_lock_fallbacks_to_peer(
+    ctx: Context[RollingOpsCharm],
+):
+    peer = PeerRelation(endpoint='restart')
+    state_in = State(leader=False, relations={peer})
+
+    state_out = ctx.run(
+        ctx.on.action('restart', params={'delay': 10}),
+        state_in,
+    )
+
+    databag = _unit_databag(state_out, peer)
+    assert databag['state'] == LockIntent.REQUEST
+    assert databag['operations']
+    assert databag['processing_backend'] == ProcessingBackend.PEER
+    assert databag['etcd_cleanup_needed'] == 'true'
+
+    q = OperationQueue.from_string(databag['operations'])
+    assert len(q) == 1
+    operation = q.peek()
+    assert operation is not None
+    assert operation.callback_id == '_restart'
+    assert operation.kwargs == {'delay': 10}
+    assert operation.max_retry is None
+    assert operation.requested_at is not None

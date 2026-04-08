@@ -33,7 +33,7 @@ from charmlibs.interfaces.tls_certificates import (
     TLSCertificatesError,
 )
 from charmlibs.rollingops.common._exceptions import RollingOpsFileSystemError
-from charmlibs.rollingops.common._models import with_pebble_retry
+from charmlibs.rollingops.common._utils import with_pebble_retry
 from charmlibs.rollingops.etcd._models import SharedCertificate
 
 BASE_DIR = pathops.LocalPath('/var/lib/rollingops/tls')

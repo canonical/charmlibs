@@ -22,23 +22,25 @@ from ops.charm import (
     RelationCreatedEvent,
     RelationDepartedEvent,
 )
-from ops.framework import EventBase
+from tenacity import retry, stop_after_delay, wait_fixed
 
 from charmlibs.pathops import PebbleConnectionError
 from charmlibs.rollingops.common._exceptions import (
     RollingOpsEtcdNotConfiguredError,
+    RollingOpsFailedToGetLockError,
     RollingOpsInvalidLockRequestError,
     RollingOpsNoEtcdRelationError,
 )
 from charmlibs.rollingops.common._models import (
     Operation,
     OperationResult,
+    RollingOpsStatus,
     RunWithLockOutcome,
     RunWithLockStatus,
     UnitBackendState,
 )
 from charmlibs.rollingops.etcd import _etcdctl as etcdctl
-from charmlibs.rollingops.etcd._etcd import EtcdLock, ManagerOperationStore
+from charmlibs.rollingops.etcd._etcd import EtcdLease, EtcdLock, ManagerOperationStore
 from charmlibs.rollingops.etcd._models import RollingOpsKeys
 from charmlibs.rollingops.etcd._relations import EtcdRequiresV1, SharedClientCertificateManager
 from charmlibs.rollingops.etcd._worker import EtcdRollingOpsAsyncWorker
@@ -93,6 +95,7 @@ class EtcdRollingOpsManager(Object):
         self.keys = RollingOpsKeys.for_owner(cluster_id=cluster_id, owner=owner)
         self.lock = EtcdLock(lock_key=self.keys.lock_key, owner=owner)
         self.operations = ManagerOperationStore(self.keys, owner)
+        self._lease = None
 
         self.framework.observe(
             charm.on[self.peer_relation_name].relation_departed, self._on_peer_relation_departed
@@ -138,13 +141,6 @@ class EtcdRollingOpsManager(Object):
 
         self.operations.request(operation)
 
-    def clean_up_operations(self) -> None:
-        if not self._etcd_relation:
-            return
-
-        etcdctl.ensure_initialized()
-        self.operations.clean_up()
-
     def ensure_processing(self):
         self.worker.start()
 
@@ -152,23 +148,6 @@ class EtcdRollingOpsManager(Object):
         """Check whether the etcdctl command is available."""
         if not etcdctl.is_etcdctl_installed():
             logger.error('%s is not installed.', etcdctl.ETCDCTL_CMD)
-            # TODO: fallback to peer relation implementation.
-
-    def _on_rollingops_lock_granted(self, event: EventBase) -> None:
-        """Handle the event when a rolling operation lock is granted.
-
-        If etcd is not yet configured, the operation is skipped.
-        """
-        if not self._peer_relation or not self._etcd_relation:
-            # TODO: handle this case. Fallback to peer relation.
-            return
-        try:
-            etcdctl.ensure_initialized()
-        except RollingOpsEtcdNotConfiguredError:
-            # TODO: handle this case. Fallback to peer relation.
-            return
-        logger.info('Received a rolling-op lock granted event.')
-        self._on_run_with_lock()
 
     def _on_peer_relation_departed(self, event: RelationDepartedEvent) -> None:
         """Handle a unit departing from the peer relation.
@@ -289,3 +268,39 @@ class EtcdRollingOpsManager(Object):
             op_id=operation.op_id,
             result=result,
         )
+
+    def request_sync_lock(self, timeout: int) -> bool:
+        """Try to acquire the lock until timeout expires.
+
+        Args:
+            timeout: Maximum time in seconds to wait for the lock.
+
+        Returns:
+            True if the lock was granted, False otherwise.
+        """
+        self._lease = EtcdLease()
+        self._lease.grant()
+
+        @retry(stop=stop_after_delay(timeout), wait=wait_fixed(15), reraise=True)
+        def acquire():
+            if not self.lock.try_acquire(self._lease.id):  # type: ignore[reportArgumentType]
+                raise RollingOpsFailedToGetLockError('Lock not acquired.')
+
+        try:
+            acquire()
+            return True
+        except RollingOpsFailedToGetLockError:
+            self._lease.revoke()
+            return False
+
+    def release_sync_lock(self) -> None:
+        """Release the lock and revoke the associated lease."""
+        self.lock.release()
+        if self._lease is not None:
+            self._lease.revoke()
+
+    def is_sync_lock_used(self) -> bool:
+        return self._lease is not None
+
+    def get_status(self) -> RollingOpsStatus:
+        return RollingOpsStatus.REQUEST
