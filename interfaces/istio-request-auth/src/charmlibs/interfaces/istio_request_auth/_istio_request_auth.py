@@ -32,12 +32,7 @@ logger = logging.getLogger(__name__)
 
 
 class ClaimToHeaderData(BaseModel):
-    """Maps a JWT claim to a request header.
-
-    Attributes:
-        header: Target request header name.
-        claim: JWT claim name to extract.
-    """
+    """Maps a JWT claim to a request header."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -46,12 +41,7 @@ class ClaimToHeaderData(BaseModel):
 
 
 class FromHeaderData(BaseModel):
-    """Specifies a header location from which to extract a JWT.
-
-    Attributes:
-        name: Header name.
-        prefix: Prefix before the token value (e.g. "Bearer ").
-    """
+    """Specifies a header location from which to extract a JWT."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -60,16 +50,7 @@ class FromHeaderData(BaseModel):
 
 
 class JWTRuleData(BaseModel):
-    """A single JWT validation rule provided by the requiring app.
-
-    Attributes:
-        issuer: Issuer URL used to validate the token's iss claim.
-        jwks_uri: JWKS endpoint URL (defaults to OIDC discovery from issuer if omitted).
-        audiences: List of allowed audience values.
-        forward_original_token: Whether to forward the original JWT to the downstream application.
-        claim_to_headers: List of claim-to-header mappings.
-        from_headers: List of header locations from which to extract JWTs.
-    """
+    """A single JWT validation rule provided by the requiring app."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -82,11 +63,7 @@ class JWTRuleData(BaseModel):
 
 
 class RequestAuthData(BaseModel):
-    """Data sent by the requirer over the istio-request-auth relation.
-
-    Attributes:
-        jwt_rules: List of JWT validation rules.
-    """
+    """Data sent by the requirer over the istio-request-auth relation."""
 
     model_config = ConfigDict(frozen=True)
 

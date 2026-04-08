@@ -32,14 +32,7 @@ logger = logging.getLogger(__name__)
 
 
 class GatewayMetadata(BaseModel):
-    """Gateway workload metadata.
-
-    Attributes:
-        namespace: Kubernetes namespace where the Gateway is deployed.
-        gateway_name: Name of the Gateway resource.
-        deployment_name: Name of the Deployment managing the Gateway workload.
-        service_account: Name of the ServiceAccount used by the Gateway workload.
-    """
+    """Gateway workload metadata."""
 
     model_config = ConfigDict(frozen=True)
 
