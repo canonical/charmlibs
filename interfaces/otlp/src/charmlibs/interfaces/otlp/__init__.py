@@ -56,7 +56,7 @@ endpoints and publish them after the charm's endpoint details have been updated 
 TLS changes.
 
 The OtlpProvider also consumes rules from related OtlpRequirer charms, which can be retrieved with
-the ``rules()`` method::
+the ``rules`` property::
 
     from charmlibs.interfaces.otlp import OtlpProvider
 
@@ -66,8 +66,8 @@ the ``rules()`` method::
             self.framework.observe(self.on.update_status, self._access_rules)
 
         def _access_rules(self, event):
-            OtlpProvider(self).rules("promql")
-            OtlpProvider(self).rules("logql")
+            for relation_id, rule_store in OtlpProvider(self).rules.items():
+                pass  # do something with rule_store.logql and/or rule_store.promql
 
 Requirer Side (Charms requiring OTLP endpoints)
 -----------------------------------------------
@@ -114,6 +114,13 @@ OtlpProvider charms with the ``publish()`` method::
                 .add_logql(OFFICIAL_LOGQL_RULES)
             )
             OtlpRequirer(self, rules=rules).publish()
+
+Generic rules are sourced from `cosl.rules.generic_alert_groups <https://github.com/canonical/cos-lib/blob/main/src/cosl/rules.py>`_.
+If the charm is an aggregator e.g., opentelemetry-collector, the type of generic rules to be
+injected into the charm's RuleStore should reflect that. This is configurable by setting the
+``aggregator_peer_relation_name`` with the name of the charm's peer relation::
+
+    OtlpRequirer(..., aggregator_peer_relation_name="my-peers").publish()
 
 Relation Data Format
 ====================
