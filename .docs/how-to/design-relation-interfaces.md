@@ -2,24 +2,20 @@
 # How to design relation interfaces
 % Based on: OP083 - Relation Interface Design
 
-When designing a schema for a new interface, observe the following rules.
+When designing the relation data format for a new interface, observe the following rules.
 
-Relation data outlives a single charm revision: either side of the relation may be upgraded first, and upgrade itself is not atomic.
+Relation data outlives a single charm revision: either side of the relation may be upgraded first, and the upgrade itself is not atomic.
 Plan for interface to evolve to avoid breaking changes and downtime during application upgrades.
 
-The databag format is long-lived contract, while the charm-facing API is easier to change.
-Please keep the two separate from the start.
+The relation data format is a long-lived contract, while the charm-facing API is easier to change.
+Keep the two separate from the start.
 
 Additionally, the ergonomics of using multiple libraries in a charm require specific API patterns.
 When interface evolves, some version of a library has to support both old and new schema, which should not leak to the charms.
 
-The ideal charm library API shape is different for delta and holistic charms. Specifically, the comparison between current relation data takes place in the library for a delta charm (against old relation data), and in the charm (againts the workload) in a holistic charm.
+First, decide what data needs to be transmitted over a relation, then, design the JSON representaion bits with provisions for backwards and forwards compatibility.
 
-First, decide what data bits should appear in the databag in the first place.
-
-Then, design the JSON representaion for these bits with provisions for backwards and forwards compatibility.
-
-Using newer Pydantic, prefer the `MISSING` sentinel value over the more traditional `None`.
+New interface libraries should use `pydantic ~ 2.12; ops ~= 3.6; pyright ~ 1.1.402`, and prefer the `MISSING` sentinel value over the more traditional `None`. Note that such libraries can only used by charms based on Ubuntu 22.04 or newer.
 
 ```py
 # missing field is read as <MISSING>; deleted when written out
@@ -34,27 +30,42 @@ Unit tests must capture the interface schema evolution. Unit tests typically als
 When the interface is modified, running unit tests against both new and old test vectors informs the charm library developer what is extended and what is broken.
 The developer then updates the unit tests encoding the conscious choice how the old data is meant to be handled.
 
-## Databag schema
+## Disign the relation data format
 
 The only changes allowed on a published interface are:
 
-- adding a new field (top level or nested)
-- removing a field (ideally on major version bump)
-- with extra caution: tweaking field validators; or extending or narrowing an enum range
+- adding a new field, at the top level or nested: this is a new feature that must be communicated by a minor version bump of the library.
+- removing a field: this is a backwards incompatible change, and must be clearly communicated by a major version bump of the library.
+- tweaking field validators or extending or narrowing an enum range: must be done with extra care, including compatibility testing between the old and new versions of the library.
 
 ### Fixed field types
 
 Once a field has been declared, the type of that field must not be changed.
 
-Field types cannot be narrowed, widened or changed entirely.
+Field types cannot be narrowed, widened or changed entirely, as such field would fail to validate in newer or older application respectively.
 
-Same applies to significant changes to the range of values that a field validator accepts.
+The same applies to significant changes to the range of values that a field validator accepts. For example:
 
-Unexpected enum values should be parsed as `MISSING` or a pre-defined catch-all `UNKNOWN` value:
+- narrowing set of allowed protocol from any to HTTP and HTTPS is probably a bug fix, if other protocols like FTP couldn't be used the workload
+- extending the ip address field with IPv6 addresses represents a breaking change, because the older remote application is bound to reject the value, potentially making the interface useless
+- narrowing the ip address field and removing IPv4 addresses represents a breaking change, because if the older remote application sends those, this side the relation is bound to reject the value, potentially making the interface useless
+
+Unexpected enum values should be treated as missing (deserialised as `<MISSING>`) or coerced to a pre-defined catch-all `UNKNOWN` value:
 
 ```py
-foo: Enum(A, B) | MISSING = MISSING
-bar: Enum(UNKNOWN, A, B) = UNKNOWN
+class FooEnum(StrEnum):
+    A = "A"
+    B = "B"
+
+foo: FooEnum | MISSING = MISSING
+
+
+class BarEnum(StrEnum):
+    UNKNOWN = "UNKNOWN"
+    A = "A"
+    B = "B"
+
+bar: BarEnum = BarEnum.UNKNOWN
 ```
 
 TBD testing
@@ -78,7 +89,7 @@ def test_invalid_field_types(bad_value: Any):
 
 ### No mandatory fields
 
-Top-level fields must not required or optional.
+Top-level fields must be not required (can be missing) or optional (can be `None`).
 
 ```py
 foo: str | MISSING = MISSING
@@ -92,7 +103,7 @@ role: Role | MISSING = MISSING
   session: str | MISSING = MISSING
 ```
 
-A default value may be used instead in some cases.
+A default value may be used instead if the interface semantics call for a well-defined default value:
 
 ```py
 protocol: Literal["http", "https"] = "https"
@@ -101,10 +112,11 @@ priority: int = 100
 sans_dns: frozenset[str] = frozenset()
 ```
 
-TBD test
+The charm library implementation must be accompanied by a unit test that ensures that the data with missing values in case of not-required semantics or null values in case of optional semantics is parsed correctly.
 
 ```py
 V1_DATABAG = {"name": "aa", "surname": "bb"}
+
 @pytest.mark.parametrize("field_to_remove", ["name", "surname"])
 def test_missing_fields(field_to_remove):
     data = {**V1_DATABAG}
@@ -114,16 +126,14 @@ def test_missing_fields(field_to_remove):
 
 ### No field reuse
 
-If a field has been removed from the interface, another field with the very same name must not be added.
+If a field has been removed from the interface, another field with the very same name must not be added. The rule exists to make field removal possible without the risk of misinterpretation when two applications from different eras are intergrated.
 
 The exception is reverting removal of a field, where the field is brought back with the exact same type and semantics.
 
-TBD test
-
-A unit test:
+Field reuse must be prevented, either by keeping a unit test after removal:
 
 ```py
-V1_DATABAG = {"name": "a name", "surname": "bb"}
+V1_DATABAG = {"name": "a name", "surname": "a surname"}
 
 def test_removed_fields():
     assert DataV2.model_validate(V1_DATABAG).name == "a name"
@@ -133,16 +143,16 @@ def test_removed_fields():
     assert DataV2.model_validate(V1_DATABAG).model_dump == {"name": "a name"}
 ```
 
-Or a state transition test:
+Or an equivalent state transition test:
 
 ```py
 def _on_relation_changed(self, event: ops.RelationChangedEvent):
     data = event.relation.load(lib.DataV2, event.app)
-    assert data.name == "aa"
+    assert ...
 
 # test
-data = {"name": '"aa"', "surname": '"bb"'}
-rel = testing.Relation('db', remote_app_data=data)
+data = {"name": '"a name"', "surname": '"a surname"'}
+rel = testing.Relation('endpoint', remote_app_data=data)
 state_in = testing.State(leader=True, relations={rel})
 ctx.run(ctx.on.relation_changed(rel), state_in)
 ```
