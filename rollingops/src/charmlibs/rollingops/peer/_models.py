@@ -231,29 +231,29 @@ class PeerUnitOperations:
             data.executed_at_dt = now_timestamp()
             return
 
-        if result == OperationResult.RETRY_HOLD:
-            queue.increase_attempt()
-            operation = queue.peek()
-            if operation is None or operation.is_max_retry_reached():
-                logger.warning('Operation max retry reached. Dropping.')
+        match result:
+            case OperationResult.RETRY_HOLD:
+                queue.increase_attempt()
+                operation = queue.peek()
+                if operation is None or operation.is_max_retry_reached():
+                    logger.warning('Operation max retry reached. Dropping.')
+                    queue.dequeue()
+                    data.intent = LockIntent.REQUEST if queue.peek() else LockIntent.IDLE
+                else:
+                    data.intent = LockIntent.RETRY_HOLD
+
+            case OperationResult.RETRY_RELEASE:
+                queue.increase_attempt()
+                operation = queue.peek()
+                if operation is None or operation.is_max_retry_reached():
+                    logger.warning('Operation max retry reached. Dropping.')
+                    queue.dequeue()
+                    data.intent = LockIntent.REQUEST if queue.peek() else LockIntent.IDLE
+                else:
+                    data.intent = LockIntent.RETRY_RELEASE
+            case _:
                 queue.dequeue()
                 data.intent = LockIntent.REQUEST if queue.peek() else LockIntent.IDLE
-            else:
-                data.intent = LockIntent.RETRY_HOLD
-
-        elif result == OperationResult.RETRY_RELEASE:
-            queue.increase_attempt()
-            operation = queue.peek()
-            if operation is None or operation.is_max_retry_reached():
-                logger.warning('Operation max retry reached. Dropping.')
-                queue.dequeue()
-                data.intent = LockIntent.REQUEST if queue.peek() else LockIntent.IDLE
-            else:
-                data.intent = LockIntent.RETRY_RELEASE
-
-        else:
-            queue.dequeue()
-            data.intent = LockIntent.REQUEST if queue.peek() else LockIntent.IDLE
 
         data.queue = queue
         data.executed_at_dt = now_timestamp()

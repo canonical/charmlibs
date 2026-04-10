@@ -299,7 +299,8 @@ def test_subsequent_lock_request_of_same_op(juju: jubilant.Juju, app_name: str):
     juju.run(unit_b, 'deferred-restart', {'delay': 10, 'max-retry': 1})
     juju.run(unit_a, 'failed-restart', {'delay': 1, 'max-retry': 2})
     for _ in range(3):
-        juju.run(unit_a, 'restart', {'delay': 1})  # change to failed-restart
+        juju.run(unit_a, 'deferred-restart', {'delay': 1, 'max-retry': 0})
+    juju.run(unit_a, 'restart', {'delay': 1})
 
     juju.wait(
         lambda status: status.apps[app_name].units[unit_a].is_active,
@@ -308,24 +309,47 @@ def test_subsequent_lock_request_of_same_op(juju: jubilant.Juju, app_name: str):
     )
 
     unit_a_events = get_unit_events(juju, unit_a)
-    relevant_events = [e['event'] for e in unit_a_events]
+    relevant_events = [e['event'] for e in unit_a_events if not e['event'].startswith('action')]
 
     logger.info('unit_a_events %s', unit_a_events)
 
     assert relevant_events == [
-        'action:failed-restart',
-        'action:restart',
-        'action:restart',
-        'action:restart',
         '_failed_restart:start',  # attempt 0
         '_failed_restart:retry_release',
         '_failed_restart:start',  # retry 1
         '_failed_restart:retry_release',
         '_failed_restart:start',  # retry 2
         '_failed_restart:retry_release',
+        '_deferred_restart:start',  # attemp 0
+        '_deferred_restart:retry_hold',
         '_restart:start',
         '_restart:done',
     ], f'unexpected event sequence: {relevant_events}'
+
+
+def test_sync_lock_is_executed(juju: jubilant.Juju, app_name: str):
+    status = juju.status()
+    units = sorted(status.apps[app_name].units)
+    for unit in units:
+        remove_transition_file(juju, unit)
+
+    for unit in units:
+        juju.run(unit, 'sync-restart', {'delay': 1})
+
+    juju.wait(jubilant.all_active, error=jubilant.any_error, timeout=TIMEOUT)
+
+    expected_events = [
+        'action:sync-restart',
+        '_sync_restart:start',
+        '_sync_restart:done',
+    ]
+
+    # mutually exclusive execution is not guarantee
+    for unit in units:
+        events = get_unit_events(juju, unit)
+        relevant_events = [e['event'] for e in events]
+
+        assert expected_events == relevant_events, f'unexpected event sequence: {relevant_events}'
 
 
 def test_retry_on_leader_unit_leaves_the_hook(juju: jubilant.Juju, app_name: str):

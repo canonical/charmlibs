@@ -186,7 +186,7 @@ class RollingOpsManager(Object):
         """
         if self._backend_state.is_peer_managed():
             logger.info('Executing rollingop on peer backend.')
-            self.peer_manager._on_run_with_lock()
+            self.peer_manager._on_rollingops_lock_granted(event)
             return
         outcome = None
         try:

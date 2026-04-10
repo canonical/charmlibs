@@ -246,7 +246,7 @@ class PeerRollingOpsManager(Object):
         operations = self._operations(self.model.unit)
         if operations.should_run(lock):
             self._on_run_with_lock()
-            self._process_locks()
+        self._process_locks()
 
     def _on_relation_departed(self, event: RelationDepartedEvent) -> None:
         """Leader cleanup: if a departing unit was granted a lock, clear the grant.
@@ -259,7 +259,7 @@ class PeerRollingOpsManager(Object):
             lock = self._lock()
             if lock.is_granted(unit.name):
                 lock.release()
-                self._process_locks()
+        self._process_locks()
 
     def _on_relation_changed(self, _: RelationChangedEvent) -> None:
         """Process relation changed."""
@@ -475,6 +475,7 @@ class PeerRollingOpsManager(Object):
             logger.exception('Operation failed: %s: %s', operation.callback_id, e)
             result = OperationResult.RETRY_RELEASE
 
+        logger.info('Operation %s executed with result %s.', operation.callback_id, result)
         operations.finish(result)
 
     def mirror_result(self, op_id: str, result: OperationResult) -> None:

@@ -135,11 +135,14 @@ class Charm(CharmBase):
     def _on_sync_restart_action(self, event: ActionEvent):
         self.model.unit.status = WaitingStatus('Awaiting _sync_restart operation')
         timeout = event.params.get('timeout', 60)
-
+        delay = event.params.get('delay')
+        self._record_transition('action:sync-restart', delay=delay, timeout=timeout)
         with self.restart_manager.acquire_sync_lock(backend_id='stop', timeout=timeout):
+            self._record_transition('_sync_restart:start', delay=delay, timeout=timeout)
             self.model.unit.status = MaintenanceStatus('Executing _sync_restart operation')
             time.sleep(int(event.params.get('delay', 0)))
             self.model.unit.status = ActiveStatus('')
+            self._record_transition('_sync_restart:done', delay=delay, timeout=timeout)
             return
         event.fail()
 
