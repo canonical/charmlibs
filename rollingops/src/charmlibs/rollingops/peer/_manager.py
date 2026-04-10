@@ -164,7 +164,6 @@ from charmlibs.rollingops.common._exceptions import (
     RollingOpsDecodingError,
     RollingOpsInvalidLockRequestError,
     RollingOpsNoRelationError,
-    RollingOpsSyncLockNotImplementedError,
 )
 from charmlibs.rollingops.common._models import Operation, OperationResult, RollingOpsStatus
 from charmlibs.rollingops.peer._models import (
@@ -356,7 +355,7 @@ class PeerRollingOpsManager(Object):
                 continue
 
             if operations.is_retry_hold():
-                self._grant_lock(lock, operations)
+                self._grant_lock(lock, operations.unit.name)
                 return
 
             if operations.is_waiting():
@@ -376,7 +375,7 @@ class PeerRollingOpsManager(Object):
 
         self._grant_lock(lock, selected)
 
-    def _grant_lock(self, lock: PeerAppLock, operations: PeerUnitOperations) -> None:
+    def _grant_lock(self, lock: PeerAppLock, unit_name: str) -> None:
         """Grant the lock to the selected unit.
 
         If the lock is granted to the leader unit:
@@ -385,12 +384,12 @@ class PeerRollingOpsManager(Object):
 
         Args:
             lock: The lock instance to grant.
-            operations: operations.
+            unit_name: name of the unit to which the lock is granted.
         """
-        lock.grant(operations.unit.name)
-        logger.info('Lock granted to unit=%s.', operations.unit.name)
+        lock.grant(unit_name)
+        logger.info('Lock granted to unit=%s.', unit_name)
 
-        if operations.unit.name == self.model.unit.name:
+        if unit_name == self.model.unit.name:
             self.worker.start()
 
     def request_async_lock(
@@ -485,25 +484,6 @@ class PeerRollingOpsManager(Object):
         actually executed the operation.
         """
         self._operations(self.model.unit).mirror_finish(op_id, result)
-
-    def request_sync_lock(self, timeout: int) -> bool:
-        """Try to acquire the lock until timeout expires.
-
-        Args:
-            timeout: Maximum time in seconds to wait for the lock.
-
-        Raises:
-            RollingOpsSyncLockNotImplementedError
-        """
-        raise RollingOpsSyncLockNotImplementedError
-
-    def release_sync_lock(self) -> None:
-        """Release the lock and revoke the associated lease.
-
-        Raises:
-            RollingOpsSyncLockNotImplementedError
-        """
-        raise RollingOpsSyncLockNotImplementedError
 
     def get_status(self) -> RollingOpsStatus:
         """Return the current rolling-ops status for this unit in peer mode.

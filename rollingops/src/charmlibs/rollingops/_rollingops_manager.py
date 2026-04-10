@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""etcd rolling ops."""
+"""Rollingops common API interface."""
 
 import logging
 from contextlib import contextmanager
@@ -106,16 +106,8 @@ class RollingOpsManager(Object):
         return self.model.get_relation(self.peer_relation_name)
 
     @property
-    def _etcd_relation(self) -> Relation | None:
-        """Return the etcd relation for this charm."""
-        return self.model.get_relation(self.etcd_relation_name)
-
-    @property
     def _backend_state(self) -> UnitBackendState:
         return UnitBackendState(self.model, self.peer_relation_name, self.model.unit)
-
-    def _has_relation(self, relation_name: str) -> bool:
-        return self.model.get_relation(relation_name) is not None
 
     def _select_processing_backend(self) -> ProcessingBackend:
         """Choose which backend should own new work for this unit."""

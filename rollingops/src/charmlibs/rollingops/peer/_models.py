@@ -358,10 +358,8 @@ def iter_peer_units(model: Model, relation_name: str) -> Iterator[Unit]:
     yield from units
 
 
-def pick_oldest_completed(
-    operations_list: list[PeerUnitOperations],
-) -> PeerUnitOperations | None:
-    """Choose the retry candidate with the oldest executed_at timestamp."""
+def pick_oldest_completed(operations_list: list[PeerUnitOperations]) -> str | None:
+    """Return the name of the unit with the oldest executed_at timestamp."""
     selected = None
     oldest = None
 
@@ -373,13 +371,11 @@ def pick_oldest_completed(
             oldest = timestamp
             selected = operations
 
-    return selected
+    return selected.unit.name if selected is not None else None
 
 
-def pick_oldest_request(
-    operations_list: list[PeerUnitOperations],
-) -> PeerUnitOperations | None:
-    """Choose the request candidate with the oldest head operation."""
+def pick_oldest_request(operations_list: list[PeerUnitOperations]) -> str | None:
+    """Return the name of the unit with the oldest head operation."""
     selected = None
     oldest = None
 
@@ -391,4 +387,4 @@ def pick_oldest_request(
             oldest = timestamp
             selected = operations
 
-    return selected
+    return selected.unit.name if selected is not None else None
