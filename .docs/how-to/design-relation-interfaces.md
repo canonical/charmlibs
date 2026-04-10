@@ -68,17 +68,19 @@ class BarEnum(StrEnum):
 bar: BarEnum = BarEnum.UNKNOWN
 ```
 
-TBD testing
+The allowed field types should be validated with a unit test, for example:
 
 ```py
 V1_FLOAT = {"number": 42.1}
 V1_INT = {"number": 42}
 V1_MISSING = {}
 
+
 def test_field_types():
     Data.model_validate(V1_FLOAT)
     Data.model_validate(V1_INT)
     Data.model_validate(V1_MISSING)
+
 
 # Note that Pydantic coerces False to 0 and "42" to 42
 @pytest.mark.parametrize("bad_value", ["str", [], {}, None])
@@ -177,7 +179,7 @@ Collections of primitive types are strongly discouraged.
 
 Data maps are strongly discouraged. An exception to this rule if when the data map key is a Juju entity with a well-known string representation, such as unit name or machine id.
 
-TBD test
+The definition must be accompanied by a unit test, which may look as follows. Note that including a custom validator requires a comprehensive set of unit tests.
 
 ```py
 DATABAG = {"foos": [
@@ -187,8 +189,8 @@ DATABAG = {"foos": [
 ]}
 
 def test_foos():
-    foos_seen_by_charm = charm_lib.parse(DATABAG).foos
-    assert charm_sees = {"a", "b"}
+    accepted_foos = charm_lib.parse(DATABAG).foos
+    assert accepted_foos == {"a", "b"}
 ```
 
 ### URLs and URIs
@@ -214,7 +216,7 @@ A sample checklist:
 - is the query required, optional or not allowed; any restrictions on keys, expected treatment for duplicate keys
 - is the fragment required, optional or not allowed; any restrictions, such as max length
 
-TBD testing
+A set of unit tests that verifies the allowed URLs may look like this, at minimum:
 
 ```py
 @pytest.mark.parametrize("bad_url", [
@@ -236,7 +238,6 @@ def test_bad_url_field_values(bad_url: str):
 def test_good_url_field_values(good_url: str)
     SomeData(url_field=good_url)
 ```
-
 
 ### Semantic grouping
 
@@ -320,7 +321,7 @@ Likewise, `.is_ready` should catch exceptions arising from loading and parsing t
 
 Exceptions can and should be used to report incorrect initialization (wrong relation name), or transient errors (unexpected hook command errors).
 
-TBD test
+Unit tests must be used to validate that initialisation and ready markers don't crash the charm on bad data:
 
 ```py
 # dummy charm
@@ -352,7 +353,7 @@ The specific shape of the API varies, here are some common examples:
 - `.is_foo_ready` and `.is_bar_ready` when the interface provides two functions
 - `.is_request_ready` and `.is_acknowledgement_ready` when two distinct states can be expressed over the interface
 
-TBD test
+A set of unit tests must be provided that clearly shows what data is considered "ready":
 
 ```py
 # dummy charm
@@ -385,7 +386,7 @@ charm --^^^^^^^^^^^^^^^^^
 charm library -------------^^^^^^^^^^^^^^^
 ```
 
-TBD test
+A unit tests must be provided that shows how the interface error is surfaced:
 
 ```py
 # dummy charm
