@@ -4,13 +4,12 @@
 
 When designing the relation data format for a new interface, observe the following rules.
 
-Relation data outlives a single charm revision: either side of the relation may be upgraded first, and the upgrade itself is not atomic.
+Relation data outlives a single charm revision: either side of the relation may be upgraded first, and the upgrade itself is not atomic. The same applies to secret content when a Juju secret is shared over a relation.
 Plan for the interface to evolve without causing breaking changes or downtime during application upgrades.
 
 The relation data format is a long-lived contract, while the charm-facing API is easier to change.
 Keep the two separate from the start.
 
-Additionally, the ergonomics of using multiple libraries in a charm require specific API patterns.
 When an interface evolves, some version of a library has to support both the old and new schema, and that complexity should not leak into charm code.
 
 First, decide what data needs to be transmitted over a relation. Then design the JSON representation with provisions for backward and forward compatibility.
@@ -161,9 +160,9 @@ ctx.run(ctx.on.relation_changed(rel), state_in)
 
 ### Collections
 
-Collections must be represented as arrays of objects on the wire, with few exceptions.
+Collections must be represented as arrays of objects on the wire when using the default JSON serialisation.
 
-Collections must be emitted in some stable order, and the order must be ignored on reception. In other words, collections are sets.
+Collections must be emitted in a stable order, so that setting the same data does not trigger interface bounce. The order must be ignored on reception, and the recipient is expected to discard duplicates. In other words, collections are sets.
 
 ```py
 class Endpoint(pydantic.BaseModel, frozen=True):
@@ -244,9 +243,18 @@ def test_good_url_field_values(good_url: str):
 The databag content should be structured to reflect the meaning of data, for example:
 
 ```py
+# Do this:
 {
     "direct": {"host": ..., "port": ...},
     "upstream": {"base_url": ..., "path": ...}
+}
+
+# Avoid this:
+{
+    "host": ...,
+    "port": ...,
+    "base_url": ...,
+    "path": ...,
 }
 ```
 
