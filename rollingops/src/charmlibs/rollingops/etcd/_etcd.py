@@ -294,13 +294,16 @@ class EtcdOperationQueue:
 
         if old_operation is not None and operation == old_operation:
             logger.info(
-                'Operation %s not added to the queue. It already exists in the back of the queue.',
+                'Operation %s not added to the etcd queue. '
+                'It already exists in the back of the queue.',
                 operation.callback_id,
             )
+            return
 
         op_str = operation.to_string()
         key = f'{self.prefix}{operation.op_id}'
         etcdctl.run('put', key, op_str)
+        logger.info('Operation %s added to the etcd queue.', operation.callback_id)
 
     def clear(self) -> None:
         etcdctl.run('del', self.prefix, '--prefix')

@@ -202,7 +202,8 @@ class PeerUnitOperations:
         added = len(queue) != previous_length
         if not added:
             logger.info(
-                'Operation %s not added to the queue. It already exists in the back of the queue.',
+                'Operation %s not added to the peer queue. '
+                'It already exists in the back of the queue.',
                 operation.callback_id,
             )
             return
@@ -211,7 +212,7 @@ class PeerUnitOperations:
         if len(queue) == 1:
             data.intent = LockIntent.REQUEST
         self._save(data)
-        logger.info('Operation %s added to the queue.', operation.callback_id)
+        logger.info('Operation %s added to the peer queue.', operation.callback_id)
 
     def finish(self, result: OperationResult) -> None:
         """Persist the result of executing the current operation."""
