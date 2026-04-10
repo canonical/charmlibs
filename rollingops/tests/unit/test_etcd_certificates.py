@@ -33,7 +33,7 @@ def make_shared_certificate() -> SharedCertificate:
     )
 
 
-def test_certs():
+def test_make_shared_certificate_is_valid():
     Certificate.from_string(VALID_CA_CERT_PEM)
     PrivateKey.from_string(VALID_CLIENT_KEY_PEM)
     Certificate.from_string(VALID_CLIENT_CERT_PEM)

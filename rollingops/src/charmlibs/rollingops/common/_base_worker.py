@@ -35,16 +35,16 @@ class BaseRollingOpsAsyncWorker(Object):
     _pid_field: str
     _log_filename: str
 
-    def __init__(self, charm: CharmBase, handle_name: str, relation_name: str):
+    def __init__(self, charm: CharmBase, handle_name: str, peer_relation_name: str):
         super().__init__(charm, handle_name)
         self._charm = charm
         self._charm_dir = charm.charm_dir
-        self._relation_name = relation_name
+        self._peer_relation_name = peer_relation_name
 
     @property
     def _relation(self) -> Relation | None:
         """Return the peer relation."""
-        return self._charm.model.get_relation(self._relation_name)
+        return self._charm.model.get_relation(self._peer_relation_name)
 
     def _venv_site_packages(self) -> pathops.LocalPath:
         """Return the charm virtualenv site-packages path."""
