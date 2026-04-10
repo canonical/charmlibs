@@ -1013,9 +1013,9 @@ class CertificateSigningRequest:
 
         sans: list[x509.GeneralName] = []
         if attributes.sans_oid:
-            sans.extend(
-                [x509.RegisteredID(x509.ObjectIdentifier(san)) for san in attributes.sans_oid]
-            )
+            sans.extend([
+                x509.RegisteredID(x509.ObjectIdentifier(san)) for san in attributes.sans_oid
+            ])
         if attributes.sans_ip:
             sans.extend([x509.IPAddress(ipaddress.ip_address(san)) for san in attributes.sans_ip])
         if attributes.sans_dns:
@@ -1183,23 +1183,21 @@ class CertificateRequestAttributes:
 
     def __hash__(self) -> int:
         """Return hash of the CertificateRequestAttributes object."""
-        return hash(
-            (
-                self.common_name,
-                frozenset(self.sans_dns) if self.sans_dns else None,
-                frozenset(self.sans_ip) if self.sans_ip else None,
-                frozenset(self.sans_oid) if self.sans_oid else None,
-                self.email_address,
-                self.organization,
-                self.organizational_unit,
-                self.country_name,
-                self.state_or_province_name,
-                self.locality_name,
-                self.is_ca,
-                self.add_unique_id_to_subject_name,
-                tuple(self.additional_critical_extensions),
-            )
-        )
+        return hash((
+            self.common_name,
+            frozenset(self.sans_dns) if self.sans_dns else None,
+            frozenset(self.sans_ip) if self.sans_ip else None,
+            frozenset(self.sans_oid) if self.sans_oid else None,
+            self.email_address,
+            self.organization,
+            self.organizational_unit,
+            self.country_name,
+            self.state_or_province_name,
+            self.locality_name,
+            self.is_ca,
+            self.add_unique_id_to_subject_name,
+            tuple(self.additional_critical_extensions),
+        ))
 
     def is_valid(self) -> bool:
         """Validate the attributes of the certificate request.
@@ -1246,15 +1244,13 @@ class ProviderCertificate:
         Returns:
             str: JSON representation of the object
         """
-        return json.dumps(
-            {
-                "csr": str(self.certificate_signing_request),
-                "certificate": str(self.certificate),
-                "ca": str(self.ca),
-                "chain": [str(cert) for cert in self.chain],
-                "revoked": self.revoked,
-            }
-        )
+        return json.dumps({
+            "csr": str(self.certificate_signing_request),
+            "certificate": str(self.certificate),
+            "ca": str(self.ca),
+            "chain": [str(cert) for cert in self.chain],
+            "revoked": self.revoked,
+        })
 
 
 @dataclass(frozen=True)
@@ -1701,24 +1697,20 @@ def _generate_subject_alternative_name_extension(
     sans: list[x509.GeneralName] = []
     try:
         loaded_san_ext = csr.extensions.get_extension_for_class(x509.SubjectAlternativeName)
-        sans.extend(
-            [x509.DNSName(name) for name in loaded_san_ext.value.get_values_for_type(x509.DNSName)]
-        )
-        sans.extend(
-            [x509.IPAddress(ip) for ip in loaded_san_ext.value.get_values_for_type(x509.IPAddress)]
-        )
-        sans.extend(
-            [
-                x509.RegisteredID(oid)
-                for oid in loaded_san_ext.value.get_values_for_type(x509.RegisteredID)
-            ]
-        )
-        sans.extend(
-            [
-                x509.RFC822Name(name)
-                for name in loaded_san_ext.value.get_values_for_type(x509.RFC822Name)
-            ]
-        )
+        sans.extend([
+            x509.DNSName(name) for name in loaded_san_ext.value.get_values_for_type(x509.DNSName)
+        ])
+        sans.extend([
+            x509.IPAddress(ip) for ip in loaded_san_ext.value.get_values_for_type(x509.IPAddress)
+        ])
+        sans.extend([
+            x509.RegisteredID(oid)
+            for oid in loaded_san_ext.value.get_values_for_type(x509.RegisteredID)
+        ])
+        sans.extend([
+            x509.RFC822Name(name)
+            for name in loaded_san_ext.value.get_values_for_type(x509.RFC822Name)
+        ])
     except x509.ExtensionNotFound:
         pass
     # If email is present in the CSR Subject, make sure it is also in the SANS
@@ -3365,12 +3357,10 @@ class TLSCertificatesProvidesV4(Object):
             if not relation.app:
                 logger.warning("Relation %s does not have an application", relation.id)
                 continue
-            certificates.extend(
-                [
-                    certificate.to_provider_certificate(relation_id=relation.id)
-                    for certificate in self._load_provider_certificates(relation)
-                ]
-            )
+            certificates.extend([
+                certificate.to_provider_certificate(relation_id=relation.id)
+                for certificate in self._load_provider_certificates(relation)
+            ])
         return certificates
 
     def get_provider_certificate_errors(
@@ -3391,18 +3381,14 @@ class TLSCertificatesProvidesV4(Object):
             if not relation.app:
                 logger.warning("Relation %s does not have an application", relation.id)
                 continue
-            errors.extend(
-                [
-                    ProviderCertificateError(
-                        relation_id=relation.id,
-                        certificate_signing_request=CertificateSigningRequest.from_string(
-                            entry.csr
-                        ),
-                        error=entry.error,
-                    )
-                    for entry in self._load_provider_request_errors(relation)
-                ]
-            )
+            errors.extend([
+                ProviderCertificateError(
+                    relation_id=relation.id,
+                    certificate_signing_request=CertificateSigningRequest.from_string(entry.csr),
+                    error=entry.error,
+                )
+                for entry in self._load_provider_request_errors(relation)
+            ])
         return errors
 
     def get_unsolicited_certificates(
