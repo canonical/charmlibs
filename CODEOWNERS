@@ -36,7 +36,7 @@
 /interfaces/azure_service_principal/ @canonical/data
 /interfaces/azure_storage/ @canonical/data
 /interfaces/certificate_transfer/ @canonical/tls
-/interfaces/cloudflared_route/ @canonical/platform-engineering 
+/interfaces/cloudflared_route/ @canonical/platform-engineering
 /interfaces/connect_client/ @canonical/data-bigdata
 /interfaces/cos_agent/ @canonical/observability
 /interfaces/database_backup/ @canonical/data
@@ -44,6 +44,7 @@
 /interfaces/etcd_client/ @canonical/data-nosql
 /interfaces/filesystem_info/ @canonical/hpc-team
 /interfaces/forward_auth @canonical/identity
+/interfaces/gateway_metadata/ @canonical/service-mesh
 /interfaces/grafana_auth/ @canonical/observability
 /interfaces/grafana_datasource/ @canonical/observability
 /interfaces/grafana_datasource_exchange/ @canonical/observability
