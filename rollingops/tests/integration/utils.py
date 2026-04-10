@@ -19,6 +19,8 @@ from datetime import UTC, datetime
 
 import jubilant
 
+from charmlibs import pathops
+
 TRACE_FILE = '/var/lib/charm-rolling-ops/transitions.log'
 
 
@@ -53,7 +55,10 @@ def remove_transition_file(juju: jubilant.Juju, unit: str):
 
 
 def is_empty_file(juju: jubilant.Juju, unit: str, path: str) -> bool:
-    task = juju.exec(f'test ! -s {path}', unit=unit)
-    if task.status != 'completed' or task.return_code != 0:
+    pathops_path = pathops.LocalPath(path)
+    try:
+        task = juju.exec(f'test ! -s {pathops_path}', unit=unit)
+    except Exception:
         return False
-    return True
+
+    return task.status == 'completed' and task.return_code == 0

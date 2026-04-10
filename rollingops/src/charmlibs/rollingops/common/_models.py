@@ -127,22 +127,10 @@ class UnitBackendState:
         """Return which backend owns execution for this unit's queue."""
         return self._load().backend
 
-    def set_backend(self, backend: ProcessingBackend) -> None:
-        """Set which backend owns execution for this unit's queue."""
-        data = self._load()
-        data.backend = backend
-        self._save(data)
-
     @property
     def cleanup_needed(self) -> bool:
         """Return whether etcd cleanup is required before etcd can be reused."""
         return self._load().cleanup_needed
-
-    def _set_cleanup_needed(self, value: bool) -> None:
-        """Persist whether etcd cleanup is required."""
-        data = self._load()
-        data.cleanup_needed = value
-        self._save(data)
 
     def fallback_to_peer(self) -> None:
         """Switch this unit's queue to peer processing and mark etcd cleanup needed."""
@@ -152,8 +140,11 @@ class UnitBackendState:
         self._save(data)
 
     def clear_fallback(self) -> None:
-        """Clear the etcd cleanup-needed flag."""
-        self._set_cleanup_needed(False)
+        """Clear the etcd cleanup-needed flag and set the backend to ETCD."""
+        data = self._load()
+        data.backend = ProcessingBackend.ETCD
+        data.cleanup_needed = False
+        self._save(data)
 
     def is_peer_managed(self) -> bool:
         """Return whether the peer backend should process this unit's queue."""

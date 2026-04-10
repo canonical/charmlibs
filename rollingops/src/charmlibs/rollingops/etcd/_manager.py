@@ -13,21 +13,19 @@
 # limitations under the License.
 
 import logging
+import time
 from typing import Any
 
 from ops import Object, Relation
 from ops.charm import (
     CharmBase,
-    RelationBrokenEvent,
     RelationCreatedEvent,
     RelationDepartedEvent,
 )
-from tenacity import retry, stop_after_delay, wait_fixed
 
 from charmlibs.pathops import PebbleConnectionError
 from charmlibs.rollingops.common._exceptions import (
     RollingOpsEtcdNotConfiguredError,
-    RollingOpsFailedToGetLockError,
     RollingOpsInvalidLockRequestError,
     RollingOpsNoEtcdRelationError,
 )
@@ -102,9 +100,6 @@ class EtcdRollingOpsManager(Object):
             charm.on[self.peer_relation_name].relation_departed, self._on_peer_relation_departed
         )
         self.framework.observe(
-            charm.on[self.etcd_relation_name].relation_broken, self._on_etcd_relation_broken
-        )
-        self.framework.observe(
             charm.on[self.etcd_relation_name].relation_created, self._on_etcd_relation_created
         )
 
@@ -120,7 +115,7 @@ class EtcdRollingOpsManager(Object):
 
     def is_available(self) -> bool:
         """Return whether etcd can currently be used."""
-        if not self._etcd_relation:
+        if self._etcd_relation is None:
             return False
         try:
             etcdctl.ensure_initialized()
@@ -130,7 +125,7 @@ class EtcdRollingOpsManager(Object):
 
     def enqueue_operation(self, operation: Operation) -> None:
         """Store an operation in etcd."""
-        if not self._etcd_relation:
+        if self._etcd_relation is None:
             raise RollingOpsNoEtcdRelationError
 
         etcdctl.ensure_initialized()
@@ -138,7 +133,7 @@ class EtcdRollingOpsManager(Object):
         backend_state = UnitBackendState(self.model, self.peer_relation_name, self.model.unit)
         if backend_state.cleanup_needed:
             self.operations.clean_up()
-            backend_state.clear_fallback()
+        backend_state.clear_fallback()
 
         self.operations.request(operation)
 
@@ -159,14 +154,6 @@ class EtcdRollingOpsManager(Object):
         unit = event.departing_unit
         if unit == self.model.unit:
             self.worker.stop()
-
-    def _on_etcd_relation_broken(self, event: RelationBrokenEvent) -> None:
-        """Handle the etcd relation being fully removed.
-
-        This method stops the etcd worker process since the required
-        relation is no longer available.
-        """
-        self.worker.stop()
 
     def request_async_lock(
         self,
@@ -275,26 +262,33 @@ class EtcdRollingOpsManager(Object):
 
         Args:
             timeout: Maximum time in seconds to wait for the lock.
+
+        Raises:
+            TimeoutError: If the lock could not be acquired before timeout.
+            RollingOpsFailedToGetLockError: If acquisition fails for another reason.
         """
         self._lease = EtcdLease()
         self._lease.grant()
 
-        @retry(stop=stop_after_delay(timeout), wait=wait_fixed(15), reraise=True)
-        def acquire():
-            if not self._sync_lock.try_acquire(self._lease.id):  # type: ignore[reportArgumentType]
-                raise RollingOpsFailedToGetLockError('Lock not acquired.')
+        deadline = time.monotonic() + timeout
 
         try:
-            acquire()
-        except RollingOpsFailedToGetLockError as e:
-            raise TimeoutError(f'Timed out acquiring etcd sync lock after {timeout}.') from e
-        except Exception as e:
-            raise RollingOpsFailedToGetLockError('Failed to acquire the etcd sync lock.') from e
-        finally:
+            while time.monotonic() < deadline:
+                try:
+                    if self._sync_lock.try_acquire(self._lease.id):  # type: ignore[reportArgumentType]
+                        logger.info('Lock acquired.')
+                        return
+                except Exception:
+                    logger.exception('Failed while trying to acquire etcd sync lock.')
+
+                time.sleep(15)
+
+            raise TimeoutError(f'Timed out acquiring etcd sync lock after {timeout}s.')
+        except Exception:
             try:
                 self._lease.revoke()
             except Exception:
-                logger.exception('Failed to released the lease %s.', self._lease.id)
+                logger.exception('Failed to revoke lease %s.', self._lease.id)
 
     def release_sync_lock(self) -> None:
         """Release the lock and revoke the associated lease."""

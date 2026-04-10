@@ -22,6 +22,7 @@ from enum import StrEnum
 from ops import Model, Unit
 
 from charmlibs.rollingops.common._exceptions import (
+    RollingOpsDecodingError,
     RollingOpsNoRelationError,
 )
 from charmlibs.rollingops.common._models import (
@@ -317,7 +318,7 @@ class PeerUnitOperations:
             return False
         return executed_at > granted_at
 
-    def mirror_finish(self, op_id: str, result: OperationResult) -> None:
+    def mirror_result(self, op_id: str, result: OperationResult) -> None:
         """Apply an execution result to the mirrored peer queue.
 
         This keeps the peer copy aligned with the backend that actually executed
@@ -340,7 +341,7 @@ class PeerUnitOperations:
                 current.op_id,
                 op_id,
             )
-            return
+            raise RollingOpsDecodingError('Inconsistent operation found.')
 
         self._apply_result_to_data(data, result)
         self._save(data)

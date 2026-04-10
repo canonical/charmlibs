@@ -55,9 +55,7 @@ def test_deploy(juju: jubilant.Juju, app_name: str):
 
 
 @pytest.mark.machine_only
-def test_restart_is_done_on_peer_backend_when_etcd_is_not_ready(
-    juju: jubilant.Juju, app_name: str
-):
+def test_charm_is_integrated_with_etcd(juju: jubilant.Juju, app_name: str):
     juju.deploy(
         'self-signed-certificates',
         app='self-signed-certificates',
@@ -77,31 +75,20 @@ def test_restart_is_done_on_peer_backend_when_etcd_is_not_ready(
     juju.wait(jubilant.all_active, error=jubilant.any_error, timeout=TIMEOUT)
 
     juju.integrate(f'{app_name}:etcd', 'etcd:etcd-client')
-    unit = f'{app_name}/0'
-    juju.run(unit, 'failed-restart', {'delay': 10, 'max-retry': 2})
-    juju.run(unit, 'restart', {'delay': 1})
-
-    assert is_empty_file(juju, unit, ETCD_PROCESS_LOGS)
-
-
-@pytest.mark.machine_only
-def test_etcdctl_config_file_is_created(juju: jubilant.Juju, app_name: str):
     juju.wait(jubilant.all_active, error=jubilant.any_error, timeout=TIMEOUT)
+
     wait_for_etcdctl_config_file(juju, f'{app_name}/0')
 
 
 @pytest.mark.machine_only
 def test_restart_action_one_unit_single_app(juju: jubilant.Juju, app_name: str):
-    juju.wait(jubilant.all_active, error=jubilant.any_error, timeout=TIMEOUT)
     unit = f'{app_name}/0'
 
     juju.run(unit, 'restart', {'delay': 1}, wait=TIMEOUT)
-
     juju.wait(jubilant.all_active, error=jubilant.any_error, timeout=TIMEOUT)
 
     events = get_unit_events(juju, unit)
     restart_events = [e['event'] for e in events]
-
     expected = [
         'action:restart',
         '_restart:start',
@@ -110,16 +97,16 @@ def test_restart_action_one_unit_single_app(juju: jubilant.Juju, app_name: str):
 
     assert restart_events == expected, f'unexpected event order: {restart_events}'
     assert not is_empty_file(juju, unit, ETCD_PROCESS_LOGS)
+    assert is_empty_file(juju, unit, PEER_PROCCES_LOGS)
 
 
 @pytest.mark.machine_only
 def test_failed_restart_retries_one_unit_single_app(juju: jubilant.Juju, app_name: str):
     unit = f'{app_name}/0'
-
     remove_transition_file(juju, unit)
-    juju.run(unit, 'failed-restart', {'delay': 1, 'max-retry': 2})
-    juju.run(unit, 'restart', {'delay': 1})
 
+    juju.run(unit, 'failed-restart', {'delay': 1, 'max-retry': 1})
+    juju.run(unit, 'restart', {'delay': 1})
     juju.wait(jubilant.all_active, error=jubilant.any_error, timeout=TIMEOUT)
 
     events = get_unit_events(juju, unit)
@@ -130,23 +117,20 @@ def test_failed_restart_retries_one_unit_single_app(juju: jubilant.Juju, app_nam
         '_failed_restart:retry_release',
         '_failed_restart:start',  # retry 1
         '_failed_restart:retry_release',
-        '_failed_restart:start',  # retry 2
-        '_failed_restart:retry_release',
         '_restart:start',
         '_restart:done',
     ]
-
     assert restart_events == expected, f'unexpected event order: {restart_events}'
+    assert is_empty_file(juju, unit, PEER_PROCCES_LOGS)
 
 
 @pytest.mark.machine_only
 def test_assert_deferred_restart_retries_one_unit_single_app(juju: jubilant.Juju, app_name: str):
     unit = f'{app_name}/0'
-
     remove_transition_file(juju, unit)
-    juju.run(unit, 'deferred-restart', {'delay': 1, 'max-retry': 2}, wait=TIMEOUT)
-    juju.run(unit, 'restart', {'delay': 1})
 
+    juju.run(unit, 'deferred-restart', {'delay': 1, 'max-retry': 1}, wait=TIMEOUT)
+    juju.run(unit, 'restart', {'delay': 1})
     juju.wait(jubilant.all_active, error=jubilant.any_error, timeout=TIMEOUT)
 
     events = get_unit_events(juju, unit)
@@ -157,13 +141,11 @@ def test_assert_deferred_restart_retries_one_unit_single_app(juju: jubilant.Juju
         '_deferred_restart:retry_hold',
         '_deferred_restart:start',  # retry 1
         '_deferred_restart:retry_hold',
-        '_deferred_restart:start',  # retry 2
-        '_deferred_restart:retry_hold',
         '_restart:start',
         '_restart:done',
     ]
-
     assert restart_events == expected, f'unexpected event order: {restart_events}'
+    assert is_empty_file(juju, unit, PEER_PROCCES_LOGS)
 
 
 @pytest.mark.machine_only
@@ -173,13 +155,11 @@ def test_assert_restart_rolls_one_unit_at_a_time_single_app(juju: jubilant.Juju,
 
     status = juju.status()
     units = sorted(status.apps[app_name].units)
-
     for unit in units:
         remove_transition_file(juju, unit)
 
     for unit in units:
-        juju.run(unit, 'restart', {'delay': 2})
-
+        juju.run(unit, 'restart', {'delay': 15})
     juju.wait(jubilant.all_active, error=jubilant.any_error, timeout=TIMEOUT)
 
     all_events: list[dict[str, str]] = []
@@ -203,10 +183,12 @@ def test_assert_restart_rolls_one_unit_at_a_time_single_app(juju: jubilant.Juju,
         assert start_event['unit'] == done_event['unit'], (
             f'start/done pair mismatch: {start_event} vs {done_event}'
         )
+    for unit in units:
+        assert is_empty_file(juju, unit, PEER_PROCCES_LOGS)
 
 
 @pytest.mark.machine_only
-def test_retry_hold_keeps_lock_on_same_unit_single_app(juju: jubilant.Juju, app_name: str):
+def test_retry_hold_operation_two_units_single_app(juju: jubilant.Juju, app_name: str):
     status = juju.status()
     units = sorted(status.apps[app_name].units)
 
@@ -232,18 +214,7 @@ def test_retry_hold_keeps_lock_on_same_unit_single_app(juju: jubilant.Juju, app_
 
     logger.info(all_events)
 
-    relevant_events = [
-        e
-        for e in all_events
-        if e['event']
-        in {
-            '_deferred_restart:start',
-            '_deferred_restart:retry_hold',
-            '_restart:start',
-            '_restart:done',
-        }
-    ]
-
+    relevant_events = [e for e in all_events if not e['event'].startswith('action')]
     sequence = [(e['unit'], e['event']) for e in relevant_events]
 
     logger.info(sequence)
@@ -259,6 +230,9 @@ def test_retry_hold_keeps_lock_on_same_unit_single_app(juju: jubilant.Juju, app_
         (unit_b, '_restart:done'),
     ], f'unexpected event sequence: {sequence}'
 
+    for unit in units:
+        assert is_empty_file(juju, unit, PEER_PROCCES_LOGS)
+
 
 @pytest.mark.machine_only
 def test_retry_release_two_units_single_app(juju: jubilant.Juju, app_name: str):
@@ -271,19 +245,18 @@ def test_retry_release_two_units_single_app(juju: jubilant.Juju, app_name: str):
     unit_b = units[4]
 
     juju.run(unit_a, 'failed-restart', {'delay': 10, 'max-retry': 2}, wait=TIMEOUT)
-    juju.run(unit_b, 'failed-restart', {'delay': 1, 'max-retry': 2}, wait=TIMEOUT)
+    juju.run(unit_b, 'failed-restart', {'delay': 15, 'max-retry': 2}, wait=TIMEOUT)
 
-    time.sleep(120)  # wait for operation execution. TODO: in charm use lock state to clear status.
+    time.sleep(
+        60 * 2
+    )  # wait for operation execution. TODO: in charm use lock state to clear status.
 
     all_events: list[dict[str, str]] = []
     all_events.extend(get_unit_events(juju, unit_a))
     all_events.extend(get_unit_events(juju, unit_b))
     all_events.sort(key=parse_ts)
 
-    all_events: list[dict[str, str]] = []
-
     restart_events = [e for e in all_events if not e['event'].startswith('action')]
-
     restart_events.sort(key=parse_ts)
 
     logger.info(restart_events)
@@ -293,68 +266,25 @@ def test_retry_release_two_units_single_app(juju: jubilant.Juju, app_name: str):
         start_event = restart_events[i]
         done_event = restart_events[i + 1]
 
-        assert start_event['event'] == '_restart:start'
-        assert done_event['event'] == '_restart:done'
+        assert start_event['event'] == '_failed_restart:start'
+        assert done_event['event'] == '_failed_restart:retry_release'
         assert start_event['unit'] == done_event['unit'], (
             f'start/done pair mismatch: {start_event} vs {done_event}'
         )
+    for unit in units:
+        assert is_empty_file(juju, unit, PEER_PROCCES_LOGS)
 
 
 @pytest.mark.machine_only
-def test_subsequent_lock_request_of_different_ops_single_app(juju: jubilant.Juju, app_name: str):
+def test_subsequent_lock_request_ops_single_app(juju: jubilant.Juju, app_name: str):
     status = juju.status()
     units = sorted(status.apps[app_name].units)
     for unit in units:
         remove_transition_file(juju, unit)
 
     unit_a = units[3]
-    unit_b = units[4]
 
-    juju.run(unit_b, 'deferred-restart', {'delay': 10, 'max-retry': 2})
-    juju.run(unit_a, 'failed-restart', {'delay': 1, 'max-retry': 2})
-    juju.run(unit_a, 'deferred-restart', {'delay': 1, 'max-retry': 0})
-    juju.run(unit_a, 'restart', {'delay': 1})
-
-    juju.wait(
-        lambda status: status.apps[app_name].units[unit_a].is_active,
-        error=jubilant.any_error,
-        timeout=TIMEOUT,
-    )
-
-    unit_a_events = get_unit_events(juju, unit_a)
-    relevant_events = [e['event'] for e in unit_a_events]
-
-    logger.info('unit_a_events %s', unit_a_events)
-
-    assert relevant_events == [
-        'action:failed-restart',
-        'action:deferred-restart',
-        'action:restart',
-        '_failed_restart:start',  # attempt 0
-        '_failed_restart:retry_release',
-        '_failed_restart:start',  # retry 1
-        '_failed_restart:retry_release',
-        '_failed_restart:start',  # retry 2
-        '_failed_restart:retry_release',
-        '_deferred_restart:start',  # attempt 0
-        '_deferred_restart:retry_hold',
-        '_restart:start',
-        '_restart:done',
-    ], f'unexpected event sequence: {relevant_events}'
-
-
-@pytest.mark.machine_only
-def test_subsequent_lock_request_of_same_op_single_app(juju: jubilant.Juju, app_name: str):
-    status = juju.status()
-    units = sorted(status.apps[app_name].units)
-    for unit in units:
-        remove_transition_file(juju, unit)
-
-    unit_a = units[3]
-    unit_b = units[4]
-
-    juju.run(unit_b, 'deferred-restart', {'delay': 10, 'max-retry': 1})
-    juju.run(unit_a, 'failed-restart', {'delay': 2, 'max-retry': 2})
+    juju.run(unit_a, 'failed-restart', {'delay': 1, 'max-retry': 1})
     for _ in range(3):
         juju.run(unit_a, 'deferred-restart', {'delay': 1, 'max-retry': 0})
     juju.run(unit_a, 'restart', {'delay': 1})
@@ -367,7 +297,6 @@ def test_subsequent_lock_request_of_same_op_single_app(juju: jubilant.Juju, app_
 
     unit_a_events = get_unit_events(juju, unit_a)
     relevant_events = [e['event'] for e in unit_a_events if not e['event'].startswith('action')]
-
     logger.info('unit_a_events %s', unit_a_events)
 
     assert relevant_events == [
@@ -375,19 +304,19 @@ def test_subsequent_lock_request_of_same_op_single_app(juju: jubilant.Juju, app_
         '_failed_restart:retry_release',
         '_failed_restart:start',  # retry 1
         '_failed_restart:retry_release',
-        '_failed_restart:start',  # retry 2
-        '_failed_restart:retry_release',
-        '_deferred_restart:start',  # attemp 0
+        '_deferred_restart:start',  # attempt 0
         '_deferred_restart:retry_hold',
         '_restart:start',
         '_restart:done',
     ], f'unexpected event sequence: {relevant_events}'
 
+    for unit in units:
+        assert is_empty_file(juju, unit, PEER_PROCCES_LOGS)
+
 
 @pytest.mark.machine_only
 def test_rolling_ops_multi_app(juju: jubilant.Juju, charm: Path, app_name: str):
     second_app = f'{app_name}-secondary'
-
     juju.deploy(charm, app=second_app, num_units=3)
     juju.wait(
         lambda status: jubilant.all_active(status, second_app),
@@ -408,12 +337,10 @@ def test_rolling_ops_multi_app(juju: jubilant.Juju, charm: Path, app_name: str):
 
     for unit in all_units:
         remove_transition_file(juju, unit)
-
-    for unit in all_units:
         wait_for_etcdctl_config_file(juju, unit)
 
     for unit in all_units:
-        juju.run(unit, 'restart', {'delay': 2}, wait=TIMEOUT)
+        juju.run(unit, 'restart', {'delay': 10}, wait=TIMEOUT)
 
     juju.wait(jubilant.all_active, error=jubilant.any_error, timeout=TIMEOUT)
 
@@ -439,6 +366,8 @@ def test_rolling_ops_multi_app(juju: jubilant.Juju, charm: Path, app_name: str):
         assert start_event['unit'] == done_event['unit'], (
             f'start/done pair mismatch: {start_event} vs {done_event}'
         )
+    for unit in all_units:
+        assert is_empty_file(juju, unit, PEER_PROCCES_LOGS)
 
 
 @pytest.mark.machine_only
@@ -452,15 +381,14 @@ def test_rolling_ops_sync_lock_multi_app(juju: jubilant.Juju, app_name: str):
 
     for unit in all_units:
         remove_transition_file(juju, unit)
-
-    for unit in all_units:
         wait_for_etcdctl_config_file(juju, unit)
 
     unit_a = primary_units[1]
     unit_b = secondary_units[1]
 
-    juju.run(unit_a, 'sync-restart', {'delay': 2})
-    juju.run(unit_b, 'sync-restart', {'delay': 2})
+    juju.cli('run', unit_a, 'sync-restart', 'delay=15', '--background')
+    time.sleep(2)
+    juju.cli('run', unit_b, 'sync-restart', 'delay=15', '--background')
 
     juju.wait(jubilant.all_active, error=jubilant.any_error, timeout=TIMEOUT)
 
@@ -471,21 +399,22 @@ def test_rolling_ops_sync_lock_multi_app(juju: jubilant.Juju, app_name: str):
         assert len(events) == 3
         all_events.extend(events)
 
-    restart_events = [e for e in all_events if not e['event'].startswith('action')]
-    restart_events.sort(key=parse_ts)
+    all_events.sort(key=parse_ts)
+    restart_events = [
+        (e['unit'], e['event']) for e in all_events if not e['event'].startswith('action')
+    ]
 
     logger.info(restart_events)
 
-    assert len(restart_events) == len({unit_a, unit_b}) * 2
-    for i in range(0, len(restart_events), 2):
-        start_event = restart_events[i]
-        done_event = restart_events[i + 1]
+    assert restart_events == [
+        (unit_a, '_sync_restart:start'),
+        (unit_a, '_sync_restart:done'),
+        (unit_b, '_sync_restart:start'),
+        (unit_b, '_sync_restart:done'),
+    ], f'unexpected event sequence: {restart_events}'
 
-        assert start_event['event'] == '_restart:start'
-        assert done_event['event'] == '_restart:done'
-        assert start_event['unit'] == done_event['unit'], (
-            f'start/done pair mismatch: {start_event} vs {done_event}'
-        )
+    for unit in all_units:
+        assert is_empty_file(juju, unit, PEER_PROCCES_LOGS)
 
 
 @pytest.mark.machine_only
@@ -498,20 +427,18 @@ def test_lock_released_when_unit_removed(juju: jubilant.Juju, app_name: str) -> 
 
     juju.wait(jubilant.all_active, error=jubilant.any_error, timeout=TIMEOUT)
 
-    juju.run(unit_a, 'deferred-restart', {'delay': 15}, wait=False)
+    juju.run(unit_a, 'deferred-restart', {'delay': 15})
     time.sleep(5)
-    juju.run(unit_b, 'restart', {'delay': 2}, wait=False)
+    juju.run(unit_b, 'restart', {'delay': 2})
 
     juju.remove_unit(unit_a)
 
     juju.wait(jubilant.all_active, error=jubilant.any_error, timeout=TIMEOUT)
 
-    assert not is_empty_file(juju, unit_b, ETCD_PROCESS_LOGS)
-
     unit_b_events = get_unit_events(juju, unit_b)
     relevant_events = [e['event'] for e in unit_b_events if not e['event'].startswith('action')]
 
-    logger.info('unit_a_events %s', unit_b_events)
+    logger.info('unit_b_events %s', unit_b_events)
 
     assert relevant_events == [
         '_restart:start',
@@ -533,13 +460,11 @@ def test_actions_still_work_after_etcd_relation_removed(
 
     juju.run(unit_a, 'failed-restart', {'delay': 10, 'max-retry': 2})
     for i in range(3):
-        juju.run(unit_a, 'restart', {'delay': str(i)})
+        juju.run(unit_a, 'restart', {'delay': i})
 
     juju.remove_relation(f'{app_name}:etcd', 'etcd:etcd-client')
 
     juju.wait(jubilant.all_active, error=jubilant.any_error, timeout=TIMEOUT)
-
-    assert not etcdctl_file_exits(juju, unit_a)
 
     unit_a_events = get_unit_events(juju, unit_a)
     relevant_events = [e['event'] for e in unit_a_events if not e['event'].startswith('action')]

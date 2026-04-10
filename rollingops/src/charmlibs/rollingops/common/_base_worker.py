@@ -40,6 +40,7 @@ class BaseRollingOpsAsyncWorker(Object):
         self._charm = charm
         self._charm_dir = charm.charm_dir
         self._peer_relation_name = peer_relation_name
+        self._handle_name = handle_name
 
     @property
     def _relation(self) -> Relation | None:
@@ -157,7 +158,7 @@ class BaseRollingOpsAsyncWorker(Object):
         ).pid
 
         self._set_pid_str(str(pid))
-        logger.info('Started rollingops worker process with PID %s', pid)
+        logger.info('Started %s process with PID %s', self._handle_name, pid)
 
     def stop(self) -> None:
         """Stop the running worker process if it exists."""

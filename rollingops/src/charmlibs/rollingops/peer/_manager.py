@@ -484,7 +484,7 @@ class PeerRollingOpsManager(Object):
         This keeps the peer standby queue aligned with the backend that
         actually executed the operation.
         """
-        self._operations(self.model.unit).mirror_finish(op_id, result)
+        self._operations(self.model.unit).mirror_result(op_id, result)
 
     def get_status(self) -> RollingOpsStatus:
         """Return the current rolling-ops status for this unit in peer mode.

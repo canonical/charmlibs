@@ -18,7 +18,7 @@ import logging
 from contextlib import contextmanager
 from typing import Any
 
-from ops import CharmBase, Object, Relation
+from ops import CharmBase, Object, Relation, RelationBrokenEvent
 from ops.framework import EventBase
 
 from charmlibs.pathops import PebbleConnectionError
@@ -95,7 +95,9 @@ class RollingOpsManager(Object):
             cluster_id=cluster_id,
             callback_targets=callback_targets,
         )
-
+        self.framework.observe(
+            charm.on[self.etcd_relation_name].relation_broken, self._on_etcd_relation_broken
+        )
         self.framework.observe(charm.on.rollingops_lock_granted, self._on_rollingops_lock_granted)
         self.framework.observe(charm.on.rollingops_etcd_failed, self._on_rollingops_etcd_failed)
         # manage update status for etcd
@@ -108,6 +110,14 @@ class RollingOpsManager(Object):
     @property
     def _backend_state(self) -> UnitBackendState:
         return UnitBackendState(self.model, self.peer_relation_name, self.model.unit)
+
+    def _on_etcd_relation_broken(self, event: RelationBrokenEvent) -> None:
+        """Handle the etcd relation being fully removed.
+
+        This method stops the etcd worker process since the required
+        relation is no longer available.
+        """
+        self._fallback_current_unit_to_peer()
 
     def _select_processing_backend(self) -> ProcessingBackend:
         """Choose which backend should own new work for this unit."""
@@ -206,7 +216,15 @@ class RollingOpsManager(Object):
             and outcome.op_id is not None
             and outcome.result is not None
         ):
-            self.peer_manager.mirror_result(outcome.op_id, outcome.result)
+            try:
+                self.peer_manager.mirror_result(outcome.op_id, outcome.result)
+            except RollingOpsDecodingError:
+                logger.info(
+                    'Inconsistencies found between peer relation and etcd. '
+                    'Falling back to peer backend.'
+                )
+                self._fallback_current_unit_to_peer()
+                return
             logger.info('Execution mirrored to peer relation.')
 
     def _on_rollingops_etcd_failed(self, event: RollingOpsEtcdFailedEvent) -> None:
