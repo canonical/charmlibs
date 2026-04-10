@@ -5,17 +5,17 @@
 When designing the relation data format for a new interface, observe the following rules.
 
 Relation data outlives a single charm revision: either side of the relation may be upgraded first, and the upgrade itself is not atomic.
-Plan for interface to evolve to avoid breaking changes and downtime during application upgrades.
+Plan for the interface to evolve without causing breaking changes or downtime during application upgrades.
 
 The relation data format is a long-lived contract, while the charm-facing API is easier to change.
 Keep the two separate from the start.
 
 Additionally, the ergonomics of using multiple libraries in a charm require specific API patterns.
-When interface evolves, some version of a library has to support both old and new schema, which should not leak to the charms.
+When an interface evolves, some version of a library has to support both the old and new schema, and that complexity should not leak into charm code.
 
-First, decide what data needs to be transmitted over a relation, then, design the JSON representaion bits with provisions for backwards and forwards compatibility.
+First, decide what data needs to be transmitted over a relation. Then design the JSON representation with provisions for backward and forward compatibility.
 
-New interface libraries should use `pydantic ~ 2.12; ops ~= 3.6; pyright ~ 1.1.402`, and prefer the `MISSING` sentinel value over the more traditional `None`. Note that such libraries can only used by charms based on Ubuntu 22.04 or newer.
+New interface libraries should use `pydantic ~ 2.12; ops ~= 3.6; pyright ~ 1.1.402`, and prefer the `MISSING` sentinel value over the more traditional `None`. Note that such libraries can only be used by charms based on Ubuntu 22.04 or newer.
 
 ```py
 # missing field is read as <MISSING>; deleted when written out
@@ -27,30 +27,30 @@ foo: str | None = None
 
 Unit tests must capture the interface schema evolution. Unit tests typically also capture the charm-facing API evolution.
 
-When the interface is modified, running unit tests against both new and old test vectors informs the charm library developer what is extended and what is broken.
-The developer then updates the unit tests encoding the conscious choice how the old data is meant to be handled.
+When the interface is modified, running unit tests against both new and old test vectors shows the charm library developer what has been extended and what has been broken.
+The developer then updates the unit tests to encode the deliberate choice for how the old data is meant to be handled.
 
-## Disign the relation data format
+## Design the relation data format
 
 The only changes allowed on a published interface are:
 
 - adding a new field, at the top level or nested: this is a new feature that must be communicated by a minor version bump of the library.
-- removing a field: this is a backwards incompatible change, and must be clearly communicated by a major version bump of the library.
-- tweaking field validators or extending or narrowing an enum range: must be done with extra care, including compatibility testing between the old and new versions of the library.
+- removing a field: this is a backward-incompatible change, and must be clearly communicated by a major version bump of the library.
+- tweaking field validators or extending or narrowing an enumeration value range: must be done with extra care, including compatibility testing between the old and new versions of the library.
 
 ### Fixed field types
 
 Once a field has been declared, the type of that field must not be changed.
 
-Field types cannot be narrowed, widened or changed entirely, as such field would fail to validate in newer or older application respectively.
+Field types cannot be narrowed, widened, or changed entirely, because such a field would fail to validate in either the newer or older application.
 
 The same applies to significant changes to the range of values that a field validator accepts. For example:
 
-- narrowing set of allowed protocol from any to HTTP and HTTPS is probably a bug fix, if other protocols like FTP couldn't be used the workload
-- extending the ip address field with IPv6 addresses represents a breaking change, because the older remote application is bound to reject the value, potentially making the interface useless
-- narrowing the ip address field and removing IPv4 addresses represents a breaking change, because if the older remote application sends those, this side the relation is bound to reject the value, potentially making the interface useless
+- narrowing the set of allowed protocols from any value to HTTP and HTTPS is probably a bug fix, if other protocols such as FTP could not be used by the workload
+- extending an IP address field to accept IPv6 addresses represents a breaking change, because the older remote application is likely to reject the value, potentially making the interface unusable
+- narrowing an IP address field by removing IPv4 addresses represents a breaking change, because if the older remote application sends them, this side of the relation is likely to reject the value, potentially making the interface unusable
 
-Unexpected enum values should be treated as missing (deserialised as `<MISSING>`) or coerced to a pre-defined catch-all `UNKNOWN` value:
+Unexpected enumeration values should be treated as missing (deserialised as `<MISSING>`) or coerced to a pre-defined catch-all `UNKNOWN` value:
 
 ```py
 class FooEnum(StrEnum):
@@ -91,18 +91,18 @@ def test_invalid_field_types(bad_value: Any):
 
 ### No mandatory fields
 
-Top-level fields must be not required (can be missing) or optional (can be `None`).
+Top-level fields must be either not required (can be missing) or optional (can be `None`).
 
 ```py
 foo: str | MISSING = MISSING
 ```
 
-Likewise most sub-fields must be not required or optional.
+Likewise, most sub-fields must be either not required or optional.
 
 ```py
 role: Role | MISSING = MISSING
-  subject: str | MISSING = MISSING
-  session: str | MISSING = MISSING
+subject: str | MISSING = MISSING
+session: str | MISSING = MISSING
 ```
 
 A default value may be used instead if the interface semantics call for a well-defined default value:
@@ -114,7 +114,7 @@ priority: int = 100
 sans_dns: frozenset[str] = frozenset()
 ```
 
-The charm library implementation must be accompanied by a unit test that ensures that the data with missing values in case of not-required semantics or null values in case of optional semantics is parsed correctly.
+The charm library implementation must be accompanied by a unit test that ensures data with missing values, in the case of not-required semantics, or null values, in the case of optional semantics, is parsed correctly.
 
 ```py
 V1_DATABAG = {"name": "aa", "surname": "bb"}
@@ -128,7 +128,7 @@ def test_missing_fields(field_to_remove):
 
 ### No field reuse
 
-If a field has been removed from the interface, another field with the very same name must not be added. The rule exists to make field removal possible without the risk of misinterpretation when two applications from different eras are intergrated.
+If a field has been removed from the interface, another field with the very same name must not be added. This rule exists to make field removal possible without the risk of misinterpretation when two applications from different eras are integrated.
 
 The exception is reverting removal of a field, where the field is brought back with the exact same type and semantics.
 
@@ -177,7 +177,7 @@ class Databag(pydantic.BaseModel):
 
 Collections of primitive types are strongly discouraged.
 
-Data maps are strongly discouraged. An exception to this rule if when the data map key is a Juju entity with a well-known string representation, such as unit name or machine id.
+Data maps are strongly discouraged. An exception to this rule is when the data map key is a Juju entity with a well-known string representation, such as a unit name or machine id.
 
 The definition must be accompanied by a unit test, which may look as follows. Note that including a custom validator requires a comprehensive set of unit tests.
 
@@ -195,12 +195,12 @@ def test_foos():
 
 ### URLs and URIs
 
-URLs, URIs and URI-looking connection strings are encouraged.
+URLs, URIs, and URI-like connection strings are encouraged.
 
 Each URL field must be documented and tested for consistency and precision:
 
 - what the purpose of the URL is
-- what kind of URL it is semantically
+- what kind of URL it is, semantically
 - what components are allowed
 - what values are allowed for each component
 
@@ -216,7 +216,7 @@ A sample checklist:
 - is the query required, optional or not allowed; any restrictions on keys, expected treatment for duplicate keys
 - is the fragment required, optional or not allowed; any restrictions, such as max length
 
-A set of unit tests that verifies the allowed URLs may look like this, at minimum:
+A set of unit tests that verify the allowed URLs may look like this, at minimum:
 
 ```py
 @pytest.mark.parametrize("bad_url", [
@@ -235,7 +235,7 @@ def test_bad_url_field_values(bad_url: str):
     "http://an.example/some/path",
     "http://an.example/some/path?some=query",
 ])
-def test_good_url_field_values(good_url: str)
+def test_good_url_field_values(good_url: str):
     SomeData(url_field=good_url)
 ```
 
@@ -254,7 +254,7 @@ The databag content should be structured to reflect the meaning of data, for exa
 
 When a secret is shared over a relation, the secret content schema must be contained in the same charm library as the relation interface schema.
 
-Same rules apply to the secret content:
+The same rules apply to the secret content:
 
 - no mandatory fields
 - no field reuse
@@ -287,7 +287,7 @@ DATABAG = {"server_uri": '"secret://42"'}
 def test_good_secret(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr("charm_lib._load_secret", GOOD_SECRET_CONTENT)
     charm_lib.parse(DATABAG)
-    assert charm_lib.get_secret_thing == "foo"
+    assert charm_lib.get_secret_thing() == "foo"
 
 def test_bad_secret():
     monkeypatch.setattr("charm_lib._load_secret", BAD_SECRET_CONTENT)
