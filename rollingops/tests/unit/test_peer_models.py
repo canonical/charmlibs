@@ -19,8 +19,7 @@ import json
 import pytest
 
 from charmlibs.rollingops.common._exceptions import RollingOpsDecodingError
-from charmlibs.rollingops.common._models import Operation
-from charmlibs.rollingops.peer._models import OperationQueue
+from charmlibs.rollingops.common._models import Operation, OperationQueue
 
 
 def _decode_queue_string(queue_str: str) -> list[dict[str, str]]:

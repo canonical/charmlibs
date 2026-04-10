@@ -23,10 +23,6 @@ class RollingOpsEtcdUnreachableError(Exception):
     """Raised if etcd server is unreachable."""
 
 
-class RollingOpsEtcdNotConfiguredError(Exception):
-    """Raised if etcd client has not been configured yet (env file does not exist)."""
-
-
 class RollingOpsFileSystemError(Exception):
     """Raised if there is a problem when interacting with the filesystem."""
 
@@ -59,6 +55,10 @@ class RollingOpsEtcdctlRetryableError(RollingOpsEtcdctlError):
     """A transient etcdctl failure that may succeed on retry."""
 
 
+class RollingOpsEtcdNotConfiguredError(RollingOpsEtcdctlError):
+    """Raised if etcd client has not been configured yet (env file does not exist)."""
+
+
 class RollingOpsEtcdctlFatalError(RollingOpsEtcdctlError):
     """A non-retryable etcdctl failure."""
 
@@ -73,3 +73,11 @@ class RollingOpsFailedToGetLockError(Exception):
 
 class RollingOpsSyncLockNotImplementedError(Exception):
     """Raised when the sync lock is not implemented."""
+
+
+class RollingOpsSyncLockBackendError(Exception):
+    """Raised when there is an error during sync lock execution."""
+
+
+class RollingOpsUnknownSyncLockBackendError(RollingOpsSyncLockBackendError):
+    """Raised when the given sync lock backend ID is unknown."""

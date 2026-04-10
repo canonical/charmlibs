@@ -14,7 +14,7 @@
 #
 # Learn more about testing at: https://juju.is/docs/sdk/testing
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from ops.testing import Context, PeerRelation, Secret, State
@@ -31,11 +31,20 @@ from charmlibs.interfaces.tls_certificates import (
     Certificate,
     PrivateKey,
 )
-from charmlibs.rollingops.common._exceptions import RollingOpsInvalidSecretContentError
-from charmlibs.rollingops.common._models import ProcessingBackend
+from charmlibs.rollingops.common._exceptions import (
+    RollingOpsEtcdNotConfiguredError,
+    RollingOpsInvalidSecretContentError,
+)
+from charmlibs.rollingops.common._models import (
+    Operation,
+    OperationQueue,
+    ProcessingBackend,
+    RollingOpsState,
+    RollingOpsStatus,
+)
 from charmlibs.rollingops.etcd._models import SharedCertificate
 from charmlibs.rollingops.etcd._relations import CERT_SECRET_FIELD
-from charmlibs.rollingops.peer._models import LockIntent, OperationQueue
+from charmlibs.rollingops.peer._models import LockIntent
 
 
 def _unit_databag(state: State, peer: PeerRelation) -> RawDataBagContents:
@@ -178,3 +187,166 @@ def test_on_restart_action_lock_fallbacks_to_peer(
     assert operation.kwargs == {'delay': 10}
     assert operation.max_retry is None
     assert operation.requested_at is not None
+
+
+def test_state_not_initialized(ctx: Context[RollingOpsCharm]):
+    state = State(leader=True)
+
+    with ctx(ctx.on.start(), state) as mgr:
+        rolling_state = mgr.charm.restart_manager.state  # type: ignore[reportUnknownVariableType]
+        assert isinstance(rolling_state, RollingOpsState)
+        assert rolling_state.status == RollingOpsStatus.INVALID
+        assert rolling_state.processing_backend is None
+        assert len(rolling_state.operations) == 0
+
+
+def test_state_peer_idle(ctx: Context[RollingOpsCharm]):
+    peer_rel = PeerRelation(
+        endpoint='restart',
+        local_unit_data={
+            'state': '',
+            'operations': '',
+            'executed_at': '',
+            'processing_backend': 'peer',
+            'etcd_cleanup_needed': 'false',
+        },
+    )
+    state = State(leader=False, relations={peer_rel})
+
+    with ctx(ctx.on.update_status(), state) as mgr:
+        rolling_state = mgr.charm.restart_manager.state  # type: ignore[reportUnknownVariableType]
+        assert isinstance(rolling_state, RollingOpsState)
+        assert rolling_state.status == RollingOpsStatus.IDLE
+        assert rolling_state.processing_backend == ProcessingBackend.PEER
+        assert len(rolling_state.operations) == 0
+
+
+def test_state_peer_waiting(ctx: Context[RollingOpsCharm]):
+    peer_rel = PeerRelation(
+        endpoint='restart',
+        local_unit_data={
+            'state': 'request',
+            'operations': OperationQueue([
+                Operation.create('restart', {'delay': 1}, max_retry=2)
+            ]).to_string(),
+            'executed_at': '',
+            'processing_backend': 'peer',
+            'etcd_cleanup_needed': 'false',
+        },
+    )
+    state = State(leader=False, relations={peer_rel})
+
+    with ctx(ctx.on.update_status(), state) as mgr:
+        rolling_state = mgr.charm.restart_manager.state  # type: ignore[reportUnknownVariableType]
+        assert isinstance(rolling_state, RollingOpsState)
+        assert rolling_state.status == RollingOpsStatus.WAITING
+        assert rolling_state.processing_backend == ProcessingBackend.PEER
+        assert len(rolling_state.operations) == 1
+
+
+def test_state_peer_is_granted(ctx: Context[RollingOpsCharm]):
+    peer_rel = PeerRelation(
+        endpoint='restart',
+        local_app_data={
+            'granted_unit': f'{ctx.app_name}/0',
+        },
+        local_unit_data={
+            'state': 'retry-release',
+            'operations': OperationQueue([
+                Operation.create('restart', {'delay': 1}, max_retry=2)
+            ]).to_string(),
+            'executed_at': '2026-04-09T10:01:00+00:00',
+            'processing_backend': 'peer',
+            'etcd_cleanup_needed': 'false',
+        },
+    )
+    state = State(leader=False, relations={peer_rel})
+
+    with ctx(ctx.on.update_status(), state) as mgr:
+        rolling_state = mgr.charm.restart_manager.state  # type: ignore[reportUnknownVariableType]
+        assert isinstance(rolling_state, RollingOpsState)
+        assert rolling_state.status == RollingOpsStatus.GRANTED
+        assert rolling_state.processing_backend == ProcessingBackend.PEER
+        assert len(rolling_state.operations) == 1
+
+
+def test_state_peer_waiting_retry(ctx: Context[RollingOpsCharm]):
+    peer_rel = PeerRelation(
+        endpoint='restart',
+        local_app_data={
+            'granted_unit': 'myapp/0',
+        },
+        local_unit_data={
+            'state': 'retry-release',
+            'operations': OperationQueue([
+                Operation.create('restart', {'delay': 1}, max_retry=2)
+            ]).to_string(),
+            'executed_at': '2026-04-09T10:01:00+00:00',
+            'processing_backend': 'peer',
+            'etcd_cleanup_needed': 'false',
+        },
+    )
+    state = State(leader=False, relations={peer_rel})
+
+    with ctx(ctx.on.update_status(), state) as mgr:
+        rolling_state = mgr.charm.restart_manager.state  # type: ignore[reportUnknownVariableType]
+        assert isinstance(rolling_state, RollingOpsState)
+        assert rolling_state.status == RollingOpsStatus.WAITING
+        assert rolling_state.processing_backend == ProcessingBackend.PEER
+        assert len(rolling_state.operations) == 1
+
+
+def test_state_etcd_status(ctx: Context[RollingOpsCharm]):
+    peer_rel = PeerRelation(
+        endpoint='restart',
+        interface='rollingops',
+        local_app_data={},
+        local_unit_data={
+            'state': '',
+            'operations': OperationQueue([
+                Operation.create('restart', {'delay': 1}, max_retry=2)
+            ]).to_string(),
+            'executed_at': '',
+            'processing_backend': 'etcd',
+            'etcd_cleanup_needed': 'false',
+        },
+    )
+    state = State(leader=False, relations={peer_rel})
+
+    with patch(
+        'charmlibs.rollingops.etcd._manager.EtcdRollingOpsManager.get_status',
+        return_value=RollingOpsStatus.GRANTED,
+    ):
+        with ctx(ctx.on.update_status(), state) as mgr:
+            rolling_state = mgr.charm.restart_manager.state  # type: ignore[reportUnknownVariableType]
+            assert isinstance(rolling_state, RollingOpsState)
+            assert rolling_state.status == RollingOpsStatus.GRANTED
+            assert rolling_state.processing_backend == ProcessingBackend.ETCD
+            assert len(rolling_state.operations) == 1
+
+
+def test_state_falls_back_to_peer_if_etcd_status_fails(ctx: Context[RollingOpsCharm]):
+    peer_rel = PeerRelation(
+        endpoint='restart',
+        interface='rollingops',
+        local_app_data={},
+        local_unit_data={
+            'state': 'request',
+            'operations': OperationQueue([Operation.create('restart', {'delay': 1})]).to_string(),
+            'executed_at': '',
+            'processing_backend': 'etcd',
+            'etcd_cleanup_needed': 'false',
+        },
+    )
+    state = State(leader=False, relations={peer_rel})
+
+    with patch(
+        'charmlibs.rollingops._rollingops_manager.EtcdRollingOpsManager.get_status',
+        side_effect=RollingOpsEtcdNotConfiguredError('boom'),
+    ):
+        with ctx(ctx.on.update_status(), state) as mgr:
+            rolling_state = mgr.charm.restart_manager.state  # type: ignore[reportUnknownVariableType]
+            assert isinstance(rolling_state, RollingOpsState)
+            assert rolling_state.status == RollingOpsStatus.WAITING
+            assert rolling_state.processing_backend == ProcessingBackend.PEER
+            assert len(rolling_state.operations) == 1

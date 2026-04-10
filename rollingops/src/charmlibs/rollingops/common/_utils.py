@@ -46,11 +46,15 @@ def now_timestamp() -> datetime:
 
 
 def parse_timestamp(timestamp: str) -> datetime | None:
-    """Parse timestamp string. Return None on errors to avoid selecting invalid timestamps."""
+    """Parse epoch timestamp string. Return None on errors."""
     try:
-        return datetime.fromisoformat(timestamp)
+        return datetime.fromtimestamp(float(timestamp), tz=UTC)
     except Exception:
         return None
+
+
+def datetime_to_str(datetime: datetime) -> str:
+    return str(datetime.timestamp())
 
 
 def setup_logging(log_file: str) -> None:

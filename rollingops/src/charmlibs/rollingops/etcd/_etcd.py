@@ -47,11 +47,19 @@ class EtcdLease:
     def revoke(self) -> None:
         """Revoke the current lease and stop the keep-alive process."""
         lease_id = self.id
-        if self.id is not None:
-            etcdctl.run('lease', 'revoke', self.id)
-            self.id = None
-            logger.info('Lease %s revoked.', lease_id)
-        self._stop_keepalive()
+        try:
+            if self.id is not None:
+                etcdctl.run('lease', 'revoke', self.id)
+        except Exception:
+            logger.exception('Fail to revoke lease %s.', lease_id)
+            raise
+        finally:
+            try:
+                self._stop_keepalive()
+            except Exception:
+                logger.exception('Fail to stop keepalive for lease %s.', lease_id)
+            finally:
+                self.id = None
 
     def _start_lease_keepalive(self) -> None:
         """Start the background process that keeps the lease alive."""
@@ -74,15 +82,20 @@ class EtcdLease:
         """Terminate the keep-alive subprocess if it is running."""
         if self.keepalive_proc is None:
             return
-        pid = self.keepalive_proc.pid
-        self.keepalive_proc.terminate()
         try:
-            self.keepalive_proc.wait(timeout=2)
-        except subprocess.TimeoutExpired:
-            self.keepalive_proc.kill()
-            self.keepalive_proc.wait(timeout=2)
-        self.keepalive_proc = None
-        logger.info('Keepalive %s stopped for lease.', pid)
+            self.keepalive_proc.terminate()
+        except ProcessLookupError:
+            # Already dead
+            return
+        except Exception:
+            try:
+                self.keepalive_proc.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                logger.exception('Fail to stop keepalive for lease %s.')
+                self.keepalive_proc.kill()
+                return
+        finally:
+            self.keepalive_proc = None
 
 
 class EtcdLock:
@@ -237,15 +250,12 @@ class EtcdOperationQueue:
         """
         return etcdctl.txn(txn)
 
-    def watch(self) -> None:
-        """Block until at least one operation exists in the queue.
-
-        This method periodically polls the queue prefix and returns once
-        an operation is detected
-        """
+    def watch(self) -> Operation:
+        """Block until at least one operation exists and return it."""
         while True:
-            if etcdctl.get_first_key_value_pair(self.prefix) is not None:
-                return
+            kv = etcdctl.get_first_key_value_pair(self.prefix)
+            if kv is not None:
+                return Operation.from_dict(kv.value)
             time.sleep(10)
 
     def dequeue(self) -> bool:
@@ -341,22 +351,9 @@ class WorkerOperationStore:
         """
         return self._pending.move_head(self._inprogress.prefix)
 
-    def wait_until_completed(self) -> None:
-        """Block until at least one operation appears in the completed queue.
-
-        This method polls the completed queue and returns once an operation
-        has been written there.
-        """
-        self._completed.watch()
-
-    def peek_completed(self) -> Operation | None:
-        """Return the first completed operation without removing it.
-
-        Returns:
-            The first operation in the completed queue, or None if the queue
-            is empty.
-        """
-        return self._completed.peek()
+    def wait_until_completed(self) -> Operation:
+        """Block until at least one operation appears in the completed queue."""
+        return self._completed.watch()
 
     def requeue_completed(self) -> bool:
         """Requeue the head completed operation back to the pending queue.
@@ -437,6 +434,9 @@ class ManagerOperationStore:
     def peek_current(self) -> Operation | None:
         """Peek the current in-progress operation."""
         return self._inprogress.peek()
+
+    def has_pending_work(self) -> bool:
+        return self.peek_current() is not None
 
     def clean_up(self) -> None:
         self._inprogress.clear()

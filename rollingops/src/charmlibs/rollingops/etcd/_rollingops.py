@@ -89,12 +89,7 @@ def main():
             dispatch_lock_granted(args.unit_name, args.charm_dir)
 
             logger.info('Waiting for operation to be finished.')
-            operations.wait_until_completed()
-            operation = operations.peek_completed()
-            if operation is None:
-                logger.info('Completed queue watch returned no operation.')
-                time.sleep(RETRY_SLEEP)
-                continue
+            operation = operations.wait_until_completed()
 
             logger.info('Operation %s completed with %s', operation.callback_id, operation.result)
             match operation.result:
@@ -109,9 +104,8 @@ def main():
                     operations.delete_completed()
 
             lease.revoke()
-            logger.info('Lease revoked.')
             lock.release()
-            logger.info('Lock released.')
+            logger.info('Lease revoked and lock released.')
 
             if not operations.has_pending():
                 logger.info('No more operations in the queue.')

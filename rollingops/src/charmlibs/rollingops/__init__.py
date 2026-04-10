@@ -20,11 +20,12 @@ from .common._exceptions import (
     RollingOpsEtcdNotConfiguredError,
     RollingOpsInvalidLockRequestError,
 )
-from .common._models import OperationResult
+from .common._models import OperationResult, SyncLockBackend
 
 __all__ = (
     'OperationResult',
     'RollingOpsEtcdNotConfiguredError',
     'RollingOpsInvalidLockRequestError',
     'RollingOpsManager',
+    'SyncLockBackend',
 )

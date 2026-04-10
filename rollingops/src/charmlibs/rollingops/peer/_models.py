@@ -13,7 +13,6 @@
 # limitations under the License.
 """Models for peer-relation rollingops."""
 
-import json
 import logging
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -23,92 +22,17 @@ from enum import StrEnum
 from ops import Model, Unit
 
 from charmlibs.rollingops.common._exceptions import (
-    RollingOpsDecodingError,
     RollingOpsNoRelationError,
 )
 from charmlibs.rollingops.common._models import (
     Operation,
+    OperationQueue,
     OperationResult,
-    ProcessingBackend,
-    RollingOpsStatus,
     UnitBackendState,
 )
-from charmlibs.rollingops.common._utils import now_timestamp, parse_timestamp
+from charmlibs.rollingops.common._utils import datetime_to_str, now_timestamp, parse_timestamp
 
 logger = logging.getLogger(__name__)
-
-
-class OperationQueue:
-    """In-memory FIFO queue of Operations with encode/decode helpers for storing in a databag."""
-
-    def __init__(self, operations: list[Operation] | None = None):
-        self.operations: list[Operation] = list(operations or [])
-
-    def __len__(self) -> int:
-        """Return the number of operations in the queue."""
-        return len(self.operations)
-
-    @property
-    def empty(self) -> bool:
-        """Return True if there are no queued operations."""
-        return not self.operations
-
-    def peek(self) -> Operation | None:
-        """Return the first operation in the queue if it exists."""
-        return self.operations[0] if self.operations else None
-
-    def _peek_last(self) -> Operation | None:
-        """Return the last operation in the queue if it exists."""
-        return self.operations[-1] if self.operations else None
-
-    def dequeue(self) -> Operation | None:
-        """Drop the first operation in the queue if it exists and return it."""
-        return self.operations.pop(0) if self.operations else None
-
-    def increase_attempt(self) -> None:
-        """Increment the attempt counter for the head operation and persist it."""
-        if self.empty:
-            return
-        self.operations[0].increase_attempt()
-
-    def enqueue(self, operation: Operation) -> None:
-        """Append operation only if it is not equal to the tail operation."""
-        last_operation = self._peek_last()
-        if last_operation is not None and last_operation == operation:
-            return
-        self.operations.append(operation)
-
-    def to_string(self) -> str:
-        """Encode entire queue to a single string."""
-        items = [op.to_string() for op in self.operations]
-        return json.dumps(items, separators=(',', ':'))
-
-    @classmethod
-    def from_string(cls, data: str) -> 'OperationQueue':
-        """Decode queue from a string.
-
-        Raises:
-            RollingOpsDecodingError: if data cannot be deserialized.
-        """
-        if not data:
-            return cls()
-
-        try:
-            items = json.loads(data)
-        except json.JSONDecodeError as e:
-            logger.error(
-                'Failed to deserialize data to create an OperationQueue from %s: %s', data, e
-            )
-            raise RollingOpsDecodingError(
-                'Failed to deserialize data to create an OperationQueue.'
-            ) from e
-        if not isinstance(items, list) or not all(isinstance(s, str) for s in items):  # type: ignore[reportUnknownVariableType]
-            raise RollingOpsDecodingError(
-                'OperationQueue string must decode to a JSON list of strings.'
-            )
-
-        operations = [Operation.from_string(s) for s in items]  # type: ignore[reportUnknownVariableType]
-        return cls(operations)
 
 
 class LockIntent(StrEnum):
@@ -135,7 +59,7 @@ class PeerAppData:
     @granted_at_dt.setter
     def granted_at_dt(self, value: datetime | None) -> None:
         """Store the grant timestamp from a datetime."""
-        self.granted_at = value.isoformat() if value is not None else ''
+        self.granted_at = datetime_to_str(value) if value is not None else ''
 
 
 @dataclass
@@ -174,7 +98,7 @@ class PeerUnitData:
     @executed_at_dt.setter
     def executed_at_dt(self, value: datetime | None) -> None:
         """Store the execution timestamp from a datetime."""
-        self.executed_at = value.isoformat() if value is not None else ''
+        self.executed_at = datetime_to_str(value) if value is not None else ''
 
 
 class PeerAppLock:
@@ -468,10 +392,3 @@ def pick_oldest_request(
             selected = operations
 
     return selected
-
-
-@dataclass
-class RollingOpsState:
-    status: RollingOpsStatus
-    processing_backend: ProcessingBackend | None
-    operations: OperationQueue

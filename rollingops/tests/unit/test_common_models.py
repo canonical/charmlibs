@@ -52,7 +52,7 @@ def test_operation_to_string_contains_string_values_only():
 
     assert obj['callback_id'] == 'cb'
     assert obj['kwargs'] == '{"a":1,"b":2}'
-    assert obj['requested_at'] == ts.isoformat()
+    assert obj['requested_at'] == str(ts.timestamp())
     assert obj.get('max_retry', '') == ''
 
 
@@ -72,7 +72,7 @@ def test_operation_to_string_contains_string_values_only_zero_max_retry():
 
     assert obj['callback_id'] == 'cb'
     assert obj['kwargs'] == '{"a":1,"b":2}'
-    assert obj['requested_at'] == ts.isoformat()
+    assert obj['requested_at'] == str(ts.timestamp())
     assert obj.get('max_retry', '') == '0'
 
 
@@ -133,7 +133,7 @@ def test_operation_from_string_valid_payload():
     payload = json.dumps({
         'callback_id': 'cb-123',
         'kwargs': json.dumps({'b': 2, 'a': 'x'}),
-        'requested_at': requested_at.isoformat(),
+        'requested_at': str(requested_at.timestamp()),
         'max_retry': '5',
         'attempt': '2',
     })
@@ -153,7 +153,7 @@ def test_from_string_valid_payload_with_empty_kwargs_and_no_max_retry():
     payload = json.dumps({
         'callback_id': 'cb-123',
         'kwargs': '',
-        'requested_at': requested_at.isoformat(),
+        'requested_at': str(requested_at.timestamp()),
         'max_retry': '',
         'attempt': '0',
     })
@@ -173,7 +173,7 @@ def test_from_string_valid_payload_with_empty_kwargs_and_0_max_retry():
     payload = json.dumps({
         'callback_id': 'cb-123',
         'kwargs': '{}',
-        'requested_at': requested_at.isoformat(),
+        'requested_at': str(requested_at.timestamp()),
         'max_retry': '0',
         'attempt': '0',
     })
@@ -205,7 +205,7 @@ def test_from_string_valid_payload_with_empty_kwargs_and_0_max_retry():
             {
                 'callback_id': 'cb-123',
                 'kwargs': '{bad kwargs json',
-                'requested_at': datetime.now(UTC).isoformat(),
+                'requested_at': str(datetime.now(UTC).timestamp()),
                 'max_retry': '3',
                 'attempt': '1',
             }
@@ -213,7 +213,7 @@ def test_from_string_valid_payload_with_empty_kwargs_and_0_max_retry():
         json.dumps(  # missing callback_id
             {
                 'kwargs': json.dumps({'x': 1}),
-                'requested_at': datetime.now(UTC).isoformat(),
+                'requested_at': str(datetime.now(UTC).timestamp()),
                 'max_retry': '3',
                 'attempt': '1',
             }
@@ -222,7 +222,7 @@ def test_from_string_valid_payload_with_empty_kwargs_and_0_max_retry():
             {
                 'callback_id': 'cb-123',
                 'kwargs': '[]',
-                'requested_at': datetime.now(UTC).isoformat(),
+                'requested_at': str(datetime.now(UTC).timestamp()),
                 'max_retry': '3',
                 'attempt': '1',
             }
@@ -264,7 +264,7 @@ def test_op_id_returns_timestamp_and_callback_id() -> None:
         result=None,
     )
 
-    assert operation.op_id == f'{requested_at.isoformat()}-restart'
+    assert operation.op_id == f'{requested_at.timestamp()}-restart'
 
 
 def test_complete_increments_attempt_and_sets_release() -> None:

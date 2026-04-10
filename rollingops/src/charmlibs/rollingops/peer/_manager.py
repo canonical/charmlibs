@@ -391,12 +391,7 @@ class PeerRollingOpsManager(Object):
         logger.info('Lock granted to unit=%s.', operations.unit.name)
 
         if operations.unit.name == self.model.unit.name:
-            if operations.is_retry(lock):
-                self.worker.start()
-                return
-
-            self._on_run_with_lock()
-            self._process_locks()
+            self.worker.start()
 
     def request_async_lock(
         self,
@@ -511,4 +506,23 @@ class PeerRollingOpsManager(Object):
         raise RollingOpsSyncLockNotImplementedError
 
     def get_status(self) -> RollingOpsStatus:
-        return RollingOpsStatus.REQUEST
+        """Return the current rolling-ops status for this unit in peer mode.
+
+        INVALID: no peer relation
+        GRANTED: lock granted and not in retry
+        WAITING: has queued work but no grant
+        IDLE: nothing pending
+        """
+        if self._relation is None:
+            return RollingOpsStatus.INVALID
+
+        lock = self._lock()
+        operations = self._operations(self.model.unit)
+
+        if lock.is_granted(self.model.unit.name):
+            return RollingOpsStatus.GRANTED
+
+        if operations.has_pending_work():
+            return RollingOpsStatus.WAITING
+
+        return RollingOpsStatus.IDLE

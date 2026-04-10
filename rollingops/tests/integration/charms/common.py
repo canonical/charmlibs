@@ -30,6 +30,7 @@ from charmlibs import pathops
 from charmlibs.rollingops import (
     OperationResult,
     RollingOpsManager,
+    SyncLockBackend,
 )
 
 logger = logging.getLogger(__name__)
@@ -38,8 +39,16 @@ TRACE_FILE = pathops.LocalPath('/var/lib/charm-rolling-ops/transitions.log')
 
 
 def _now_timestamp_str() -> str:
-    """UTC timestamp as a string using ISO 8601 format."""
-    return datetime.now(UTC).isoformat()
+    """UTC timestamp as a epoch."""
+    return str(datetime.now(UTC).timestamp())
+
+
+class MySyncBackend(SyncLockBackend):
+    def acquire(self, timeout: int) -> None:
+        logger.info('acquiring sync lock')
+
+    def release(self) -> None:
+        logger.info('releasing sync lock')
 
 
 class Charm(CharmBase):
@@ -59,6 +68,9 @@ class Charm(CharmBase):
             etcd_relation_name='etcd',
             cluster_id='cluster-12345',
             callback_targets=callback_targets,
+            sync_lock_targets={
+                'stop': MySyncBackend,
+            },
         )
 
         self.framework.observe(self.on.restart_action, self._on_restart_action)
@@ -123,11 +135,11 @@ class Charm(CharmBase):
     def _on_sync_restart_action(self, event: ActionEvent):
         self.model.unit.status = WaitingStatus('Awaiting _sync_restart operation')
         timeout = event.params.get('timeout', 60)
-        if self.restart_manager.request_sync_lock(timeout=timeout):
+
+        with self.restart_manager.acquire_sync_lock(backend_id='stop', timeout=timeout):
             self.model.unit.status = MaintenanceStatus('Executing _sync_restart operation')
             time.sleep(int(event.params.get('delay', 0)))
             self.model.unit.status = ActiveStatus('')
-            self.restart_manager.release_sync_lock()
             return
         event.fail()
 

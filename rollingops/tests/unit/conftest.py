@@ -181,7 +181,9 @@ class BaseRollingOpsTestCharm(ops.CharmBase):
         self.framework.observe(self.on.failed_restart_action, self._on_failed_restart_action)
         self.framework.observe(self.on.deferred_restart_action, self._on_deferred_restart_action)
 
-    def _make_restart_manager(self, callback_targets: dict[str, Any]) -> Any:
+    def _make_restart_manager(
+        self, callback_targets: dict[str, Any]
+    ) -> PeerRollingOpsManager | RollingOpsManager:
         raise NotImplementedError
 
     def _on_restart_action(self, event: ActionEvent) -> None:
@@ -303,10 +305,10 @@ actions: dict[str, Any] = {
 
 
 @pytest.fixture
-def peer_ctx(peer_charm_test: type[PeerRollingOpsCharm]) -> Context[PeerRollingOpsCharm]:
-    return Context(peer_charm_test, meta=meta, actions=actions)
+def ctx(charm_test: type[RollingOpsCharm]) -> Context[RollingOpsCharm]:
+    return Context(charm_test, meta=meta, actions=actions)
 
 
 @pytest.fixture
-def ctx(charm_test: type[RollingOpsCharm]) -> Context[RollingOpsCharm]:
-    return Context(charm_test, meta=meta, actions=actions)
+def peer_ctx(peer_charm_test: type[PeerRollingOpsCharm]) -> Context[PeerRollingOpsCharm]:
+    return Context(peer_charm_test, meta=meta, actions=actions)

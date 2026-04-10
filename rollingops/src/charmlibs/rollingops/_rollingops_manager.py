@@ -15,6 +15,7 @@
 """etcd rolling ops."""
 
 import logging
+from contextlib import contextmanager
 from typing import Any
 
 from ops import CharmBase, Object, Relation
@@ -29,16 +30,20 @@ from charmlibs.rollingops.common._exceptions import (
     RollingOpsInvalidLockRequestError,
     RollingOpsNoEtcdRelationError,
     RollingOpsNoRelationError,
+    RollingOpsSyncLockBackendError,
 )
 from charmlibs.rollingops.common._models import (
     Operation,
+    OperationQueue,
     ProcessingBackend,
+    RollingOpsState,
     RollingOpsStatus,
+    SyncLockBackend,
     UnitBackendState,
 )
 from charmlibs.rollingops.etcd._manager import EtcdRollingOpsManager
 from charmlibs.rollingops.peer._manager import PeerRollingOpsManager
-from charmlibs.rollingops.peer._models import OperationQueue, PeerUnitOperations, RollingOpsState
+from charmlibs.rollingops.peer._models import PeerUnitOperations
 
 logger = logging.getLogger(__name__)
 
@@ -67,12 +72,14 @@ class RollingOpsManager(Object):
         etcd_relation_name: str,
         cluster_id: str,
         callback_targets: dict[str, Any],
+        sync_lock_targets: dict[str, type[SyncLockBackend]] | None = None,
     ):
         super().__init__(charm, 'rolling-ops-manager')
 
         self.charm = charm
         self.peer_relation_name = peer_relation_name
         self.etcd_relation_name = etcd_relation_name
+        self._sync_lock_targets = sync_lock_targets or {}
         charm.on.define_event('rollingops_lock_granted', RollingOpsLockGrantedEvent)
         charm.on.define_event('rollingops_etcd_failed', RollingOpsEtcdFailedEvent)
 
@@ -215,44 +222,61 @@ class RollingOpsManager(Object):
         logger.warning('Received rollingops_etcd_failed; falling back to peer backend.')
         self._fallback_current_unit_to_peer()
 
-    def request_sync_lock(self, timeout: int) -> bool:
-        """Try to acquire the lock until timeout expires.
+    def _get_sync_lock_backend(self, backend_id: str) -> SyncLockBackend:
+        """Resolve and instantiate a sync lock backend."""
+        backend_cls = self._sync_lock_targets.get(backend_id, None)
+        if backend_cls is None:
+            raise RollingOpsSyncLockBackendError(f'Unknown sync lock backend: {backend_id}.')
 
-        Args:
-            timeout: Maximum time in seconds to wait for the lock.
+        return backend_cls()
 
-        Returns:
-            True if the lock was granted. False otherwise.
-        """
+    @contextmanager
+    def acquire_sync_lock(self, backend_id: str, timeout: int):
+        """Acquire and release a sync lock backend around a critical section."""
         if self.etcd_manager.is_available():
+            logger.info('Acquiring sync lock on etcd.')
             try:
-                return self.etcd_manager.request_sync_lock(timeout)
-            except _ETCD_FALLBACK_EXCEPTIONS as e:
+                self.etcd_manager.acquire_sync_lock(timeout)
+                yield
+                return
+            except Exception as e:
                 logger.exception(
                     'Failed to request etcd sync lock; falling back to peer: %s',
                     e,
                 )
-
-        return self.peer_manager.request_sync_lock(timeout)
-
-    def release_sync_lock(self) -> None:
-        """Release the lock and revoke the associated lease."""
-        if not self.etcd_manager.is_sync_lock_used():
-            self.peer_manager.release_sync_lock()
+            finally:
+                try:
+                    self.etcd_manager.release_sync_lock()
+                    logger.info('etcd lock released.')
+                except Exception as e:
+                    logger.exception('Failed to release sync lock: %s', e)
             return
+
+        backend = self._get_sync_lock_backend(backend_id)
+        logger.info('Acquiring sync lock backend %s.', backend_id)
         try:
-            self.etcd_manager.release_sync_lock()
-        except _ETCD_FALLBACK_EXCEPTIONS as e:
-            logger.exception(
-                'Failed to release sync lock: %s',
-                e,
-            )
+            backend.acquire(timeout=timeout)
+        except Exception as e:
+            raise RollingOpsSyncLockBackendError(
+                f'Failed to acquire sync lock backend {backend_id}'
+            ) from e
+
+        try:
+            yield
+        finally:
+            try:
+                backend.release()
+                logger.info('Sync lock backend %s released.', backend_id)
+            except Exception as e:
+                raise RollingOpsSyncLockBackendError(
+                    f'Failed to release sync lock backend {backend_id}'
+                ) from e
 
     @property
     def state(self) -> RollingOpsState:
         if self._peer_relation is None:
             return RollingOpsState(
-                status=RollingOpsStatus.NOT_INITIALIZED,
+                status=RollingOpsStatus.INVALID,
                 processing_backend=None,
                 operations=OperationQueue(),
             )
@@ -264,11 +288,9 @@ class RollingOpsManager(Object):
             try:
                 status = self.etcd_manager.get_status()
             except _ETCD_FALLBACK_EXCEPTIONS as e:
-                logger.exception(
-                    'Failed to release sync lock: %s',
-                    e,
-                )
+                logger.exception('Failed to get status: %s', e)
                 self._fallback_current_unit_to_peer()
+                status = self.peer_manager.get_status()
 
         return RollingOpsState(
             status=status,

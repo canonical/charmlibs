@@ -93,7 +93,8 @@ class EtcdRollingOpsManager(Object):
         )
 
         self.keys = RollingOpsKeys.for_owner(cluster_id=cluster_id, owner=owner)
-        self.lock = EtcdLock(lock_key=self.keys.lock_key, owner=owner)
+        self._async_lock = EtcdLock(lock_key=self.keys.lock_key, owner=owner)
+        self._sync_lock = EtcdLock(lock_key=self.keys.lock_key, owner=f'{owner}:sync')
         self.operations = ManagerOperationStore(self.keys, owner)
         self._lease = None
 
@@ -224,7 +225,7 @@ class EtcdRollingOpsManager(Object):
         After execution, the operation is moved to the completed queue and its
         updated state is persisted.
         """
-        if not self.lock.is_held():
+        if not self._async_lock.is_held():
             logger.info('Lock is not granted. Operation will not run.')
             return RunWithLockOutcome(status=RunWithLockStatus.NOT_GRANTED)
 
@@ -269,38 +270,55 @@ class EtcdRollingOpsManager(Object):
             result=result,
         )
 
-    def request_sync_lock(self, timeout: int) -> bool:
+    def acquire_sync_lock(self, timeout: int) -> None:
         """Try to acquire the lock until timeout expires.
 
         Args:
             timeout: Maximum time in seconds to wait for the lock.
-
-        Returns:
-            True if the lock was granted, False otherwise.
         """
         self._lease = EtcdLease()
         self._lease.grant()
 
         @retry(stop=stop_after_delay(timeout), wait=wait_fixed(15), reraise=True)
         def acquire():
-            if not self.lock.try_acquire(self._lease.id):  # type: ignore[reportArgumentType]
+            if not self._sync_lock.try_acquire(self._lease.id):  # type: ignore[reportArgumentType]
                 raise RollingOpsFailedToGetLockError('Lock not acquired.')
 
         try:
             acquire()
-            return True
-        except RollingOpsFailedToGetLockError:
-            self._lease.revoke()
-            return False
+        except RollingOpsFailedToGetLockError as e:
+            raise TimeoutError(f'Timed out acquiring etcd sync lock after {timeout}.') from e
+        except Exception as e:
+            raise RollingOpsFailedToGetLockError('Failed to acquire the etcd sync lock.') from e
+        finally:
+            try:
+                self._lease.revoke()
+            except Exception:
+                logger.exception('Failed to released the lease %s.', self._lease.id)
 
     def release_sync_lock(self) -> None:
         """Release the lock and revoke the associated lease."""
-        self.lock.release()
+        self._sync_lock.release()
         if self._lease is not None:
             self._lease.revoke()
 
-    def is_sync_lock_used(self) -> bool:
-        return self._lease is not None
-
     def get_status(self) -> RollingOpsStatus:
-        return RollingOpsStatus.REQUEST
+        """Return the current rolling-ops status for this unit in etcd mode.
+
+        INVALID: no peer relation
+        GRANTED: lock granted and not in retry
+        WAITING: has queued work but no grant
+        IDLE: nothing pending
+        """
+        if self._peer_relation is None or self._etcd_relation is None:
+            return RollingOpsStatus.INVALID
+
+        etcdctl.ensure_initialized()
+
+        if self._async_lock.is_held():
+            return RollingOpsStatus.GRANTED
+
+        if self.operations.has_pending_work():
+            return RollingOpsStatus.WAITING
+
+        return RollingOpsStatus.IDLE
