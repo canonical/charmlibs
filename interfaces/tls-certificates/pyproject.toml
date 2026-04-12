@@ -32,7 +32,7 @@ functional = [  # installed for `just functional interfaces/tls_certificates`
 ]
 integration = [  # installed for `just integration interfaces/tls_certificates`
     "jubilant<2",
-    "pytest-jubilant<2",
+    "pytest-jubilant~=2.0",
 ]
 
 [project.urls]
