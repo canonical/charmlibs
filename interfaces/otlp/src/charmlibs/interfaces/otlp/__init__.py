@@ -56,7 +56,7 @@ endpoints and publish them after the charm's endpoint details have been updated 
 TLS changes.
 
 The OtlpProvider also consumes rules from related OtlpRequirer charms, which can be retrieved with
-the ``rules()`` method::
+the ``rules`` property::
 
     from charmlibs.interfaces.otlp import OtlpProvider
 
@@ -66,8 +66,8 @@ the ``rules()`` method::
             self.framework.observe(self.on.update_status, self._access_rules)
 
         def _access_rules(self, event):
-            OtlpProvider(self).rules("promql")
-            OtlpProvider(self).rules("logql")
+            for relation_id, rule_store in OtlpProvider(self).rules.items():
+                pass  # do something with rule_store.logql and/or rule_store.promql
 
 Requirer Side (Charms requiring OTLP endpoints)
 -----------------------------------------------

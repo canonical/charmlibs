@@ -27,3 +27,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Replace the requirer's rule path interface with an interface accepting an object containing rules
 - Generic PromQL alert rules for requirer charms that are of the aggregator or application type
+
+## [0.3.0]
+
+### Added
+
+- Added an `insecure` field to the OtlpEndpoint(s) in the databag to communicate TLS, required for some gRPC applications
+
+## [0.4.0]
+
+### Updated
+
+- `OtlpProvider.rules` now returns a mapping of relation ID to a RuleStore object

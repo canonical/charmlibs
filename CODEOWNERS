@@ -75,7 +75,7 @@
 /interfaces/pyroscope_cluster/ @canonical/tracing-and-profiling
 /interfaces/s3/ @canonical/data
 /interfaces/saml/ @canonical/platform-engineering
-/interfaces/slo/ @canonical/tracing-and-profiling
+/interfaces/sloth/ @canonical/tracing-and-profiling
 /interfaces/smtp/ @canonical/platform-engineering
 /interfaces/tempo_cluster/ @canonical/tracing-and-profiling
 /interfaces/tls-certificates/ @canonical/tls

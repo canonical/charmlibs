@@ -37,27 +37,27 @@ logger = logging.getLogger(__name__)
 PEERS_ENDPOINT = 'my-peers'
 LOKI_RULES_DEST_PATH = 'loki_alert_rules'
 METRICS_RULES_DEST_PATH = 'prometheus_alert_rules'
-SINGLE_LOGQL_ALERT = AlertingRuleFormat(
-    alert='HighLogVolume',
-    expr='count_over_time({job=~".+"}[30s]) > 100',
-    labels={'severity': 'high'},
-)
-SINGLE_LOGQL_RECORD = RecordingRuleFormat(
-    record='log:error_rate:rate5m',
-    expr='sum by (service) (rate({job=~".+"} | json | level="error" [5m]))',
-    labels={'severity': 'high'},
-)
-SINGLE_PROMQL_ALERT = AlertingRuleFormat(
-    alert='Workload Missing',
-    expr='up{job=~".+"} == 0',
-    for_='0m',
-    labels={'severity': 'critical'},
-)
-SINGLE_PROMQL_RECORD = RecordingRuleFormat(
-    record='code:prometheus_http_requests_total:sum',
-    expr='sum by (code) (prometheus_http_requests_total{job=~".+"})',
-    labels={'severity': 'high'},
-)
+SINGLE_LOGQL_ALERT: AlertingRuleFormat = {
+    'alert': 'HighLogVolume',
+    'expr': 'count_over_time({job=~".+"}[30s]) > 100',
+    'labels': {'severity': 'high'},
+}
+SINGLE_LOGQL_RECORD: RecordingRuleFormat = {
+    'record': 'log:error_rate:rate5m',
+    'expr': 'sum by (service) (rate({job=~".+"} | json | level="error" [5m]))',
+    'labels': {'severity': 'high'},
+}
+SINGLE_PROMQL_ALERT: AlertingRuleFormat = {
+    'alert': 'Workload Missing',
+    'expr': 'up{job=~".+"} == 0',
+    'for': '0m',
+    'labels': {'severity': 'critical'},
+}
+SINGLE_PROMQL_RECORD: RecordingRuleFormat = {
+    'record': 'code:prometheus_http_requests_total:sum',
+    'expr': 'sum by (code) (prometheus_http_requests_total{job=~".+"})',
+    'labels': {'severity': 'high'},
+}
 OFFICIAL_LOGQL_RULES = OfficialRuleFileFormat(
     groups=[
         {

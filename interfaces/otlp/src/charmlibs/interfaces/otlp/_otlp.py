@@ -30,12 +30,7 @@ from pathlib import Path
 from typing import Any, Final, Literal
 
 from cosl.juju_topology import JujuTopology
-from cosl.rules import (
-    HOST_METRICS_MISSING_RULE_NAME,
-    InjectResult,
-    Rules,
-    generic_alert_groups,
-)
+from cosl.rules import HOST_METRICS_MISSING_RULE_NAME, Rules, generic_alert_groups
 from cosl.types import OfficialRuleFileFormat, SingleRuleFormat
 from cosl.utils import LZMABase64
 from ops import CharmBase
@@ -130,6 +125,14 @@ class RuleStore:
         self.promql.add_path(dir_path, recursive=recursive)
         return self
 
+    def combine(self, other: 'RuleStore') -> 'RuleStore':
+        """Combine rules from another RuleStore with this RuleStore."""
+        if other_logql := other.logql.as_dict():
+            self.logql.add(other_logql)
+        if other_promql := other.promql.as_dict():
+            self.promql.add(other_promql)
+        return self
+
 
 class _RulesModel(BaseModel):
     """Rules of various formats (query languages) to support in the relation databag."""
@@ -155,6 +158,10 @@ class OtlpEndpoint(BaseModel):
     endpoint: str = Field(description="URL of the OTLP endpoint (e.g. 'http://collector:4318').")
     telemetries: Sequence[str] = Field(
         description='Telemetry signal types accepted by this endpoint.'
+    )
+    insecure: bool = Field(
+        description='Whether this endpoint requires an insecure connection (e.g. no TLS).',
+        default=False,
     )
 
 
@@ -431,13 +438,16 @@ class OtlpProvider:
         protocol: Literal['http', 'grpc'],
         endpoint: str,
         telemetries: Sequence[Literal['logs', 'metrics', 'traces']],
+        insecure: bool = False,
     ) -> 'OtlpProvider':
-        """Add an OtlpEndpoint to the list of endpoints to publish.
-
-        Call this method after endpoint-changing events e.g. TLS and ingress.
-        """
+        """Add an OtlpEndpoint to the list of endpoints to publish."""
         self._endpoints.append(
-            _OtlpEndpoint(protocol=protocol, endpoint=endpoint, telemetries=telemetries)
+            _OtlpEndpoint(
+                protocol=protocol,
+                endpoint=endpoint,
+                telemetries=telemetries,
+                insecure=insecure,
+            )
         )
         return self
 
@@ -451,24 +461,22 @@ class OtlpProvider:
         for relation in self._charm.model.relations[self._relation_name]:
             relation.save(databag, self._charm.app)
 
-    def rules(self, query_type: Literal['logql', 'promql']) -> dict[str, OfficialRuleFileFormat]:
+    @property
+    def rules(self) -> dict[int, RuleStore]:
         """Fetch rules for all relations of the desired query and rule types.
 
-        This method returns all rules of the desired query and rule types
-        provided by related OTLP requirer charms. These rules may be used to
-        generate a rules file for each relation since the returned list of
-        groups are indexed by relation ID. This method ensures rules:
+        This method returns all rules of varying query and rule types, provided
+        by related OTLP requirer charms. This method ensures rules:
 
-            - have Juju topology from the rule's labels injected into the expr.
-            - are valid using CosTool.
+            - have labels from the charm's Juju topology.
+            - have expression labels from the charm's Juju topology.
+            - are validated using CosTool.
 
         Returns:
-            a mapping of relation ID to a dictionary of alert rule groups
-            following the OfficialRuleFileFormat from cos-lib.
+            a mapping of relation ID to a RuleStore object.
         """
-        rules_map: dict[str, OfficialRuleFileFormat] = {}
+        rules_map: dict[int, RuleStore] = {}
         # Instantiate Rules with topology to ensure that rules always have an identifier
-        rules_obj = Rules(query_type, self._topology)
         for relation in self._charm.model.relations[self._relation_name]:
             if not relation.data[relation.app]:
                 # The databags haven't initialized yet, continue
@@ -480,19 +488,22 @@ class OtlpProvider:
                 logger.error('OTLP databag failed validation: %s', e)
                 continue
 
-            # Get rules for the desired query type
-            rules_for_type: OfficialRuleFileFormat | None = getattr(
-                requirer.rules, query_type, None
+            # Create a RuleStore for this relation's rules, and inject topology labels
+            rules = RuleStore(self._topology)
+            logql_result = rules.logql.inject_and_validate_rules(
+                requirer.rules.logql, requirer.metadata
             )
-            if not rules_for_type:
-                continue
+            promql_result = rules.promql.inject_and_validate_rules(
+                requirer.rules.promql, requirer.metadata
+            )
+            if logql_result.rules and not logql_result.errmsg:
+                rules.logql.add(logql_result.rules)
+            if promql_result.rules and not promql_result.errmsg:
+                rules.promql.add(promql_result.rules)
+            for errmsg in [logql_result.errmsg, promql_result.errmsg]:
+                if errmsg and self._charm.unit.is_leader():
+                    relation.data[self._charm.app]['event'] = json.dumps({'errors': errmsg})
 
-            result: InjectResult = rules_obj.inject_and_validate_rules(
-                rules_for_type, requirer.metadata
-            )
-            if result.errmsg and self._charm.unit.is_leader():
-                relation.data[self._charm.app]['event'] = json.dumps({'errors': result.errmsg})
-            if result.identifier:
-                rules_map[result.identifier] = result.rules
+            rules_map[relation.id] = rules
 
         return rules_map

@@ -195,7 +195,7 @@ jobs:
   integration:
     needs: init
     if: contains(fromJson(needs.init.outputs.tests), 'integration') && !inputs.skip-juju
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
       matrix:

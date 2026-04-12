@@ -46,9 +46,9 @@ init *args:
 fast-lint path='.':
     #!/usr/bin/env -S bash -xueo pipefail
     FAILURES=0
-    uv run --only-group=fast-lint ruff check --preview '{{path}}' || ((FAILURES+=1))
-    uv run --only-group=fast-lint ruff check --preview --diff '{{path}}' || : 'Printed diff of changes to fix `ruff check` issues.'
-    uv run --only-group=fast-lint ruff format --preview --diff '{{path}}' || ((FAILURES+=1))
+    uv run --only-group=fast-lint ruff check '{{path}}' || ((FAILURES+=1))
+    uv run --only-group=fast-lint ruff check --diff '{{path}}' || : 'Printed diff of changes to fix `ruff check` issues.'
+    uv run --only-group=fast-lint ruff format --diff '{{path}}' || ((FAILURES+=1))
     : "$FAILURES command(s) failed."
     exit $FAILURES
 
@@ -57,8 +57,8 @@ check package: (lint package) (unit package) (docs::html package)
 
 [doc('Run `ruff check --fix` and `ruff --format`, modifying files in place.')]
 format package='.':
-    uv run --only-group=fast-lint ruff format --preview '{{package}}'
-    uv run --only-group=fast-lint ruff check --preview --fix '{{package}}'
+    uv run --only-group=fast-lint ruff format '{{package}}'
+    uv run --only-group=fast-lint ruff check --fix '{{package}}'
 
 [doc("Run `uv add` for package, respecting repo-level version constraints, e.g. `just add pathops 'pydantic>=2'`.")]
 [positional-arguments]  # pass recipe args to recipe script positionally (so we can get correct quoting)

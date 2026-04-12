@@ -4,10 +4,11 @@
 """Feature: Rules aggregation and labeling."""
 
 import json
-from typing import Any, cast
+from typing import Any
 
 import ops
 import pytest
+from cosl.juju_topology import JujuTopology
 from cosl.rules import HOST_METRICS_MISSING_RULE_NAME
 from cosl.utils import LZMABase64
 from ops import testing
@@ -18,6 +19,7 @@ from charmlibs.interfaces.otlp._otlp import DEFAULT_REQUIRER_RELATION_NAME as SE
 from charmlibs.interfaces.otlp._otlp import (
     OtlpProvider,
     OtlpRequirer,
+    RuleStore,
     _OtlpRequirerAppData,
     _RulesModel,
 )
@@ -92,11 +94,10 @@ def test_duplicate_rules_per_unit(
 ):
     with otlp_requirer_ctx(otlp_requirer_ctx.on.update_status(), state=State(leader=True)) as mgr:
         # GIVEN any charm
-        charm_any = cast('Any', mgr.charm)
         # WHEN the OtlpRequirer is initialized
         # * generic aggregator rules are desired
         # * no peer relation name is provided
-        result = OtlpRequirer(charm_any)._duplicate_rules_per_unit(
+        result = OtlpRequirer(mgr.charm)._duplicate_rules_per_unit(
             alert_rules={
                 'groups': [
                     {
@@ -240,19 +241,16 @@ def test_provider_rules(
     state = State(leader=True, relations=[receiver], model=MODEL)
     with otlp_provider_ctx(otlp_provider_ctx.on.update_status(), state=state) as mgr:
         # WHEN the provider aggregates the rules from the databag
-        charm_any = cast('Any', mgr.charm)
-        logql = OtlpProvider(charm_any, RECEIVE).rules('logql')
-        promql = OtlpProvider(charm_any, RECEIVE).rules('promql')
+        rule_store = OtlpProvider(mgr.charm, RECEIVE).rules[receiver.id]
+        logql = rule_store.logql.as_dict()
+        promql = rule_store.promql.as_dict()
+        # THEN LogQL and PromQL rules exist in the RuleStore
         assert logql
         assert promql
         for result in [logql, promql]:
             app = metadata['application'] if metadata else 'otlp-provider'
             charm = metadata['charm_name'] if metadata else 'otlp-provider'
-
-            # THEN the identifier is present
-            identifier = f'{MODEL_NAME}_{MODEL_SHORT_UUID}_{app}'
-            assert identifier in result
-            groups = result[identifier].get('groups', [])
+            groups = result.get('groups', [])
             assert groups
             for group in groups:
                 for rule in group.get('rules', []):
@@ -266,3 +264,109 @@ def test_provider_rules(
                     assert f'juju_model="{MODEL_NAME}"' in rule['expr']
                     assert f'juju_model_uuid="{MODEL_UUID}"' in rule['expr']
                     assert f'juju_application="{app}"' in rule['expr']
+
+
+def _make_store() -> RuleStore:
+    return RuleStore(
+        JujuTopology(
+            model=MODEL_NAME,
+            model_uuid=MODEL_UUID,
+            application='test-app',
+            unit='test-app/0',
+            charm_name='test-charm',
+        )
+    )
+
+
+def test_rulestore_combine_logql_only_into_empty():
+    # GIVEN a RuleStore with LogQL rules
+    source = _make_store().add_logql(SINGLE_LOGQL_ALERT, group_name='logql_group')
+    # AND a target RuleStore with no rules
+    target = _make_store()
+
+    # WHEN combined
+    target.combine(source)
+
+    # THEN the target now contains the LogQL rules
+    assert target.logql.as_dict().get('groups')
+    # AND no PromQL rules were added
+    assert not target.promql.as_dict().get('groups')
+
+
+def test_rulestore_combine_promql_only_into_empty():
+    # GIVEN a RuleStore with PromQL rules
+    source = _make_store().add_promql(SINGLE_PROMQL_ALERT, group_name='promql_group')
+    # AND a target RuleStore with no rules
+    target = _make_store()
+
+    # WHEN combined
+    target.combine(source)
+
+    # THEN the target now contains the PromQL rules
+    assert target.promql.as_dict().get('groups')
+    # AND no LogQL rules were added
+    assert not target.logql.as_dict().get('groups')
+
+
+def test_rulestore_combine_both_rule_types():
+    # GIVEN a RuleStore with both LogQL and PromQL rules
+    source = (
+        _make_store()
+        .add_logql(SINGLE_LOGQL_ALERT, group_name='logql_group')
+        .add_promql(SINGLE_PROMQL_ALERT, group_name='promql_group')
+    )
+    # AND a target RuleStore with no rules
+    target = _make_store()
+
+    # WHEN combined
+    target.combine(source)
+
+    # THEN both rule types are present in the target
+    assert target.logql.as_dict().get('groups')
+    assert target.promql.as_dict().get('groups')
+
+
+def test_rulestore_combine_merges_with_existing_rules():
+    # GIVEN a target RuleStore that already has a LogQL rule
+    target = _make_store().add_logql(SINGLE_LOGQL_RECORD, group_name='existing_group')
+    # AND a source RuleStore with a different LogQL rule
+    source = _make_store().add_logql(SINGLE_LOGQL_ALERT, group_name='new_group')
+
+    # WHEN combined
+    target.combine(source)
+
+    # THEN the target contains rules from both
+    groups = target.logql.as_dict().get('groups', [])
+    group_names = [g['name'] for g in groups]
+    assert any('existing_group' in name for name in group_names)
+    assert any('new_group' in name for name in group_names)
+
+
+def test_rulestore_combine_empty_source_does_not_clear_target():
+    # GIVEN a target RuleStore with LogQL and PromQL rules
+    target = (
+        _make_store()
+        .add_logql(SINGLE_LOGQL_ALERT, group_name='logql_group')
+        .add_promql(SINGLE_PROMQL_ALERT, group_name='promql_group')
+    )
+    # AND an empty source RuleStore
+    source = _make_store()
+
+    # WHEN combined
+    target.combine(source)
+
+    # THEN the target rules are unchanged
+    assert target.logql.as_dict().get('groups')
+    assert target.promql.as_dict().get('groups')
+
+
+def test_rulestore_combine_returns_self():
+    # GIVEN two RuleStores
+    target = _make_store()
+    source = _make_store().add_promql(SINGLE_PROMQL_ALERT, group_name='promql_group')
+
+    # WHEN combined
+    result = target.combine(source)
+
+    # THEN combine returns the target (self) for chaining
+    assert result is target
