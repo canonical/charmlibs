@@ -44,7 +44,7 @@ def _now_timestamp_str() -> str:
 
 
 class MySyncBackend(SyncLockBackend):
-    def acquire(self, timeout: int) -> None:
+    def acquire(self, timeout: int | None) -> None:
         logger.info('acquiring sync lock')
 
     def release(self) -> None:

@@ -35,7 +35,7 @@ from charmlibs.pathops import LocalPath
 from charmlibs.rollingops import RollingOpsManager
 from charmlibs.rollingops.common._models import OperationResult
 from charmlibs.rollingops.etcd._models import SharedCertificate
-from charmlibs.rollingops.peer._manager import PeerRollingOpsManager
+from charmlibs.rollingops.peer._backend import PeerRollingOpsBackend
 
 VALID_CA_CERT_PEM = """-----BEGIN CERTIFICATE-----
       MIIC6DCCAdCgAwIBAgIUW42TU9LSjEZLMCclWrvSwAsgRtcwDQYJKoZIhvcNAQEL
@@ -183,7 +183,7 @@ class BaseRollingOpsTestCharm(ops.CharmBase):
 
     def _make_restart_manager(
         self, callback_targets: dict[str, Any]
-    ) -> PeerRollingOpsManager | RollingOpsManager:
+    ) -> PeerRollingOpsBackend | RollingOpsManager:
         raise NotImplementedError
 
     def _on_restart_action(self, event: ActionEvent) -> None:
@@ -219,8 +219,8 @@ class BaseRollingOpsTestCharm(ops.CharmBase):
 
 
 class PeerRollingOpsCharm(BaseRollingOpsTestCharm):
-    def _make_restart_manager(self, callback_targets: dict[str, Any]) -> PeerRollingOpsManager:
-        return PeerRollingOpsManager(
+    def _make_restart_manager(self, callback_targets: dict[str, Any]) -> PeerRollingOpsBackend:
+        return PeerRollingOpsBackend(
             charm=self,
             relation_name='restart',
             callback_targets=callback_targets,

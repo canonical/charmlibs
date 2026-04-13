@@ -23,9 +23,7 @@ from ops.charm import (
     RelationDepartedEvent,
 )
 
-from charmlibs.pathops import PebbleConnectionError
 from charmlibs.rollingops.common._exceptions import (
-    RollingOpsEtcdNotConfiguredError,
     RollingOpsInvalidLockRequestError,
     RollingOpsNoEtcdRelationError,
 )
@@ -46,8 +44,16 @@ from charmlibs.rollingops.etcd._worker import EtcdRollingOpsAsyncWorker
 logger = logging.getLogger(__name__)
 
 
-class EtcdRollingOpsManager(Object):
-    """Rolling ops manager for clusters."""
+class EtcdRollingOpsBackend(Object):
+    """Manage rolling operations using etcd-backed coordination.
+
+    This backend stores operation state in etcd, coordinates asynchronous
+    execution through an etcd-backed distributed lock, and exposes a
+    synchronous lock interface for critical sections.
+
+    Each unit manages its own etcd worker process and operation queues.
+    Operations are scoped using a cluster identifier and a per-unit owner.
+    """
 
     def __init__(
         self,
@@ -57,14 +63,17 @@ class EtcdRollingOpsManager(Object):
         cluster_id: str,
         callback_targets: dict[str, Any],
     ):
-        """Register our custom events.
+        """Initialize the etcd-backed rolling-ops backend.
 
-        params:
-            charm: the charm we are attaching this to.
-            peer_relation_name: peer relation used for rolling ops.
-            etcd_relation_name: the relation to integrate with etcd.
-            cluster_id: unique identifier for the cluster
-            callback_targets: mapping from callback_id -> callable.
+        Args:
+            charm: The charm instance owning this backend.
+            peer_relation_name: Name of the peer relation used for shared
+                state and worker coordination.
+            etcd_relation_name: Name of the relation providing etcd access.
+            cluster_id: Identifier used to scope etcd keys for this rolling-ops
+                instance.
+            callback_targets: Mapping from callback identifiers to callables
+                executed when an operation is granted the asynchronous lock.
         """
         super().__init__(charm, 'etcd-rolling-ops-manager')
         self._charm = charm
@@ -105,26 +114,49 @@ class EtcdRollingOpsManager(Object):
 
     @property
     def _peer_relation(self) -> Relation | None:
-        """Return the peer relation for this charm."""
+        """Return the peer relation for this backend."""
         return self.model.get_relation(self.peer_relation_name)
 
     @property
     def _etcd_relation(self) -> Relation | None:
-        """Return the etcd relation for this charm."""
+        """Return the etcd relation for this backend."""
         return self.model.get_relation(self.etcd_relation_name)
 
     def is_available(self) -> bool:
-        """Return whether etcd can currently be used."""
+        """Return whether the etcd backend is currently usable.
+
+        The backend is considered available only if the etcd relation exists
+        and the etcd client has been initialized successfully.
+
+        Returns:
+            True if etcd can currently be used, otherwise False.
+        """
         if self._etcd_relation is None:
             return False
         try:
             etcdctl.ensure_initialized()
-        except (PebbleConnectionError, RollingOpsEtcdNotConfiguredError):
+        except Exception:
             return False
         return True
 
     def enqueue_operation(self, operation: Operation) -> None:
-        """Store an operation in etcd."""
+        """Persist an operation in etcd for this unit.
+
+        Before storing the operation, this method clears any pending fallback
+        state for the current unit. If the unit had previously fallen back
+        from etcd to peer processing and cleanup is still required, stale etcd
+        operation state is removed first so processing can resume from a clean
+        slate.
+
+        Args:
+            operation: The operation to enqueue.
+
+        Raises:
+            RollingOpsNoEtcdRelationError: If the etcd relation does not exist.
+            RollingOpsEtcdNotConfiguredError: If the etcd client has not been
+                configured yet.
+            PebbleConnectionError: If the remote container cannot be reached.
+        """
         if self._etcd_relation is None:
             raise RollingOpsNoEtcdRelationError
 
@@ -138,18 +170,30 @@ class EtcdRollingOpsManager(Object):
         self.operations.request(operation)
 
     def ensure_processing(self):
+        """Ensure that the etcd worker process is running.
+
+        The worker is responsible for acquiring the asynchronous lock and
+        processing queued operations for this unit.
+        """
         self.worker.start()
 
     def _on_etcd_relation_created(self, event: RelationCreatedEvent) -> None:
-        """Check whether the etcdctl command is available."""
+        """Validate that the etcdctl command is available when etcd is related.
+
+        Args:
+            event: The relation-created event for the etcd relation.
+        """
         if not etcdctl.is_etcdctl_installed():
             logger.error('%s is not installed.', etcdctl.ETCDCTL_CMD)
 
     def _on_peer_relation_departed(self, event: RelationDepartedEvent) -> None:
-        """Handle a unit departing from the peer relation.
+        """Handle removal of a unit from the peer relation.
 
-        If the current unit is the one departing, stop the etcd worker
-        process to ensure a clean shutdown.
+        If the current unit is departing, the etcd worker process is stopped
+        to ensure a clean shutdown and avoid leaving a stale worker running.
+
+        Args:
+            event: The peer relation departed event.
         """
         unit = event.departing_unit
         if unit == self.model.unit:
@@ -211,6 +255,10 @@ class EtcdRollingOpsManager(Object):
 
         After execution, the operation is moved to the completed queue and its
         updated state is persisted.
+
+        Returns:
+            A structured outcome describing whether an operation was executed
+            and, if so, which operation was finalized and with what result.
         """
         if not self._async_lock.is_held():
             logger.info('Lock is not granted. Operation will not run.')
@@ -257,52 +305,69 @@ class EtcdRollingOpsManager(Object):
             result=result,
         )
 
-    def acquire_sync_lock(self, timeout: int) -> None:
-        """Try to acquire the lock until timeout expires.
+    def acquire_sync_lock(self, timeout: int | None) -> None:
+        """Acquire the etcd-backed synchronous lock for this unit.
+
+        A dedicated lease is granted and kept alive for the duration of the
+        lock. The backend then repeatedly attempts to acquire the sync lock
+        until it succeeds or the timeout expires.
 
         Args:
             timeout: Maximum time in seconds to wait for the lock.
+                None means wait indefinitely.
 
         Raises:
-            TimeoutError: If the lock could not be acquired before timeout.
-            RollingOpsFailedToGetLockError: If acquisition fails for another reason.
+            TimeoutError: If the lock could not be acquired before the timeout.
+            Exception: Re-raises unexpected etcd or lock acquisition failures
+                after revoking the lease.
         """
         self._lease = EtcdLease()
         self._lease.grant()
 
-        deadline = time.monotonic() + timeout
+        deadline = None if timeout is None else time.monotonic() + timeout
 
         try:
-            while time.monotonic() < deadline:
+            while True:
                 try:
                     if self._sync_lock.try_acquire(self._lease.id):  # type: ignore[reportArgumentType]
-                        logger.info('Lock acquired.')
+                        logger.info('etcd lock acquired.')
                         return
                 except Exception:
                     logger.exception('Failed while trying to acquire etcd sync lock.')
+                    raise
+
+                if deadline is not None and time.monotonic() >= deadline:
+                    raise TimeoutError(f'Timed out acquiring etcd sync lock after {timeout}s.')
 
                 time.sleep(15)
 
-            raise TimeoutError(f'Timed out acquiring etcd sync lock after {timeout}s.')
         except Exception:
             try:
                 self._lease.revoke()
             except Exception:
                 logger.exception('Failed to revoke lease %s.', self._lease.id)
+            raise
 
     def release_sync_lock(self) -> None:
-        """Release the lock and revoke the associated lease."""
+        """Release the synchronous lock and revoke its lease."""
         self._sync_lock.release()
         if self._lease is not None:
             self._lease.revoke()
 
     def get_status(self) -> RollingOpsStatus:
-        """Return the current rolling-ops status for this unit in etcd mode.
+        """Return the rolling-ops status for this unit in etcd mode.
 
-        INVALID: no peer relation
-        GRANTED: lock granted and not in retry
-        WAITING: has queued work but no grant
-        IDLE: nothing pending
+        Status is derived from the current etcd-backed lock state and the
+        unit's queued operation state.
+
+        Returned values:
+            - INVALID: the peer or etcd relation is missing
+            - GRANTED: the async lock is currently held by this unit
+            - WAITING: this unit has queued work but does not hold the lock
+            - IDLE: this unit has no pending work
+
+        Returns:
+            The current rolling-ops status for this unit.
         """
         if self._peer_relation is None or self._etcd_relation is None:
             return RollingOpsStatus.INVALID

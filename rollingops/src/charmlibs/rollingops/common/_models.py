@@ -407,7 +407,7 @@ class RollingOpsState:
 
 class SyncLockBackend(ABC):
     @abstractmethod
-    def acquire(self, timeout: int) -> None:
+    def acquire(self, timeout: int | None) -> None:
         pass
 
     @abstractmethod

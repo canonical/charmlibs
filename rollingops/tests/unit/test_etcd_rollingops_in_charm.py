@@ -314,7 +314,7 @@ def test_state_etcd_status(ctx: Context[RollingOpsCharm]):
     state = State(leader=False, relations={peer_rel})
 
     with patch(
-        'charmlibs.rollingops.etcd._manager.EtcdRollingOpsManager.get_status',
+        'charmlibs.rollingops.etcd._backend.EtcdRollingOpsBackend.get_status',
         return_value=RollingOpsStatus.GRANTED,
     ):
         with ctx(ctx.on.update_status(), state) as mgr:
@@ -341,7 +341,7 @@ def test_state_falls_back_to_peer_if_etcd_status_fails(ctx: Context[RollingOpsCh
     state = State(leader=False, relations={peer_rel})
 
     with patch(
-        'charmlibs.rollingops._rollingops_manager.EtcdRollingOpsManager.get_status',
+        'charmlibs.rollingops._rollingops_manager.EtcdRollingOpsBackend.get_status',
         side_effect=RollingOpsEtcdNotConfiguredError('boom'),
     ):
         with ctx(ctx.on.update_status(), state) as mgr:

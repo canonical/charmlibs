@@ -28,7 +28,13 @@ logger = logging.getLogger(__name__)
 
 
 class PeerRollingOpsAsyncWorker(BaseRollingOpsAsyncWorker):
-    """Manage the peer-backed rolling-ops worker process."""
+    """Manage the peer-backed rolling-ops worker process.
+
+    The worker state is coordinated through the peer relation application
+    databag to ensure that it remains accessible across leadership
+    changes. This guarantees that a newly elected leader can detect,
+    stop, or restart an existing worker process as needed.
+    """
 
     _pid_field = 'peer-rollingops-worker-pid'
     _log_filename = 'peer_rollingops_worker'
@@ -42,21 +48,54 @@ class PeerRollingOpsAsyncWorker(BaseRollingOpsAsyncWorker):
         return self._relation.data[self.model.app]  # type: ignore[reportOptionalMemberAccess]
 
     def _worker_script_path(self) -> pathops.LocalPath:
+        """Return the path to the peer rolling-ops worker script.
+
+        This script is executed in a background process to handle operation
+        processing for the peer backend.
+        """
         return pathops.LocalPath(
             self._venv_site_packages() / 'charmlibs' / 'rollingops' / 'peer' / '_rollingops.py'
         )
 
     def _get_pid_str(self) -> str:
+        """Return the stored worker process PID as a string.
+
+        The PID is persisted in the application databag of the peer relation.
+        If no relation is available or no PID is stored, an empty string is returned.
+
+        Returns:
+            The worker process PID as a string, or an empty string if not set.
+        """
         if self._relation is None:
             return ''
         return self._app_data.get(self._pid_field, '')
 
     def _set_pid_str(self, pid: str) -> None:
+        """Persist the worker process PID in the peer relation databag.
+
+        The PID is stored in the application databag because it is used
+        to trigger rolling operations on the leader and the leader may change.
+
+        Args:
+            pid: The process identifier to store.
+        """
         if self._relation is None:
             return
         self._app_data.update({self._pid_field: pid})
 
     def _on_existing_worker(self, pid: int) -> bool:
+        """Handle the presence of an already running worker process.
+
+        When an existing worker is detected, it is stopped before starting a
+        new one to ensure a single active worker per application.
+
+        Args:
+            pid: The PID of the currently running worker.
+
+        Returns:
+            True to indicate that the existing worker was handled and a new
+            worker can be started.
+        """
         logger.info('Stopping existing RollingOps worker PID %s before restart.', pid)
         self.stop()
         return True

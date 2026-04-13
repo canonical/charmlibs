@@ -30,12 +30,33 @@ logger = logging.getLogger(__name__)
 
 
 class BaseRollingOpsAsyncWorker(Object):
-    """Base class for external rolling-ops worker processes."""
+    """Base class for external rolling-ops worker processes.
+
+    This class provides the common lifecycle management for background
+    worker processes used by rolling-ops backends. It is responsible for:
+
+    - locating the worker script inside the charm virtualenv
+    - building the execution environment for the subprocess
+    - validating required files before startup
+    - starting and stopping the worker process
+    - persisting and retrieving the worker PID through backend-specific storage
+
+    Subclasses define where worker state is stored, how existing workers
+    should be handled, and which worker script and arguments should be used.
+    """
 
     _pid_field: str
     _log_filename: str
 
     def __init__(self, charm: CharmBase, handle_name: str, peer_relation_name: str):
+        """Initialize the base rolling-ops worker helper.
+
+        Args:
+            charm: The charm instance managing the worker process.
+            handle_name: Framework handle name used for this worker object.
+            peer_relation_name: Name of the peer relation used by subclasses
+                to store and retrieve worker state.
+        """
         super().__init__(charm, handle_name)
         self._charm = charm
         self._charm_dir = charm.charm_dir
@@ -44,11 +65,15 @@ class BaseRollingOpsAsyncWorker(Object):
 
     @property
     def _relation(self) -> Relation | None:
-        """Return the peer relation."""
+        """Return the peer relation used for worker state."""
         return self._charm.model.get_relation(self._peer_relation_name)
 
     def _venv_site_packages(self) -> pathops.LocalPath:
-        """Return the charm virtualenv site-packages path."""
+        """Return the site-packages path for the charm virtualenv.
+
+        This path is used to locate the rolling-ops worker scripts and ensure
+        the spawned subprocess can import charm library code.
+        """
         return pathops.LocalPath(
             self._charm_dir
             / 'venv'
@@ -58,7 +83,16 @@ class BaseRollingOpsAsyncWorker(Object):
         )
 
     def _build_env(self) -> dict[str, str]:
-        """Build the environment for the spawned worker."""
+        """Build the environment used to spawn the worker subprocess.
+
+        The worker runs outside the current Juju hook context, so the Juju
+        context identifier is removed from the environment. The charm virtualenv
+        site-packages path is also prepended to ``PYTHONPATH`` so that the
+        worker can import charm libraries correctly.
+
+        Returns:
+            A copy of the current environment adjusted for the worker process.
+        """
         new_env = os.environ.copy()
         new_env.pop('JUJU_CONTEXT_ID', None)
 
@@ -78,15 +112,36 @@ class BaseRollingOpsAsyncWorker(Object):
         raise NotImplementedError
 
     def _worker_args(self) -> list[str]:
-        """Return backend-specific worker CLI args."""
+        """Return additional backend-specific command-line arguments.
+
+        Subclasses may override this to pass extra arguments required by the
+        worker process.
+
+        Returns:
+            A list of command-line arguments to append when starting the worker.
+        """
         return []
 
     def _get_pid_str(self) -> str:
-        """Return the stored worker PID string."""
+        """Return the stored worker PID string.
+
+        Returns:
+            The stored PID as a string, or an empty string if no PID is stored.
+
+        Raises:
+            NotImplementedError: If not implemented by a subclass.
+        """
         raise NotImplementedError
 
     def _set_pid_str(self, pid: str) -> None:
-        """Persist the worker PID string."""
+        """Persist the worker PID string.
+
+        Args:
+            pid: The PID string to persist. An empty string clears the stored PID.
+
+        Raises:
+            NotImplementedError: If not implemented by a subclass.
+        """
         raise NotImplementedError
 
     def _on_existing_worker(self, pid: int) -> bool:
@@ -99,7 +154,15 @@ class BaseRollingOpsAsyncWorker(Object):
         raise NotImplementedError
 
     def _validate_startup_paths(self) -> None:
-        """Validate any paths before starting."""
+        """Validate that the worker runtime files exist before startup.
+
+        This checks that the charm virtualenv site-packages directory exists
+        and that the backend-specific worker script is present.
+
+        Raises:
+            RollingOpsCharmLibMissingError: If the virtualenv or worker script
+                cannot be found.
+        """
         venv_path = self._venv_site_packages()
         if not with_pebble_retry(lambda: venv_path.exists()):
             raise RollingOpsCharmLibMissingError(
@@ -123,7 +186,13 @@ class BaseRollingOpsAsyncWorker(Object):
             return True
 
     def start(self) -> None:
-        """Start a new worker process if one is not already running."""
+        """Start the worker subprocess if one is not already running.
+
+        Raises:
+            RollingOpsCharmLibMissingError: If the virtualenv or worker script
+                required to start the worker is missing.
+            OSError: If the worker subprocess cannot be started.
+        """
         pid_str = self._get_pid_str()
         if pid_str:
             try:
@@ -161,7 +230,15 @@ class BaseRollingOpsAsyncWorker(Object):
         logger.info('Started %s process with PID %s', self._handle_name, pid)
 
     def stop(self) -> None:
-        """Stop the running worker process if it exists."""
+        """Stop the running worker subprocess, if one is recorded.
+
+        This method reads the stored PID, sends ``SIGTERM`` to the process,
+        and falls back to ``SIGKILL`` if termination fails. If the process is
+        already gone or the stored PID is invalid, worker state is cleaned up.
+
+        The stored PID is cleared when the worker is successfully considered
+        stopped or no longer present.
+        """
         pid_str = self._get_pid_str()
 
         try:

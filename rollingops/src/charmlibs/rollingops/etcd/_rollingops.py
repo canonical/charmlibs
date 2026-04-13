@@ -106,12 +106,8 @@ def main():
             lease.revoke()
             lock.release()
             logger.info('Lease revoked and lock released.')
-
-            if not operations.has_pending():
-                logger.info('No more operations in the queue.')
-                break
-
             time.sleep(RETRY_SLEEP)
+
     except Exception as e:
         logger.exception('Fatal etcd worker error: %s', e)
 
