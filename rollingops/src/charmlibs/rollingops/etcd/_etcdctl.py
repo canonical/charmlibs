@@ -53,8 +53,8 @@ SERVER_CA_PATH = BASE_DIR / 'server-ca.pem'
 CONFIG_FILE_PATH = BASE_DIR / 'etcdctl.json'
 ETCDCTL_CMD = 'etcdctl'
 ETCDCTL_TIMEOUT_SECONDS = 15
-ETCDCTL_RETRY_ATTEMPTS = 3
-ETCDCTL_RETRY_WAIT_SECONDS = 2
+ETCDCTL_RETRY_ATTEMPTS = 12
+ETCDCTL_RETRY_WAIT_SECONDS = 5
 
 
 @lru_cache(maxsize=1)
@@ -228,7 +228,6 @@ def _run_checked(*args: str, cmd_input: str | None = None) -> subprocess.Complet
 
     Raises:
         RollingOpsEtcdNotConfiguredError: if etcdctl is not configured.
-        RollingOpsFileSystemError: if configuration cannot be read.
         PebbleConnectionError: if the remote container cannot be reached.
         RollingOpsEtcdctlRetryableError: for transient command failures.
         RollingOpsEtcdctlFatalError: for non-retryable command failures.
@@ -342,6 +341,9 @@ def get_first_key_value_pair(key_prefix: str) -> EtcdKV | None:
         - The parsed JSON value as a dictionary
 
         Returns None if no key exists or the command fails.
+
+    Raises:
+        RollingOpsEtcdctlParseError: if the output is malformed
     """
     return _get_key_value_pair(key_prefix, '--limit=1')
 
@@ -358,6 +360,9 @@ def get_last_key_value_pair(key_prefix: str) -> EtcdKV | None:
         - The parsed JSON value as a dictionary
 
         Returns None if no key exists or the command fails.
+
+    Raises:
+        RollingOpsEtcdctlParseError: if the output is malformed
     """
     return _get_key_value_pair(
         key_prefix,
@@ -381,7 +386,6 @@ def txn(txn_input: str) -> bool:
 
     Raises:
         RollingOpsEtcdNotConfiguredError: if etcdctl is not configured.
-        RollingOpsFileSystemError: if configuration cannot be read.
         PebbleConnectionError: if the remote container cannot be reached.
         RollingOpsEtcdctlError: etcdctl command error.
     """

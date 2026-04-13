@@ -23,7 +23,7 @@ from sys import version_info
 from ops import CharmBase, Object, Relation
 
 from charmlibs import pathops
-from charmlibs.rollingops.common._exceptions import RollingOpsCharmLibMissingError
+from charmlibs.rollingops.common._exceptions import RollingOpsLibMissingError
 from charmlibs.rollingops.common._utils import with_pebble_retry
 
 logger = logging.getLogger(__name__)
@@ -160,18 +160,18 @@ class BaseRollingOpsAsyncWorker(Object):
         and that the backend-specific worker script is present.
 
         Raises:
-            RollingOpsCharmLibMissingError: If the virtualenv or worker script
+            RollingOpsLibMissingError: If the virtualenv or worker script
                 cannot be found.
         """
         venv_path = self._venv_site_packages()
         if not with_pebble_retry(lambda: venv_path.exists()):
-            raise RollingOpsCharmLibMissingError(
+            raise RollingOpsLibMissingError(
                 f'Expected virtualenv site-packages not found: {venv_path}'
             )
 
         worker = self._worker_script_path()
         if not with_pebble_retry(lambda: worker.exists()):
-            raise RollingOpsCharmLibMissingError(f'Worker script not found: {worker}')
+            raise RollingOpsLibMissingError(f'Worker script not found: {worker}')
 
     def _is_pid_alive(self, pid: int) -> bool:
         """Return whether the given PID appears to be alive."""
@@ -189,7 +189,7 @@ class BaseRollingOpsAsyncWorker(Object):
         """Start the worker subprocess if one is not already running.
 
         Raises:
-            RollingOpsCharmLibMissingError: If the virtualenv or worker script
+            RollingOpsLibMissingError: If the virtualenv or worker script
                 required to start the worker is missing.
             OSError: If the worker subprocess cannot be started.
         """

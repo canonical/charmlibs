@@ -75,7 +75,7 @@ class EtcdLease:
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             text=True,
-        )  # handle error case?
+        )
         logger.info('Keepalive started for lease %s.', self.id)
 
     def _stop_keepalive(self) -> None:
@@ -453,13 +453,30 @@ class ManagerOperationStore:
         return self._inprogress.move_operation(self._completed.prefix, operation)
 
     def peek_current(self) -> Operation | None:
-        """Peek the current in-progress operation."""
+        """Return the current in-progress operation without modifying state.
+
+        Returns:
+            The current in-progress operation, or None if no operation is
+            being processed.
+        """
         return self._inprogress.peek()
 
     def has_pending_work(self) -> bool:
+        """Return whether there is an operation currently being processed.
+
+        Returns:
+            True if there is a current operation, otherwise False.
+        """
         return self.peek_current() is not None
 
     def clean_up(self) -> None:
+        """Clear all operation queues for this unit.
+
+        This removes all in-progress, pending, and completed operations,
+        resetting the local etcd-backed state. It is typically used when
+        recovering from inconsistencies or after switching backends to
+        ensure a clean starting point.
+        """
         self._inprogress.clear()
         self._pending.clear()
         self._completed.clear()

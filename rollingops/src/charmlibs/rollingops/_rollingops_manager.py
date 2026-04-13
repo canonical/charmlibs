@@ -21,16 +21,11 @@ from typing import Any
 from ops import CharmBase, Object, Relation, RelationBrokenEvent
 from ops.framework import EventBase
 
-from charmlibs.pathops import PebbleConnectionError
 from charmlibs.rollingops.common._exceptions import (
     RollingOpsDecodingError,
-    RollingOpsEtcdctlError,
-    RollingOpsEtcdNotConfiguredError,
-    RollingOpsFileSystemError,
     RollingOpsInvalidLockRequestError,
-    RollingOpsNoEtcdRelationError,
     RollingOpsNoRelationError,
-    RollingOpsSyncLockBackendError,
+    RollingOpsSyncLockError,
 )
 from charmlibs.rollingops.common._models import (
     Operation,
@@ -46,14 +41,6 @@ from charmlibs.rollingops.peer._backend import PeerRollingOpsBackend
 from charmlibs.rollingops.peer._models import PeerUnitOperations
 
 logger = logging.getLogger(__name__)
-
-_ETCD_FALLBACK_EXCEPTIONS = (
-    RollingOpsEtcdctlError,
-    RollingOpsEtcdNotConfiguredError,
-    RollingOpsFileSystemError,
-    RollingOpsNoEtcdRelationError,
-    PebbleConnectionError,
-)
 
 
 class RollingOpsLockGrantedEvent(EventBase):
@@ -254,7 +241,7 @@ class RollingOpsManager(Object):
         if backend == ProcessingBackend.ETCD:
             try:
                 self.etcd_backend.enqueue_operation(operation)
-            except _ETCD_FALLBACK_EXCEPTIONS as e:
+            except Exception as e:
                 logger.warning(
                     'Failed to persist operation in etcd backend; falling back to peer: %s',
                     e,
@@ -288,7 +275,7 @@ class RollingOpsManager(Object):
         try:
             logger.info('Executing rollingop on etcd backend.')
             outcome = self.etcd_backend._on_run_with_lock()
-        except _ETCD_FALLBACK_EXCEPTIONS as e:
+        except Exception as e:
             logger.warning(
                 'etcd backend failed while handling rollingops_lock_granted; '
                 'falling back to peer: %s',
@@ -297,17 +284,16 @@ class RollingOpsManager(Object):
             self._fallback_current_unit_to_peer()
             return
 
-        if outcome.executed and outcome.op_id is not None and outcome.result is not None:
-            try:
-                self.peer_backend.mirror_result(outcome.op_id, outcome.result)
-            except RollingOpsDecodingError:
-                logger.info(
-                    'Inconsistencies found between peer relation and etcd. '
-                    'Falling back to peer backend.'
-                )
-                self._fallback_current_unit_to_peer()
-                return
-            logger.info('Execution mirrored to peer relation.')
+        try:
+            self.peer_backend.mirror_outcome(outcome)
+        except RollingOpsDecodingError:
+            logger.info(
+                'Inconsistencies found between peer relation and etcd. '
+                'Falling back to peer backend.'
+            )
+            self._fallback_current_unit_to_peer()
+            return
+        logger.info('Execution mirrored to peer relation.')
 
     def _on_rollingops_etcd_failed(self, event: RollingOpsEtcdFailedEvent) -> None:
         """Fall back to peer when the etcd worker reports a fatal failure."""
@@ -324,12 +310,12 @@ class RollingOpsManager(Object):
             A new sync lock backend instance.
 
         Raises:
-            RollingOpsSyncLockBackendError: If no backend is registered for
+            RollingOpsSyncLockError: If no backend is registered for
                 the given identifier.
         """
         backend_cls = self._sync_lock_targets.get(backend_id, None)
         if backend_cls is None:
-            raise RollingOpsSyncLockBackendError(f'Unknown sync lock backend: {backend_id}.')
+            raise RollingOpsSyncLockError(f'Unknown sync lock backend: {backend_id}.')
 
         return backend_cls()
 
@@ -361,8 +347,7 @@ class RollingOpsManager(Object):
         Raises:
             TimeoutError: If lock acquisition through etcd or the peer backend
                 times out.
-            RollingOpsSyncLockBackendError: If the peer sync lock backend is
-                unknown or fails while acquiring or releasing the lock.
+            RollingOpsSyncLockError: if there is an error when acquiring the lock.
         """
         if self.etcd_backend.is_available():
             logger.info('Acquiring sync lock on etcd.')
@@ -390,7 +375,7 @@ class RollingOpsManager(Object):
         try:
             backend.acquire(timeout=timeout)
         except Exception as e:
-            raise RollingOpsSyncLockBackendError(
+            raise RollingOpsSyncLockError(
                 f'Failed to acquire sync lock backend {backend_id}'
             ) from e
 
@@ -401,7 +386,7 @@ class RollingOpsManager(Object):
                 backend.release()
                 logger.info('Sync lock backend %s released.', backend_id)
             except Exception as e:
-                raise RollingOpsSyncLockBackendError(
+                raise RollingOpsSyncLockError(
                     f'Failed to release sync lock backend {backend_id}'
                 ) from e
 
@@ -432,7 +417,7 @@ class RollingOpsManager(Object):
         if self._backend_state.is_etcd_managed():
             try:
                 status = self.etcd_backend.get_status()
-            except _ETCD_FALLBACK_EXCEPTIONS as e:
+            except Exception as e:
                 logger.exception('Failed to get status: %s', e)
                 self._fallback_current_unit_to_peer()
                 status = self.peer_backend.get_status()
@@ -458,7 +443,7 @@ class RollingOpsManager(Object):
 
             try:
                 self.etcd_backend.ensure_processing()
-            except _ETCD_FALLBACK_EXCEPTIONS as e:
+            except Exception as e:
                 logger.warning('etcd worker failed: %s; falling back.', e)
                 self._fallback_current_unit_to_peer()
                 return

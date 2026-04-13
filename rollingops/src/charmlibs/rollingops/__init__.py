@@ -17,15 +17,29 @@
 from ._rollingops_manager import RollingOpsManager
 from ._version import __version__ as __version__
 from .common._exceptions import (
+    RollingOpsDecodingError,
+    RollingOpsEtcdctlError,
     RollingOpsEtcdNotConfiguredError,
+    RollingOpsFileSystemError,
     RollingOpsInvalidLockRequestError,
+    RollingOpsInvalidSecretContentError,
+    RollingOpsLibMissingError,
+    RollingOpsNoRelationError,
+    RollingOpsSyncLockError,
 )
 from .common._models import OperationResult, SyncLockBackend
 
 __all__ = (
     'OperationResult',
+    'RollingOpsDecodingError',
     'RollingOpsEtcdNotConfiguredError',
+    'RollingOpsEtcdctlError',
+    'RollingOpsFileSystemError',
     'RollingOpsInvalidLockRequestError',
+    'RollingOpsInvalidSecretContentError',
+    'RollingOpsLibMissingError',
     'RollingOpsManager',
+    'RollingOpsNoRelationError',
+    'RollingOpsSyncLockError',
     'SyncLockBackend',
 )

@@ -165,7 +165,13 @@ from charmlibs.rollingops.common._exceptions import (
     RollingOpsInvalidLockRequestError,
     RollingOpsNoRelationError,
 )
-from charmlibs.rollingops.common._models import Operation, OperationResult, RollingOpsStatus
+from charmlibs.rollingops.common._models import (
+    Operation,
+    OperationResult,
+    RollingOpsStatus,
+    RunWithLockOutcome,
+    RunWithLockStatus,
+)
 from charmlibs.rollingops.peer._models import (
     PeerAppLock,
     PeerUnitOperations,
@@ -506,11 +512,12 @@ class PeerRollingOpsBackend(Object):
             return
 
         if not (callback := self.callback_targets.get(operation.callback_id)):
-            logger.warning(
-                'Operation %s target was not found. It cannot be executed.',
+            logger.error(
+                'Operation %s target was not found. Releasing operation without retry.',
                 operation.callback_id,
             )
-            return  # lock is not released!!!!!
+            operations.finish(OperationResult.RELEASE)
+            return
         logger.info(
             'Executing callback_id=%s, attempt=%s', operation.callback_id, operation.attempt
         )
@@ -523,17 +530,37 @@ class PeerRollingOpsBackend(Object):
         logger.info('Operation %s executed with result %s.', operation.callback_id, result)
         operations.finish(result)
 
-    def mirror_result(self, op_id: str, result: OperationResult) -> None:
+    def mirror_outcome(self, outcome: RunWithLockOutcome) -> None:
         """Apply the execution result to the mirrored peer queue.
 
         This keeps the peer standby queue aligned with the backend that
         actually executed the operation.
 
         Args:
-            op_id: Identifier of the operation to update.
-            result: Final execution result to apply to the mirrored queue.
+            outcome: The etcd execution outcome to mirror.
+
+        Raises:
+            RollingOpsDecodingError: If theres is an inconsistency found.
         """
-        self._operations(self.model.unit).mirror_result(op_id, result)
+        match outcome.status:
+            case RunWithLockStatus.NOT_GRANTED:
+                logger.info('Skipping mirror: etcd lock was not granted.')
+                return
+
+            case RunWithLockStatus.NO_OPERATION:
+                if not self._operations(self.model.unit).has_pending_work():
+                    logger.info('Skipping mirror: no operation.')
+                    return
+                raise RollingOpsDecodingError(
+                    'Mismatch between the etcd and peer operation queue.'
+                )
+
+            case RunWithLockStatus.MISSING_CALLBACK | RunWithLockStatus.EXECUTED:
+                self._operations(self.model.unit).mirror_result(outcome.op_id, outcome.result)  # type: ignore[reportArgumentType]
+            case _:
+                raise RollingOpsDecodingError(
+                    f'Unsupported run-with-lock outcome: {outcome.status}'
+                )
 
     def get_status(self) -> RollingOpsStatus:
         """Return the current rolling-ops status for this unit in peer mode.

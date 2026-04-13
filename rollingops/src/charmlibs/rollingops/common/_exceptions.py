@@ -15,39 +15,39 @@
 """Exceptions used in rollingops."""
 
 
-class RollingOpsNoEtcdRelationError(Exception):
+class RollingOpsError(Exception):
+    """General rollingops error."""
+
+
+class RollingOpsNoRelationError(RollingOpsError):
     """Raised if we are trying to process a lock, but do not appear to have a relation yet."""
 
 
-class RollingOpsEtcdUnreachableError(Exception):
-    """Raised if etcd server is unreachable."""
+class RollingOpsNoEtcdRelationError(RollingOpsNoRelationError):
+    """Raised if we are trying to process a lock, but do not appear to have a relation yet."""
 
 
-class RollingOpsFileSystemError(Exception):
+class RollingOpsFileSystemError(RollingOpsError):
     """Raised if there is a problem when interacting with the filesystem."""
 
 
-class RollingOpsInvalidLockRequestError(Exception):
+class RollingOpsInvalidLockRequestError(RollingOpsError):
     """Raised if the lock request is invalid."""
 
 
-class RollingOpsDecodingError(Exception):
+class RollingOpsDecodingError(RollingOpsError):
     """Raised if json content cannot be processed."""
 
 
-class RollingOpsInvalidSecretContentError(Exception):
+class RollingOpsInvalidSecretContentError(RollingOpsError):
     """Raised if the content of a secret is invalid."""
 
 
-class RollingOpsCharmLibMissingError(Exception):
+class RollingOpsLibMissingError(RollingOpsError):
     """Raised if the path to the libraries cannot be resolved."""
 
 
-class RollingOpsNoRelationError(Exception):
-    """Raised if we are trying to process a lock, but do not appear to have a relation yet."""
-
-
-class RollingOpsEtcdctlError(Exception):
+class RollingOpsEtcdctlError(RollingOpsError):
     """Base exception for etcdctl command failures."""
 
 
@@ -67,17 +67,5 @@ class RollingOpsEtcdctlParseError(RollingOpsEtcdctlError):
     """Raised when etcdctl output cannot be parsed."""
 
 
-class RollingOpsFailedToGetLockError(Exception):
-    """Raised when the attempt to get the lock fails."""
-
-
-class RollingOpsSyncLockNotImplementedError(Exception):
-    """Raised when the sync lock is not implemented."""
-
-
-class RollingOpsSyncLockBackendError(Exception):
+class RollingOpsSyncLockError(RollingOpsError):
     """Raised when there is an error during sync lock execution."""
-
-
-class RollingOpsUnknownSyncLockBackendError(RollingOpsSyncLockBackendError):
-    """Raised when the given sync lock backend ID is unknown."""

@@ -49,6 +49,12 @@ class ProcessingBackend(StrEnum):
 
 
 class RunWithLockStatus(StrEnum):
+    """Status of an attempt to execute an operation under a distributed lock.
+
+    These values describe what happened when a unit tried to run an
+    operation while interacting with the lock.
+    """
+
     NOT_GRANTED = 'not_granted'
     NO_OPERATION = 'no_operation'
     MISSING_CALLBACK = 'missing_callback'
@@ -56,6 +62,12 @@ class RunWithLockStatus(StrEnum):
 
 
 class RollingOpsStatus(StrEnum):
+    """High-level rolling-ops state for a unit.
+
+    This status reflects whether the unit is currently executing, waiting,
+    or idle with respect to rolling operations.
+    """
+
     INVALID = 'invalid'
     WAITING = 'waiting'
     GRANTED = 'granted'
@@ -64,15 +76,16 @@ class RollingOpsStatus(StrEnum):
 
 @dataclass
 class RunWithLockOutcome:
-    """Outcome of attempting to execute the current operation under a lock."""
+    """Result of attempting to execute an operation under a distributed lock.
+
+    This object captures both whether an operation was executed and, if so,
+    the identity and result of that operation. It is used to propagate
+    execution outcomes across backends (e.g. etcd → peer mirroring).
+    """
 
     status: RunWithLockStatus
     op_id: str | None = None
     result: OperationResult | None = None
-
-    @property
-    def executed(self) -> bool:
-        return self.status == RunWithLockStatus.EXECUTED
 
 
 @dataclass
@@ -400,16 +413,44 @@ class OperationQueue:
 
 @dataclass
 class RollingOpsState:
+    """Snapshot of the rolling-ops state for a unit.
+
+    This aggregates the current status, the backend responsible for
+    processing operations, and the unit's operation queue.
+    """
+
     status: RollingOpsStatus
     processing_backend: ProcessingBackend | None
     operations: OperationQueue
 
 
 class SyncLockBackend(ABC):
+    """Interface for synchronous lock backends.
+
+    Implementations provide a mechanism to acquire and release a lock
+    protecting a critical section. These backends are used by the
+    RollingOpsManager to coordinate synchronous operations within a
+    single unit when etcd is not available.
+    """
+
     @abstractmethod
     def acquire(self, timeout: int | None) -> None:
+        """Acquire the lock, blocking until it is granted or timeout expires.
+
+        Args:
+            timeout: Maximum time in seconds to wait for the lock.
+                None means wait indefinitely.
+
+        Raises:
+            TimeoutError: If the lock could not be acquired within the timeout.
+        """
         pass
 
     @abstractmethod
     def release(self) -> None:
+        """Release the lock.
+
+        Implementations must ensure that only the lock owner can release
+        the lock and that any associated resources are cleaned up.
+        """
         pass

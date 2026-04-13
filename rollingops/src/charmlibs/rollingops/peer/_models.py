@@ -325,15 +325,15 @@ class PeerUnitOperations:
         This keeps the peer copy aligned with the backend that actually executed
         the operation.
 
-        If the current mirrored head no longer matches the finalized operation,
-        this method does nothing.
+        Raises:
+            RollingOpsDecodingError: if there is an inconsistency found.
         """
         data = self._load()
         current = data.queue.peek()
 
         if current is None:
             logger.warning('Cannot mirror finalized operation: peer queue is empty.')
-            return
+            raise RollingOpsDecodingError('Inconsistent operation found.')
 
         if current.op_id != op_id:
             logger.warning(

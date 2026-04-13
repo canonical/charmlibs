@@ -26,6 +26,7 @@ from ops.charm import (
 from charmlibs.rollingops.common._exceptions import (
     RollingOpsInvalidLockRequestError,
     RollingOpsNoEtcdRelationError,
+    RollingOpsSyncLockError,
 )
 from charmlibs.rollingops.common._models import (
     Operation,
@@ -269,13 +270,15 @@ class EtcdRollingOpsBackend(Object):
             return RunWithLockOutcome(status=RunWithLockStatus.NO_OPERATION)
 
         if not (callback := self.callback_targets.get(operation.callback_id)):
-            logger.warning(
-                'Operation %s target was not found. It cannot be executed.',
+            logger.error(
+                'Operation %s target was not found. Releasing operation without retry.',
                 operation.callback_id,
             )
+            self.operations.finalize(operation, OperationResult.RELEASE)
             return RunWithLockOutcome(
                 status=RunWithLockStatus.MISSING_CALLBACK,
                 op_id=operation.op_id,
+                result=OperationResult.RELEASE,
             )
         logger.info(
             'Executing callback_id=%s, attempt=%s', operation.callback_id, operation.attempt
@@ -318,15 +321,14 @@ class EtcdRollingOpsBackend(Object):
 
         Raises:
             TimeoutError: If the lock could not be acquired before the timeout.
-            Exception: Re-raises unexpected etcd or lock acquisition failures
-                after revoking the lease.
+            RollingOpsSyncLockError: if there was an error obtaining the lock.
         """
         self._lease = EtcdLease()
-        self._lease.grant()
 
         deadline = None if timeout is None else time.monotonic() + timeout
 
         try:
+            self._lease.grant()
             while True:
                 try:
                     if self._sync_lock.try_acquire(self._lease.id):  # type: ignore[reportArgumentType]
@@ -341,12 +343,12 @@ class EtcdRollingOpsBackend(Object):
 
                 time.sleep(15)
 
-        except Exception:
+        except Exception as e:
             try:
                 self._lease.revoke()
             except Exception:
                 logger.exception('Failed to revoke lease %s.', self._lease.id)
-            raise
+            raise RollingOpsSyncLockError('Failed to acquire the etcd sync lock') from e
 
     def release_sync_lock(self) -> None:
         """Release the synchronous lock and revoke its lease."""
