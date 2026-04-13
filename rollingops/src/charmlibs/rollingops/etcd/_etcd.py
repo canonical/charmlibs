@@ -341,6 +341,24 @@ class WorkerOperationStore:
         """
         return self._pending.peek() is not None
 
+    def has_inprogress(self) -> bool:
+        """Check whether there are in-progress operations.
+
+        Returns:
+            True if at least one operation exists in the inprogress queue,
+            otherwise False.
+        """
+        return self._inprogress.peek() is not None
+
+    def has_completed(self) -> bool:
+        """Check whether there are completed operations.
+
+        Returns:
+            True if at least one operation exists in the completed queue,
+            otherwise False.
+        """
+        return self._completed.peek() is not None
+
     def claim_next(self) -> bool:
         """Move the next pending operation to the in-progress queue.
 

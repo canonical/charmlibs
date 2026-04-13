@@ -88,11 +88,14 @@ def test_restart_action_one_unit_single_app(juju: jubilant.Juju, app_name: str):
     juju.wait(jubilant.all_active, error=jubilant.any_error, timeout=TIMEOUT)
 
     events = get_unit_events(juju, unit)
-    restart_events = [e['event'] for e in events]
+    restart_events = [
+        (e['event'], e['processing_backend'])
+        for e in events
+        if not e['event'].startswith('action')
+    ]
     expected = [
-        'action:restart',
-        '_restart:start',
-        '_restart:done',
+        ('_restart:start', 'etcd'),
+        ('_restart:done', 'etcd'),
     ]
 
     assert restart_events == expected, f'unexpected event order: {restart_events}'
@@ -110,15 +113,19 @@ def test_failed_restart_retries_one_unit_single_app(juju: jubilant.Juju, app_nam
     juju.wait(jubilant.all_active, error=jubilant.any_error, timeout=TIMEOUT)
 
     events = get_unit_events(juju, unit)
-    restart_events = [e['event'] for e in events if not e['event'].startswith('action')]
+    restart_events = [
+        (e['event'], e['processing_backend'])
+        for e in events
+        if not e['event'].startswith('action')
+    ]
 
     expected = [
-        '_failed_restart:start',  # attempt 0
-        '_failed_restart:retry_release',
-        '_failed_restart:start',  # retry 1
-        '_failed_restart:retry_release',
-        '_restart:start',
-        '_restart:done',
+        ('_failed_restart:start', 'etcd'),  # attempt 0
+        ('_failed_restart:retry_release', 'etcd'),
+        ('_failed_restart:start', 'etcd'),  # retry 1
+        ('_failed_restart:retry_release', 'etcd'),
+        ('_restart:start', 'etcd'),
+        ('_restart:done', 'etcd'),
     ]
     assert restart_events == expected, f'unexpected event order: {restart_events}'
     assert is_empty_file(juju, unit, PEER_PROCCES_LOGS)
@@ -134,15 +141,19 @@ def test_assert_deferred_restart_retries_one_unit_single_app(juju: jubilant.Juju
     juju.wait(jubilant.all_active, error=jubilant.any_error, timeout=TIMEOUT)
 
     events = get_unit_events(juju, unit)
-    restart_events = [e['event'] for e in events if not e['event'].startswith('action')]
+    restart_events = [
+        (e['event'], e['processing_backend'])
+        for e in events
+        if not e['event'].startswith('action')
+    ]
 
     expected = [
-        '_deferred_restart:start',  # attempt 0
-        '_deferred_restart:retry_hold',
-        '_deferred_restart:start',  # retry 1
-        '_deferred_restart:retry_hold',
-        '_restart:start',
-        '_restart:done',
+        ('_deferred_restart:start', 'etcd'),  # attempt 0
+        ('_deferred_restart:retry_hold', 'etcd'),
+        ('_deferred_restart:start', 'etcd'),  # retry 1
+        ('_deferred_restart:retry_hold', 'etcd'),
+        ('_restart:start', 'etcd'),
+        ('_restart:done', 'etcd'),
     ]
     assert restart_events == expected, f'unexpected event order: {restart_events}'
     assert is_empty_file(juju, unit, PEER_PROCCES_LOGS)
@@ -180,9 +191,9 @@ def test_assert_restart_rolls_one_unit_at_a_time_single_app(juju: jubilant.Juju,
 
         assert start_event['event'] == '_restart:start'
         assert done_event['event'] == '_restart:done'
-        assert start_event['unit'] == done_event['unit'], (
-            f'start/done pair mismatch: {start_event} vs {done_event}'
-        )
+        assert start_event['unit'] == done_event['unit']
+        assert start_event['processing_backend'] == 'etcd'
+        assert done_event['processing_backend'] == 'etcd'
     for unit in units:
         assert is_empty_file(juju, unit, PEER_PROCCES_LOGS)
 
@@ -215,19 +226,19 @@ def test_retry_hold_operation_two_units_single_app(juju: jubilant.Juju, app_name
     logger.info(all_events)
 
     relevant_events = [e for e in all_events if not e['event'].startswith('action')]
-    sequence = [(e['unit'], e['event']) for e in relevant_events]
+    sequence = [(e['unit'], e['event'], e['processing_backend']) for e in relevant_events]
 
     logger.info(sequence)
 
     assert sequence == [
-        (unit_a, '_deferred_restart:start'),  # attempt 0
-        (unit_a, '_deferred_restart:retry_hold'),
-        (unit_a, '_deferred_restart:start'),  # retry 1
-        (unit_a, '_deferred_restart:retry_hold'),
-        (unit_a, '_deferred_restart:start'),  # retry 2
-        (unit_a, '_deferred_restart:retry_hold'),
-        (unit_b, '_restart:start'),
-        (unit_b, '_restart:done'),
+        (unit_a, '_deferred_restart:start', 'etcd'),  # attempt 0
+        (unit_a, '_deferred_restart:retry_hold', 'etcd'),
+        (unit_a, '_deferred_restart:start', 'etcd'),  # retry 1
+        (unit_a, '_deferred_restart:retry_hold', 'etcd'),
+        (unit_a, '_deferred_restart:start', 'etcd'),  # retry 2
+        (unit_a, '_deferred_restart:retry_hold', 'etcd'),
+        (unit_b, '_restart:start', 'etcd'),
+        (unit_b, '_restart:done', 'etcd'),
     ], f'unexpected event sequence: {sequence}'
 
     for unit in units:
@@ -268,9 +279,10 @@ def test_retry_release_two_units_single_app(juju: jubilant.Juju, app_name: str):
 
         assert start_event['event'] == '_failed_restart:start'
         assert done_event['event'] == '_failed_restart:retry_release'
-        assert start_event['unit'] == done_event['unit'], (
-            f'start/done pair mismatch: {start_event} vs {done_event}'
-        )
+        assert start_event['unit'] == done_event['unit']
+        assert start_event['processing_backend'] == 'etcd'
+        assert done_event['processing_backend'] == 'etcd'
+
     for unit in units:
         assert is_empty_file(juju, unit, PEER_PROCCES_LOGS)
 
@@ -296,18 +308,22 @@ def test_subsequent_lock_request_ops_single_app(juju: jubilant.Juju, app_name: s
     )
 
     unit_a_events = get_unit_events(juju, unit_a)
-    relevant_events = [e['event'] for e in unit_a_events if not e['event'].startswith('action')]
+    relevant_events = [
+        (e['event'], e['processing_backend'])
+        for e in unit_a_events
+        if not e['event'].startswith('action')
+    ]
     logger.info('unit_a_events %s', unit_a_events)
 
     assert relevant_events == [
-        '_deferred_restart:start',  # attempt 0
-        '_deferred_restart:retry_hold',
-        '_deferred_restart:start',  # retry 1
-        '_deferred_restart:retry_hold',
-        '_failed_restart:start',  # attempt 0
-        '_failed_restart:retry_release',
-        '_restart:start',
-        '_restart:done',
+        ('_deferred_restart:start', 'etcd'),  # attempt 0
+        ('_deferred_restart:retry_hold', 'etcd'),
+        ('_deferred_restart:start', 'etcd'),  # retry 1
+        ('_deferred_restart:retry_hold', 'etcd'),
+        ('_failed_restart:start', 'etcd'),  # attempt 0
+        ('_failed_restart:retry_release', 'etcd'),
+        ('_restart:start', 'etcd'),
+        ('_restart:done', 'etcd'),
     ], f'unexpected event sequence: {relevant_events}'
 
     for unit in units:
@@ -363,9 +379,10 @@ def test_rolling_ops_multi_app(juju: jubilant.Juju, charm: Path, app_name: str):
 
         assert start_event['event'] == '_restart:start'
         assert done_event['event'] == '_restart:done'
-        assert start_event['unit'] == done_event['unit'], (
-            f'start/done pair mismatch: {start_event} vs {done_event}'
-        )
+        assert start_event['unit'] == done_event['unit']
+        assert start_event['processing_backend'] == 'etcd'
+        assert done_event['processing_backend'] == 'etcd'
+
     for unit in all_units:
         assert is_empty_file(juju, unit, PEER_PROCCES_LOGS)
 
@@ -401,16 +418,18 @@ def test_rolling_ops_sync_lock_multi_app(juju: jubilant.Juju, app_name: str):
 
     all_events.sort(key=parse_ts)
     restart_events = [
-        (e['unit'], e['event']) for e in all_events if not e['event'].startswith('action')
+        (e['unit'], e['event'], e['processing_backend'])
+        for e in all_events
+        if not e['event'].startswith('action')
     ]
 
     logger.info(restart_events)
 
     assert restart_events == [
-        (unit_a, '_sync_restart:start'),
-        (unit_a, '_sync_restart:done'),
-        (unit_b, '_sync_restart:start'),
-        (unit_b, '_sync_restart:done'),
+        (unit_a, '_sync_restart:start', 'etcd'),
+        (unit_a, '_sync_restart:done', 'etcd'),
+        (unit_b, '_sync_restart:start', 'etcd'),
+        (unit_b, '_sync_restart:done', 'etcd'),
     ], f'unexpected event sequence: {restart_events}'
 
     for unit in all_units:
@@ -436,13 +455,17 @@ def test_lock_released_when_unit_removed(juju: jubilant.Juju, app_name: str) -> 
     juju.wait(jubilant.all_active, error=jubilant.any_error, timeout=TIMEOUT)
 
     unit_b_events = get_unit_events(juju, unit_b)
-    relevant_events = [e['event'] for e in unit_b_events if not e['event'].startswith('action')]
+    relevant_events = [
+        (e['event'], e['processing_backend'])
+        for e in unit_b_events
+        if not e['event'].startswith('action')
+    ]
 
     logger.info('unit_b_events %s', unit_b_events)
 
     assert relevant_events == [
-        '_restart:start',
-        '_restart:done',
+        ('_restart:start', 'etcd'),
+        ('_restart:done', 'etcd'),
     ], f'unexpected event sequence: {relevant_events}'
 
 
@@ -471,17 +494,9 @@ def test_actions_still_work_after_etcd_relation_removed(
 
     logger.info('unit_a_events %s', unit_a_events)
 
-    assert relevant_events == [
-        '_failed_restart:start',  # attempt 0
-        '_failed_restart:retry_release',
-        '_failed_restart:start',  # retry 1
-        '_failed_restart:retry_release',
-        '_failed_restart:start',  # retry 2
-        '_failed_restart:retry_release',
-        '_restart:start',
-        '_restart:done',
-        '_restart:start',
-        '_restart:done',
-        '_restart:start',
-        '_restart:done',
-    ], f'unexpected event sequence: {relevant_events}'
+    # During fallback if the execution is not fully committed to etcd, it may
+    # be re-executed on the peer context.
+    assert relevant_events.count('_failed_restart:start') >= 3, relevant_events
+    assert relevant_events.count('_failed_restart:retry_release') >= 3, relevant_events
+    assert relevant_events.count('_restart:start') >= 3, relevant_events
+    assert relevant_events.count('_restart:done') >= 3, relevant_events

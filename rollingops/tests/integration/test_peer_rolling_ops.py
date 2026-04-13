@@ -53,6 +53,7 @@ def test_restart_action_one_unit(juju: jubilant.Juju, app_name: str):
     ]
 
     assert restart_events == expected, f'unexpected event order: {restart_events}'
+    assert all(e['processing_backend'] == 'peer' for e in events)
 
 
 def test_failed_restart_retries_one_unit(juju: jubilant.Juju, app_name: str):
@@ -79,6 +80,7 @@ def test_failed_restart_retries_one_unit(juju: jubilant.Juju, app_name: str):
     ]
 
     assert restart_events == expected, f'unexpected event order: {restart_events}'
+    assert all(e['processing_backend'] == 'peer' for e in events)
 
 
 def test_assert_deferred_restart_retries_one_unit(juju: jubilant.Juju, app_name: str):
@@ -105,6 +107,7 @@ def test_assert_deferred_restart_retries_one_unit(juju: jubilant.Juju, app_name:
     ]
 
     assert restart_events == expected, f'unexpected event order: {restart_events}'
+    assert all(e['processing_backend'] == 'peer' for e in events)
 
 
 def test_assert_restart_rolls_one_unit_at_a_time(juju: jubilant.Juju, app_name: str):
@@ -142,6 +145,7 @@ def test_assert_restart_rolls_one_unit_at_a_time(juju: jubilant.Juju, app_name: 
         assert start_event['unit'] == done_event['unit'], (
             f'start/done pair mismatch: {start_event} vs {done_event}'
         )
+    assert all(e['processing_backend'] == 'peer' for e in all_events)
 
 
 def test_retry_hold_keeps_lock_on_same_unit(juju: jubilant.Juju, app_name: str):
@@ -196,6 +200,7 @@ def test_retry_hold_keeps_lock_on_same_unit(juju: jubilant.Juju, app_name: str):
         (unit_b, '_restart:start'),
         (unit_b, '_restart:done'),
     ], f'unexpected event sequence: {sequence}'
+    assert all(e['processing_backend'] == 'peer' for e in all_events)
 
 
 def test_retry_release_alternates_execution(juju: jubilant.Juju, app_name: str):
@@ -243,6 +248,7 @@ def test_retry_release_alternates_execution(juju: jubilant.Juju, app_name: str):
         (unit_b, '_failed_restart:start'),  # retry 2
         (unit_b, '_failed_restart:retry_release'),
     ], f'unexpected event sequence: {sequence}'
+    assert all(e['processing_backend'] == 'peer' for e in all_events)
 
 
 def test_subsequent_lock_request_of_different_ops(juju: jubilant.Juju, app_name: str):
@@ -285,6 +291,7 @@ def test_subsequent_lock_request_of_different_ops(juju: jubilant.Juju, app_name:
         '_restart:start',
         '_restart:done',
     ], f'unexpected event sequence: {relevant_events}'
+    assert all(e['processing_backend'] == 'peer' for e in unit_a_events)
 
 
 def test_subsequent_lock_request_of_same_op(juju: jubilant.Juju, app_name: str):
@@ -325,6 +332,7 @@ def test_subsequent_lock_request_of_same_op(juju: jubilant.Juju, app_name: str):
         '_restart:start',
         '_restart:done',
     ], f'unexpected event sequence: {relevant_events}'
+    assert all(e['processing_backend'] == 'peer' for e in unit_a_events)
 
 
 def test_sync_lock_is_executed(juju: jubilant.Juju, app_name: str):
@@ -350,6 +358,7 @@ def test_sync_lock_is_executed(juju: jubilant.Juju, app_name: str):
         relevant_events = [e['event'] for e in events]
 
         assert expected_events == relevant_events, f'unexpected event sequence: {relevant_events}'
+        assert all(e['processing_backend'] == 'peer' for e in events)
 
 
 def test_retry_on_leader_unit_leaves_the_hook(juju: jubilant.Juju, app_name: str):
@@ -378,3 +387,4 @@ def test_retry_on_leader_unit_leaves_the_hook(juju: jubilant.Juju, app_name: str
         '_restart:start',
         '_restart:done',
     ], f'unexpected event sequence: {relevant_events}'
+    assert all(e['processing_backend'] == 'peer' for e in non_leader_events)

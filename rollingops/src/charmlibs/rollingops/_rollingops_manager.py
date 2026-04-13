@@ -134,7 +134,7 @@ class RollingOpsManager(Object):
         )
         self.framework.observe(charm.on.rollingops_lock_granted, self._on_rollingops_lock_granted)
         self.framework.observe(charm.on.rollingops_etcd_failed, self._on_rollingops_etcd_failed)
-        # manage update status for etcd
+        self.framework.observe(charm.on.update_status, self._on_update_status)
 
     @property
     def _peer_relation(self) -> Relation | None:
@@ -443,3 +443,25 @@ class RollingOpsManager(Object):
             processing_backend=self._backend_state.backend,
             operations=operations.queue,
         )
+
+    def _on_update_status(self, _: EventBase) -> None:
+        """Periodic reconciliation of rolling-ops state.
+
+        Ensures the correct backend is active, workers are running,
+        and fallback is triggered if etcd becomes unhealthy.
+        """
+        if self._backend_state.is_etcd_managed():
+            if not self.etcd_backend.is_available():
+                logger.warning('etcd unavailable during update_status; falling back.')
+                self._fallback_current_unit_to_peer()
+                return
+
+            try:
+                self.etcd_backend.ensure_processing()
+            except _ETCD_FALLBACK_EXCEPTIONS as e:
+                logger.warning('etcd worker failed: %s; falling back.', e)
+                self._fallback_current_unit_to_peer()
+                return
+
+        else:
+            self.peer_backend.ensure_processing()
