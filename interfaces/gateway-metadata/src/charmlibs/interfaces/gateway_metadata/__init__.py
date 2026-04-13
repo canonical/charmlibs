@@ -15,9 +15,23 @@
 """Gateway metadata interface library.
 
 This library provides the provider and requirer sides of the ``gateway-metadata``
-relation interface. The provider charm publishes metadata about its Gateway workload
-(namespace, gateway name, deployment name, service account) and the requirer charm
-reads it.
+relation interface for sharing Kubernetes Gateway API metadata (name, namespace,
+deployment name, service account) between gateway providers and consuming charms.
+
+What is this library for?
+=========================
+
+Charms that wrap a Kubernetes Gateway API resource (e.g. ``istio-ingress-k8s``)
+automatically spin up a Gateway resource which creates proxy pods and routes for
+traffic routing. In certain cases, charms using the gateway need to know specific
+information about the gateway itself, including the gateway name, gateway class,
+and other details. This information can be used to create custom resources that
+attach to the gateway.
+
+The ``gateway-metadata`` interface provides an umbrella relation containing gateway
+information that requiring charms can use to attach custom resources to the gateway
+managed by the provider charm. While currently used by the ``istio-ingress-k8s``
+charm, it is designed for any charm that wraps a Kubernetes Gateway API resource.
 
 Provider usage::
 
