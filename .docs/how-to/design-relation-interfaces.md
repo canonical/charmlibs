@@ -90,13 +90,30 @@ def test_invalid_field_types(bad_value: Any):
 
 ### No mandatory fields
 
-Top-level fields must be either not required (can be missing) or optional (can be `None`).
+Top-level fields must not be mandatory. Any and all top-level fields may be absent in the relation data, and it must still parse cleanly.
+
+This implies that the empty relation data must have a valid representation in the interface model.
+In practice, use a single model for both reading and writing.
+Apart from `<MISSING>`, that means the writer will naturally materialise the model's default values when writing the relation data.
+Readers must therefore handle both representations: a field may be absent, or it may be present with the default value.
+
+For new interfaces, prefer representing an absent field as `<MISSING>`.
+This makes absence explicit in the model, and a field that is still `<MISSING>` will be cleared again when the relation data is written.
 
 ```py
 foo: str | MISSING = MISSING
 ```
 
-Likewise, most sub-fields must be either not required or optional.
+Within a given interface, use a single missing-value convention throughout: either all `<MISSING>` or all `None`.
+
+```py
+foo: str | None = None
+```
+
+At the top level, avoid other in-domain defaults.
+Top-level fields should normally use the interface's chosen missing-value convention: `<MISSING>` for newer interfaces, or `None` for older ones.
+
+Likewise, most nested fields should be either not required, optional, or supplied with a schema-assigned in-domain value.
 
 ```py
 role: Role | MISSING = MISSING
@@ -104,7 +121,10 @@ subject: str | MISSING = MISSING
 session: str | MISSING = MISSING
 ```
 
-A default value may be used instead if the interface semantics call for a well-defined default value:
+Assign a concrete in-domain value in the schema only when the interface semantics define that value unambiguously and all implementations should treat it the same way.
+This is appropriate for nested special enum-like or otherwise tightly defined cases, but should be uncommon.
+
+Further examples of such schema-assigned values:
 
 ```py
 protocol: Literal["http", "https"] = "https"
@@ -113,10 +133,20 @@ priority: int = 100
 sans_dns: frozenset[str] = frozenset()
 ```
 
-The charm library implementation must be accompanied by a unit test that ensures data with missing values, in the case of not-required semantics, or null values, in the case of optional semantics, is parsed correctly.
+The charm library implementation must be accompanied by unit tests that show:
+
+- the empty relation data is parsed correctly
+- data with missing values parses correctly for not-required fields
+- data with `null` values parses correctly for optional fields
+- any schema-assigned in-domain values are applied deliberately and consistently
 
 ```py
 V1_DATABAG = {"name": "aa", "surname": "bb"}
+
+
+def test_empty_databag():
+    assert DataV2.model_validate({})
+
 
 @pytest.mark.parametrize("field_to_remove", ["name", "surname"])
 def test_missing_fields(field_to_remove):
@@ -240,7 +270,7 @@ def test_good_url_field_values(good_url: str):
 
 ### Semantic grouping
 
-The databag content should be structured to reflect the meaning of data, for example:
+The relation data should be structured to reflect the meaning of data, for example:
 
 ```py
 # Do this:
