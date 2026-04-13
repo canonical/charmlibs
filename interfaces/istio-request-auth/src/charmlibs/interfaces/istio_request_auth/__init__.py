@@ -15,8 +15,28 @@
 """Istio request authentication interface library.
 
 This library provides the provider and requirer sides of the ``istio-request-auth``
-relation interface. Downstream applications use the requirer to publish their JWT
-authentication rules, and the ingress charm uses the provider to read them.
+relation interface for configuring Istio
+`RequestAuthentication <https://istio.io/latest/docs/reference/config/security/request_authentication/>`_
+resources via relation data (JWT rules, JWKS endpoints, claim-to-header mapping).
+
+What is this library for?
+=========================
+
+The `istio-ingress-k8s <https://github.com/canonical/istio-ingress-k8s-operator/>`_ charm
+wraps a `Kubernetes Gateway API <https://gateway-api.sigs.k8s.io/>`_ of class ``istio``. It
+can connect to an OAuth 2.0 provider like the ``oauth2-proxy`` charm via the ``forward-auth``
+relation to forward requests via an authentication stack for user authentication.
+
+Istio also natively supports validating a pre-generated JWT against an issuer using a
+``RequestAuthentication`` Kubernetes resource. This means a request containing a JWT in
+the header can be natively authenticated by Istio instead of taking a detour via the
+authentication stack, and the claims from the token are parsed and added as headers to
+the downstream request.
+
+For applications to take advantage of this feature, they need to tell Istio which issuers
+they trust and which headers they want the claims in the token to be mapped to. To enable
+this information exchange and add the appropriate ``RequestAuthentication`` resource, the
+``istio-request-auth`` interface library is introduced.
 
 Requirer usage::
 

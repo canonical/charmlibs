@@ -48,6 +48,7 @@
 /interfaces/grafana_datasource/ @canonical/observability
 /interfaces/grafana_datasource_exchange/ @canonical/observability
 /interfaces/hydra_endpoints @canonical/identity
+/interfaces/istio-request-auth/ @canonical/service-mesh
 /interfaces/jwt/ @canonical/data
 /interfaces/k8s-service/ @canonical/mlops
 /interfaces/kafka_client/ @canonical/data-bigdata
