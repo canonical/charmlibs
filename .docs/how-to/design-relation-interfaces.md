@@ -14,16 +14,6 @@ When an interface evolves, some version of a library has to support both the old
 
 First, decide what data needs to be transmitted over a relation. Then design the JSON representation with provisions for backward and forward compatibility.
 
-New interface libraries should use `pydantic ~ 2.12; ops ~= 3.6; pyright ~ 1.1.402`, and prefer the `MISSING` sentinel value over the more traditional `None`. Note that such libraries can only be used by charms based on Ubuntu 22.04 or newer.
-
-```py
-# missing field is read as <MISSING>; deleted when written out
-foo: str | MISSING = MISSING
-
-# missing field is read as None; written out as JSON null
-foo: str | None = None
-```
-
 Unit tests must capture the interface schema evolution. Unit tests typically also capture the charm-facing API evolution.
 
 When the interface is modified, running unit tests against both new and old test vectors shows the charm library developer what has been extended and what has been broken.
@@ -49,14 +39,14 @@ The same applies to significant changes to the range of values that a field vali
 - extending an IP address field to accept IPv6 addresses represents a breaking change, because the older remote application is likely to reject the value, potentially making the interface unusable
 - narrowing an IP address field by removing IPv4 addresses represents a breaking change, because if the older remote application sends them, this side of the relation is likely to reject the value, potentially making the interface unusable
 
-Unexpected enumeration values should be treated as missing (deserialised as `<MISSING>`) or coerced to a pre-defined catch-all `UNKNOWN` value:
+Unexpected enumeration values should be treated as missing (deserialised as `None`) or coerced to a pre-defined catch-all `UNKNOWN` value:
 
 ```py
 class FooEnum(StrEnum):
     A = "A"
     B = "B"
 
-foo: FooEnum | MISSING = MISSING
+foo: FooEnum | None = None
 
 
 class BarEnum(StrEnum):
@@ -72,13 +62,13 @@ The allowed field types should be validated with a unit test, for example:
 ```py
 V1_FLOAT = {"number": 42.1}
 V1_INT = {"number": 42}
-V1_MISSING = {}
+V1_EMPTY = {}
 
 
 def test_field_types():
     Data.model_validate(V1_FLOAT)
     Data.model_validate(V1_INT)
-    Data.model_validate(V1_MISSING)
+    Data.model_validate(V1_EMPTY)
 
 
 # Note that Pydantic coerces False to 0 and "42" to 42
@@ -94,31 +84,25 @@ Top-level fields must not be mandatory. Any and all top-level fields may be abse
 
 This implies that the empty relation data must have a valid representation in the interface model.
 In practice, use a single model for both reading and writing.
-Apart from `<MISSING>`, that means the writer will naturally materialise the model's default values when writing the relation data.
+That means the writer will naturally materialise the model's default values when writing the relation data.
 Readers must therefore handle both representations: a field may be absent, or it may be present with the default value.
 
-For new interfaces, prefer representing an absent field as `<MISSING>`.
-This makes absence explicit in the model, and a field that is still `<MISSING>` will be cleared again when the relation data is written.
-
-```py
-foo: str | MISSING = MISSING
-```
-
-Within a given interface, use a single missing-value convention throughout: either all `<MISSING>` or all `None`.
+For new interfaces, prefer representing an absent field as `None`.
+This keeps the model straightforward and makes the missing-value convention easy to read in both code and tests.
 
 ```py
 foo: str | None = None
 ```
 
 At the top level, avoid other in-domain defaults.
-Top-level fields should normally use the interface's chosen missing-value convention: `<MISSING>` for newer interfaces, or `None` for older ones.
+Top-level fields should normally use `None` to represent absence.
 
 Likewise, most nested fields should be either not required, optional, or supplied with a schema-assigned in-domain value.
 
 ```py
-role: Role | MISSING = MISSING
-subject: str | MISSING = MISSING
-session: str | MISSING = MISSING
+role: Role | None = None
+    subject: str | None = None
+    session: str | None = None
 ```
 
 Assign a concrete in-domain value in the schema only when the interface semantics define that value unambiguously and all implementations should treat it the same way.
@@ -196,12 +180,12 @@ Collections must be emitted in a stable order, so that setting the same data doe
 
 ```py
 class Endpoint(pydantic.BaseModel, frozen=True):
-    id: str | MISSING = MISSING
-    some_url: str | MISSING = MISSING
+    id: str | None = None
+    some_url: str | None = None
 
 
 class Databag(pydantic.BaseModel):
-    endpoints: frozenset[Endpoint] | MISSING = MISSING
+    endpoints: frozenset[Endpoint] | None = None
 ```
 
 Collections of primitive types are strongly discouraged.
