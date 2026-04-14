@@ -20,6 +20,7 @@ import subprocess
 import time
 
 import charmlibs.rollingops.etcd._etcdctl as etcdctl
+from charmlibs.rollingops.common._exceptions import RollingOpsEtcdTransactionError
 from charmlibs.rollingops.common._models import Operation, OperationResult
 from charmlibs.rollingops.etcd._models import RollingOpsKeys
 
@@ -359,46 +360,46 @@ class WorkerOperationStore:
         """
         return self._completed.peek() is not None
 
-    def claim_next(self) -> bool:
+    def claim_next(self) -> None:
         """Move the next pending operation to the in-progress queue.
 
         This operation is performed atomically and only succeeds if:
         - the lock is still held by this owner
         - the head of the pending queue has not changed
 
-        Returns:
-            True if the operation was successfully claimed,
-            otherwise False.
+        Raises:
+            RollingOpsEtcdTransactionError: if the transaction failed.
         """
-        return self._pending.move_head(self._inprogress.prefix)
+        if not self._pending.move_head(self._inprogress.prefix):
+            raise RollingOpsEtcdTransactionError('Failed to move operation to in progress.')
 
     def wait_until_completed(self) -> Operation:
         """Block until at least one operation appears in the completed queue."""
         return self._completed.watch()
 
-    def requeue_completed(self) -> bool:
+    def requeue_completed(self) -> None:
         """Requeue the head completed operation back to the pending queue.
 
         This is typically used when an operation needs to be retried
         (e.g., RETRY_RELEASE or RETRY_HOLD semantics).
 
-        Returns:
-            True if the operation was successfully moved back to pending,
-            otherwise False.
+        Raises:
+            RollingOpsEtcdTransactionError: if the transaction failed.
         """
-        return self._completed.move_head(self._pending.prefix)
+        if not self._completed.move_head(self._pending.prefix):
+            raise RollingOpsEtcdTransactionError('Failed to move operation to pending.')
 
-    def delete_completed(self) -> bool:
+    def delete_completed(self) -> None:
         """Remove the head operation from the completed queue.
 
         This is typically used when an operation has finished successfully
         and does not need to be retried.
 
-        Returns:
-            True if the operation was successfully removed,
-            otherwise False.
+        Raises:
+            RollingOpsEtcdTransactionError: if the transaction failed.
         """
-        return self._completed.dequeue()
+        if not self._completed.dequeue():
+            raise RollingOpsEtcdTransactionError('Failed finalize operation.')
 
 
 class ManagerOperationStore:
@@ -432,7 +433,7 @@ class ManagerOperationStore:
         """
         self._pending.enqueue(operation)
 
-    def finalize(self, operation: Operation, result: OperationResult) -> bool:
+    def finalize(self, operation: Operation, result: OperationResult) -> None:
         """Move an in-progress operation to the completed queue.
 
         This should be called after the operation has been executed and its
@@ -441,6 +442,10 @@ class ManagerOperationStore:
         Args:
             operation: The operation currently in the in-progress queue.
             result: Result of the executions.
+
+        Raises:
+            RollingOpsEtcdTransactionError: if the operation cannot be marked
+                as completed.
         """
         match result:
             case OperationResult.RETRY_HOLD:
@@ -450,7 +455,8 @@ class ManagerOperationStore:
             case _:
                 operation.complete()
 
-        return self._inprogress.move_operation(self._completed.prefix, operation)
+        if not self._inprogress.move_operation(self._completed.prefix, operation):
+            raise RollingOpsEtcdTransactionError('Failed to set the operation as completed.')
 
     def peek_current(self) -> Operation | None:
         """Return the current in-progress operation without modifying state.

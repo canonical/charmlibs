@@ -260,6 +260,10 @@ class EtcdRollingOpsBackend(Object):
         Returns:
             A structured outcome describing whether an operation was executed
             and, if so, which operation was finalized and with what result.
+
+        Raises:
+            RollingOpsEtcdTransactionError: if the operation cannot be marked
+                as completed.
         """
         if not self._async_lock.is_held():
             logger.info('Lock is not granted. Operation will not run.')

@@ -69,3 +69,7 @@ class RollingOpsEtcdctlParseError(RollingOpsEtcdctlError):
 
 class RollingOpsSyncLockError(RollingOpsError):
     """Raised when there is an error during sync lock execution."""
+
+
+class RollingOpsEtcdTransactionError(RollingOpsError):
+    """Raised when an etcd transaction fails."""

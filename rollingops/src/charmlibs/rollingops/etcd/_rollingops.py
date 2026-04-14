@@ -114,8 +114,7 @@ def main():
                     continue
                 logger.info('Lock granted.')
 
-            if not operations.claim_next():
-                raise RollingOpsEtcdInconsistencyError('Failed to get next operation.')
+            operations.claim_next()
 
             dispatch_lock_granted(args.unit_name, args.charm_dir)
 
