@@ -23,7 +23,9 @@ class ProviderSchema(DataBagSchema):
     sentinel_endpoints: str = Field(
         description="Comma separated list of Valkey Sentinel endpoints",
         title="Sentinel Endpoints",
-        examples=["valkey-0.valkey-endpoints:26379,valkey-1.valkey-endpoints:26379,valkey-2.valkey-endpoints:26379"],
+        examples=[
+            "valkey-0.valkey-endpoints:26379,valkey-1.valkey-endpoints:26379,valkey-2.valkey-endpoints:26379"
+        ],
     )
 
     mode: str = Field(
