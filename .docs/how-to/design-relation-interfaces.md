@@ -190,10 +190,6 @@ class Databag(pydantic.BaseModel):
     endpoints: frozenset[Endpoint] | None = None
 ```
 
-Collections of primitive types are strongly discouraged.
-
-Data maps are strongly discouraged. An exception to this rule is when the data map key is a Juju entity with a well-known string representation, such as a unit name or machine id.
-
 The definition must be accompanied by a unit test, which may look as follows. Note that including a custom validator requires a comprehensive set of unit tests.
 
 ```py
@@ -206,6 +202,18 @@ DATABAG = {"foos": [
 def test_foos():
     accepted_foos = charm_lib.parse(DATABAG).foos
     assert accepted_foos == {"a", "b"}
+```
+
+Collections of primitive types are strongly discouraged.
+
+Data maps are strongly discouraged. An exception to this rule is when the data map key is a Juju entity with a well-known string representation, such as a unit name or machine id:
+
+```py
+INGRESS_PER_UNIT_DATABAG = {"ingress": {
+    "recipient-app/0": {"url": ...},
+    "recipient-app/1": {"url": ...},
+    ...
+}}
 ```
 
 ### URLs and URIs
