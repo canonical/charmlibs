@@ -1,0 +1,17 @@
+name: valkey_client
+version: 0
+status: draft
+lib: charms.data_platform_libs.data_interfaces
+summary: Access Valkey databases with credentials and TLS configuration.
+description: |
+  The `valkey_client` interface allows charms to access Valkey databases with user-specific credentials and TLS configuration.
+  The provider charm creates Valkey users and permissions based on requirer requests, while the requirer charm shares the desired key access prefix.
+
+providers:
+  - name: valkey-operator
+    url: https://github.com/canonical/valkey-operator
+    branch: 9/edge
+
+requirers: []
+
+maintainer: data-platform-nosql

@@ -80,6 +80,7 @@
 /interfaces/tempo_cluster/ @canonical/tracing-and-profiling
 /interfaces/tls-certificates/ @canonical/tls
 /interfaces/tracing/ @canonical/tracing-and-profiling
+/interfaces/valkey_client/ @canonical/data-nosql
 /interfaces/vault-autounseal/ @canonical/tls
 /interfaces/vault-kv/ @canonical/tls
 /interfaces/k8s_backup_target/ @canonical/analytics
