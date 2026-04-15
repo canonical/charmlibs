@@ -31,7 +31,8 @@ Istio also natively supports validating a pre-generated JWT against an issuer us
 ``RequestAuthentication`` Kubernetes resource. This means a request containing a JWT in
 the header can be natively authenticated by Istio instead of taking a detour via the
 authentication stack, and the claims from the token are parsed and added as headers to
-the downstream request.
+the downstream request. The `RequestAuthentication` resource is purely an Istio concept
+offered by the CRDs native to Istio. Hence the interface is named with an `istio-` prefix.
 
 For applications to take advantage of this feature, they need to tell Istio which issuers
 they trust and which headers they want the claims in the token to be mapped to. To enable
