@@ -178,6 +178,8 @@ Collections must be represented as arrays of objects on the wire when using the 
 
 Collections must be emitted in a stable order, so that setting the same data does not trigger interface bounce. The order must be ignored on reception, and the recipient is expected to discard duplicates. In other words, collections are sets.
 
+Additionally, while empty objects are technically valid, and so are objects with only unknown fields set, the recipient is expected to filter those out for lack of semantic value.
+
 ```py
 class Endpoint(pydantic.BaseModel, frozen=True):
     id: str | None = None
@@ -196,9 +198,9 @@ The definition must be accompanied by a unit test, which may look as follows. No
 
 ```py
 DATABAG = {"foos": [
-    {"foo": "a"},
-    {"strange-data": "bar"},
-    {"foo": "b", "new-field": "d"}
+    {"foo": "a"},                   # ok
+    {"strange-data": "bar"},        # filtered out
+    {"foo": "b", "new-field": "d"}  # new-field dropped
 ]}
 
 def test_foos():
