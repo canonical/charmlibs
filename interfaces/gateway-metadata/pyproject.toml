@@ -1,10 +1,10 @@
 [project]
-name = "charmlibs-interfaces-example-interface"
-description = "The charmlibs.interfaces.example_interface package."
+name = "charmlibs-interfaces-gateway-metadata"
+description = "The charmlibs.interfaces.gateway_metadata package."
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [
-    {name="The Charm Tech team at Canonical"},
+    {name="Service Mesh"},
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -15,31 +15,28 @@ classifiers = [
 ]
 dynamic = ["version"]
 dependencies = [
-    # "ops",
+    "ops",
+    "pydantic>=2",
 ]
-
-[project.optional-dependencies]
-testing = ["charmlibs-interfaces-example-interface-testing==0.0.0.dev0"]
 
 [dependency-groups]
-lint = [  # installed for `just lint interfaces/example-interface` (unit, functional, and integration are also installed)
+lint = [  # installed for `just lint interfaces/gateway-metadata` (unit, functional, and integration are also installed)
     # "typing_extensions",
 ]
-unit = [  # installed for `just unit interfaces/example-interface`
+unit = [  # installed for `just unit interfaces/gateway-metadata`
     "ops[testing]",
-    "charmlibs-interfaces-example-interface[testing]",
 ]
-functional = [  # installed for `just functional interfaces/example-interface`
+functional = [  # installed for `just functional interfaces/gateway-metadata`
 ]
-integration = [  # installed for `just integration interfaces/example-interface`
+integration = [  # installed for `just integration interfaces/gateway-metadata`
     "jubilant",
 ]
 
 [project.urls]
-"Documentation" = "https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/example-interface"
-"Repository" = "https://github.com/canonical/charmlibs/tree/main/interfaces/example-interface"
+"Documentation" = "https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/gateway-metadata"
+"Repository" = "https://github.com/canonical/charmlibs/tree/main/interfaces/gateway-metadata"
 "Issues" = "https://github.com/canonical/charmlibs/issues"
-"Changelog" = "https://github.com/canonical/charmlibs/blob/main/interfaces/example-interface/CHANGELOG.md"
+"Changelog" = "https://github.com/canonical/charmlibs/blob/main/interfaces/gateway-metadata/CHANGELOG.md"
 
 [build-system]
 requires = ["hatchling"]
@@ -49,10 +46,7 @@ build-backend = "hatchling.build"
 packages = ["src/charmlibs"]
 
 [tool.hatch.version]
-path = "src/charmlibs/interfaces/example_interface/_version.py"
-
-[tool.uv.sources]
-charmlibs-interfaces-example-interface-testing = { path = "testing", editable = true }
+path = "src/charmlibs/interfaces/gateway_metadata/_version.py"
 
 [tool.ruff]
 extend = "../../pyproject.toml"
