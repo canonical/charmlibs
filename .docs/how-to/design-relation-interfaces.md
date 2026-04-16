@@ -21,7 +21,7 @@ When the interface evolves, some version of the library has to support both the 
 
 ### Charm-facing API
 
-The relation data format is a long-lived contract, while the charm-facing API is easier to change. Design the charm-facing API and relation data format separately from the start.
+The relation data format is a long-lived contract, while the charm-facing library API is easier to change. Design the charm-facing API and relation data format separately from the start.
 
 ### Unit tests
 
@@ -201,6 +201,13 @@ class Endpoint(pydantic.BaseModel, frozen=True):
 
 class Databag(pydantic.BaseModel):
     endpoints: frozenset[Endpoint] | None = None
+
+
+# This is preferred
+SAMPLE_DATABAG = {"endpoints": [
+    {"id": "foo", "some_url": "//foo-path"},
+    {"id": "bar", "some_url": "//bar-path"},
+]}
 ```
 
 The definition must be accompanied by a unit test, which may look as follows. Note that including a custom validator requires a comprehensive set of unit tests.
@@ -217,14 +224,15 @@ def test_foos():
     assert accepted_foos == {"a", "b"}
 ```
 
-Collections of primitive types are strongly discouraged.
+Collections of primitive types are strongly discouraged, because they are impossible to extend.
 
 Data maps are strongly discouraged. An exception to this rule is when the data map key is a Juju entity with a well-known string representation, such as a unit name or machine id:
 
 ```py
+# This is allowed
 INGRESS_PER_UNIT_DATABAG = {"ingress": {
-    "recipient-app/0": {"url": ...},
-    "recipient-app/1": {"url": ...},
+    "recipient-app/0": {"url": "external.host:2009/"}
+    "recipient-app/1": {"url": "external.host:2007/"},
     ...
 }}
 ```
