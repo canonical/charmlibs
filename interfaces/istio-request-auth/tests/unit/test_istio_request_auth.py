@@ -45,7 +45,7 @@ def _sample_auth_data():
                 forward_original_token=True,
                 claim_to_headers=[
                     ClaimToHeaderData(header='x-user-id', claim='email'),
-                    ClaimToHeaderData(header='x-user-id', claim='client_id'),
+                    ClaimToHeaderData(header='x-user-id', claim='sub'),
                 ],
             ),
         ]

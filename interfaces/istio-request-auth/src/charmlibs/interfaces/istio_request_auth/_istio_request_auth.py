@@ -54,11 +54,18 @@ class JWTRuleData(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
+    # The following fields mirror the JWTRule entry in the RequestAuthentication CRD.
+    # For details check https://istio.io/latest/docs/reference/config/security/request_authentication/#JWTRule
     issuer: str = Field(description='Issuer URL for token validation')
     jwks_uri: str | None = None
     audiences: list[str] | None = None
     forward_original_token: bool | None = None
+    # claim_to_headers allows
+    # - mapping a single claim to multiple from_headers
+    # - mapping multiple claims to the same header
+    #   (in this case all available claims will be concatenated with a comma separator. missing claims will be skipped)
     claim_to_headers: list[ClaimToHeaderData] | None = None
+    # from_headers allows defining multiple potential header sources. The first one with a valid token will be used.
     from_headers: list[FromHeaderData] | None = None
 
 
@@ -120,8 +127,8 @@ class IstioRequestAuthProvider(Object):
             try:
                 auth_data = RequestAuthData.model_validate_json(data_json)
                 result[relation.app.name] = auth_data
-            except Exception:
-                logger.exception('Failed to parse request auth data from %s', relation.app.name)
+            except Exception as e:
+                logger.exception('Failed to parse request auth data from %s: %s', relation.app.name, e)
 
         return result
 
