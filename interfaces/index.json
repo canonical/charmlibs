@@ -611,13 +611,13 @@
   },
   {
     "name": "valkey_client",
-    "version": "0",
+    "version": "1",
     "lib": "charms.data_platform_libs.data_interfaces",
     "lib_url": "https://charmhub.io/data-platform-libs/libraries/data_interfaces",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/valkey_client/",
     "summary": "Access Valkey databases with credentials and TLS configuration.",
     "description": "The `valkey_client` interface allows charms to access Valkey databases with user-specific credentials and TLS configuration.\nThe provider charm creates Valkey users and permissions based on requirer requests, while the requirer charm shares the desired key access prefix.",
-    "status": "draft"
+    "status": "published"
   },
   {
     "name": "vault-autounseal",
