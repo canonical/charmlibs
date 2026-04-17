@@ -23,6 +23,7 @@ import pytest
 from charmlibs.rollingops.common._exceptions import RollingOpsDecodingError
 from charmlibs.rollingops.common._models import (
     Operation,
+    OperationQueue,
     OperationResult,
 )
 
@@ -36,7 +37,7 @@ def test_operation_create_sets_fields():
     assert isinstance(op.requested_at, datetime)
 
 
-def test_operation_to_string_contains_string_values_only():
+def test_operation_to_string():
     ts = datetime(2026, 2, 23, 12, 0, 0, 123456, tzinfo=UTC)
     op = Operation(
         callback_id='cb',
@@ -48,16 +49,20 @@ def test_operation_to_string_contains_string_values_only():
     )
 
     s = op.to_string()
-    obj = json.loads(s)
+    expected = (
+        '{"callback_id":"cb",'
+        '"requested_at":"1771848000.123456",'
+        '"max_retry":null,'
+        '"attempt":0,'
+        '"result":null,'
+        '"kwargs":{"a":1,"b":2}}'
+    )
 
-    assert obj['callback_id'] == 'cb'
-    assert obj['kwargs'] == '{"a":1,"b":2}'
-    assert obj['requested_at'] == str(ts.timestamp())
-    assert obj.get('max_retry', '') == ''
+    assert s == expected
 
 
-def test_operation_to_string_contains_string_values_only_zero_max_retry():
-    ts = datetime(2026, 2, 23, 12, 0, 0, 123456, tzinfo=UTC)
+def test_operation_to_string_zero_max_retry():
+    ts = datetime(2026, 2, 23, 4, 0, 0, 123456, tzinfo=UTC)
     op = Operation(
         callback_id='cb',
         kwargs={'b': 2, 'a': 1},
@@ -68,12 +73,39 @@ def test_operation_to_string_contains_string_values_only_zero_max_retry():
     )
 
     s = op.to_string()
-    obj = json.loads(s)
+    expected = (
+        '{"callback_id":"cb",'
+        '"requested_at":"1771819200.123456",'
+        '"max_retry":0,'
+        '"attempt":0,'
+        '"result":null,'
+        '"kwargs":{"a":1,"b":2}}'
+    )
+    assert s == expected
 
-    assert obj['callback_id'] == 'cb'
-    assert obj['kwargs'] == '{"a":1,"b":2}'
-    assert obj['requested_at'] == str(ts.timestamp())
-    assert obj.get('max_retry', '') == '0'
+
+def test_operation_to_string_none_max_retry():
+    ts = datetime(2026, 2, 23, 4, 0, 0, 123456, tzinfo=UTC)
+    op = Operation(
+        callback_id='cb',
+        kwargs={'b': 2, 'a': 1},
+        requested_at=ts,
+        max_retry=None,
+        attempt=0,
+        result=None,
+    )
+
+    s = op.to_string()
+    expected = (
+        '{"callback_id":"cb",'
+        '"requested_at":"1771819200.123456",'
+        '"max_retry":null,'
+        '"attempt":0,'
+        '"result":null,'
+        '"kwargs":{"a":1,"b":2}}'
+    )
+
+    assert s == expected
 
 
 def test_operation_is_max_retry_reached_on_zero_max_retry():
@@ -132,8 +164,8 @@ def test_operation_from_string_valid_payload():
     requested_at = datetime(2026, 3, 12, 10, 30, 45, 123456, tzinfo=UTC)
     payload = json.dumps({
         'callback_id': 'cb-123',
-        'kwargs': json.dumps({'b': 2, 'a': 'x'}),
-        'requested_at': str(requested_at.timestamp()),
+        'kwargs': {'b': 2, 'a': 'x'},
+        'requested_at': '1773311445.123456',
         'max_retry': '5',
         'attempt': '2',
     })
@@ -152,9 +184,7 @@ def test_from_string_valid_payload_with_empty_kwargs_and_no_max_retry():
     requested_at = datetime(2026, 3, 12, 10, 30, 45, 123456, tzinfo=UTC)
     payload = json.dumps({
         'callback_id': 'cb-123',
-        'kwargs': '',
-        'requested_at': str(requested_at.timestamp()),
-        'max_retry': '',
+        'requested_at': '1773311445.123456',
         'attempt': '0',
     })
 
@@ -172,8 +202,8 @@ def test_from_string_valid_payload_with_empty_kwargs_and_0_max_retry():
     requested_at = datetime(2026, 3, 12, 10, 30, 45, 123456, tzinfo=UTC)
     payload = json.dumps({
         'callback_id': 'cb-123',
-        'kwargs': '{}',
-        'requested_at': str(requested_at.timestamp()),
+        'kwargs': {},
+        'requested_at': '1773311445.123456',
         'max_retry': '0',
         'attempt': '0',
     })
@@ -195,7 +225,7 @@ def test_from_string_valid_payload_with_empty_kwargs_and_0_max_retry():
         json.dumps(  # invalid requested_at
             {
                 'callback_id': 'cb-123',
-                'kwargs': json.dumps({'x': 1}),
+                'kwargs': {'x': 1},
                 'requested_at': 'bad-ts',
                 'max_retry': '3',
                 'attempt': '1',
@@ -205,15 +235,15 @@ def test_from_string_valid_payload_with_empty_kwargs_and_0_max_retry():
             {
                 'callback_id': 'cb-123',
                 'kwargs': '{bad kwargs json',
-                'requested_at': str(datetime.now(UTC).timestamp()),
+                'requested_at': '1773311445.123456',
                 'max_retry': '3',
                 'attempt': '1',
             }
         ),
         json.dumps(  # missing callback_id
             {
-                'kwargs': json.dumps({'x': 1}),
-                'requested_at': str(datetime.now(UTC).timestamp()),
+                'kwargs': {'x': 1},
+                'requested_at': '1773311445.123456',
                 'max_retry': '3',
                 'attempt': '1',
             }
@@ -222,7 +252,7 @@ def test_from_string_valid_payload_with_empty_kwargs_and_0_max_retry():
             {
                 'callback_id': 'cb-123',
                 'kwargs': '[]',
-                'requested_at': str(datetime.now(UTC).timestamp()),
+                'requested_at': '1773311445.123456',
                 'max_retry': '3',
                 'attempt': '1',
             }
@@ -230,7 +260,7 @@ def test_from_string_valid_payload_with_empty_kwargs_and_0_max_retry():
         json.dumps(  # missing requested_at
             {
                 'callback_id': 'cb-123',
-                'kwargs': '{}',
+                'kwargs': {},
                 'requested_at': '',
                 'max_retry': '3',
                 'attempt': '1',
@@ -239,7 +269,7 @@ def test_from_string_valid_payload_with_empty_kwargs_and_0_max_retry():
         json.dumps(  # result
             {
                 'callback_id': 'cb-123',
-                'kwargs': '{}',
+                'kwargs': {},
                 'requested_at': 'bad-ts',
                 'max_retry': '3',
                 'attempt': '1',
@@ -377,3 +407,137 @@ def test_retry_release_with_no_max_retry_sets_retry_release() -> None:
 
     assert operation.attempt == 6
     assert operation.result == OperationResult.RETRY_RELEASE
+
+
+def test_queue_empty_behaviour():
+    q = OperationQueue()
+
+    assert len(q) == 0
+    assert q.empty is True
+    assert q.peek() is None
+    assert q.dequeue() is None
+
+    assert q.to_string() == '[]'
+
+
+def test_queue_enqueue_and_fifo_order():
+    q = OperationQueue()
+    op1 = Operation.create('a', {'x': 2})
+    op2 = Operation.create('b', {'i': 2})
+    q.enqueue(op1)
+    q.enqueue(op2)
+
+    assert len(q) == 2
+    op = q.peek()
+    assert op is not None
+    assert op == op1
+
+    first = q.dequeue()
+    assert first is not None
+    assert first == op1
+    assert len(q) == 1
+    op = q.peek()
+    assert op is not None
+    assert op == op2
+
+    second = q.dequeue()
+    assert second is not None
+    assert second == op2
+    assert q.empty is True
+
+
+def test_queue_deduplicates_only_against_last_item():
+    q = OperationQueue()
+    op1 = Operation.create('a', {'x': 2})
+    op2 = Operation.create('a', {'x': 2})
+    op3 = Operation.create('a', {'x': 4})
+
+    q.enqueue(op1)
+    assert len(q) == 1
+
+    q.enqueue(op2)
+    assert len(q) == 1
+
+    q.enqueue(op3)
+    assert len(q) == 2
+
+    q.enqueue(op2)
+    assert len(q) == 3
+
+
+def test_queue_to_string_and_from_string():
+    q1 = OperationQueue()
+    ts1 = datetime(2026, 2, 23, 12, 0, 0, 123456, tzinfo=UTC)
+    op1 = Operation(
+        callback_id='a',
+        kwargs={'x': 1},
+        requested_at=ts1,
+        max_retry=5,
+        attempt=0,
+        result=None,
+    )
+    ts2 = datetime(2026, 2, 20, 12, 0, 0, 123456, tzinfo=UTC)
+    op2 = Operation(
+        callback_id='b',
+        kwargs={'y': 'z'},
+        requested_at=ts2,
+        max_retry=None,
+        attempt=0,
+        result=None,
+    )
+    q1.enqueue(op1)
+    q1.enqueue(op2)
+
+    encoded = q1.to_string()
+    expected = (
+        '[{"callback_id":"a",'
+        '"requested_at":"1771848000.123456",'
+        '"max_retry":5,'
+        '"attempt":0,'
+        '"result":null,'
+        '"kwargs":{"x":1}},'
+        '{"callback_id":"b",'
+        '"requested_at":"1771588800.123456",'
+        '"max_retry":null,'
+        '"attempt":0,'
+        '"result":null,'
+        '"kwargs":{"y":"z"}}]'
+    )
+
+    assert encoded == expected
+
+    q2 = OperationQueue.from_string(encoded)
+
+    assert len(q2) == 2
+    op = q2.peek()
+    assert op is not None
+    assert op == op1
+
+    op = q2.dequeue()
+    assert op is not None
+    assert op == op1
+
+    op = q2.dequeue()
+    assert op is not None
+    assert op == op2
+    assert q2.empty
+
+
+def test_queue_from_string_empty_string_is_empty_queue():
+    q = OperationQueue.from_string('')
+    assert q.empty
+    assert q.peek() is None
+
+
+def test_queue_from_string_rejects_non_list_json():
+    with pytest.raises(
+        RollingOpsDecodingError, match='Failed to deserialize data to create an OperationQueue'
+    ):
+        OperationQueue.from_string('{"not": "a list"}')
+
+
+def test_queue_from_string_rejects_invalid_json():
+    with pytest.raises(
+        RollingOpsDecodingError, match='Failed to deserialize data to create an OperationQueue'
+    ):
+        OperationQueue.from_string('{invalid')

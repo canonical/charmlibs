@@ -86,7 +86,7 @@ class EtcdRollingOpsBackend(Object):
         self.worker = EtcdRollingOpsAsyncWorker(
             charm, peer_relation_name=peer_relation_name, owner=owner, cluster_id=cluster_id
         )
-        self.keys = RollingOpsKeys.for_owner(cluster_id, owner)
+        self.keys = RollingOpsKeys.for_owner(cluster_id=cluster_id, owner=owner)
 
         self.shared_certificates = SharedClientCertificateManager(
             charm,
@@ -99,12 +99,10 @@ class EtcdRollingOpsBackend(Object):
             cluster_id=self.keys.cluster_prefix,
             shared_certificates=self.shared_certificates,
         )
-
-        self.keys = RollingOpsKeys.for_owner(cluster_id=cluster_id, owner=owner)
         self._async_lock = EtcdLock(lock_key=self.keys.lock_key, owner=owner)
         self._sync_lock = EtcdLock(lock_key=self.keys.lock_key, owner=f'{owner}:sync')
-        self.operations = ManagerOperationStore(self.keys, owner)
-        self._lease = None
+        self._lease: EtcdLease | None = None
+        self.operations_store = ManagerOperationStore(self.keys, owner)
 
         self.framework.observe(
             charm.on[self.peer_relation_name].relation_departed, self._on_peer_relation_departed
@@ -165,10 +163,10 @@ class EtcdRollingOpsBackend(Object):
 
         backend_state = UnitBackendState(self.model, self.peer_relation_name, self.model.unit)
         if backend_state.cleanup_needed:
-            self.operations.clean_up()
+            self.operations_store.clean_up()
         backend_state.clear_fallback()
 
-        self.operations.request(operation)
+        self.operations_store.request(operation)
 
     def ensure_processing(self):
         """Ensure that the etcd worker process is running.
@@ -177,6 +175,10 @@ class EtcdRollingOpsBackend(Object):
         processing queued operations for this unit.
         """
         self.worker.start()
+
+    def is_processing(self) -> bool:
+        """Return whether the etcd worker process is currently running."""
+        return self.worker.is_running()
 
     def _on_etcd_relation_created(self, event: RelationCreatedEvent) -> None:
         """Validate that the etcdctl command is available when etcd is related.
@@ -244,7 +246,7 @@ class EtcdRollingOpsBackend(Object):
             kwargs = {}
 
         operation = Operation.create(callback_id, kwargs, max_retry)
-        self.operations.request(operation)
+        self.operations_store.request(operation)
         self.worker.start()
 
     def _on_run_with_lock(self) -> RunWithLockOutcome:
@@ -269,7 +271,7 @@ class EtcdRollingOpsBackend(Object):
             logger.info('Lock is not granted. Operation will not run.')
             return RunWithLockOutcome(status=RunWithLockStatus.NOT_GRANTED)
 
-        if not (operation := self.operations.peek_current()):
+        if not (operation := self.operations_store.peek_current()):
             logger.info('Lock granted but there is no operation to run.')
             return RunWithLockOutcome(status=RunWithLockStatus.NO_OPERATION)
 
@@ -278,7 +280,7 @@ class EtcdRollingOpsBackend(Object):
                 'Operation %s target was not found. Releasing operation without retry.',
                 operation.callback_id,
             )
-            self.operations.finalize(operation, OperationResult.RELEASE)
+            self.operations_store.finalize(operation, OperationResult.RELEASE)
             return RunWithLockOutcome(
                 status=RunWithLockStatus.MISSING_CALLBACK,
                 op_id=operation.op_id,
@@ -305,7 +307,15 @@ class EtcdRollingOpsBackend(Object):
                 logger.info('Finished %s. Lock will be released.', operation.callback_id)
                 result = OperationResult.RELEASE
 
-        self.operations.finalize(operation, result)
+        try:
+            self.operations_store.finalize(operation, result)
+        except Exception:
+            logger.exception('Failed to commit operation %s to etcd.', operation.callback_id)
+            return RunWithLockOutcome(
+                status=RunWithLockStatus.EXECUTED_NOT_COMMITTED,
+                op_id=operation.op_id,
+                result=result,
+            )
         return RunWithLockOutcome(
             status=RunWithLockStatus.EXECUTED,
             op_id=operation.op_id,
@@ -333,9 +343,12 @@ class EtcdRollingOpsBackend(Object):
 
         try:
             self._lease.grant()
+
+            if self._lease.id is None:
+                raise RollingOpsSyncLockError('Failed to grant an etcd lease.')
             while True:
                 try:
-                    if self._sync_lock.try_acquire(self._lease.id):  # type: ignore[reportArgumentType]
+                    if self._sync_lock.try_acquire(self._lease.id):
                         logger.info('etcd lock acquired.')
                         return
                 except Exception:
@@ -367,7 +380,7 @@ class EtcdRollingOpsBackend(Object):
         unit's queued operation state.
 
         Returned values:
-            - INVALID: the peer or etcd relation is missing
+            - UNAVAILABLE: etcd backend is not available
             - GRANTED: the async lock is currently held by this unit
             - WAITING: this unit has queued work but does not hold the lock
             - IDLE: this unit has no pending work
@@ -375,15 +388,13 @@ class EtcdRollingOpsBackend(Object):
         Returns:
             The current rolling-ops status for this unit.
         """
-        if self._peer_relation is None or self._etcd_relation is None:
-            return RollingOpsStatus.INVALID
-
-        etcdctl.ensure_initialized()
+        if self._peer_relation is None or self._etcd_relation is None or not self.is_available():
+            return RollingOpsStatus.UNAVAILABLE
 
         if self._async_lock.is_held():
             return RollingOpsStatus.GRANTED
 
-        if self.operations.has_pending_work():
+        if self.operations_store.has_pending_work():
             return RollingOpsStatus.WAITING
 
         return RollingOpsStatus.IDLE

@@ -473,19 +473,27 @@ def test_lock_released_when_unit_removed(juju: jubilant.Juju, app_name: str) -> 
 def test_actions_still_work_after_etcd_relation_removed(
     juju: jubilant.Juju, app_name: str
 ) -> None:
-    units = sorted(juju.status().apps[app_name].units.keys())
-    for unit in units:
+    second_app = f'{app_name}-secondary'
+    primary_units = sorted(juju.status().apps[app_name].units.keys())
+    secondary_units = sorted(juju.status().apps[second_app].units.keys())
+    all_units: list[str] = primary_units + secondary_units
+
+    for unit in all_units:
         remove_transition_file(juju, unit)
+        wait_for_etcdctl_config_file(juju, unit)
 
     juju.wait(jubilant.all_active, error=jubilant.any_error, timeout=TIMEOUT)
 
-    unit_a = units[3]
+    unit_a = primary_units[3]
 
-    juju.run(unit_a, 'failed-restart', {'delay': 10, 'max-retry': 2})
-    for i in range(3):
-        juju.run(unit_a, 'restart', {'delay': i})
+    juju.run(unit_a, 'failed-restart', {'delay': 10, 'max-retry': 1})
+    juju.run(unit_a, 'restart', {'delay': 1})
+    juju.run(unit_a, 'restart', {'delay': 2})
 
     juju.remove_relation(f'{app_name}:etcd', 'etcd:etcd-client')
+
+    unit_b = secondary_units[1]
+    juju.run(unit_b, 'restart', {'delay': 1})
 
     juju.wait(jubilant.all_active, error=jubilant.any_error, timeout=TIMEOUT)
 
@@ -494,9 +502,20 @@ def test_actions_still_work_after_etcd_relation_removed(
 
     logger.info('unit_a_events %s', unit_a_events)
 
-    # During fallback if the execution is not fully committed to etcd, it may
-    # be re-executed on the peer context.
-    assert relevant_events.count('_failed_restart:start') >= 3, relevant_events
-    assert relevant_events.count('_failed_restart:retry_release') >= 3, relevant_events
-    assert relevant_events.count('_restart:start') >= 3, relevant_events
-    assert relevant_events.count('_restart:done') >= 3, relevant_events
+    assert relevant_events.count('_failed_restart:start') == 2, relevant_events
+    assert relevant_events.count('_failed_restart:retry_release') == 2, relevant_events
+    assert relevant_events.count('_restart:start') == 2, relevant_events
+    assert relevant_events.count('_restart:done') == 2, relevant_events
+
+    unit_b_events = get_unit_events(juju, unit_b)
+    assert len(unit_b_events) == 3
+    restart_events = [
+        (e['event'], e['processing_backend'])
+        for e in unit_b_events
+        if not e['event'].startswith('action')
+    ]
+
+    assert restart_events == [
+        ('_restart:start', 'etcd'),
+        ('_restart:done', 'etcd'),
+    ], f'unexpected event sequence: {restart_events}'

@@ -17,12 +17,20 @@
 import json
 import logging
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
 from ops import Model, Unit
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    RootModel,
+    field_serializer,
+    field_validator,
+)
 
 from charmlibs.rollingops.common._exceptions import (
     RollingOpsDecodingError,
@@ -34,7 +42,25 @@ logger = logging.getLogger(__name__)
 
 
 class OperationResult(StrEnum):
-    """Callback return values."""
+    """Result values returned by rolling-ops callbacks on async locks.
+
+    These values control how the rolling-ops manager updates the operation
+    state and whether the distributed lock is released or retained.
+
+    - RELEASE:
+        The operation completed successfully and no retry is required.
+        The lock is released and the next unit may be scheduled.
+
+    - RETRY_RELEASE:
+        The operation failed or timed out and should be retried later.
+        The operation is re-queued and the lock is released so that
+        other units may proceed before this operation is retried.
+
+    - RETRY_HOLD:
+        The operation failed or timed out and should be retried immediately.
+        The operation is re-queued and the lock is kept by the current
+        unit, allowing it to retry immediately.
+    """
 
     RELEASE = 'release'
     RETRY_RELEASE = 'retry-release'
@@ -59,22 +85,40 @@ class RunWithLockStatus(StrEnum):
     NO_OPERATION = 'no_operation'
     MISSING_CALLBACK = 'missing_callback'
     EXECUTED = 'executed'
+    EXECUTED_NOT_COMMITTED = 'executed_not_committed'
 
 
 class RollingOpsStatus(StrEnum):
-    """High-level rolling-ops state for a unit.
+    """High-level rolling-ops status for a unit.
 
-    This status reflects whether the unit is currently executing, waiting,
-    or idle with respect to rolling operations.
+    It reflects whether the unit is currently executing work, waiting
+    for execution, idle, or unable to participate.
+
+    States:
+
+    - UNAVAILABLE:
+        Rolling-ops cannot be used on this unit. This typically occurs when
+        required relations are missing or the selected backend is not reachable.
+            * peer backend: peer relation does not exist
+            * etcd backend: peer or etcd relation missing, or etcd not reachable
+
+    - WAITING:
+        The unit has pending operations but does not currently hold the lock.
+
+    - GRANTED:
+        The unit currently holds the lock and may execute operations.
+
+    - IDLE:
+        The unit has no pending operations and is not holding the lock.
     """
 
-    INVALID = 'invalid'
+    UNAVAILABLE = 'unavailable'
     WAITING = 'waiting'
     GRANTED = 'granted'
     IDLE = 'idle'
 
 
-@dataclass
+@dataclass(frozen=True)
 class RunWithLockOutcome:
     """Result of attempting to execute an operation under a distributed lock.
 
@@ -129,8 +173,7 @@ class UnitBackendState:
         self._relation = relation
         self.unit = unit
 
-    def _load(self) -> BackendState:
-        return self._relation.load(BackendState, self.unit, decoder=lambda s: s)
+        self._backend_state = self._relation.load(BackendState, self.unit, decoder=lambda s: s)
 
     def _save(self, data: BackendState) -> None:
         self._relation.save(data, self.unit, encoder=str)
@@ -138,26 +181,24 @@ class UnitBackendState:
     @property
     def backend(self) -> ProcessingBackend:
         """Return which backend owns execution for this unit's queue."""
-        return self._load().backend
+        return self._backend_state.backend
 
     @property
     def cleanup_needed(self) -> bool:
         """Return whether etcd cleanup is required before etcd can be reused."""
-        return self._load().cleanup_needed
+        return self._backend_state.cleanup_needed
 
     def fallback_to_peer(self) -> None:
         """Switch this unit's queue to peer processing and mark etcd cleanup needed."""
-        data = self._load()
-        data.backend = ProcessingBackend.PEER
-        data.cleanup_needed = True
-        self._save(data)
+        self._backend_state.backend = ProcessingBackend.PEER
+        self._backend_state.cleanup_needed = True
+        self._save(self._backend_state)
 
     def clear_fallback(self) -> None:
         """Clear the etcd cleanup-needed flag and set the backend to ETCD."""
-        data = self._load()
-        data.backend = ProcessingBackend.ETCD
-        data.cleanup_needed = False
-        self._save(data)
+        self._backend_state.backend = ProcessingBackend.ETCD
+        self._backend_state.cleanup_needed = False
+        self._save(self._backend_state)
 
     def is_peer_managed(self) -> bool:
         """Return whether the peer backend should process this unit's queue."""
@@ -168,55 +209,63 @@ class UnitBackendState:
         return self.backend == ProcessingBackend.ETCD
 
 
-@dataclass
-class Operation:
+class Operation(BaseModel):
     """A single queued operation."""
+
+    model_config = ConfigDict(use_enum_values=True)
 
     callback_id: str
     requested_at: datetime
-    max_retry: int | None
-    attempt: int
-    result: OperationResult | None
-    kwargs: dict[str, Any] = field(default_factory=dict[str, Any])
+    max_retry: int | None = None
+    attempt: int = 0
+    result: OperationResult | None = None
+    kwargs: dict[str, Any] = Field(default_factory=dict)
 
+    @field_validator('callback_id')
     @classmethod
-    def _validate_fields(
-        cls, callback_id: Any, kwargs: Any, requested_at: Any, max_retry: Any, attempt: Any
-    ) -> None:
-        """Validate the class attributes."""
-        if not isinstance(callback_id, str) or not callback_id.strip():
+    def validate_callback_id(cls, value: str) -> str:
+        if not value.strip():
             raise ValueError('callback_id must be a non-empty string')
+        return value
 
-        if not isinstance(kwargs, dict):
-            raise ValueError('kwargs must be a dict')
+    @field_validator('kwargs')
+    @classmethod
+    def validate_kwargs(cls, value: dict[str, Any]) -> dict[str, Any]:
         try:
-            json.dumps(kwargs)
+            json.dumps(value)
         except TypeError as e:
             raise ValueError(f'kwargs must be JSON-serializable: {e}') from e
+        return value
 
-        if not isinstance(requested_at, datetime):
-            raise ValueError('requested_at must be a datetime')
+    @field_serializer('kwargs')
+    def serialize_kwargs(self, value: dict[str, Any]) -> dict[str, Any]:
+        """Ensure deterministic ordering of kwargs."""
+        return dict(sorted(value.items()))
 
-        if max_retry is not None:
-            if not isinstance(max_retry, int):
-                raise ValueError('max_retry must be an int')
-            if max_retry < 0:
-                raise ValueError('max_retry must be >= 0')
+    @field_validator('max_retry')
+    @classmethod
+    def validate_max_retry(cls, value: int | None) -> int | None:
+        if value is not None and value < 0:
+            raise ValueError('max_retry must be >= 0')
+        return value
 
-        if not isinstance(attempt, int):
-            raise ValueError('attempt must be an int')
-        if attempt < 0:
+    @field_validator('attempt')
+    @classmethod
+    def validate_attempt(cls, value: int) -> int:
+        if value < 0:
             raise ValueError('attempt must be >= 0')
+        return value
 
-    def __post_init__(self) -> None:
-        """Validate the class attributes."""
-        self._validate_fields(
-            self.callback_id,
-            self.kwargs,
-            self.requested_at,
-            self.max_retry,
-            self.attempt,
-        )
+    @field_validator('requested_at', mode='before')
+    @classmethod
+    def validate_requested_at(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return parse_timestamp(value)
+        return value
+
+    @field_serializer('requested_at')
+    def serialize_requested_at(self, value: datetime) -> str:
+        return datetime_to_str(value)
 
     @classmethod
     def create(
@@ -235,20 +284,20 @@ class Operation:
             result=None,
         )
 
-    def _to_dict(self) -> dict[str, str]:
-        """Dict form (string-only values)."""
-        return {
-            'callback_id': self.callback_id,
-            'kwargs': self._kwargs_to_json(),
-            'requested_at': datetime_to_str(self.requested_at),
-            'max_retry': '' if self.max_retry is None else str(self.max_retry),
-            'attempt': str(self.attempt),
-            'result': '' if self.result is None else self.result,
-        }
-
     def to_string(self) -> str:
-        """Serialize to a string suitable for a Juju databag."""
-        return json.dumps(self._to_dict(), separators=(',', ':'))
+        """Serialize to a single JSON object string."""
+        return self.model_dump_json()
+
+    @classmethod
+    def from_string(cls, data: str) -> 'Operation':
+        """Deserialize from a JSON string."""
+        try:
+            return cls.model_validate_json(data)
+        except Exception as e:
+            logger.error('Failed to deserialize Operation from %s: %s', data, e)
+            raise RollingOpsDecodingError(
+                'Failed to deserialize data to create an Operation'
+            ) from e
 
     def increase_attempt(self) -> None:
         """Increment the attempt counter."""
@@ -266,7 +315,11 @@ class Operation:
         self.result = OperationResult.RELEASE
 
     def retry_release(self) -> None:
-        """Mark the operation for retry if it has not reached the max retry."""
+        """Mark the operation to be retried later, releasing the lock.
+
+        If the maximum retry count is reached, the operation is marked as
+        ``RELEASE`` and will not be retried further.
+        """
         self.increase_attempt()
         if self.is_max_retry_reached():
             logger.warning('Operation max retry reached. Dropping.')
@@ -275,7 +328,11 @@ class Operation:
             self.result = OperationResult.RETRY_RELEASE
 
     def retry_hold(self) -> None:
-        """Mark the operation for retry if it has not reached the max retry."""
+        """Mark the operation to be retried immediately, retaining the lock.
+
+        If the maximum retry count is reached, the operation is marked as
+        ``RELEASE`` and will not be retried further.
+        """
         self.increase_attempt()
         if self.is_max_retry_reached():
             self.result = OperationResult.RELEASE
@@ -287,41 +344,6 @@ class Operation:
     def op_id(self) -> str:
         """Return the unique identifier for this operation."""
         return f'{datetime_to_str(self.requested_at)}-{self.callback_id}'
-
-    @classmethod
-    def from_string(cls, data: str) -> 'Operation':
-        """Deserialize from a Juju databag string.
-
-        Raises:
-            RollingOpsDecodingError: if data cannot be deserialized.
-        """
-        try:
-            obj = json.loads(data)
-        except json.JSONDecodeError as e:
-            logger.error('Failed to deserialize Operation from %s: %s', data, e)
-            raise RollingOpsDecodingError(
-                'Failed to deserialize data to create an Operation'
-            ) from e
-        return cls.from_dict(obj)
-
-    @classmethod
-    def from_dict(cls, data: dict[str, str]) -> 'Operation':
-        """Create an Operation from its dict (etcd) representation."""
-        try:
-            return cls(
-                callback_id=data['callback_id'],
-                requested_at=parse_timestamp(data['requested_at']),  # type: ignore[reportArgumentType]
-                max_retry=int(data['max_retry']) if data.get('max_retry') else None,
-                attempt=int(data['attempt']),
-                kwargs=json.loads(data['kwargs']) if data.get('kwargs') else {},
-                result=OperationResult(data['result']) if data.get('result') else None,
-            )
-
-        except (json.JSONDecodeError, KeyError, TypeError, ValueError) as e:
-            logger.error('Failed to deserialize Operation from %s: %s', data, e)
-            raise RollingOpsDecodingError(
-                'Failed to deserialize data to create an Operation'
-            ) from e
 
     def _kwargs_to_json(self) -> str:
         """Deterministic JSON serialization for kwargs."""
@@ -338,20 +360,25 @@ class Operation:
         return hash((self.callback_id, self._kwargs_to_json()))
 
 
-class OperationQueue:
+class OperationQueue(RootModel[list[Operation]]):
     """In-memory FIFO queue of Operations with encode/decode helpers for storing in a databag."""
 
-    def __init__(self, operations: list[Operation] | None = None):
-        self.operations: list[Operation] = list(operations or [])
+    def __init__(self, operations: list[Operation] | None = None) -> None:
+        super().__init__(root=operations or [])  # pyright: ignore[reportUnknownMemberType]
+
+    @property
+    def operations(self) -> list[Operation]:
+        """Return the underlying list of operations."""
+        return self.root
 
     def __len__(self) -> int:
         """Return the number of operations in the queue."""
-        return len(self.operations)
+        return len(self.root)
 
     @property
     def empty(self) -> bool:
         """Return True if there are no queued operations."""
-        return not self.operations
+        return not self.root
 
     def peek(self) -> Operation | None:
         """Return the first operation in the queue if it exists."""
@@ -379,48 +406,64 @@ class OperationQueue:
         self.operations.append(operation)
 
     def to_string(self) -> str:
-        """Encode entire queue to a single string."""
-        items = [op.to_string() for op in self.operations]
-        return json.dumps(items, separators=(',', ':'))
+        """Encode entire queue to a single JSON string."""
+        return self.model_dump_json()
 
     @classmethod
     def from_string(cls, data: str) -> 'OperationQueue':
-        """Decode queue from a string.
+        """Decode a queue from a JSON string.
+
+        Args:
+            data: Serialized queue as a JSON array of operation objects.
+
+        Returns:
+            The decoded operation queue.
 
         Raises:
-            RollingOpsDecodingError: if data cannot be deserialized.
+            RollingOpsDecodingError: If the queue cannot be deserialized.
         """
         if not data:
-            return cls()
+            return cls([])
 
         try:
-            items = json.loads(data)
-        except json.JSONDecodeError as e:
+            return cls.model_validate_json(data)
+        except Exception as e:
             logger.error(
-                'Failed to deserialize data to create an OperationQueue from %s: %s', data, e
+                'Failed to deserialize data to create an OperationQueue from %s: %s',
+                data,
+                e,
             )
             raise RollingOpsDecodingError(
                 'Failed to deserialize data to create an OperationQueue.'
             ) from e
-        if not isinstance(items, list) or not all(isinstance(s, str) for s in items):  # type: ignore[reportUnknownVariableType]
-            raise RollingOpsDecodingError(
-                'OperationQueue string must decode to a JSON list of strings.'
-            )
-
-        operations = [Operation.from_string(s) for s in items]  # type: ignore[reportUnknownVariableType]
-        return cls(operations)
 
 
-@dataclass
+@dataclass(frozen=True)
 class RollingOpsState:
     """Snapshot of the rolling-ops state for a unit.
 
-    This aggregates the current status, the backend responsible for
-    processing operations, and the unit's operation queue.
+    This object provides a view of the rolling-ops system from the perspective
+    of a single unit.
+
+    This state is intended for decision-making in charm logic
+
+    The `processing_backend` reflects the backend currently selected
+        for execution. It may change dynamically (e.g. fallback from etcd
+        to peer).
+    The `operations` queue always reflects the peer-backed state, which
+        acts as the source of truth and fallback mechanism.
+    When `status` is UNAVAILABLE, the unit cannot currently participate
+        in rolling operations due to missing relations or backend failures.
+
+    Attributes:
+        status: High-level rolling-ops status for the unit.
+        processing_backend: Backend currently responsible for executing
+            operations (e.g. ETCD or PEER).
+        operations: The unit's operation queue.
     """
 
     status: RollingOpsStatus
-    processing_backend: ProcessingBackend | None
+    processing_backend: ProcessingBackend
     operations: OperationQueue
 
 
@@ -444,7 +487,7 @@ class SyncLockBackend(ABC):
         Raises:
             TimeoutError: If the lock could not be acquired within the timeout.
         """
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def release(self) -> None:
@@ -453,4 +496,4 @@ class SyncLockBackend(ABC):
         Implementations must ensure that only the lock owner can release
         the lock and that any associated resources are cleaned up.
         """
-        pass
+        raise NotImplementedError

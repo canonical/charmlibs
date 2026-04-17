@@ -19,7 +19,8 @@ dependencies = [
     "charmlibs-interfaces-tls-certificates>=1.8.1",
     "charmlibs-pathops>=1.2.1",
     "dpcharmlibs-interfaces==1.0.0",
-    "tenacity"
+    "tenacity",
+    "pydantic>=2.12.5",
 ]
 
 [dependency-groups]

@@ -112,9 +112,7 @@ class PeerAppLock:
 
         self._relation = relation
         self._app = model.app
-
-    def _load(self) -> PeerAppData:
-        return self._relation.load(PeerAppData, self._app, decoder=lambda s: s)
+        self._app_data = self._relation.load(PeerAppData, self._app, decoder=lambda s: s)
 
     def _save(self, data: PeerAppData) -> None:
         self._relation.save(data, self._app, encoder=str)
@@ -122,26 +120,24 @@ class PeerAppLock:
     @property
     def granted_unit(self) -> str:
         """Return the unit name currently holding the grant, if any."""
-        return self._load().granted_unit
+        return self._app_data.granted_unit
 
     @property
     def granted_at(self) -> datetime | None:
         """Return the timestamp when the grant was issued, if any."""
-        return self._load().granted_at_dt
+        return self._app_data.granted_at_dt
 
     def grant(self, unit_name: str) -> None:
         """Grant the lock to the provided unit."""
-        data = self._load()
-        data.granted_unit = unit_name
-        data.granted_at_dt = now_timestamp()
-        self._save(data)
+        self._app_data.granted_unit = unit_name
+        self._app_data.granted_at_dt = now_timestamp()
+        self._save(self._app_data)
 
     def release(self) -> None:
         """Clear the current grant."""
-        data = self._load()
-        data.granted_unit = ''
-        data.granted_at_dt = None
-        self._save(data)
+        self._app_data.granted_unit = ''
+        self._app_data.granted_at_dt = None
+        self._save(self._app_data)
 
     def is_granted(self, unit_name: str) -> bool:
         """Return whether the provided unit currently holds the grant."""
@@ -159,9 +155,7 @@ class PeerUnitOperations:
         self._relation = relation
         self.unit = unit
         self._backend_state = UnitBackendState(model, relation_name, unit)
-
-    def _load(self) -> PeerUnitData:
-        return self._relation.load(PeerUnitData, self.unit, decoder=lambda s: s)
+        self._unit_data = self._relation.load(PeerUnitData, self.unit, decoder=lambda s: s)
 
     def _save(self, data: PeerUnitData) -> None:
         self._relation.save(data, self.unit, encoder=str)
@@ -173,20 +167,20 @@ class PeerUnitOperations:
     @property
     def intent(self) -> LockIntent:
         """Return the current unit intent."""
-        return self._load().intent
+        return self._unit_data.intent
 
     @property
     def executed_at(self) -> datetime | None:
         """Return the last execution timestamp for this unit."""
-        return self._load().executed_at_dt
+        return self._unit_data.executed_at_dt
 
     @property
     def queue(self) -> OperationQueue:
-        return self._load().queue
+        return self._unit_data.queue
 
     def get_current(self) -> Operation | None:
         """Return the head operation, if any."""
-        return self._load().queue.peek()
+        return self._unit_data.queue.peek()
 
     def has_pending_work(self) -> bool:
         """Return whether this unit still has queued work."""
@@ -194,7 +188,7 @@ class PeerUnitOperations:
 
     def request(self, operation: Operation) -> None:
         """Enqueue an operation and mark this unit as requesting the lock."""
-        data = self._load()
+        data = self._unit_data
         queue = data.queue
 
         previous_length = len(queue)
@@ -211,14 +205,14 @@ class PeerUnitOperations:
         data.queue = queue
         if len(queue) == 1:
             data.intent = LockIntent.REQUEST
+        self._unit_data = data
         self._save(data)
         logger.info('Operation %s added to the peer queue.', operation.callback_id)
 
     def finish(self, result: OperationResult) -> None:
         """Persist the result of executing the current operation."""
-        data = self._load()
-        self._apply_result_to_data(data, result)
-        self._save(data)
+        self._apply_result_to_data(self._unit_data, result)
+        self._save(self._unit_data)
 
     def _apply_result_to_data(
         self,
@@ -328,7 +322,7 @@ class PeerUnitOperations:
         Raises:
             RollingOpsDecodingError: if there is an inconsistency found.
         """
-        data = self._load()
+        data = self._unit_data
         current = data.queue.peek()
 
         if current is None:

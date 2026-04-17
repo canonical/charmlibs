@@ -35,7 +35,6 @@ from charmlibs.pathops import LocalPath
 from charmlibs.rollingops import RollingOpsManager
 from charmlibs.rollingops.common._models import OperationResult
 from charmlibs.rollingops.etcd._models import SharedCertificate
-from charmlibs.rollingops.peer._backend import PeerRollingOpsBackend
 
 VALID_CA_CERT_PEM = """-----BEGIN CERTIFICATE-----
       MIIC6DCCAdCgAwIBAgIUW42TU9LSjEZLMCclWrvSwAsgRtcwDQYJKoZIhvcNAQEL
@@ -166,7 +165,7 @@ def certificates_manager_patches() -> Generator[dict[str, MagicMock], None, None
         }
 
 
-class BaseRollingOpsTestCharm(ops.CharmBase):
+class RollingOpsCharm(ops.CharmBase):
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
 
@@ -176,15 +175,16 @@ class BaseRollingOpsTestCharm(ops.CharmBase):
             '_deferred_restart': self._deferred_restart,
         }
 
-        self.restart_manager = self._make_restart_manager(callback_targets)
+        self.restart_manager = RollingOpsManager(
+            charm=self,
+            peer_relation_name='restart',
+            etcd_relation_name='etcd',
+            cluster_id='cluster-12345',
+            callback_targets=callback_targets,
+        )
         self.framework.observe(self.on.restart_action, self._on_restart_action)
         self.framework.observe(self.on.failed_restart_action, self._on_failed_restart_action)
         self.framework.observe(self.on.deferred_restart_action, self._on_deferred_restart_action)
-
-    def _make_restart_manager(
-        self, callback_targets: dict[str, Any]
-    ) -> PeerRollingOpsBackend | RollingOpsManager:
-        raise NotImplementedError
 
     def _on_restart_action(self, event: ActionEvent) -> None:
         delay = event.params.get('delay')
@@ -216,31 +216,6 @@ class BaseRollingOpsTestCharm(ops.CharmBase):
 
     def _deferred_restart(self, delay: int = 0) -> OperationResult:
         return OperationResult.RETRY_HOLD
-
-
-class PeerRollingOpsCharm(BaseRollingOpsTestCharm):
-    def _make_restart_manager(self, callback_targets: dict[str, Any]) -> PeerRollingOpsBackend:
-        return PeerRollingOpsBackend(
-            charm=self,
-            relation_name='restart',
-            callback_targets=callback_targets,
-        )
-
-
-class RollingOpsCharm(BaseRollingOpsTestCharm):
-    def _make_restart_manager(self, callback_targets: dict[str, Any]) -> RollingOpsManager:
-        return RollingOpsManager(
-            charm=self,
-            peer_relation_name='restart',
-            etcd_relation_name='etcd',
-            cluster_id='cluster-12345',
-            callback_targets=callback_targets,
-        )
-
-
-@pytest.fixture
-def peer_charm_test() -> type[PeerRollingOpsCharm]:
-    return PeerRollingOpsCharm
 
 
 @pytest.fixture
@@ -307,8 +282,3 @@ actions: dict[str, Any] = {
 @pytest.fixture
 def ctx(charm_test: type[RollingOpsCharm]) -> Context[RollingOpsCharm]:
     return Context(charm_test, meta=meta, actions=actions)
-
-
-@pytest.fixture
-def peer_ctx(peer_charm_test: type[PeerRollingOpsCharm]) -> Context[PeerRollingOpsCharm]:
-    return Context(peer_charm_test, meta=meta, actions=actions)

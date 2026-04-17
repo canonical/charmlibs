@@ -278,11 +278,12 @@ def _run_checked(*args: str, cmd_input: str | None = None) -> subprocess.Complet
     return res
 
 
-def run(*args: str) -> str:
+def run(*args: str, cmd_input: str | None = None) -> str:
     """Execute an etcdctl command.
 
     Args:
         args: List of arguments to pass to etcdctl.
+        cmd_input: value to use as input when running the command.
 
     Returns:
         The stdout of the command, stripped, or None if execution failed.
@@ -293,7 +294,7 @@ def run(*args: str) -> str:
         PebbleConnectionError: if the remote container cannot be reached.
         RollingOpsEtcdctlError: etcdctl command error.
     """
-    return _run_checked(*args).stdout.strip()
+    return _run_checked(*args, cmd_input=cmd_input).stdout.strip()
 
 
 def _get_key_value_pair(key_prefix: str, *extra_args: str) -> EtcdKV | None:
@@ -388,6 +389,19 @@ def txn(txn_input: str) -> bool:
         RollingOpsEtcdNotConfiguredError: if etcdctl is not configured.
         PebbleConnectionError: if the remote container cannot be reached.
         RollingOpsEtcdctlError: etcdctl command error.
+        RollingOpsEtcdctlParseError: if invalid response is found
     """
     res = _run_checked('txn', cmd_input=txn_input)
-    return 'SUCCESS' in res.stdout
+
+    lines = res.stdout.splitlines()
+    if not lines:
+        raise RollingOpsEtcdctlParseError('Empty txn response')
+
+    first_line = lines[0].strip()
+
+    if first_line == 'SUCCESS':
+        return True
+    if first_line == 'FAILURE':
+        return False
+
+    raise RollingOpsEtcdctlParseError(f'Unexpected txn response: {res.stdout}')

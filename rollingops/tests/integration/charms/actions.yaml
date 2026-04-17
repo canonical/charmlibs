@@ -39,6 +39,6 @@ sync-restart:
       type: integer
       default: 0
     timeout:
-      description: "Time (seconds) to wait before given up."
+      description: "Time (seconds) to wait before giving up."
       type: integer
       default: 60

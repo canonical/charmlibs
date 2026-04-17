@@ -32,14 +32,12 @@ from charmlibs.interfaces.tls_certificates import (
     PrivateKey,
 )
 from charmlibs.rollingops.common._exceptions import (
-    RollingOpsEtcdNotConfiguredError,
     RollingOpsInvalidSecretContentError,
 )
 from charmlibs.rollingops.common._models import (
     Operation,
     OperationQueue,
     ProcessingBackend,
-    RollingOpsState,
     RollingOpsStatus,
 )
 from charmlibs.rollingops.etcd._models import SharedCertificate
@@ -193,10 +191,9 @@ def test_state_not_initialized(ctx: Context[RollingOpsCharm]):
     state = State(leader=True)
 
     with ctx(ctx.on.start(), state) as mgr:
-        rolling_state = mgr.charm.restart_manager.state  # type: ignore[reportUnknownVariableType]
-        assert isinstance(rolling_state, RollingOpsState)
-        assert rolling_state.status == RollingOpsStatus.INVALID
-        assert rolling_state.processing_backend is None
+        rolling_state = mgr.charm.restart_manager.state
+        assert rolling_state.status == RollingOpsStatus.UNAVAILABLE
+        assert rolling_state.processing_backend == ProcessingBackend.PEER
         assert len(rolling_state.operations) == 0
 
 
@@ -214,8 +211,7 @@ def test_state_peer_idle(ctx: Context[RollingOpsCharm]):
     state = State(leader=False, relations={peer_rel})
 
     with ctx(ctx.on.update_status(), state) as mgr:
-        rolling_state = mgr.charm.restart_manager.state  # type: ignore[reportUnknownVariableType]
-        assert isinstance(rolling_state, RollingOpsState)
+        rolling_state = mgr.charm.restart_manager.state
         assert rolling_state.status == RollingOpsStatus.IDLE
         assert rolling_state.processing_backend == ProcessingBackend.PEER
         assert len(rolling_state.operations) == 0
@@ -237,8 +233,7 @@ def test_state_peer_waiting(ctx: Context[RollingOpsCharm]):
     state = State(leader=False, relations={peer_rel})
 
     with ctx(ctx.on.update_status(), state) as mgr:
-        rolling_state = mgr.charm.restart_manager.state  # type: ignore[reportUnknownVariableType]
-        assert isinstance(rolling_state, RollingOpsState)
+        rolling_state = mgr.charm.restart_manager.state
         assert rolling_state.status == RollingOpsStatus.WAITING
         assert rolling_state.processing_backend == ProcessingBackend.PEER
         assert len(rolling_state.operations) == 1
@@ -263,8 +258,7 @@ def test_state_peer_is_granted(ctx: Context[RollingOpsCharm]):
     state = State(leader=False, relations={peer_rel})
 
     with ctx(ctx.on.update_status(), state) as mgr:
-        rolling_state = mgr.charm.restart_manager.state  # type: ignore[reportUnknownVariableType]
-        assert isinstance(rolling_state, RollingOpsState)
+        rolling_state = mgr.charm.restart_manager.state
         assert rolling_state.status == RollingOpsStatus.GRANTED
         assert rolling_state.processing_backend == ProcessingBackend.PEER
         assert len(rolling_state.operations) == 1
@@ -289,8 +283,7 @@ def test_state_peer_waiting_retry(ctx: Context[RollingOpsCharm]):
     state = State(leader=False, relations={peer_rel})
 
     with ctx(ctx.on.update_status(), state) as mgr:
-        rolling_state = mgr.charm.restart_manager.state  # type: ignore[reportUnknownVariableType]
-        assert isinstance(rolling_state, RollingOpsState)
+        rolling_state = mgr.charm.restart_manager.state
         assert rolling_state.status == RollingOpsStatus.WAITING
         assert rolling_state.processing_backend == ProcessingBackend.PEER
         assert len(rolling_state.operations) == 1
@@ -318,8 +311,7 @@ def test_state_etcd_status(ctx: Context[RollingOpsCharm]):
         return_value=RollingOpsStatus.GRANTED,
     ):
         with ctx(ctx.on.update_status(), state) as mgr:
-            rolling_state = mgr.charm.restart_manager.state  # type: ignore[reportUnknownVariableType]
-            assert isinstance(rolling_state, RollingOpsState)
+            rolling_state = mgr.charm.restart_manager.state
             assert rolling_state.status == RollingOpsStatus.GRANTED
             assert rolling_state.processing_backend == ProcessingBackend.ETCD
             assert len(rolling_state.operations) == 1
@@ -342,11 +334,10 @@ def test_state_falls_back_to_peer_if_etcd_status_fails(ctx: Context[RollingOpsCh
 
     with patch(
         'charmlibs.rollingops._rollingops_manager.EtcdRollingOpsBackend.get_status',
-        side_effect=RollingOpsEtcdNotConfiguredError('boom'),
+        return_value=RollingOpsStatus.UNAVAILABLE,
     ):
         with ctx(ctx.on.update_status(), state) as mgr:
-            rolling_state = mgr.charm.restart_manager.state  # type: ignore[reportUnknownVariableType]
-            assert isinstance(rolling_state, RollingOpsState)
+            rolling_state = mgr.charm.restart_manager.state
             assert rolling_state.status == RollingOpsStatus.WAITING
             assert rolling_state.processing_backend == ProcessingBackend.PEER
             assert len(rolling_state.operations) == 1

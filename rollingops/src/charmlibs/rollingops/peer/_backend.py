@@ -221,7 +221,6 @@ class PeerRollingOpsBackend(Object):
             charm.on[self.relation_name].relation_departed, self._on_relation_departed
         )
         self.framework.observe(charm.on.leader_elected, self._process_locks)
-        self.framework.observe(charm.on.update_status, self._on_rollingops_lock_granted)
 
     @property
     def _relation(self) -> Relation | None:
@@ -287,7 +286,6 @@ class PeerRollingOpsBackend(Object):
         """
         if not self._relation:
             return
-        logger.info('Received a rolling-ops lock granted event.')
         lock = self._lock()
         operations = self._operations(self.model.unit)
         if operations.should_run(lock):
@@ -555,7 +553,11 @@ class PeerRollingOpsBackend(Object):
                     'Mismatch between the etcd and peer operation queue.'
                 )
 
-            case RunWithLockStatus.MISSING_CALLBACK | RunWithLockStatus.EXECUTED:
+            case (
+                RunWithLockStatus.MISSING_CALLBACK
+                | RunWithLockStatus.EXECUTED
+                | RunWithLockStatus.EXECUTED_NOT_COMMITTED
+            ):
                 self._operations(self.model.unit).mirror_result(outcome.op_id, outcome.result)  # type: ignore[reportArgumentType]
             case _:
                 raise RollingOpsDecodingError(
@@ -569,7 +571,7 @@ class PeerRollingOpsBackend(Object):
         and from the shared peer lock state.
 
         Returned values:
-            - INVALID: the peer relation does not exist
+            - UNAVAILABLE: the peer relation does not exist
             - GRANTED: the current unit holds the peer lock
             - WAITING: the current unit has queued work but does not hold the lock
             - IDLE: the current unit has no pending work
@@ -578,7 +580,7 @@ class PeerRollingOpsBackend(Object):
             The current rolling-ops status for this unit.
         """
         if self._relation is None:
-            return RollingOpsStatus.INVALID
+            return RollingOpsStatus.UNAVAILABLE
 
         lock = self._lock()
         operations = self._operations(self.model.unit)

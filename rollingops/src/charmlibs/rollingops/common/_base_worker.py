@@ -122,22 +122,24 @@ class BaseRollingOpsAsyncWorker(Object):
         """
         return []
 
-    def _get_pid_str(self) -> str:
-        """Return the stored worker PID string.
+    @property
+    def _pid(self) -> int | None:
+        """Return the stored worker PID.
 
         Returns:
-            The stored PID as a string, or an empty string if no PID is stored.
+            The stored PID, None if no PID is stored.
 
         Raises:
             NotImplementedError: If not implemented by a subclass.
         """
         raise NotImplementedError
 
-    def _set_pid_str(self, pid: str) -> None:
+    @_pid.setter
+    def _pid(self, value: int | None) -> None:
         """Persist the worker PID string.
 
         Args:
-            pid: The PID string to persist. An empty string clears the stored PID.
+            value: The PID string to persist. An empty string clears the stored PID.
 
         Raises:
             NotImplementedError: If not implemented by a subclass.
@@ -193,40 +195,37 @@ class BaseRollingOpsAsyncWorker(Object):
                 required to start the worker is missing.
             OSError: If the worker subprocess cannot be started.
         """
-        pid_str = self._get_pid_str()
-        if pid_str:
-            try:
-                pid = int(pid_str)
-            except (ValueError, TypeError):
-                pid = None
-
-            if pid is not None and self._is_pid_alive(pid) and not self._on_existing_worker(pid):
-                return
+        if self._relation is None:
+            logger.info('Peer relation does not exist. Worker cannot start.')
+            return
+        pid = self._pid
+        if pid is not None and self._is_pid_alive(pid) and not self._on_existing_worker(pid):
+            return
 
         self._validate_startup_paths()
 
         worker = self._worker_script_path()
         env = self._build_env()
 
-        log_out = open(f'/var/log/{self._log_filename}.log', 'a')  # noqa: SIM115
-        pid = subprocess.Popen(
-            [
-                '/usr/bin/python3',
-                '-u',
-                str(worker),
-                '--unit-name',
-                self.model.unit.name,
-                '--charm-dir',
-                str(self._charm_dir),
-                *self._worker_args(),
-            ],
-            cwd=str(self._charm_dir),
-            stdout=log_out,
-            stderr=log_out,
-            env=env,
-        ).pid
+        with open(f'{self._log_filename}', 'a') as log_out:
+            pid = subprocess.Popen(
+                [
+                    '/usr/bin/python3',
+                    '-u',
+                    str(worker),
+                    '--unit-name',
+                    self.model.unit.name,
+                    '--charm-dir',
+                    str(self._charm_dir),
+                    *self._worker_args(),
+                ],
+                cwd=str(self._charm_dir),
+                stdout=log_out,
+                stderr=log_out,
+                env=env,
+            ).pid
 
-        self._set_pid_str(str(pid))
+        self._pid = pid
         logger.info('Started %s process with PID %s', self._handle_name, pid)
 
     def stop(self) -> None:
@@ -239,13 +238,13 @@ class BaseRollingOpsAsyncWorker(Object):
         The stored PID is cleared when the worker is successfully considered
         stopped or no longer present.
         """
-        pid_str = self._get_pid_str()
+        if self._relation is None:
+            logger.info('Peer relation not found. Worker cannot be stopped.')
+            return
 
-        try:
-            pid = int(pid_str)
-        except (TypeError, ValueError):
-            logger.info('Missing PID or invalid PID found in worker state.')
-            self._set_pid_str('')
+        pid = self._pid
+        if pid is None or pid <= 0:
+            logger.info('Invalid PID found. Worker cannot be stopped.')
             return
 
         try:
@@ -270,4 +269,11 @@ class BaseRollingOpsAsyncWorker(Object):
                 logger.warning('Failed to SIGKILL process PID %s', pid)
                 return
 
-        self._set_pid_str('')
+        self._pid = None
+
+    def is_running(self) -> bool:
+        """Return whether the recorded worker process appears to be alive."""
+        pid = self._pid
+        if pid is None:
+            return False
+        return self._is_pid_alive(pid)

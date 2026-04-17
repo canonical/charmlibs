@@ -27,7 +27,7 @@ from .common._exceptions import (
     RollingOpsNoRelationError,
     RollingOpsSyncLockError,
 )
-from .common._models import OperationResult, SyncLockBackend
+from .common._models import OperationResult, RollingOpsState, RollingOpsStatus, SyncLockBackend
 
 __all__ = (
     'OperationResult',
@@ -40,6 +40,8 @@ __all__ = (
     'RollingOpsLibMissingError',
     'RollingOpsManager',
     'RollingOpsNoRelationError',
+    'RollingOpsState',
+    'RollingOpsStatus',
     'RollingOpsSyncLockError',
     'SyncLockBackend',
 )

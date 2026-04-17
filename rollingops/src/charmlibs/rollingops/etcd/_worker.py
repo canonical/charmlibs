@@ -23,7 +23,7 @@ from charmlibs.rollingops.common._base_worker import BaseRollingOpsAsyncWorker
 
 logger = logging.getLogger(__name__)
 
-WORKER_PID_FIELD = 'etcd-rollingops-worker-pid'
+ETCD_LOG_FILENAME = '/var/log/etcd_rollingops_worker.log'
 
 
 class EtcdRollingOpsAsyncWorker(BaseRollingOpsAsyncWorker):
@@ -35,8 +35,8 @@ class EtcdRollingOpsAsyncWorker(BaseRollingOpsAsyncWorker):
     manage its own worker lifecycle.
     """
 
-    _pid_field = WORKER_PID_FIELD
-    _log_filename = 'etcd_rollingops_worker'
+    _pid_field = 'etcd-rollingops-worker-pid'
+    _log_filename = ETCD_LOG_FILENAME
 
     def __init__(self, charm: CharmBase, peer_relation_name: str, owner: str, cluster_id: str):
         super().__init__(charm, 'etcd-rollingops-async-worker', peer_relation_name)
@@ -66,7 +66,8 @@ class EtcdRollingOpsAsyncWorker(BaseRollingOpsAsyncWorker):
             self._cluster_id,
         ]
 
-    def _get_pid_str(self) -> str:
+    @property
+    def _pid(self) -> int | None:
         """Return the stored worker process PID for this unit.
 
         The PID is stored in the unit databag because each unit runs its own
@@ -74,24 +75,35 @@ class EtcdRollingOpsAsyncWorker(BaseRollingOpsAsyncWorker):
         that worker lifecycle management is isolated per unit.
 
         Returns:
-            The worker process PID as a string, or an empty string if not set.
+            The worker process PID, or None if not set.
         """
         if self._relation is None:
-            return ''
-        return self._relation.data[self.model.unit].get(self._pid_field, '')
+            return None
+        pid = self._relation.data[self.model.unit].get(self._pid_field, '')
 
-    def _set_pid_str(self, pid: str) -> None:
+        try:
+            pid = int(pid)
+        except (ValueError, TypeError):
+            logger.info('Missing PID or invalid PID found in etcd worker state.')
+            pid = None
+
+        return pid
+
+    @_pid.setter
+    def _pid(self, value: int | None) -> None:
         """Persist the worker process PID in the unit databag.
 
         The PID is stored per unit to reflect that each unit owns and manages
         its own worker process when using the etcd backend.
 
         Args:
-            pid: The process identifier to store.
+            value: The process identifier to store.
         """
         if self._relation is None:
             return
-        self._relation.data[self.model.unit].update({self._pid_field: pid})
+        self._relation.data[self.model.unit].update({
+            self._pid_field: '' if value is None else str(value)
+        })
 
     def _on_existing_worker(self, pid: int) -> bool:
         """Executed on detection of an already running worker for this unit.

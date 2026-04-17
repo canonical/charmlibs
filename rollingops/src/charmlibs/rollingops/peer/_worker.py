@@ -26,6 +26,8 @@ from charmlibs.rollingops.common._base_worker import BaseRollingOpsAsyncWorker
 
 logger = logging.getLogger(__name__)
 
+PEER_LOG_FILENAME = '/var/log/peer_rollingops_worker.log'
+
 
 class PeerRollingOpsAsyncWorker(BaseRollingOpsAsyncWorker):
     """Manage the peer-backed rolling-ops worker process.
@@ -37,7 +39,7 @@ class PeerRollingOpsAsyncWorker(BaseRollingOpsAsyncWorker):
     """
 
     _pid_field = 'peer-rollingops-worker-pid'
-    _log_filename = 'peer_rollingops_worker'
+    _log_filename = PEER_LOG_FILENAME
 
     def __init__(self, charm: CharmBase, relation_name: str):
         super().__init__(charm, 'peer-rollingops-async-worker', relation_name)
@@ -57,31 +59,39 @@ class PeerRollingOpsAsyncWorker(BaseRollingOpsAsyncWorker):
             self._venv_site_packages() / 'charmlibs' / 'rollingops' / 'peer' / '_rollingops.py'
         )
 
-    def _get_pid_str(self) -> str:
-        """Return the stored worker process PID as a string.
+    @property
+    def _pid(self) -> int | None:
+        """Return the stored worker process PID.
 
         The PID is persisted in the application databag of the peer relation.
-        If no relation is available or no PID is stored, an empty string is returned.
 
         Returns:
-            The worker process PID as a string, or an empty string if not set.
+            The worker process PID, or None if not set.
         """
         if self._relation is None:
-            return ''
-        return self._app_data.get(self._pid_field, '')
+            return None
+        pid = self._app_data.get(self._pid_field, '')
 
-    def _set_pid_str(self, pid: str) -> None:
+        try:
+            pid = int(pid)
+        except (ValueError, TypeError):
+            pid = None
+
+        return pid
+
+    @_pid.setter
+    def _pid(self, value: int | None) -> None:
         """Persist the worker process PID in the peer relation databag.
 
         The PID is stored in the application databag because it is used
         to trigger rolling operations on the leader and the leader may change.
 
         Args:
-            pid: The process identifier to store.
+            value: The process identifier to store.
         """
         if self._relation is None:
             return
-        self._app_data.update({self._pid_field: pid})
+        self._app_data.update({self._pid_field: '' if value is None else str(value)})
 
     def _on_existing_worker(self, pid: int) -> bool:
         """Handle the presence of an already running worker process.

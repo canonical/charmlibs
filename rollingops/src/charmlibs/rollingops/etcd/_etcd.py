@@ -14,19 +14,22 @@
 
 """Classes that manage etcd concepts."""
 
-import json
 import logging
 import subprocess
 import time
 
 import charmlibs.rollingops.etcd._etcdctl as etcdctl
-from charmlibs.rollingops.common._exceptions import RollingOpsEtcdTransactionError
+from charmlibs.rollingops.common._exceptions import (
+    RollingOpsEtcdctlFatalError,
+    RollingOpsEtcdctlParseError,
+    RollingOpsEtcdTransactionError,
+)
 from charmlibs.rollingops.common._models import Operation, OperationResult
 from charmlibs.rollingops.etcd._models import RollingOpsKeys
 
 logger = logging.getLogger(__name__)
 
-LOCK_LEASE_TTL = 60
+LOCK_LEASE_TTL = '60'
 
 
 class EtcdLease:
@@ -38,9 +41,15 @@ class EtcdLease:
 
     def grant(self) -> None:
         """Create a new lease and start the keep-alive process."""
-        res = etcdctl.run('lease', 'grant', str(LOCK_LEASE_TTL))
-        # parse: "lease 694d9c9aeca3422a granted with TTL(1800s)"
+        res = etcdctl.run('lease', 'grant', LOCK_LEASE_TTL)
+        # parse: "lease 694d9c9aeca3422a granted with TTL(60s)"
         parts = res.split()
+        try:
+            lease_id = parts[1]
+            int(lease_id, 16)
+        except (IndexError, ValueError) as e:
+            raise RollingOpsEtcdctlParseError(f'Invalid lease output: {res}') from e
+
         self.id = parts[1]
         logger.info('%s', res)
         self._start_lease_keepalive()
@@ -128,6 +137,9 @@ class EtcdLock:
         Returns:
             True if the lock was successfully acquired, otherwise False.
         """
+        if not self.lock_key or not self.owner or not lease_id:
+            raise RollingOpsEtcdctlFatalError('Invalid input for lock acquire transaction.')
+
         txn = f"""\
         version("{self.lock_key}") = "0"
 
@@ -144,6 +156,9 @@ class EtcdLock:
         the current owner. This prevents one process from accidentally
         releasing a lock held by another owner.
         """
+        if not self.lock_key or not self.owner:
+            raise RollingOpsEtcdctlFatalError('Invalid input for lock release transaction.')
+
         txn = f"""\
         value("{self.lock_key}") = "{self.owner}"
 
@@ -154,7 +169,9 @@ class EtcdLock:
         etcdctl.txn(txn)
 
     def is_held(self) -> bool:
-        """Check whether the lock is currently held by this owner."""
+        """Check whether the lock is currently held by the owner."""
+        if not self.lock_key or not self.owner:
+            raise RollingOpsEtcdctlFatalError('Invalid input for check lock ownership operation.')
         res = etcdctl.run('get', self.lock_key, '--print-value-only')
         return res == self.owner
 
@@ -178,14 +195,14 @@ class EtcdOperationQueue:
         kv = etcdctl.get_first_key_value_pair(self.prefix)
         if kv is None:
             return None
-        return Operation.from_dict(kv.value)
+        return Operation.model_validate(kv.value)
 
     def _peek_last(self) -> Operation | None:
         """Return the last operation in the queue without removing it."""
         kv = etcdctl.get_last_key_value_pair(self.prefix)
         if kv is None:
             return None
-        return Operation.from_dict(kv.value)
+        return Operation.model_validate(kv.value)
 
     def move_head(self, to_queue_prefix: str) -> bool:
         """Move the first operation in the queue to another queue.
@@ -207,14 +224,14 @@ class EtcdOperationQueue:
 
         op_id = kv.key.split('/')[-1]
         new_key = f'{to_queue_prefix}{op_id}'
-        data = json.dumps(kv.value)
-        value_escaped = data.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n')
+        op = Operation.model_validate(kv.value)
+        data = op.to_string()
 
         txn = f"""\
         value("{self.lock_key}") = "{self.owner}"
         version("{kv.key}") != "0"
 
-        put "{new_key}" "{value_escaped}"
+        put "{new_key}" {data}
         del "{kv.key}"
 
 
@@ -238,13 +255,12 @@ class EtcdOperationQueue:
         new_key = f'{to_queue_prefix}{operation.op_id}'
 
         data = operation.to_string()
-        value_escaped = data.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n')
 
         txn = f"""\
         value("{self.lock_key}") = "{self.owner}"
         version("{old_key}") != "0"
 
-        put "{new_key}" "{value_escaped}"
+        put "{new_key}" {data}
         del "{old_key}"
 
 
@@ -256,7 +272,7 @@ class EtcdOperationQueue:
         while True:
             kv = etcdctl.get_first_key_value_pair(self.prefix)
             if kv is not None:
-                return Operation.from_dict(kv.value)
+                return Operation.model_validate(kv.value)
             time.sleep(10)
 
     def dequeue(self) -> bool:
@@ -303,7 +319,7 @@ class EtcdOperationQueue:
 
         op_str = operation.to_string()
         key = f'{self.prefix}{operation.op_id}'
-        etcdctl.run('put', key, op_str)
+        etcdctl.run('put', key, cmd_input=op_str)
         logger.info('Operation %s added to the etcd queue.', operation.callback_id)
 
     def clear(self) -> None:
@@ -360,18 +376,26 @@ class WorkerOperationStore:
         """
         return self._completed.peek() is not None
 
-    def claim_next(self) -> None:
+    def claim_next(self) -> str:
         """Move the next pending operation to the in-progress queue.
 
         This operation is performed atomically and only succeeds if:
         - the lock is still held by this owner
         - the head of the pending queue has not changed
 
+        Returns:
+            The operation ID of the operation
+
         Raises:
             RollingOpsEtcdTransactionError: if the transaction failed.
         """
         if not self._pending.move_head(self._inprogress.prefix):
             raise RollingOpsEtcdTransactionError('Failed to move operation to in progress.')
+
+        operation = self._inprogress.peek()
+        if operation is None:
+            raise RollingOpsEtcdTransactionError('Failed to get the ID of the next operation.')
+        return operation.op_id
 
     def wait_until_completed(self) -> Operation:
         """Block until at least one operation appears in the completed queue."""

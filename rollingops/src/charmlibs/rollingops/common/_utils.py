@@ -29,6 +29,9 @@ from charmlibs.pathops import PebbleConnectionError
 logger = logging.getLogger(__name__)
 T = TypeVar('T')
 
+LOCK_GRANTED_HOOK_NAME = 'rollingops_lock_granted'
+ETCD_FAILED_HOOK_NAME = 'rollingops_etcd_failed'
+
 
 @retry(
     retry=retry_if_exception_type((PebbleConnectionError, pebble.APIError, pebble.ChangeError)),
@@ -53,39 +56,59 @@ def parse_timestamp(timestamp: str) -> datetime | None:
         return None
 
 
-def datetime_to_str(datetime: datetime) -> str:
-    return str(datetime.timestamp())
+def datetime_to_str(dt: datetime) -> str:
+    return str(dt.timestamp())
 
 
-def setup_logging(log_file: str) -> None:
+def setup_logging(
+    log_file: str,
+    *,
+    unit_name: str,
+    cluster_id: str | None = None,
+    owner: str | None = None,
+) -> None:
     """Configure logging with file rotation.
 
     This sets up the root logger to write INFO-level (and above) logs
     to a rotating file handler. Log files are capped at 10 MB each,
-    with up to 3 backup files retained.
+    with up to 10 backup files retained.
 
     This functions is used in the context of the background process.
 
     Args:
         log_file: Path to the log file where logs should be written.
+        unit_name: Juju unit name associated with the background process.
+        cluster_id: Optional etcd cluster identifier.
+        owner: Optional worker owner identifier.
     """
     handler = RotatingFileHandler(
         log_file,
         maxBytes=10 * 1024 * 1024,  # 10 MB
-        backupCount=3,
+        backupCount=10,
     )
 
     formatter = logging.Formatter(
-        '%(asctime)s [%(levelname)s] [%(process)d] %(name)s: %(message)s'
+        '%(asctime)s [%(levelname)s] [%(process)d] '
+        '[unit=%(unit_name)s cluster=%(cluster_id)s owner=%(owner)s] '
+        '%(name)s: %(message)s'
     )
     handler.setFormatter(formatter)
 
+    def add_context(record: logging.LogRecord) -> bool:
+        record.unit_name = unit_name
+        record.cluster_id = cluster_id or '-'
+        record.owner = owner or '-'
+        return True
+
+    handler.addFilter(add_context)
+
     root = logging.getLogger()
     root.setLevel(logging.INFO)
+    root.handlers.clear()
     root.addHandler(handler)
 
 
-def dispatch_hook(unit_name: str, charm_dir: str, hook_name: str) -> None:
+def _dispatch_hook(unit_name: str, charm_dir: str, hook_name: str) -> None:
     """Execute a Juju hook on a specific unit via juju-exec.
 
     This function triggers a charm hook by invoking the charm's `dispatch`
@@ -107,7 +130,7 @@ def dispatch_hook(unit_name: str, charm_dir: str, hook_name: str) -> None:
 
 
 def dispatch_lock_granted(unit_name: str, charm_dir: str) -> None:
-    """Dispatch the 'rollingops_lock_granted' hook on a unit.
+    """Dispatch the LOCK_GRANTED_HOOK_NAME hook on a unit.
 
     Args:
         unit_name: The Juju unit name (e.g., "app/0").
@@ -116,5 +139,18 @@ def dispatch_lock_granted(unit_name: str, charm_dir: str) -> None:
     Raises:
         subprocess.CalledProcessError: If the hook execution fails.
     """
-    hook_name = 'rollingops_lock_granted'
-    dispatch_hook(unit_name, charm_dir, hook_name)
+    _dispatch_hook(unit_name, charm_dir, LOCK_GRANTED_HOOK_NAME)
+
+
+def dispatch_etcd_failed(unit_name: str, charm_dir: str) -> None:
+    """Dispatch the fatal etcd-worker failure hook.
+
+    This notifies the charm that the etcd worker encountered an
+    unrecoverable error so that higher-level logic can fall back to the
+    peer backend.
+
+    Args:
+        unit_name: Name of the unit dispatching the hook.
+        charm_dir: Path to the charm root directory.
+    """
+    _dispatch_hook(unit_name, charm_dir, ETCD_FAILED_HOOK_NAME)

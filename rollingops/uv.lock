@@ -114,6 +114,7 @@ dependencies = [
     { name = "charmlibs-pathops" },
     { name = "dpcharmlibs-interfaces" },
     { name = "ops" },
+    { name = "pydantic" },
     { name = "tenacity" },
 ]
 
@@ -133,6 +134,7 @@ requires-dist = [
     { name = "charmlibs-pathops", specifier = ">=1.2.1" },
     { name = "dpcharmlibs-interfaces", specifier = "==1.0.0" },
     { name = "ops" },
+    { name = "pydantic", specifier = ">=2.12.5" },
     { name = "tenacity" },
 ]
 
