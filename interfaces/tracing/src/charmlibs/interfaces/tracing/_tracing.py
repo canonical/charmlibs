@@ -31,7 +31,7 @@ parent charm.
 
 Alternatively to providing the list of requested protocols at init time, the charm can do it at
 any point in time by calling the
-`TracingEndpointRequirer.request_protocols(*protocol:str, relation:Optional[Relation])` method.
+`TracingEndpointRequirer.request_protocols(*protocol:str, relation:Relation | None)` method.
 Using this method also allows you to use per-relation protocols.
 
 Units of requirer charms obtain the tempo endpoint to which they will push their traces by calling
@@ -78,16 +78,7 @@ import json
 import logging
 from pathlib import Path
 from collections.abc import MutableMapping, Sequence
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Literal,
-    Optional,
-    Type,
-    TypeVar,
-    Union,
-    cast,
-)
+from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast
 
 import pydantic
 from ops.charm import (
@@ -130,7 +121,7 @@ ReceiverProtocol = Literal[
 ]
 
 RawReceiver = tuple[ReceiverProtocol, str]
-# Helper type. A raw receiver is defined as a tuple consisting of the protocol name, and the (external, if available),
+# Helper type. A raw receiver is defined as a tuple consisting of the protocol name, and the
 # (secured, if available) resolvable server url.
 
 
@@ -198,7 +189,7 @@ if int(pydantic.version.VERSION.split(".")[0]) < 2:
 
         @classmethod
         def load(
-            cls: Type[_DatabagModelT], databag: MutableMapping[str, str]
+            cls: type[_DatabagModelT], databag: MutableMapping[str, str]
         ) -> _DatabagModelT:
             """Load this model from a Juju databag."""
             if cls._NEST_UNDER:
@@ -225,7 +216,7 @@ if int(pydantic.version.VERSION.split(".")[0]) < 2:
 
         def dump(
             self,
-            databag: Optional[MutableMapping[str, str]] = None,
+            databag: MutableMapping[str, str] | None = None,
             clear: bool = True,
         ) -> MutableMapping[str, str]:
             """Write the contents of this model to Juju databag.
@@ -269,7 +260,7 @@ else:
 
         @classmethod
         def load(
-            cls: Type[_DatabagModelT], databag: MutableMapping[str, str]
+            cls: type[_DatabagModelT], databag: MutableMapping[str, str]
         ) -> _DatabagModelT:
             """Load this model from a Juju databag."""
             nest_under = cls.model_config.get("_NEST_UNDER")  # type: ignore
@@ -297,7 +288,7 @@ else:
 
         def dump(
             self,
-            databag: Optional[MutableMapping[str, str]] = None,
+            databag: MutableMapping[str, str] | None = None,
             clear: bool = True,
         ) -> MutableMapping[str, str]:
             """Write the contents of this model to Juju databag.
@@ -601,7 +592,7 @@ class TracingEndpointProvider(Object):
     def __init__(
         self,
         charm: CharmBase,
-        external_url: Optional[str] = None,
+        external_url: str | None = None,
         relation_name: str = DEFAULT_RELATION_NAME,
     ):
         """Initialize.
@@ -761,7 +752,7 @@ class TracingEndpointRequirer(Object):
         self,
         charm: CharmBase,
         relation_name: str = DEFAULT_RELATION_NAME,
-        protocols: Optional[list[ReceiverProtocol]] = None,
+        protocols: list[ReceiverProtocol] | None = None,
     ):
         """Construct a tracing requirer for a Tempo charm.
 
@@ -822,7 +813,7 @@ class TracingEndpointRequirer(Object):
                 pass
 
     def request_protocols(
-        self, protocols: Sequence[ReceiverProtocol], relation: Optional[Relation] = None
+        self, protocols: Sequence[ReceiverProtocol], relation: Relation | None = None
     ) -> None:
         """Publish the list of protocols which the provider should activate."""
         # todo: should we check if _is_single_endpoint and len(self.relations) > 1 and raise, here?
@@ -848,7 +839,7 @@ class TracingEndpointRequirer(Object):
         return self._charm.model.relations[self._relation_name]
 
     @property
-    def _relation(self) -> Optional[Relation]:
+    def _relation(self) -> Relation | None:
         """If this wraps a single endpoint, the relation bound to it, if any."""
         if not self._is_single_endpoint:
             objname = type(self).__name__
@@ -861,7 +852,7 @@ class TracingEndpointRequirer(Object):
         relations = self.relations
         return relations[0] if relations else None
 
-    def is_ready(self, relation: Optional[Relation] = None) -> bool:
+    def is_ready(self, relation: Relation | None = None) -> bool:
         """Is this endpoint ready?"""
         relation = relation or self._relation
         if not relation:
@@ -898,8 +889,8 @@ class TracingEndpointRequirer(Object):
         self.on.endpoint_removed.emit(relation)  # type: ignore
 
     def get_all_endpoints(
-        self, relation: Optional[Relation] = None
-    ) -> Optional[TracingProviderAppData]:
+        self, relation: Relation | None = None
+    ) -> TracingProviderAppData | None:
         """Unmarshalled relation data."""
         relation = relation or self._relation
         if not self.is_ready(relation):
@@ -907,8 +898,8 @@ class TracingEndpointRequirer(Object):
         return TracingProviderAppData.load(relation.data[relation.app])  # type: ignore
 
     def _get_endpoint(
-        self, relation: Optional[Relation], protocol: ReceiverProtocol
-    ) -> Optional[str]:
+        self, relation: Relation | None, protocol: ReceiverProtocol
+    ) -> str | None:
         app_data = self.get_all_endpoints(relation)
         if not app_data:
             return None
@@ -932,8 +923,8 @@ class TracingEndpointRequirer(Object):
         return receiver.url
 
     def get_endpoint(
-        self, protocol: ReceiverProtocol, relation: Optional[Relation] = None
-    ) -> Optional[str]:
+        self, protocol: ReceiverProtocol, relation: Relation | None = None
+    ) -> str | None:
         """Receiver endpoint for the given protocol.
 
         It could happen that this function gets called before the provider publishes the endpoints.
@@ -969,8 +960,8 @@ class TracingEndpointRequirer(Object):
 # it's helpful when tracing.py and charm_tracing.py are used together
 # the path forward should be charmlibs.xx.tracing and ops[tracing].
 def charm_tracing_config(
-    endpoint_requirer: TracingEndpointRequirer, cert_path: Optional[Union[Path, str]]
-) -> tuple[Optional[str], Optional[str]]:
+    endpoint_requirer: TracingEndpointRequirer, cert_path: Path | str | None
+) -> tuple[str | None, str | None]:
     """Return the charm_tracing config you likely want.
 
     If no endpoint is provided:
