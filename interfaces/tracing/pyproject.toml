@@ -15,8 +15,8 @@ classifiers = [
 ]
 dynamic = ["version"]
 dependencies = [
-    "ops",
-    "pydantic",
+    "ops~=3.0",
+    "pydantic~=2.0",
 ]
 
 [dependency-groups]
@@ -25,6 +25,7 @@ lint = [  # installed for `just lint interfaces/tracing` (unit, functional, and 
 ]
 unit = [  # installed for `just unit interfaces/tracing`
     "ops[testing]",
+    "pytest",
 ]
 functional = [  # installed for `just functional interfaces/tracing`
 ]
