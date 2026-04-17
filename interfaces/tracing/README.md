@@ -10,12 +10,6 @@ from charmlibs.interfaces import tracing
 
 See the [reference documentation](https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/tracing) for more.
 
-## FIXME from here
-
-This document explains how to integrate with the Tempo charm for the purpose of pushing traces to a
-tracing endpoint provided by Tempo. It also explains how alternative implementations of the Tempo charm
-may maintain the same interface and be backward compatible with all currently integrated charms.
-
 ## Requirer Library Usage
 
 Charms seeking to push traces to Tempo, must do so using the `TracingEndpointRequirer`
@@ -26,15 +20,18 @@ object only requires instantiating it, typically in the constructor of your char
  This relation must use the `tracing` interface.
  The `TracingEndpointRequirer` object may be instantiated as follows
 
-    from charms.tempo_coordinator_k8s.v0.tracing import TracingEndpointRequirer
 
-    def __init__(self, *args):
-        super().__init__(*args)
-        # ...
-        self.tracing = TracingEndpointRequirer(self,
-            protocols=['otlp_grpc', 'otlp_http', 'jaeger_http_thrift']
-        )
-        # ...
+```py
+from charms.tempo_coordinator_k8s.v0.tracing import TracingEndpointRequirer
+
+def __init__(self, *args):
+    super().__init__(*args)
+    # ...
+    self.tracing = TracingEndpointRequirer(self,
+        protocols=['otlp_grpc', 'otlp_http', 'jaeger_http_thrift']
+    )
+    # ...
+```
 
 Note that the first argument (`self`) to `TracingEndpointRequirer` is always a reference to the
 parent charm.
@@ -62,7 +59,7 @@ go through the ingress and get load balanced across all units. Otherwise, if the
 The `TracingEndpointProvider` object may be used by charms to manage relations with their
 trace sources. For this purposes a Tempo-like charm needs to do two things
 
-1. Instantiate the `TracingEndpointProvider` object by providing it a
+Instantiate the `TracingEndpointProvider` object by providing it a
 reference to the parent (Tempo) charm and optionally the name of the relation that the Tempo charm
 uses to interact with its trace sources. This relation must conform to the `tracing` interface
 and it is strongly recommended that this relation be named `tracing` which is its
@@ -71,13 +68,12 @@ default value.
 For example a Tempo charm may instantiate the `TracingEndpointProvider` in its constructor as
 follows
 
-    from charms.tempo_coordinator_k8s.v0.tracing import TracingEndpointProvider
+```py
+from charms.tempo_coordinator_k8s.v0.tracing import TracingEndpointProvider
 
-    def __init__(self, *args):
-        super().__init__(*args)
-        # ...
-        self.tracing = TracingEndpointProvider(self)
-        # ...
-
-
-
+def __init__(self, *args):
+    super().__init__(*args)
+    # ...
+    self.tracing = TracingEndpointProvider(self)
+    # ...
+```
