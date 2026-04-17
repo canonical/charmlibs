@@ -77,16 +77,14 @@ import enum
 import json
 import logging
 from pathlib import Path
+from collections.abc import MutableMapping, Sequence
 from typing import (
     TYPE_CHECKING,
     Any,
-    Dict,
-    List,
     Literal,
-    MutableMapping,
     Optional,
-    Sequence,
-    Tuple,
+    Type,
+    TypeVar,
     Union,
     cast,
 )
@@ -117,6 +115,8 @@ PYDEPS = ["pydantic"]
 
 logger = logging.getLogger(__name__)
 
+_DatabagModelT = TypeVar("_DatabagModelT", bound="DatabagModel")
+
 DEFAULT_RELATION_NAME = "tracing"
 RELATION_INTERFACE_NAME = "tracing"
 
@@ -129,7 +129,7 @@ ReceiverProtocol = Literal[
     "jaeger_thrift_http",
 ]
 
-RawReceiver = Tuple[ReceiverProtocol, str]
+RawReceiver = tuple[ReceiverProtocol, str]
 # Helper type. A raw receiver is defined as a tuple consisting of the protocol name, and the (external, if available),
 # (secured, if available) resolvable server url.
 
@@ -144,7 +144,7 @@ class TransportProtocolType(str, enum.Enum):
     grpc = "grpc"
 
 
-receiver_protocol_to_transport_protocol: Dict[
+receiver_protocol_to_transport_protocol: dict[
     ReceiverProtocol, TransportProtocolType
 ] = {
     "zipkin": TransportProtocolType.http,
@@ -197,7 +197,9 @@ if int(pydantic.version.VERSION.split(".")[0]) < 2:
         _NEST_UNDER = None
 
         @classmethod
-        def load(cls, databag: MutableMapping):
+        def load(
+            cls: Type[_DatabagModelT], databag: MutableMapping[str, str]
+        ) -> _DatabagModelT:
             """Load this model from a Juju databag."""
             if cls._NEST_UNDER:
                 return cls.parse_obj(json.loads(databag[cls._NEST_UNDER]))
@@ -221,7 +223,11 @@ if int(pydantic.version.VERSION.split(".")[0]) < 2:
                 logger.debug(msg, exc_info=True)
                 raise DataValidationError(msg) from e
 
-        def dump(self, databag: Optional[MutableMapping] = None, clear: bool = True):
+        def dump(
+            self,
+            databag: Optional[MutableMapping[str, str]] = None,
+            clear: bool = True,
+        ) -> MutableMapping[str, str]:
             """Write the contents of this model to Juju databag.
 
             :param databag: the databag to write the data to.
@@ -262,7 +268,9 @@ else:
         """Pydantic config."""
 
         @classmethod
-        def load(cls, databag: MutableMapping):
+        def load(
+            cls: Type[_DatabagModelT], databag: MutableMapping[str, str]
+        ) -> _DatabagModelT:
             """Load this model from a Juju databag."""
             nest_under = cls.model_config.get("_NEST_UNDER")  # type: ignore
             if nest_under:
@@ -287,7 +295,11 @@ else:
                 logger.debug(msg, exc_info=True)
                 raise DataValidationError(msg) from e
 
-        def dump(self, databag: Optional[MutableMapping] = None, clear: bool = True):
+        def dump(
+            self,
+            databag: Optional[MutableMapping[str, str]] = None,
+            clear: bool = True,
+        ) -> MutableMapping[str, str]:
             """Write the contents of this model to Juju databag.
 
             :param databag: the databag to write the data to.
@@ -389,7 +401,7 @@ class Receiver(BaseModel):
 class TracingProviderAppData(DatabagModel):  # noqa: D101 # type: ignore
     """Application databag model for the tracing provider."""
 
-    receivers: List[Receiver] = Field(
+    receivers: list[Receiver] = Field(
         ...,
         description="List of all receivers enabled on the tracing provider.",
     )
@@ -398,19 +410,21 @@ class TracingProviderAppData(DatabagModel):  # noqa: D101 # type: ignore
 class TracingRequirerAppData(DatabagModel):  # noqa: D101 # type: ignore
     """Application databag model for the tracing requirer."""
 
-    receivers: List[ReceiverProtocol]
+    receivers: list[ReceiverProtocol]
     """Requested receivers."""
 
 
 class _AutoSnapshotEvent(RelationEvent):
-    __args__: Tuple[str, ...] = ()
-    __optional_kwargs__: Dict[str, Any] = {}
+    __args__: tuple[str, ...] = ()
+    __optional_kwargs__: dict[str, Any] = {}
 
     @classmethod
-    def __attrs__(cls):
+    def __attrs__(cls) -> tuple[str, ...]:
         return cls.__args__ + tuple(cls.__optional_kwargs__.keys())
 
-    def __init__(self, handle, relation, *args, **kwargs):
+    def __init__(
+        self, handle: Any, relation: Relation, *args: Any, **kwargs: Any
+    ) -> None:
         super().__init__(handle, relation)
 
         if not len(self.__args__) == len(args):
@@ -424,7 +438,7 @@ class _AutoSnapshotEvent(RelationEvent):
             obj = kwargs.get(attr, default)
             setattr(self, attr, obj)
 
-    def snapshot(self) -> dict:
+    def snapshot(self) -> dict[str, Any]:
         dct = super().snapshot()
         for attr in self.__attrs__():
             obj = getattr(self, attr)
@@ -439,7 +453,7 @@ class _AutoSnapshotEvent(RelationEvent):
 
         return dct
 
-    def restore(self, snapshot: dict) -> None:
+    def restore(self, snapshot: dict[str, Any]) -> None:
         super().restore(snapshot)
         for attr, obj in snapshot.items():
             setattr(self, attr, obj)
@@ -499,7 +513,7 @@ def _validate_relation_by_interface_and_direction(
     relation_name: str,
     expected_relation_interface: str,
     expected_relation_role: RelationRole,
-):
+) -> None:
     """Validate a relation.
 
     Verifies that the `relation_name` provided: (1) exists in metadata.yaml,
@@ -558,7 +572,7 @@ class RequestEvent(RelationEvent):
     """Event emitted when a remote requests a tracing endpoint."""
 
     @property
-    def requested_receivers(self) -> List[ReceiverProtocol]:
+    def requested_receivers(self) -> list[ReceiverProtocol]:
         """List of receiver protocols that have been requested."""
         relation = self.relation
         app = relation.app
@@ -631,16 +645,16 @@ class TracingEndpointProvider(Object):
             self._on_relation_broken_event,
         )
 
-    def _on_relation_broken_event(self, e: RelationBrokenEvent):
+    def _on_relation_broken_event(self, e: RelationBrokenEvent) -> None:
         """Handle relation broken events."""
         self.on.broken.emit(e.relation)
 
-    def _on_relation_event(self, e: RelationEvent):
+    def _on_relation_event(self, e: RelationEvent) -> None:
         """Handle relation created/joined/changed events."""
         if self.is_requirer_ready(e.relation):
             self.on.request.emit(e.relation)
 
-    def is_requirer_ready(self, relation: Relation):
+    def is_requirer_ready(self, relation: Relation) -> bool:
         """Attempt to determine if requirer has already populated app data."""
         try:
             self._get_requested_protocols(relation)
@@ -649,7 +663,7 @@ class TracingEndpointProvider(Object):
         return True
 
     @staticmethod
-    def _get_requested_protocols(relation: Relation):
+    def _get_requested_protocols(relation: Relation) -> list[ReceiverProtocol]:
         app = relation.app
         if not app:
             raise NotReadyError("relation.app is None")
@@ -661,9 +675,9 @@ class TracingEndpointProvider(Object):
             raise NotReadyError()
         return databag.receivers
 
-    def requested_protocols(self):
+    def requested_protocols(self) -> set[ReceiverProtocol]:
         """All receiver protocols that have been requested by our related apps."""
-        requested_protocols = set()
+        requested_protocols: set[ReceiverProtocol] = set()
         for relation in self.relations:
             try:
                 protocols = self._get_requested_protocols(relation)
@@ -673,11 +687,11 @@ class TracingEndpointProvider(Object):
         return requested_protocols
 
     @property
-    def relations(self) -> List[Relation]:
+    def relations(self) -> list[Relation]:
         """All relations active on this endpoint."""
         return self._charm.model.relations[self._relation_name]
 
-    def publish_receivers(self, receivers: Sequence[RawReceiver]):
+    def publish_receivers(self, receivers: Sequence[RawReceiver]) -> None:
         """Let all requirers know that these receivers are active and listening."""
         if not self._charm.unit.is_leader():
             raise RuntimeError("only leader can do this")
@@ -723,10 +737,10 @@ class EndpointChangedEvent(_AutoSnapshotEvent):
     __args__ = ("_receivers",)
 
     if TYPE_CHECKING:
-        _receivers = []  # type: List[dict]
+        _receivers = []  # type: list[dict]
 
     @property
-    def receivers(self) -> List[Receiver]:
+    def receivers(self) -> list[Receiver]:
         """Cast receivers back from dict."""
         return [Receiver(**i) for i in self._receivers]
 
@@ -747,7 +761,7 @@ class TracingEndpointRequirer(Object):
         self,
         charm: CharmBase,
         relation_name: str = DEFAULT_RELATION_NAME,
-        protocols: Optional[List[ReceiverProtocol]] = None,
+        protocols: Optional[list[ReceiverProtocol]] = None,
     ):
         """Construct a tracing requirer for a Tempo charm.
 
@@ -809,7 +823,7 @@ class TracingEndpointRequirer(Object):
 
     def request_protocols(
         self, protocols: Sequence[ReceiverProtocol], relation: Optional[Relation] = None
-    ):
+    ) -> None:
         """Publish the list of protocols which the provider should activate."""
         # todo: should we check if _is_single_endpoint and len(self.relations) > 1 and raise, here?
         relations = [relation] if relation else self.relations
@@ -829,7 +843,7 @@ class TracingEndpointRequirer(Object):
             raise DataAccessPermissionError("only leaders can request_protocols")
 
     @property
-    def relations(self) -> List[Relation]:
+    def relations(self) -> list[Relation]:
         """The tracing relations associated with this endpoint."""
         return self._charm.model.relations[self._relation_name]
 
@@ -847,7 +861,7 @@ class TracingEndpointRequirer(Object):
         relations = self.relations
         return relations[0] if relations else None
 
-    def is_ready(self, relation: Optional[Relation] = None):
+    def is_ready(self, relation: Optional[Relation] = None) -> bool:
         """Is this endpoint ready?"""
         relation = relation or self._relation
         if not relation:
@@ -868,7 +882,7 @@ class TracingEndpointRequirer(Object):
             return False
         return True
 
-    def _on_tracing_relation_changed(self, event):
+    def _on_tracing_relation_changed(self, event: RelationEvent) -> None:
         """Notify the providers that there is new endpoint information available."""
         relation = event.relation
         if not self.is_ready(relation):
@@ -878,7 +892,7 @@ class TracingEndpointRequirer(Object):
         data = TracingProviderAppData.load(relation.data[relation.app])
         self.on.endpoint_changed.emit(relation, [i.dict() for i in data.receivers])  # type: ignore
 
-    def _on_tracing_relation_broken(self, event: RelationBrokenEvent):
+    def _on_tracing_relation_broken(self, event: RelationBrokenEvent) -> None:
         """Notify the providers that the endpoint is broken."""
         relation = event.relation
         self.on.endpoint_removed.emit(relation)  # type: ignore
@@ -898,7 +912,7 @@ class TracingEndpointRequirer(Object):
         app_data = self.get_all_endpoints(relation)
         if not app_data:
             return None
-        receivers: List[Receiver] = list(
+        receivers: list[Receiver] = list(
             filter(lambda i: i.protocol.name == protocol, app_data.receivers)
         )
         if not receivers:
@@ -956,7 +970,7 @@ class TracingEndpointRequirer(Object):
 # the path forward should be charmlibs.xx.tracing and ops[tracing].
 def charm_tracing_config(
     endpoint_requirer: TracingEndpointRequirer, cert_path: Optional[Union[Path, str]]
-) -> Tuple[Optional[str], Optional[str]]:
+) -> tuple[Optional[str], Optional[str]]:
     """Return the charm_tracing config you likely want.
 
     If no endpoint is provided:
