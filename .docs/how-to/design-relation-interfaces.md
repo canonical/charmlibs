@@ -34,9 +34,9 @@ The developer then updates the unit tests to encode the deliberate choice for ho
 
 The only changes allowed on a published interface are:
 
-- adding a new field, at the top level or nested: this is a new feature that must be communicated by a minor version bump of the library.
-- removing a field: this is a backward-incompatible change, and must be clearly communicated by a major version bump of the library.
-- tweaking field validators or extending or narrowing an enumeration value range: must be done with extra care, including compatibility testing between the old and new versions of the library.
+- Adding a new field, at the top level or nested: this is a new feature that must be communicated by a minor version bump of the library.
+- Removing a field: this is a backward-incompatible change, and must be clearly communicated by a major version bump of the library.
+- Tweaking field validators or extending or narrowing an enumeration value range: must be done with extra care, including compatibility testing between the old and new versions of the library.
 
 ## Design the relation data format
 
