@@ -48,9 +48,9 @@ Field types cannot be narrowed, widened, or changed entirely, because such a fie
 
 The same applies to significant changes to the range of values that a field validator accepts. For example:
 
-- narrowing the set of allowed protocols from any value to HTTP and HTTPS is probably a bug fix, if other protocols such as FTP could not be used by the workload
-- extending an IP address field to accept IPv6 addresses represents a breaking change, because the older remote application is likely to reject the value, potentially making the interface unusable
-- narrowing an IP address field by removing IPv4 addresses represents a breaking change, because if the older remote application sends them, this side of the relation is likely to reject the value, potentially making the interface unusable
+- Narrowing the set of allowed protocols from any value to HTTP and HTTPS is probably a bug fix, if other protocols such as FTP could not be used by the workload.
+- Extending an IP address field to accept IPv6 addresses represents a breaking change. The older remote application is likely to reject an IPv6 address, potentially making the interface unusable.
+- Narrowing an IP address field by removing IPv4 addresses represents a breaking change. If the older remote application sends an IPv4 address, this side of the relation is likely to reject the value, potentially making the interface unusable.
 
 Unexpected enumeration values should be treated as missing (deserialised as `None`) or coerced to a pre-defined catch-all `UNKNOWN` value:
 
