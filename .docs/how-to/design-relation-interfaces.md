@@ -154,7 +154,7 @@ def test_missing_fields(field_to_remove):
 
 ### No field reuse
 
-If a field has been removed from the interface, another field with the very same name must not be added. This rule exists to make field removal possible without the risk of misinterpretation when two applications from different eras are integrated.
+If a field has been removed from the interface, another field with the same name must not be added. This rule exists to make field removal possible without the risk of misinterpretation when two applications from different eras are integrated.
 
 The exception is reverting removal of a field, where the field is brought back with the exact same type and semantics.
 
