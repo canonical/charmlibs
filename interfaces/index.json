@@ -612,7 +612,7 @@
   {
     "name": "valkey_client",
     "version": "1",
-    "lib": "charms.data_platform_libs.data_interfaces",
+    "lib": "dpcharmlibs.interfaces",
     "lib_url": "https://charmhub.io/data-platform-libs/libraries/data_interfaces",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/valkey_client/",
     "summary": "Access Valkey databases with credentials and TLS configuration.",

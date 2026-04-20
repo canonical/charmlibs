@@ -1,7 +1,7 @@
 name: valkey_client
 version: 1
 status: published
-lib: charms.data_platform_libs.data_interfaces
+lib: dpcharmlibs.interfaces
 summary: Access Valkey databases with credentials and TLS configuration.
 description: |
   The `valkey_client` interface allows charms to access Valkey databases with user-specific credentials and TLS configuration.
