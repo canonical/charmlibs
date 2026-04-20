@@ -195,7 +195,7 @@ ctx.run(ctx.on.relation_changed(rel), state_in)
 
 Collections must be represented as arrays of objects on the wire when using the default JSON serialisation.
 
-Collections must be emitted in a stable order, so that setting the same data does not trigger interface bounce. The order must be ignored on reception, and the recipient is expected to discard duplicates. In other words, collections are sets.
+Collections must be emitted in a stable order, so that setting the same data does not trigger spurious relation-changed events. The order must be ignored on reception, and the recipient is expected to discard duplicates. In other words, collections are sets.
 
 Additionally, while empty objects are technically valid, and so are objects with only unknown fields set, the recipient is expected to filter those out for lack of semantic value.
 
