@@ -232,7 +232,7 @@ def test_foos():
 
 Collections of primitive types are strongly discouraged, because they are impossible to extend.
 
-Data maps are strongly discouraged. An exception to this rule is when the data map key is a Juju entity with a well-known string representation, such as a unit name or machine id:
+Data maps are strongly discouraged. An exception to this rule is when the data map key is a Juju entity with a well-known string representation, such as a unit name or machine ID:
 
 ```py
 # This is allowed
