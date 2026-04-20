@@ -210,7 +210,7 @@ SAMPLE_DATABAG = {"endpoints": [
 ]}
 ```
 
-The definition must be accompanied by a unit test, which may look as follows. Note that including a custom validator requires a comprehensive set of unit tests.
+The definition must be accompanied by comprehensive unit tests. A unit test may look like:
 
 ```py
 DATABAG = {"foos": [
