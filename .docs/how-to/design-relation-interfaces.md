@@ -97,7 +97,7 @@ Top-level fields must not be mandatory. Any and all top-level fields may be abse
 
 This implies that the empty relation data must have a valid representation in the interface model.
 In practice, use a single model for both reading and writing.
-That means the writer will naturally materialise the model's default values when writing the relation data.
+That means the writer will use the model's default values when writing the relation data.
 Readers must therefore handle both representations: a field may be absent, or it may be present with the default value.
 
 For new interfaces, prefer representing an absent field as `None`.
