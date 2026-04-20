@@ -6,15 +6,15 @@ from contextlib import nullcontext
 import pytest
 from ops import CharmBase, Framework, RelationBrokenEvent, RelationChangedEvent
 from scenario import Context, Relation, State
+from tempo import Tempo
 
 from charmlibs.interfaces.tracing import (
+    DataAccessPermissionError,
     EndpointChangedEvent,
     EndpointRemovedEvent,
     ProtocolNotRequestedError,
     TracingEndpointRequirer,
-    DataAccessPermissionError,
 )
-from tempo import Tempo
 
 
 class MyCharm(CharmBase):

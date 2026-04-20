@@ -1,8 +1,8 @@
 from unittest.mock import PropertyMock, patch
-import pytest
-from scenario import Relation, State
 
+import pytest
 from charms.tempo_coordinator_k8s.v0.tracing import TracingProviderAppData
+from scenario import Relation, State
 
 
 @pytest.mark.parametrize("leader", (True, False))
@@ -47,12 +47,9 @@ def test_receiver_api(
     # THEN both protocols are in the receivers published in the databag (local side)
 
     r_out = [r for r in state_out.relations if r.id == tracing_http.id][0]
-    assert sorted(
-        [
-            r.protocol.name
-            for r in TracingProviderAppData.load(r_out.local_app_data).receivers
-        ]
-    ) == ["otlp_grpc", "otlp_http"]
+    assert sorted([
+        r.protocol.name for r in TracingProviderAppData.load(r_out.local_app_data).receivers
+    ]) == ["otlp_grpc", "otlp_http"]
 
 
 def test_leader_removes_receivers_on_relation_broken(
@@ -90,12 +87,9 @@ def test_leader_removes_receivers_on_relation_broken(
 
     # THEN otlp_grpc is gone from the databag
     r_out = [r for r in state_out.relations if r.id == tracing_http.id][0]
-    assert sorted(
-        [
-            r.protocol.name
-            for r in TracingProviderAppData.load(r_out.local_app_data).receivers
-        ]
-    ) == ["otlp_http"]
+    assert sorted([
+        r.protocol.name for r in TracingProviderAppData.load(r_out.local_app_data).receivers
+    ]) == ["otlp_http"]
 
 
 @patch(
@@ -127,9 +121,6 @@ def test_publish_receivers(
 
     # THEN, two receiver endpoints should be published using the mocked value of app_hostname
     relation_out = state_out.get_relation(tracing_http.id)
-    assert sorted(
-        [
-            r.url
-            for r in TracingProviderAppData.load(relation_out.local_app_data).receivers
-        ]
-    ) == ["app.hostname:4317", "http://app.hostname:4318"]
+    assert sorted([
+        r.url for r in TracingProviderAppData.load(relation_out.local_app_data).receivers
+    ]) == ["app.hostname:4317", "http://app.hostname:4318"]

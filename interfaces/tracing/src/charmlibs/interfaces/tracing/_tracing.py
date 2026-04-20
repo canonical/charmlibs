@@ -62,9 +62,7 @@ class TransportProtocolType(str, enum.Enum):
     grpc = "grpc"
 
 
-receiver_protocol_to_transport_protocol: dict[
-    ReceiverProtocol, TransportProtocolType
-] = {
+receiver_protocol_to_transport_protocol: dict[ReceiverProtocol, TransportProtocolType] = {
     "zipkin": TransportProtocolType.http,
     "otlp_grpc": TransportProtocolType.grpc,
     "otlp_http": TransportProtocolType.http,
@@ -115,9 +113,7 @@ if int(pydantic.version.VERSION.split(".")[0]) < 2:
         _NEST_UNDER = None
 
         @classmethod
-        def load(
-            cls: type[_DatabagModelT], databag: MutableMapping[str, str]
-        ) -> _DatabagModelT:
+        def load(cls: type[_DatabagModelT], databag: MutableMapping[str, str]) -> _DatabagModelT:
             """Load this model from a Juju databag."""
             if cls._NEST_UNDER:
                 return cls.parse_obj(json.loads(databag[cls._NEST_UNDER]))
@@ -186,9 +182,7 @@ else:
         """Pydantic config."""
 
         @classmethod
-        def load(
-            cls: type[_DatabagModelT], databag: MutableMapping[str, str]
-        ) -> _DatabagModelT:
+        def load(cls: type[_DatabagModelT], databag: MutableMapping[str, str]) -> _DatabagModelT:
             """Load this model from a Juju databag."""
             nest_under = cls.model_config.get("_NEST_UNDER")  # type: ignore
             if nest_under:
@@ -340,9 +334,7 @@ class _AutoSnapshotEvent(RelationEvent):
     def __attrs__(cls) -> tuple[str, ...]:
         return cls.__args__ + tuple(cls.__optional_kwargs__.keys())
 
-    def __init__(
-        self, handle: Any, relation: Relation, *args: Any, **kwargs: Any
-    ) -> None:
+    def __init__(self, handle: Any, relation: Relation, *args: Any, **kwargs: Any) -> None:
         super().__init__(handle, relation)
 
         if not len(self.__args__) == len(args):
@@ -396,8 +388,10 @@ class RelationInterfaceMismatchError(Exception):
         self.relation_name = relation_name
         self.expected_relation_interface = expected_relation_interface
         self.actual_relation_interface = actual_relation_interface
-        self.message = (f"The {relation_name!r} relation has {actual_relation_interface!r} as "
-        f"interface rather than the expected {expected_relation_interface!r}")
+        self.message = (
+            f"The {relation_name!r} relation has {actual_relation_interface!r} as "
+            f"interface rather than the expected {expected_relation_interface!r}"
+        )
 
         super().__init__(self.message)
 
@@ -477,9 +471,7 @@ def _validate_relation_by_interface_and_direction(
                 relation_name, RelationRole.requires, RelationRole.provides
             )
     else:
-        raise TypeError(
-            f"Unexpected RelationDirection: {expected_relation_role}"
-        )
+        raise TypeError(f"Unexpected RelationDirection: {expected_relation_role}")
 
 
 class RequestEvent(RelationEvent):
@@ -629,8 +621,8 @@ class TracingEndpointProvider(Object):
                 # args are bytes
                 msg = e.args[0]
                 if isinstance(msg, bytes) and msg.startswith(
-                        b"ERROR cannot read relation application settings: permission denied"
-                    ):
+                    b"ERROR cannot read relation application settings: permission denied"
+                ):
                     logger.error(
                         "encountered error %s while attempting to update_relation_data."
                         "The relation must be gone.",
@@ -716,9 +708,7 @@ class TracingEndpointRequirer(Object):
         self._relation_name = relation_name
 
         events = self._charm.on[self._relation_name]
-        self.framework.observe(
-            events.relation_changed, self._on_tracing_relation_changed
-        )
+        self.framework.observe(events.relation_changed, self._on_tracing_relation_changed)
         self.framework.observe(events.relation_broken, self._on_tracing_relation_broken)
 
         if protocols and self._charm.unit.is_leader():
@@ -811,18 +801,14 @@ class TracingEndpointRequirer(Object):
         relation = event.relation
         self.on.endpoint_removed.emit(relation)  # type: ignore
 
-    def get_all_endpoints(
-        self, relation: Relation | None = None
-    ) -> TracingProviderAppData | None:
+    def get_all_endpoints(self, relation: Relation | None = None) -> TracingProviderAppData | None:
         """Unmarshalled relation data."""
         relation = relation or self._relation
         if not self.is_ready(relation):
             return
         return TracingProviderAppData.load(relation.data[relation.app])  # type: ignore
 
-    def _get_endpoint(
-        self, relation: Relation | None, protocol: ReceiverProtocol
-    ) -> str | None:
+    def _get_endpoint(self, relation: Relation | None, protocol: ReceiverProtocol) -> str | None:
         app_data = self.get_all_endpoints(relation)
         if not app_data:
             return None
@@ -868,9 +854,7 @@ class TracingEndpointRequirer(Object):
             relations = [relation] if relation else self.relations
             for relation in relations:
                 try:
-                    databag = TracingRequirerAppData.load(
-                        relation.data[self._charm.app]
-                    )
+                    databag = TracingRequirerAppData.load(relation.data[self._charm.app])
                 except DataValidationError:
                     continue
 
