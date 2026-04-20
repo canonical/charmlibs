@@ -1,3 +1,9 @@
+---
+myst:
+  html_meta:
+    description: Follow the design rules for relation interfaces between charms, so that interfaces can evolve without causing breaking changes or downtime. 
+---
+
 (design-relation-interfaces)=
 # How to design relation interfaces
 % Based on: OP083 - Relation Interface Design
