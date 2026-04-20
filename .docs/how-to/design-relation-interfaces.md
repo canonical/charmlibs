@@ -162,7 +162,7 @@ def test_missing_fields(field_to_remove):
 
 If a field has been removed from the interface, another field with the same name must not be added. This rule exists to make field removal possible without the risk of misinterpretation when two applications from different eras are integrated.
 
-The exception is reverting removal of a field, where the field is brought back with the exact same type and semantics.
+The exception is reverting removal of a field, where the field is brought back with identical type and semantics.
 
 Field reuse must be prevented, either by keeping a unit test after removal:
 
