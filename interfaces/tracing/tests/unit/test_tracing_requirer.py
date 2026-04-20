@@ -1,12 +1,11 @@
 # Copyright 2026 Canonical Ltd.
-
 import socket
 from contextlib import nullcontext
+from typing import TypeAlias
 
+import ops
+import ops.testing
 import pytest
-from ops import CharmBase, Framework, RelationBrokenEvent, RelationChangedEvent
-from scenario import Context, Relation, State
-from tempo import Tempo
 
 from charmlibs.interfaces.tracing import (
     DataAccessPermissionError,
@@ -17,19 +16,22 @@ from charmlibs.interfaces.tracing import (
 )
 
 
-class MyCharm(CharmBase):
-    def __init__(self, framework: Framework):
+class MyCharm(ops.CharmBase):
+    def __init__(self, framework: ops.Framework):
         super().__init__(framework)
         self.tracing = TracingEndpointRequirer(self, protocols=["otlp_grpc"])
         framework.observe(self.tracing.on.endpoint_changed, self._on_endpoint_changed)
 
-    def _on_endpoint_changed(self, e):
+    def _on_endpoint_changed(self, e: EndpointChangedEvent):
         pass
+
+
+Context: TypeAlias = ops.testing.Context[MyCharm]
 
 
 @pytest.fixture
 def context():
-    return Context(
+    return ops.testing.Context(
         charm_type=MyCharm,
         meta={
             "name": "jolly",
@@ -39,17 +41,15 @@ def context():
 
 
 @pytest.mark.parametrize("leader", (True, False))
-def test_requirer_api(context, leader):
+def test_requirer_api(context: Context, leader: bool):
     host = socket.getfqdn()
-    tracing = Relation(
-        "tracing",
-        remote_app_data={
-            "receivers": f'[{{"protocol": {{"name": "otlp_grpc", "type": "grpc"}}, "url": "{host}:4317"}}, '
-            f'{{"protocol": {{"name": "otlp_http", "type": "http"}}, "url": "http://{host}:4318"}}, '
-            f'{{"protocol": {{"name": "zipkin", "type": "http"}}, "url": "http://{host}:9411" }}]',
-        },
+    recv = (
+        f'[{{"protocol": {{"name": "otlp_grpc", "type": "grpc"}}, "url": "{host}:4317"}}, '
+        f'{{"protocol": {{"name": "otlp_http", "type": "http"}}, "url": "http://{host}:4318"}}, '
+        f'{{"protocol": {{"name": "zipkin", "type": "http"}}, "url": "http://{host}:9411" }}]'
     )
-    state = State(leader=leader, relations=[tracing])
+    tracing = ops.testing.Relation("tracing", remote_app_data={"receivers": recv})
+    state = ops.testing.State(leader=leader, relations=[tracing])
 
     with context(context.on.relation_changed(tracing), state) as mgr:
         charm = mgr.charm
@@ -60,7 +60,7 @@ def test_requirer_api(context, leader):
         rel = charm.model.get_relation("tracing")
         assert charm.tracing.is_ready(rel)
 
-    rchanged, epchanged = context.emitted_events
+    _rchanged, epchanged = context.emitted_events
     assert isinstance(epchanged, EndpointChangedEvent)
     assert epchanged.receivers[0].protocol.name == "otlp_grpc"
     assert epchanged.receivers[1].protocol.name == "otlp_http"
@@ -68,17 +68,15 @@ def test_requirer_api(context, leader):
 
 
 @pytest.mark.parametrize("leader", (True, False))
-def test_requirer_api_with_internal_scheme(context, leader):
+def test_requirer_api_with_internal_scheme(context: Context, leader: bool):
     host = socket.getfqdn()
-    tracing = Relation(
-        "tracing",
-        remote_app_data={
-            "receivers": f'[{{"protocol": {{"name": "otlp_grpc", "type": "grpc"}} , "url": "{host}:4317"}}, '
-            f'{{"protocol": {{"name": "otlp_http", "type": "http"}}, "url": "https://{host}:4318"}}, '
-            f'{{"protocol": {{"name": "zipkin", "type": "http"}}, "url":  "https://{host}:9411"}}]',
-        },
+    recv = (
+        f'[{{"protocol": {{"name": "otlp_grpc", "type": "grpc"}} , "url": "{host}:4317"}}, '
+        f'{{"protocol": {{"name": "otlp_http", "type": "http"}}, "url": "https://{host}:4318"}}, '
+        f'{{"protocol": {{"name": "zipkin", "type": "http"}}, "url":  "https://{host}:9411"}}]'
     )
-    state = State(leader=leader, relations=[tracing])
+    tracing = ops.testing.Relation("tracing", remote_app_data={"receivers": recv})
+    state = ops.testing.State(leader=leader, relations=[tracing])
 
     with context(context.on.relation_changed(tracing), state) as mgr:
         charm = mgr.charm
@@ -89,24 +87,22 @@ def test_requirer_api_with_internal_scheme(context, leader):
         rel = charm.model.get_relation("tracing")
         assert charm.tracing.is_ready(rel)
 
-    rchanged, epchanged = context.emitted_events
+    _rchanged, epchanged = context.emitted_events
     assert isinstance(epchanged, EndpointChangedEvent)
     assert epchanged.receivers[0].protocol.name == "otlp_grpc"
 
 
 @pytest.mark.parametrize("leader", (True, False))
-def test_ingressed_requirer_api(context, leader):
+def test_ingressed_requirer_api(context: Context, leader: bool):
     # WHEN external_url is present in remote app databag
     external_url = "http://1.2.3.4"
-    tracing = Relation(
-        "tracing",
-        remote_app_data={
-            "receivers": f'[{{"protocol": {{"name": "otlp_grpc", "type": "grpc"}}, "url": "{external_url.split("://")[1]}:4317" }}, '
-            f'{{"protocol": {{"name": "otlp_http", "type": "http"}} , "url": "{external_url}:4318" }}, '
-            f'{{"protocol": {{"name": "zipkin", "type": "http"}} , "url": "{external_url}:9411" }}]',
-        },
+    recv = (
+        '[{{"protocol": {{"name": "otlp_grpc", "type": "grpc"}}, "url": "1.2.3.4:4317" }}, '
+        '{{"protocol": {{"name": "otlp_http", "type": "http"}} , "url": "http://1.2.3.4:4318" }}, '
+        '{{"protocol": {{"name": "zipkin", "type": "http"}} , "url": "http://1.2.3.4:9411" }}]'
     )
-    state = State(leader=leader, relations=[tracing])
+    tracing = ops.testing.Relation("tracing", remote_app_data={"receivers": recv})
+    state = ops.testing.State(leader=leader, relations=[tracing])
 
     # THEN get_endpoint uses external URL instead of the host
     with context(context.on.relation_changed(tracing), state) as mgr:
@@ -151,12 +147,12 @@ def test_ingressed_requirer_api(context, leader):
     ),
 )
 @pytest.mark.parametrize("leader", (True, False))
-def test_invalid_data(context, data, leader):
-    tracing = Relation(
+def test_invalid_data(context: Context, data: dict[str, str], leader: bool):
+    tracing = ops.testing.Relation(
         "tracing",
         remote_app_data=data,
     )
-    state = State(leader=leader, relations=[tracing])
+    state = ops.testing.State(leader=leader, relations=[tracing])
 
     with context(context.on.relation_changed(tracing), state) as mgr:
         charm = mgr.charm
@@ -167,29 +163,29 @@ def test_invalid_data(context, data, leader):
     emitted_events = context.emitted_events
     assert len(emitted_events) == 2
     rchanged, rremoved = emitted_events
-    assert isinstance(rchanged, RelationChangedEvent)
+    assert isinstance(rchanged, ops.RelationChangedEvent)
     assert isinstance(rremoved, EndpointRemovedEvent)
 
 
 @pytest.mark.parametrize("leader", (True, False))
-def test_broken(context, leader):
-    tracing = Relation("tracing")
-    state = State(leader=leader, relations=[tracing])
+def test_broken(context: Context, leader: bool):
+    tracing = ops.testing.Relation("tracing")
+    state = ops.testing.State(leader=leader, relations=[tracing])
 
     context.run(context.on.relation_broken(tracing), state)
 
     emitted_events = context.emitted_events
     assert len(emitted_events) == 2
     rchanged, ebroken = emitted_events
-    assert isinstance(rchanged, RelationBrokenEvent)
+    assert isinstance(rchanged, ops.RelationBrokenEvent)
     assert isinstance(ebroken, EndpointRemovedEvent)
 
 
 @pytest.mark.parametrize("leader", (True, False))
-def test_requested_not_yet_replied(context, leader):
+def test_requested_not_yet_replied(context: Context, leader: bool):
     # GIVEN an empty tracing relation
-    tracing = Relation("tracing")
-    state = State(leader=leader, relations=[tracing])
+    tracing = ops.testing.Relation("tracing")
+    state = ops.testing.State(leader=leader, relations=[tracing])
 
     # WHEN we receive a created event
     with context(context.on.relation_created(tracing), state) as mgr:
@@ -207,9 +203,9 @@ def test_requested_not_yet_replied(context, leader):
 
 
 @pytest.mark.parametrize("leader", (True, False))
-def test_not_requested_raises(context, leader):
-    tracing = Relation("tracing")
-    state = State(leader=leader, relations=[tracing])
+def test_not_requested_raises(context: Context, leader: bool):
+    tracing = ops.testing.Relation("tracing")
+    state = ops.testing.State(leader=leader, relations=[tracing])
 
     with context(context.on.relation_created(tracing), state) as mgr:
         charm = mgr.charm

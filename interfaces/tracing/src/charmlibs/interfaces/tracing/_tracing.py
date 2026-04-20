@@ -17,19 +17,7 @@ from ops.charm import (
 )
 from ops.framework import EventSource, Object
 from ops.model import ModelError, Relation
-from pydantic import BaseModel, Field
-
-# The unique Charmhub library identifier, never change it
-LIBID = "d2f02b1f8d1244b5989fd55bc3a28943"
-
-# Increment this major API version when introducing breaking changes
-LIBAPI = 0
-
-# Increment this PATCH version before using `charmcraft publish-lib` or reset
-# to 0 if you are raising the major API version
-LIBPATCH = 11
-
-PYDEPS = ["pydantic"]
+from pydantic import BaseModel, ConfigDict, Field
 
 logger = logging.getLogger(__name__)
 
@@ -96,149 +84,79 @@ class AmbiguousRelationUsageError(TracingError):
     """Raised when one wrongly assumes that there can only be one relation on an endpoint."""
 
 
-if int(pydantic.version.VERSION.split(".")[0]) < 2:
 
-    class DatabagModel(BaseModel):  # type: ignore
-        """Base databag model."""
+class DatabagModel(BaseModel):
+    """Base databag model."""
 
-        class Config:
-            """Pydantic config."""
+    model_config = ConfigDict(
+        # ignore any extra fields in the databag
+        extra="ignore",
+        # Allow instantiating this class by field name (instead of forcing alias).
+        populate_by_name=True,
+        # Custom config key: whether to nest the whole datastructure (as json)
+        # under a field or spread it out at the toplevel.
+        _NEST_UNDER=None,  # type: ignore
+    )
+    """Pydantic config."""
 
-            # ignore any extra fields in the databag
-            extra = "ignore"
-            """Ignore any extra fields in the databag."""
-            allow_population_by_field_name = True
-            """Allow instantiating this class by field name (instead of forcing alias)."""
+    @classmethod
+    def load(cls: type[_DatabagModelT], databag: MutableMapping[str, str]) -> _DatabagModelT:
+        """Load this model from a Juju databag."""
+        nest_under = cls.model_config.get("_NEST_UNDER")  # type: ignore
+        if nest_under:
+            return cls.model_validate(json.loads(databag[nest_under]))  # type: ignore
 
-        _NEST_UNDER = None
+        try:
+            data = {
+                k: json.loads(v)
+                for k, v in databag.items()
+                # Don't attempt to parse model-external values
+                if k in {(f.alias or n) for n, f in cls.__fields__.items()}
+            }
+        except json.JSONDecodeError as e:
+            msg = f"invalid databag contents: expecting json. {databag}"
+            logger.error(msg)
+            raise DataValidationError(msg) from e
 
-        @classmethod
-        def load(cls: type[_DatabagModelT], databag: MutableMapping[str, str]) -> _DatabagModelT:
-            """Load this model from a Juju databag."""
-            if cls._NEST_UNDER:
-                return cls.parse_obj(json.loads(databag[cls._NEST_UNDER]))
+        try:
+            return cls.model_validate_json(json.dumps(data))  # type: ignore
+        except pydantic.ValidationError as e:
+            msg = f"failed to validate databag: {databag}"
+            logger.debug(msg, exc_info=True)
+            raise DataValidationError(msg) from e
 
-            try:
-                data = {
-                    k: json.loads(v)
-                    for k, v in databag.items()
-                    # Don't attempt to parse model-external values
-                    if k in {f.alias for f in cls.__fields__.values()}
-                }
-            except json.JSONDecodeError as e:
-                msg = f"invalid databag contents: expecting json. {databag}"
-                logger.error(msg)
-                raise DataValidationError(msg) from e
+    def dump(
+        self,
+        databag: MutableMapping[str, str] | None = None,
+        clear: bool = True,
+    ) -> MutableMapping[str, str]:
+        """Write the contents of this model to Juju databag.
 
-            try:
-                return cls.parse_raw(json.dumps(data))  # type: ignore
-            except pydantic.ValidationError as e:
-                msg = f"failed to validate databag: {databag}"
-                logger.debug(msg, exc_info=True)
-                raise DataValidationError(msg) from e
+        :param databag: the databag to write the data to.
+        :param clear: ensure the databag is cleared before writing it.
+        """
+        if clear and databag:
+            databag.clear()
 
-        def dump(
-            self,
-            databag: MutableMapping[str, str] | None = None,
-            clear: bool = True,
-        ) -> MutableMapping[str, str]:
-            """Write the contents of this model to Juju databag.
-
-            :param databag: the databag to write the data to.
-            :param clear: ensure the databag is cleared before writing it.
-            """
-            if clear and databag:
-                databag.clear()
-
-            if databag is None:
-                databag = {}
-
-            if self._NEST_UNDER:
-                databag[self._NEST_UNDER] = self.json(by_alias=True)
-                return databag
-
-            dct = self.dict()
-            for key, field in self.__fields__.items():  # type: ignore
-                value = dct[key]
-                databag[field.alias or key] = json.dumps(value)
-
+        if databag is None:
+            databag = {}
+        nest_under = self.model_config.get("_NEST_UNDER")
+        if nest_under:
+            databag[nest_under] = self.model_dump_json(  # type: ignore
+                by_alias=True,
+                # skip keys whose values are default
+                exclude_defaults=True,
+            )
             return databag
 
-else:
-    from pydantic import ConfigDict
+        dct = self.model_dump()  # type: ignore
+        for key, field in self.model_fields.items():  # type: ignore
+            value = dct[key]
+            if value == field.default:
+                continue
+            databag[field.alias or key] = json.dumps(value)
 
-    class DatabagModel(BaseModel):
-        """Base databag model."""
-
-        model_config = ConfigDict(
-            # ignore any extra fields in the databag
-            extra="ignore",
-            # Allow instantiating this class by field name (instead of forcing alias).
-            populate_by_name=True,
-            # Custom config key: whether to nest the whole datastructure (as json)
-            # under a field or spread it out at the toplevel.
-            _NEST_UNDER=None,  # type: ignore
-        )
-        """Pydantic config."""
-
-        @classmethod
-        def load(cls: type[_DatabagModelT], databag: MutableMapping[str, str]) -> _DatabagModelT:
-            """Load this model from a Juju databag."""
-            nest_under = cls.model_config.get("_NEST_UNDER")  # type: ignore
-            if nest_under:
-                return cls.model_validate(json.loads(databag[nest_under]))  # type: ignore
-
-            try:
-                data = {
-                    k: json.loads(v)
-                    for k, v in databag.items()
-                    # Don't attempt to parse model-external values
-                    if k in {(f.alias or n) for n, f in cls.__fields__.items()}
-                }
-            except json.JSONDecodeError as e:
-                msg = f"invalid databag contents: expecting json. {databag}"
-                logger.error(msg)
-                raise DataValidationError(msg) from e
-
-            try:
-                return cls.model_validate_json(json.dumps(data))  # type: ignore
-            except pydantic.ValidationError as e:
-                msg = f"failed to validate databag: {databag}"
-                logger.debug(msg, exc_info=True)
-                raise DataValidationError(msg) from e
-
-        def dump(
-            self,
-            databag: MutableMapping[str, str] | None = None,
-            clear: bool = True,
-        ) -> MutableMapping[str, str]:
-            """Write the contents of this model to Juju databag.
-
-            :param databag: the databag to write the data to.
-            :param clear: ensure the databag is cleared before writing it.
-            """
-            if clear and databag:
-                databag.clear()
-
-            if databag is None:
-                databag = {}
-            nest_under = self.model_config.get("_NEST_UNDER")
-            if nest_under:
-                databag[nest_under] = self.model_dump_json(  # type: ignore
-                    by_alias=True,
-                    # skip keys whose values are default
-                    exclude_defaults=True,
-                )
-                return databag
-
-            dct = self.model_dump()  # type: ignore
-            for key, field in self.model_fields.items():  # type: ignore
-                value = dct[key]
-                if value == field.default:
-                    continue
-                databag[field.alias or key] = json.dumps(value)
-
-            return databag
+        return databag
 
 
 # todo use models from charm-relation-interfaces
