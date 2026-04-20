@@ -804,7 +804,7 @@ def charm_tracing_config(
 
     Usage:
     >>> from lib.charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
-    >>> from lib.charms.tempo_coordinator_k8s.v0.tracing import charm_tracing_config
+    >>> from charmlibs.interfaces.tracing import charm_tracing_config
     >>> @trace_charm(tracing_endpoint="my_endpoint", cert_path="cert_path")
     >>> class MyCharm(...):
     >>>     _cert_path = "/path/to/cert/on/charm/container.crt"

@@ -1,3 +1,4 @@
+# Copyright 2026 Canonical Ltd.
 import json
 import socket
 from dataclasses import replace

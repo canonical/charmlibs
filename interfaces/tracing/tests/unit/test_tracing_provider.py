@@ -1,7 +1,8 @@
+# Copyright 2026 Canonical Ltd.
 from unittest.mock import PropertyMock, patch
 
 import pytest
-from charms.tempo_coordinator_k8s.v0.tracing import TracingProviderAppData
+from charmlibs.interfaces.tracing import TracingProviderAppData
 from scenario import Relation, State
 
 

@@ -22,7 +22,7 @@ object only requires instantiating it, typically in the constructor of your char
 
 
 ```py
-from charms.tempo_coordinator_k8s.v0.tracing import TracingEndpointRequirer
+from charmlibs.interfaces.tracing import TracingEndpointRequirer
 
 def __init__(self, *args):
     super().__init__(*args)
@@ -69,7 +69,7 @@ For example a Tempo charm may instantiate the `TracingEndpointProvider` in its c
 follows
 
 ```py
-from charms.tempo_coordinator_k8s.v0.tracing import TracingEndpointProvider
+from charmlibs.interfaces.tracing import TracingEndpointProvider
 
 def __init__(self, *args):
     super().__init__(*args)
