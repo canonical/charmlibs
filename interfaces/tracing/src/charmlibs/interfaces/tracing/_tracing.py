@@ -5,7 +5,7 @@ import json
 import logging
 from collections.abc import MutableMapping, Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast
+from typing import Any, Literal, TypeVar, cast
 
 import pydantic
 from ops.charm import (
@@ -101,16 +101,16 @@ class DatabagModel(BaseModel):
     @classmethod
     def load(cls: type[_DatabagModelT], databag: MutableMapping[str, str]) -> _DatabagModelT:
         """Load this model from a Juju databag."""
-        nest_under = cls.model_config.get("_NEST_UNDER")  # type: ignore
+        nest_under = cls.model_config.get("_NEST_UNDER")
         if nest_under:
-            return cls.model_validate(json.loads(databag[nest_under]))  # type: ignore
+            return cls.model_validate(json.loads(databag[nest_under]))
 
         try:
             data = {
                 k: json.loads(v)
                 for k, v in databag.items()
                 # Don't attempt to parse model-external values
-                if k in {(f.alias or n) for n, f in cls.__fields__.items()}
+                if k in {(f.alias or n) for n, f in cls.field_names.items()}  # type: ignore
             }
         except json.JSONDecodeError as e:
             msg = f"invalid databag contents: expecting json. {databag}"
@@ -118,7 +118,7 @@ class DatabagModel(BaseModel):
             raise DataValidationError(msg) from e
 
         try:
-            return cls.model_validate_json(json.dumps(data))  # type: ignore
+            return cls.model_validate_json(json.dumps(data))
         except pydantic.ValidationError as e:
             msg = f"failed to validate databag: {databag}"
             logger.debug(msg, exc_info=True)
@@ -141,14 +141,14 @@ class DatabagModel(BaseModel):
             databag = {}
         nest_under = self.model_config.get("_NEST_UNDER")
         if nest_under:
-            databag[nest_under] = self.model_dump_json(  # type: ignore
+            databag[nest_under] = self.model_dump_json(
                 by_alias=True,
                 # skip keys whose values are default
                 exclude_defaults=True,
             )
             return databag
 
-        dct = self.model_dump()  # type: ignore
+        dct = self.model_dump()
         for key, field in self.model_fields.items():  # type: ignore
             value = dct[key]
             if value == field.default:
@@ -188,7 +188,7 @@ else:
     class ProtocolType(BaseModel):
         """Protocol Type."""
 
-        model_config = ConfigDict(  # type: ignore
+        model_config = ConfigDict(
             # Allow serializing enum values.
             use_enum_values=True
         )
@@ -558,13 +558,10 @@ class EndpointChangedEvent(_AutoSnapshotEvent):
 
     __args__ = ("_receivers",)
 
-    if TYPE_CHECKING:
-        _receivers = []  # type: list[dict]
-
     @property
     def receivers(self) -> list[Receiver]:
         """Cast receivers back from dict."""
-        return [Receiver(**i) for i in self._receivers]
+        return [Receiver(**i) for i in self._receivers]  # type: ignore
 
 
 class TracingEndpointRequirerEvents(CharmEvents):
@@ -688,9 +685,6 @@ class TracingEndpointRequirer(Object):
         if not relation:
             logger.debug("no relation on %r: tracing not ready", self._relation_name)
             return False
-        if relation.data is None:
-            logger.error("relation data is None for %s", relation)
-            return False
         if not relation.app:
             logger.error("%s event received but there is no relation.app", relation)
             return False
@@ -707,7 +701,7 @@ class TracingEndpointRequirer(Object):
         """Notify the providers that there is new endpoint information available."""
         relation = event.relation
         if not self.is_ready(relation):
-            self.on.endpoint_removed.emit(relation)  # type: ignore
+            self.on.endpoint_removed.emit(relation)
             return
 
         data = TracingProviderAppData.load(relation.data[relation.app])
@@ -716,7 +710,7 @@ class TracingEndpointRequirer(Object):
     def _on_tracing_relation_broken(self, event: RelationBrokenEvent) -> None:
         """Notify the providers that the endpoint is broken."""
         relation = event.relation
-        self.on.endpoint_removed.emit(relation)  # type: ignore
+        self.on.endpoint_removed.emit(relation)
 
     def get_all_endpoints(self, relation: Relation | None = None) -> TracingProviderAppData | None:
         """Unmarshalled relation data."""
@@ -766,7 +760,7 @@ class TracingEndpointRequirer(Object):
         """
         endpoint = self._get_endpoint(relation or self._relation, protocol=protocol)
         if not endpoint:
-            requested_protocols = set()
+            requested_protocols: set[ReceiverProtocol] = set()
             relations = [relation] if relation else self.relations
             for relation in relations:
                 try:
