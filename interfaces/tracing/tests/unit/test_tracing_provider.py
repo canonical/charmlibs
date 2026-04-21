@@ -1,10 +1,14 @@
 # Copyright 2026 Canonical Ltd.
-from unittest.mock import PropertyMock, patch
+from typing import TypeAlias
 
+import ops.testing
 import pytest
-from scenario import Relation, State
 
-from charmlibs.interfaces.tracing import TracingProviderAppData
+from charmlibs.interfaces.tracing import (
+    ReceiverProtocol,
+    TracingEndpointProvider,
+    TracingProviderAppData,
+)
 
 RECV_GRPC = (
     '[{"protocol": {"name": "otlp_grpc", "type": "grpc"} , "url": "foo.com:10"}, '
@@ -16,31 +20,50 @@ RECV_HTTP = (
 )
 
 
+class MyCharm(ops.CharmBase):
+    external_url: str = "default-host.example"
+
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+        self.tracing = TracingEndpointProvider(self, external_url=self.external_url)
+
+    def todo(self):
+        requested_protocols = set(self.tracing.requested_protocols())
+        requested_receivers = requested_protocols
+        if self.unit.is_leader():
+            self.tracing.publish_receivers(
+                [(p, self.get_receiver_url(p)) for p in requested_receivers]
+            )
+
+    def get_receiver_url(self, protocol: ReceiverProtocol) -> str:
+        if protocol == "otlp_grpc":
+            return f"{self.external_url}:10"
+        elif protocol == "otlp_http":
+            return f"http://{self.external_url}:11"
+        else:
+            raise ValueError("unsupported")
+
+
+Context: TypeAlias = ops.testing.Context[MyCharm]
+
+
 @pytest.mark.parametrize("leader", (True, False))
-def test_receiver_api(
-    context,
-    s3,
-    all_worker,
-    nginx_container,
-    nginx_prometheus_exporter_container,
-    leader,
-):
+def test_receiver_api(context: Context, leader: bool):
     # GIVEN two incoming tracing relations asking for otlp grpc and http respectively
-    tracing_grpc = Relation(
+    tracing_grpc = ops.testing.Relation(
         "tracing",
         remote_app_data={"receivers": '["otlp_grpc"]'},
         local_app_data={"receivers": RECV_GRPC},
     )
-    tracing_http = Relation(
+    tracing_http = ops.testing.Relation(
         "tracing",
         remote_app_data={"receivers": '["otlp_http"]'},
         local_app_data={"receivers": RECV_HTTP},
     )
 
-    state = State(
+    state = ops.testing.State(
         leader=leader,
-        relations=[tracing_grpc, tracing_http, s3, all_worker],
-        containers=[nginx_container, nginx_prometheus_exporter_container],
+        relations=[tracing_grpc, tracing_http],
     )
 
     # WHEN any event occurs
@@ -57,25 +80,22 @@ def test_receiver_api(
     ]) == ["otlp_grpc", "otlp_http"]
 
 
-def test_leader_removes_receivers_on_relation_broken(
-    context, s3, all_worker, nginx_container, nginx_prometheus_exporter_container
-):
+def test_leader_removes_receivers_on_relation_broken(context: Context):
     # GIVEN two incoming tracing relations asking for otel grpc and http respectively
-    tracing_grpc = Relation(
+    tracing_grpc = ops.testing.Relation(
         "tracing",
         remote_app_data={"receivers": '["otlp_grpc"]'},
         local_app_data={"receivers": RECV_GRPC},
     )
-    tracing_http = Relation(
+    tracing_http = ops.testing.Relation(
         "tracing",
         remote_app_data={"receivers": '["otlp_http"]'},
         local_app_data={"receivers": RECV_HTTP},
     )
 
-    state = State(
+    state = ops.testing.State(
         leader=True,
-        relations=[tracing_grpc, tracing_http, s3, all_worker],
-        containers=[nginx_container, nginx_prometheus_exporter_container],
+        relations=[tracing_grpc, tracing_http],
     )
 
     # WHEN the charm receives a relation-broken event for the one asking for otlp_grpc
@@ -91,28 +111,26 @@ def test_leader_removes_receivers_on_relation_broken(
     ]) == ["otlp_http"]
 
 
-@patch(
-    "charm.TempoCoordinatorCharm.app_hostname",
-    PropertyMock(return_value="app.hostname"),
-)
-def test_publish_receivers(
-    context, s3, all_worker, nginx_container, nginx_prometheus_exporter_container
-):
+# FIXME: inject this into the charm
+#@patch(
+#    "charm.TempoCoordinatorCharm.app_hostname",
+#    PropertyMock(return_value="app.hostname"),
+#)
+def test_publish_receivers(context: Context):
     # GIVEN two incoming tracing relations asking for otlp grpc and http respectively
-    tracing_grpc = Relation(
+    tracing_grpc = ops.testing.Relation(
         "tracing",
         remote_app_data={"receivers": '["otlp_grpc"]'},
     )
-    tracing_http = Relation(
+    tracing_http = ops.testing.Relation(
         "tracing",
         remote_app_data={"receivers": '["otlp_http"]'},
     )
 
     # AND a leader unit
-    state = State(
+    state = ops.testing.State(
         leader=True,
-        relations=[tracing_grpc, tracing_http, s3, all_worker],
-        containers=[nginx_container, nginx_prometheus_exporter_container],
+        relations=[tracing_grpc, tracing_http],
     )
 
     # WHEN a relation_changed event occurs
