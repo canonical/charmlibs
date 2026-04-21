@@ -209,9 +209,7 @@ class IstioRequestAuthRequirer(Object):
         to the application databag so ``jwt_rules`` appears as a top-level key.
 
         Args:
-            jwt_rules: The JWT validation rules to publish.  Defaults to
-                ``None``, which writes an empty databag (provider will treat
-                as not-ready).
+            jwt_rules: The JWT validation rules to publish.
         """
         if not self._charm.unit.is_leader():
             logger.debug('Not leader, skipping request auth data publication')

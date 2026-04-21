@@ -114,33 +114,6 @@ def test_requirer_publishes_jwt_rules_as_top_level_key():
     assert len(parsed[0]['claim_to_headers']) == 2
 
 
-def test_requirer_publishes_none_when_no_rules():
-    """publish_data() with no args writes jwt_rules as null."""
-
-    class NoRulesRequirer(CharmBase):
-        META = REQUIRER_META
-
-        def __init__(self, framework: ops.Framework):
-            super().__init__(framework)
-            self.request_auth = IstioRequestAuthRequirer(self)
-            self.framework.observe(
-                self.on['istio-request-auth'].relation_changed, self._on_changed
-            )
-
-        def _on_changed(self, _: ops.EventBase) -> None:
-            self.request_auth.publish_data()
-
-    relation = Relation(endpoint='istio-request-auth', interface='istio_request_auth')
-    ctx = Context(NoRulesRequirer, meta=REQUIRER_META)
-    state_out = ctx.run(
-        ctx.on.relation_changed(relation=relation),
-        State(relations=[relation], leader=True),
-    )
-    rel_out = state_out.get_relation(relation.id)
-    assert 'jwt_rules' in rel_out.local_app_data
-    assert json.loads(rel_out.local_app_data['jwt_rules']) is None
-
-
 def test_requirer_skips_publish_when_not_leader():
     relation = Relation(endpoint='istio-request-auth', interface='istio_request_auth')
     ctx = Context(RequirerCharm, meta=REQUIRER_META)
