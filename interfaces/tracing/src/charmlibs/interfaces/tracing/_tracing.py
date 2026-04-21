@@ -84,7 +84,6 @@ class AmbiguousRelationUsageError(TracingError):
     """Raised when one wrongly assumes that there can only be one relation on an endpoint."""
 
 
-
 class DatabagModel(BaseModel):
     """Base databag model."""
 
