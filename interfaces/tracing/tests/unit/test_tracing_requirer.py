@@ -46,7 +46,7 @@ def test_requirer_api(context: Context, leader: bool):
     recv = (
         f'[{{"protocol": {{"name": "otlp_grpc", "type": "grpc"}}, "url": "{host}:4317"}}, '
         f'{{"protocol": {{"name": "otlp_http", "type": "http"}}, "url": "http://{host}:4318"}}, '
-        f'{{"protocol": {{"name": "zipkin", "type": "http"}}, "url": "http://{host}:9411" }}]'
+        f'{{"protocol": {{"name": "zipkin", "type": "http"}}, "url": "http://{host}:9411"}}]'
     )
     tracing = ops.testing.Relation("tracing", remote_app_data={"receivers": recv})
     state = ops.testing.State(leader=leader, relations=[tracing])
@@ -71,7 +71,7 @@ def test_requirer_api(context: Context, leader: bool):
 def test_requirer_api_with_internal_scheme(context: Context, leader: bool):
     host = socket.getfqdn()
     recv = (
-        f'[{{"protocol": {{"name": "otlp_grpc", "type": "grpc"}} , "url": "{host}:4317"}}, '
+        f'[{{"protocol": {{"name": "otlp_grpc", "type": "grpc"}}, "url": "{host}:4317"}}, '
         f'{{"protocol": {{"name": "otlp_http", "type": "http"}}, "url": "https://{host}:4318"}}, '
         f'{{"protocol": {{"name": "zipkin", "type": "http"}}, "url":  "https://{host}:9411"}}]'
     )
@@ -97,9 +97,9 @@ def test_ingressed_requirer_api(context: Context, leader: bool):
     # WHEN external_url is present in remote app databag
     external_url = "http://1.2.3.4"
     recv = (
-        '[{{"protocol": {{"name": "otlp_grpc", "type": "grpc"}}, "url": "1.2.3.4:4317" }}, '
-        '{{"protocol": {{"name": "otlp_http", "type": "http"}} , "url": "http://1.2.3.4:4318" }}, '
-        '{{"protocol": {{"name": "zipkin", "type": "http"}} , "url": "http://1.2.3.4:9411" }}]'
+        '[{"protocol": {"name": "otlp_grpc", "type": "grpc"}, "url": "1.2.3.4:4317" }, '
+        '{"protocol": {"name": "otlp_http", "type": "http"}, "url": "http://1.2.3.4:4318"}, '
+        '{"protocol": {"name": "zipkin", "type": "http"}, "url": "http://1.2.3.4:9411"}]'
     )
     tracing = ops.testing.Relation("tracing", remote_app_data={"receivers": recv})
     state = ops.testing.State(leader=leader, relations=[tracing])
@@ -107,20 +107,14 @@ def test_ingressed_requirer_api(context: Context, leader: bool):
     # THEN get_endpoint uses external URL instead of the host
     with context(context.on.relation_changed(tracing), state) as mgr:
         charm = mgr.charm
-        assert (
-            charm.tracing.get_endpoint("otlp_grpc")
-            == f"{external_url.split('://')[1]}:{Tempo.receiver_ports['otlp_grpc']}"
-        )
-        for proto in ["otlp_http", "zipkin"]:
-            assert (
-                charm.tracing.get_endpoint(proto)
-                == f"{external_url}:{Tempo.receiver_ports[proto]}"
-            )
+        assert charm.tracing.get_endpoint("otlp_grpc") == f"{external_url.split('://')[1]}:4317"
+        assert charm.tracing.get_endpoint("otlp_http") == f"{external_url}:4318"
+        assert charm.tracing.get_endpoint("zipkin") == f"{external_url}:9411"
 
         rel = charm.model.get_relation("tracing")
         assert charm.tracing.is_ready(rel)
 
-    rchanged, epchanged = context.emitted_events
+    _rchanged, epchanged = context.emitted_events
     assert isinstance(epchanged, EndpointChangedEvent)
     assert epchanged.receivers[0].protocol.name == "otlp_grpc"
 
