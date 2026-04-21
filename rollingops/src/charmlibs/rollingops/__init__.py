@@ -27,10 +27,21 @@ from .common._exceptions import (
     RollingOpsNoRelationError,
     RollingOpsSyncLockError,
 )
-from .common._models import OperationResult, RollingOpsState, RollingOpsStatus, SyncLockBackend
+from .common._models import (
+    Operation,
+    OperationQueue,
+    OperationResult,
+    ProcessingBackend,
+    RollingOpsState,
+    RollingOpsStatus,
+    SyncLockBackend,
+)
 
 __all__ = (
+    'Operation',
+    'OperationQueue',
     'OperationResult',
+    'ProcessingBackend',
     'RollingOpsDecodingError',
     'RollingOpsEtcdNotConfiguredError',
     'RollingOpsEtcdctlError',

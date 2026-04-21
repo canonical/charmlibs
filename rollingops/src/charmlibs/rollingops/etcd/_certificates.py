@@ -24,6 +24,8 @@ Certificates are valid for 50 years. They are not renewed or rotated.
 
 from datetime import timedelta
 
+import shortuuid
+
 from charmlibs import pathops
 from charmlibs.interfaces.tls_certificates import (
     Certificate,
@@ -88,7 +90,7 @@ def _has_client_cert_key_and_ca(shared: SharedCertificate) -> bool:
         raise RollingOpsFileSystemError('Failed to read certificates and key.') from e
 
 
-def generate(common_name: str) -> SharedCertificate:
+def generate(model_uuid: str, app_name: str) -> SharedCertificate:
     """Generate a client CA and client certificate if they do not exist.
 
     This method creates:
@@ -101,8 +103,8 @@ def generate(common_name: str) -> SharedCertificate:
     If the certificates already exist, this method does nothing.
 
     Args:
-        common_name: Common Name (CN) used in the client certificate
-            subject. This value should not contain slashes.
+        model_uuid: string used to build the common name.
+        app_name: string used to build the common name.
 
     Raises:
         PebbleConnectionError: if the remote container cannot be reached
@@ -115,6 +117,9 @@ def generate(common_name: str) -> SharedCertificate:
             CA_CERT_PATH,
         )
 
+    # Produce a unique <=64-character string
+    raw = f'{model_uuid}-{app_name}'
+    common_name = shortuuid.uuid(name=raw)
     ca_key = PrivateKey.generate(key_size=KEY_SIZE)
     ca_attributes = CertificateRequestAttributes(
         common_name=common_name,

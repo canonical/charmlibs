@@ -112,8 +112,7 @@ class SharedClientCertificateManager(Object):
             )
             return
 
-        common_name = f'rollingops-{self.model.uuid}-{self.model.app.name}'
-        shared = certificates.generate(common_name)
+        shared = certificates.generate(self.model.uuid, self.model.app.name)
 
         secret = self.model.app.add_secret(
             content={

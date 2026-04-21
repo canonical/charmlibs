@@ -21,6 +21,7 @@ dependencies = [
     "dpcharmlibs-interfaces==1.0.0",
     "tenacity",
     "pydantic>=2.12.5",
+    "shortuuid>=1.0.13",
 ]
 
 [dependency-groups]

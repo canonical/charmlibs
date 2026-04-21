@@ -304,6 +304,7 @@ class RollingOpsManager(Object):
         logger.info('Execution mirrored to peer relation.')
         if outcome.status == RunWithLockStatus.EXECUTED_NOT_COMMITTED:
             self._fallback_current_unit_to_peer()
+            logger.info('Fell back to peer backend.')
 
     def _on_rollingops_etcd_failed(self, event: RollingOpsEtcdFailedEvent) -> None:
         """Fall back to peer when the etcd worker reports a fatal failure."""

@@ -14,7 +14,9 @@
 
 """Classes that manage etcd concepts."""
 
+import ctypes
 import logging
+import signal
 import subprocess
 import time
 
@@ -34,6 +36,8 @@ LOCK_LEASE_TTL = '60'
 
 class EtcdLease:
     """Manage the lifecycle of an etcd lease and its keep-alive process."""
+
+    PR_SET_PDEATHSIG = 1
 
     def __init__(self):
         self.id: str | None = None
@@ -71,6 +75,12 @@ class EtcdLease:
             finally:
                 self.id = None
 
+    @staticmethod
+    def _set_parent_death_signal() -> None:
+        """Ask the kernel to send SIGTERM to the child if its parent dies."""
+        libc = ctypes.CDLL('libc.so.6')
+        libc.prctl(EtcdLease.PR_SET_PDEATHSIG, signal.SIGTERM)
+
     def _start_lease_keepalive(self) -> None:
         """Start the background process that keeps the lease alive."""
         lease_id = self.id
@@ -81,10 +91,8 @@ class EtcdLease:
         self.keepalive_proc = subprocess.Popen(
             [etcdctl.ETCDCTL_CMD, 'lease', 'keep-alive', lease_id],
             env=etcdctl.load_env(),
-            stdin=subprocess.PIPE,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
             text=True,
+            preexec_fn=self._set_parent_death_signal,
         )
         logger.info('Keepalive started for lease %s.', self.id)
 
