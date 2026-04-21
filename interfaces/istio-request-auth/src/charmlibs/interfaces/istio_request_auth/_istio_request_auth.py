@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class ClaimToHeaderData(BaseModel):
+class ClaimToHeader(BaseModel):
     """Maps a JWT claim to a request header."""
 
     model_config = ConfigDict(frozen=True)
@@ -40,7 +40,7 @@ class ClaimToHeaderData(BaseModel):
     claim: str = Field(description='JWT claim name to extract')
 
 
-class FromHeaderData(BaseModel):
+class FromHeader(BaseModel):
     """Specifies a header location from which to extract a JWT."""
 
     model_config = ConfigDict(frozen=True)
@@ -49,7 +49,7 @@ class FromHeaderData(BaseModel):
     prefix: str | None = None
 
 
-class JWTRuleData(BaseModel):
+class JWTRule(BaseModel):
     """A single JWT validation rule provided by the requiring app."""
 
     model_config = ConfigDict(frozen=True)
@@ -60,27 +60,48 @@ class JWTRuleData(BaseModel):
     jwks_uri: str | None = None
     audiences: list[str] | None = None
     forward_original_token: bool | None = None
-    # claim_to_headers allows
-    # - mapping a single claim to multiple from_headers
-    # - mapping multiple claims to the same header
-    #   (in this case all available claims will be concatenated with a comma separator. missing claims will be skipped)
-    claim_to_headers: list[ClaimToHeaderData] | None = None
-    # from_headers allows defining multiple potential header sources. The first one with a valid token will be used.
-    from_headers: list[FromHeaderData] | None = None
+    # claim_to_headers allows mapping a single claim to multiple headers or
+    # multiple claims to the same header (concatenated with comma; missing
+    # claims are skipped).
+    claim_to_headers: list[ClaimToHeader] | None = None
+    # from_headers allows defining multiple potential header sources.
+    # The first one with a valid token will be used.
+    from_headers: list[FromHeader] | None = None
 
 
-class RequestAuthData(BaseModel):
-    """Data sent by the requirer over the istio-request-auth relation."""
+class _RequestAuthData(BaseModel):
+    """Top-level databag model for the istio-request-auth relation.
+
+    Each field maps directly to a top-level key in the Juju application databag.
+    Use ``ops.Relation.load`` / ``ops.Relation.save`` to (de)serialise.
+
+    ``jwt_rules`` defaults to ``None``.  When it is missing, ``None``, or an
+    empty list the provider side treats the relation as not-ready and skips
+    the application.
+    """
 
     model_config = ConfigDict(frozen=True)
 
-    jwt_rules: list[JWTRuleData] = Field(description='List of JWT validation rules')
+    jwt_rules: list[JWTRule] | None = Field(
+        default=None,
+        description='List of JWT validation rules. Missing or empty means not ready.',
+    )
 
 
 class IstioRequestAuthProvider(Object):
     """Provider side of the istio-request-auth interface.
 
-    Used by the ingress charm to read JWT authentication rules from all related applications.
+    Used by the ingress charm to read JWT authentication rules from all related
+    applications.
+
+    Applications that are connected but have not provided valid (non-empty)
+    ``jwt_rules`` are excluded from :meth:`get_data` but included in
+    :meth:`get_connected_apps`.  Consumers can compare the two sets to
+    identify applications that have not yet provided data::
+
+        valid = provider.get_data()
+        connected = provider.get_connected_apps()
+        apps_without_data = connected - set(valid.keys())
     """
 
     def __init__(
@@ -100,35 +121,61 @@ class IstioRequestAuthProvider(Object):
 
     @property
     def is_ready(self) -> bool:
-        """Check if any related application has provided request auth data.
+        """Check if any related application has provided valid request auth data.
 
         Returns:
-            True if at least one requirer has published data, False otherwise.
+            True if at least one requirer has published non-empty jwt_rules.
         """
         return bool(self.get_data())
 
-    def get_data(self) -> dict[str, RequestAuthData]:
-        """Retrieve request auth data from all related applications.
+    def get_connected_apps(self) -> set[str]:
+        """Return the names of all applications connected over the relation.
+
+        This includes apps that have not yet provided valid data.
+        """
+        apps: set[str] = set()
+        for relation in self._charm.model.relations.get(self._relation_name, []):
+            if relation.app:
+                apps.add(relation.app.name)
+        return apps
+
+    def get_data(self) -> dict[str, list[JWTRule]]:
+        """Retrieve valid JWT rules from all related applications.
+
+        Uses ``ops.Relation.load`` to deserialise each application's databag
+        into :class:`RequestAuthData`.  Only applications whose databag
+        contains a non-empty ``jwt_rules`` list are included.
 
         Returns:
-            A dict mapping application name to its RequestAuthData.
+            A dict mapping application name to its list of ``JWTRule`` objects.
         """
-        result: dict[str, RequestAuthData] = {}
+        result: dict[str, list[JWTRule]] = {}
         relations = self._charm.model.relations.get(self._relation_name, [])
 
         for relation in relations:
             if not relation.app:
                 continue
 
-            data_json = relation.data[relation.app].get('request_auth_data')
-            if not data_json:
-                continue
+            app_name = relation.app.name
 
             try:
-                auth_data = RequestAuthData.model_validate_json(data_json)
-                result[relation.app.name] = auth_data
+                data = relation.load(_RequestAuthData, relation.app)
             except Exception as e:
-                logger.exception('Failed to parse request auth data from %s: %s', relation.app.name, e)
+                logger.exception(
+                    'Failed to parse databag from application %s: %s',
+                    app_name,
+                    e,
+                )
+                continue
+
+            if not data.jwt_rules:
+                logger.warning(
+                    'Application %s has not provided jwt_rules',
+                    app_name,
+                )
+                continue
+
+            result[app_name] = data.jwt_rules
 
         return result
 
@@ -155,17 +202,22 @@ class IstioRequestAuthRequirer(Object):
         self._charm = charm
         self._relation_name = relation_name
 
-    def publish_data(self, data: RequestAuthData) -> None:
-        """Publish request auth data to the provider.
+    def publish_data(self, jwt_rules: list[JWTRule]) -> None:
+        """Publish JWT rules to the provider.
+
+        Uses ``ops.Relation.save`` to write a :class:`RequestAuthData` instance
+        to the application databag so ``jwt_rules`` appears as a top-level key.
 
         Args:
-            data: The RequestAuthData to publish.
+            jwt_rules: The JWT validation rules to publish.  Defaults to
+                ``None``, which writes an empty databag (provider will treat
+                as not-ready).
         """
         if not self._charm.unit.is_leader():
             logger.debug('Not leader, skipping request auth data publication')
             return
 
-        relations = self._charm.model.relations.get(self._relation_name, [])
+        data = _RequestAuthData(jwt_rules=jwt_rules)
 
-        for relation in relations:
-            relation.data[self._charm.app]['request_auth_data'] = data.model_dump_json()
+        for relation in self._charm.model.relations.get(self._relation_name, []):
+            relation.save(data, self._charm.app)

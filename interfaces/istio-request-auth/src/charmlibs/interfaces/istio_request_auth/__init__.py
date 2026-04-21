@@ -39,12 +39,20 @@ they trust and which headers they want the claims in the token to be mapped to. 
 this information exchange and add the appropriate ``RequestAuthentication`` resource, the
 ``istio-request-auth`` interface library is introduced.
 
+Security note
+=============
+
+If a requirer is connected but has not provided valid (non-empty) ``jwt_rules``, no
+``RequestAuthentication`` resource is created.  This could allow unauthenticated
+traffic.  The provider exposes :meth:`~IstioRequestAuthProvider.get_connected_apps`
+so the ingress charm can detect such applications and drop their ingress until valid
+rules are provided.
+
 Requirer usage::
 
     from charmlibs.interfaces.istio_request_auth import (
-        ClaimToHeaderData,
-        JWTRuleData,
-        RequestAuthData,
+        ClaimToHeader,
+        JWTRule,
         IstioRequestAuthRequirer,
     )
 
@@ -54,18 +62,14 @@ Requirer usage::
             self.request_auth = IstioRequestAuthRequirer(self)
 
         def _publish_rules(self):
-            self.request_auth.publish_data(
-                RequestAuthData(
-                    jwt_rules=[
-                        JWTRuleData(
-                            issuer="https://accounts.example.com",
-                            claim_to_headers=[
-                                ClaimToHeaderData(header="x-user-email", claim="email"),
-                            ],
-                        ),
-                    ]
-                )
-            )
+            self.request_auth.publish_data([
+                JWTRule(
+                    issuer="https://accounts.example.com",
+                    claim_to_headers=[
+                        ClaimToHeader(header="x-user-email", claim="email"),
+                    ],
+                ),
+            ])
 
 Provider usage::
 
@@ -76,28 +80,26 @@ Provider usage::
             super().__init__(*args)
             self.request_auth = IstioRequestAuthProvider(self)
 
-        def _read_rules(self):
-            if self.request_auth.is_ready:
-                data = self.request_auth.get_data()
-                for app_name, auth_data in data.items():
-                    ...
+        def _reconcile(self):
+            valid = self.request_auth.get_data()
+            connected = self.request_auth.get_connected_apps()
+            invalid_apps = connected - set(valid.keys())
+            # Drop ingress for invalid_apps, create RequestAuthentication for valid
 """
 
 from ._istio_request_auth import (
-    ClaimToHeaderData,
-    FromHeaderData,
+    ClaimToHeader,
+    FromHeader,
     IstioRequestAuthProvider,
     IstioRequestAuthRequirer,
-    JWTRuleData,
-    RequestAuthData,
+    JWTRule,
 )
 from ._version import __version__ as __version__
 
 __all__ = [
-    'ClaimToHeaderData',
-    'FromHeaderData',
+    'ClaimToHeader',
+    'FromHeader',
     'IstioRequestAuthProvider',
     'IstioRequestAuthRequirer',
-    'JWTRuleData',
-    'RequestAuthData',
+    'JWTRule',
 ]
