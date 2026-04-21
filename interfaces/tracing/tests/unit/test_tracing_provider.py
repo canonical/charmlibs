@@ -2,8 +2,18 @@
 from unittest.mock import PropertyMock, patch
 
 import pytest
-from charmlibs.interfaces.tracing import TracingProviderAppData
 from scenario import Relation, State
+
+from charmlibs.interfaces.tracing import TracingProviderAppData
+
+RECV_GRPC = (
+    '[{"protocol": {"name": "otlp_grpc", "type": "grpc"} , "url": "foo.com:10"}, '
+    '{"protocol": {"name": "otlp_http", "type": "http"}, "url": "http://foo.com:11"}] '
+)
+RECV_HTTP = (
+    '[{"protocol": {"name": "otlp_grpc", "type": "grpc"} , "url": "foo.com:10"}, '
+    '{"protocol": {"name": "otlp_http", "type": "http"}, "url": "http://foo.com:11"}] '
+)
 
 
 @pytest.mark.parametrize("leader", (True, False))
@@ -19,18 +29,12 @@ def test_receiver_api(
     tracing_grpc = Relation(
         "tracing",
         remote_app_data={"receivers": '["otlp_grpc"]'},
-        local_app_data={
-            "receivers": '[{"protocol": {"name": "otlp_grpc", "type": "grpc"} , "url": "foo.com:10"}, '
-            '{"protocol": {"name": "otlp_http", "type": "http"}, "url": "http://foo.com:11"}] '
-        },
+        local_app_data={"receivers": RECV_GRPC},
     )
     tracing_http = Relation(
         "tracing",
         remote_app_data={"receivers": '["otlp_http"]'},
-        local_app_data={
-            "receivers": '[{"protocol": {"name": "otlp_grpc", "type": "grpc"} , "url": "foo.com:10"}, '
-            '{"protocol": {"name": "otlp_http", "type": "http"}, "url": "http://foo.com:11"}] '
-        },
+        local_app_data={"receivers": RECV_HTTP},
     )
 
     state = State(
@@ -47,7 +51,7 @@ def test_receiver_api(
 
     # THEN both protocols are in the receivers published in the databag (local side)
 
-    r_out = [r for r in state_out.relations if r.id == tracing_http.id][0]
+    r_out = next(r for r in state_out.relations if r.id == tracing_http.id)
     assert sorted([
         r.protocol.name for r in TracingProviderAppData.load(r_out.local_app_data).receivers
     ]) == ["otlp_grpc", "otlp_http"]
@@ -60,18 +64,12 @@ def test_leader_removes_receivers_on_relation_broken(
     tracing_grpc = Relation(
         "tracing",
         remote_app_data={"receivers": '["otlp_grpc"]'},
-        local_app_data={
-            "receivers": '[{"protocol": {"name": "otlp_grpc", "type": "grpc"} , "url": "foo.com:10"}, '
-            '{"protocol": {"name": "otlp_http", "type": "http"}, "url": "http://foo.com:11"}] '
-        },
+        local_app_data={"receivers": RECV_GRPC},
     )
     tracing_http = Relation(
         "tracing",
         remote_app_data={"receivers": '["otlp_http"]'},
-        local_app_data={
-            "receivers": '[{"protocol": {"name": "otlp_grpc", "type": "grpc"} , "url": "foo.com:10"}, '
-            '{"protocol": {"name": "otlp_http", "type": "http"}, "url": "http://foo.com:11"}] '
-        },
+        local_app_data={"receivers": RECV_HTTP},
     )
 
     state = State(
@@ -87,7 +85,7 @@ def test_leader_removes_receivers_on_relation_broken(
         state_out = mgr.run()
 
     # THEN otlp_grpc is gone from the databag
-    r_out = [r for r in state_out.relations if r.id == tracing_http.id][0]
+    r_out = next(r for r in state_out.relations if r.id == tracing_http.id)
     assert sorted([
         r.protocol.name for r in TracingProviderAppData.load(r_out.local_app_data).receivers
     ]) == ["otlp_http"]
