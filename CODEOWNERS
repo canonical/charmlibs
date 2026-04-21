@@ -88,6 +88,9 @@
 # /interfaces/gateway-metadata/
 /interfaces/gateway-metadata @canonical/service-mesh
 
+# /interfaces/istio-request-auth/
+/interfaces/istio-request-auth/ @canonical/service-mesh
+
 # /interfaces/grafana_auth/
 /interfaces/grafana_auth/interface/ @canonical/observability
 /interfaces/grafana_auth/ruff.toml @canonical/observability
