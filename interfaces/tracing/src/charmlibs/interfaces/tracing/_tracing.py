@@ -761,9 +761,8 @@ class TracingEndpointRequirer(Object):
         by the `is_ready` check.
 
         Raises:
-        ProtocolNotRequestedError:
-            If the charm unit is the leader unit and attempts to obtain an endpoint for a protocol
-            it did not request.
+            ProtocolNotRequestedError: If the charm unit is the leader unit and attempts to obtain
+                an endpoint for a protocol it did not request.
         """
         endpoint = self._get_endpoint(relation or self._relation, protocol=protocol)
         if not endpoint:
