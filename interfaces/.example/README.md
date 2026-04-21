@@ -8,4 +8,4 @@ To install, add `charmlibs-interfaces-example-interface` to your Python dependen
 from charmlibs.interfaces import example_interface
 ```
 
-See the [reference documentation](https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/example_interface) for more.
+See the [reference documentation](https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/example-interface) for more.

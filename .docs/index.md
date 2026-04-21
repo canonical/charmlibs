@@ -42,6 +42,7 @@ If you're new to charms, see {ref}`Juju | Charm <juju:charm>`.
 - {ref}`Manage charm libraries <how-to-manage-charm-libraries>`
 - {ref}`Distribute charm libraries <how-to-python-package>`
 - {ref}`Migrate your library to the monorepo <how-to-migrate>`
+- {ref}`Provide relation data for charm tests <how-to-provide-data-for-charm-tests>`
 - {ref}`Customize functional tests <how-to-customize-functional-tests>`
 - {ref}`Customize integration tests <how-to-customize-integration-tests>`
 ```

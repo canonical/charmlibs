@@ -22,6 +22,11 @@
 /.package/ @canonical/charmlibs-maintainers
 /interfaces/.package/ @canonical/charmlibs-maintainers
 
+# interfaces/index.json doesn't require CODEOWNERS review as its contents are validated in CI
+/interfaces/index.json
+
+# individual package and interface entries
+
 # charmlibs packages (alphabetical)
 /apt/ @canonical/charmlibs-maintainers
 /nginx_k8s/ @canonical/tracing-and-profiling
@@ -32,60 +37,217 @@
 /systemd/ @canonical/charmlibs-maintainers
 
 # charmlibs.interfaces packages (alphabetical)
-/interfaces/auth_proxy @canonical/identity
-/interfaces/azure_service_principal/ @canonical/data
-/interfaces/azure_storage/ @canonical/data
-/interfaces/certificate_transfer/ @canonical/tls
-/interfaces/cloudflared_route/ @canonical/platform-engineering 
-/interfaces/connect_client/ @canonical/data-bigdata
-/interfaces/cos_agent/ @canonical/observability
-/interfaces/database_backup/ @canonical/data
-/interfaces/dns_record/ @canonical/platform-engineering
-/interfaces/etcd_client/ @canonical/data-nosql
-/interfaces/filesystem_info/ @canonical/hpc-team
-/interfaces/forward_auth @canonical/identity
-/interfaces/grafana_auth/ @canonical/observability
-/interfaces/grafana_datasource/ @canonical/observability
-/interfaces/grafana_datasource_exchange/ @canonical/observability
-/interfaces/hydra_endpoints @canonical/identity
-/interfaces/istio-request-auth/ @canonical/service-mesh
-/interfaces/jwt/ @canonical/data
-/interfaces/k8s-service/ @canonical/mlops
-/interfaces/kafka_client/ @canonical/data-bigdata
-/interfaces/karapace_client/ @canonical/data-bigdata
-/interfaces/kratos_external_idp @canonical/identity
-/interfaces/kratos_info @canonical/identity
-/interfaces/kubeflow_dashboard_links/ @canonical/mlops
-/interfaces/ldap @canonical/identity
-/interfaces/litmus_auth/ @canonical/tracing-and-profiling
-/interfaces/login_ui_endpoints @canonical/identity
-/interfaces/milter/ @canonical/platform-engineering
-/interfaces/mimir_cluster/ @canonical/observability
-/interfaces/mongodb_client/ @canonical/data-nosql
-/interfaces/mysql_client/ @canonical/data-mysql
-/interfaces/nginx-route/ @canonical/platform-engineering
-/interfaces/oauth @canonical/identity
-/interfaces/opencti_connector/ @canonical/platform-engineering
-/interfaces/openfga @canonical/identity
-/interfaces/opensearch_client/ @canonical/data-nosql
-/interfaces/otlp/ @canonical/observability-core
-/interfaces/postgresql_client/ @canonical/data-postgresql
-/interfaces/profiling/ @canonical/tracing-and-profiling
-/interfaces/prometheus_remote_write/ @canonical/observability-core
-/interfaces/prometheus_scrape/ @canonical/observability-core
-/interfaces/pyroscope_cluster/ @canonical/tracing-and-profiling
-/interfaces/s3/ @canonical/data
-/interfaces/saml/ @canonical/platform-engineering
-/interfaces/sloth/ @canonical/tracing-and-profiling
-/interfaces/smtp/ @canonical/platform-engineering
-/interfaces/tempo_cluster/ @canonical/tracing-and-profiling
-/interfaces/tls-certificates/ @canonical/tls
-/interfaces/tracing/ @canonical/tracing-and-profiling
-/interfaces/vault-autounseal/ @canonical/tls
-/interfaces/vault-kv/ @canonical/tls
-/interfaces/k8s_backup_target/ @canonical/analytics
-/interfaces/velero_backup_config/ @canonical/analytics
-/interfaces/wazuh_api_client/ @canonical/platform-engineering
 
-# interfaces/index.json doesn't require CODEOWNERS review as its contents are validated in CI
-/interfaces/index.json
+# /interfaces/auth_proxy/
+/interfaces/auth_proxy/interface/ @canonical/identity
+/interfaces/auth_proxy/ruff.toml @canonical/identity
+
+# /interfaces/azure_service_principal/
+/interfaces/azure_service_principal/interface/ @canonical/data
+/interfaces/azure_service_principal/ruff.toml @canonical/data
+
+# /interfaces/azure_storage/
+/interfaces/azure_storage/interface/ @canonical/data
+/interfaces/azure_storage/ruff.toml @canonical/data
+
+# /interfaces/certificate_transfer/
+/interfaces/certificate_transfer/ @canonical/tls
+
+# /interfaces/cloudflared_route/
+/interfaces/cloudflared_route/interface/ @canonical/platform-engineering
+/interfaces/cloudflared_route/ruff.toml @canonical/platform-engineering
+
+# /interfaces/connect_client/
+/interfaces/connect_client/interface/ @canonical/data-bigdata
+/interfaces/connect_client/ruff.toml @canonical/data-bigdata
+
+# /interfaces/cos_agent/
+/interfaces/cos_agent/interface/ @canonical/observability
+/interfaces/cos_agent/ruff.toml @canonical/observability
+
+# /interfaces/database_backup/
+/interfaces/database_backup/interface/ @canonical/data
+/interfaces/database_backup/ruff.toml @canonical/data
+
+# /interfaces/dns_record/
+/interfaces/dns_record/interface/ @canonical/platform-engineering
+/interfaces/dns_record/ruff.toml @canonical/platform-engineering
+
+# /interfaces/etcd_client/
+/interfaces/etcd_client/interface/ @canonical/data-nosql
+/interfaces/etcd_client/ruff.toml @canonical/data-nosql
+
+# /interfaces/filesystem_info/
+/interfaces/filesystem_info/interface/ @canonical/hpc-team
+/interfaces/filesystem_info/ruff.toml @canonical/hpc-team
+
+# /interfaces/forward_auth/
+/interfaces/forward_auth/interface/ @canonical/identity
+/interfaces/forward_auth/ruff.toml @canonical/identity
+
+# /interfaces/gateway-metadata/
+/interfaces/gateway-metadata @canonical/service-mesh
+
+# /interfaces/grafana_auth/
+/interfaces/grafana_auth/interface/ @canonical/observability
+/interfaces/grafana_auth/ruff.toml @canonical/observability
+
+# /interfaces/grafana_datasource/
+/interfaces/grafana_datasource/interface/ @canonical/observability
+/interfaces/grafana_datasource/ruff.toml @canonical/observability
+
+# /interfaces/grafana_datasource_exchange/
+/interfaces/grafana_datasource_exchange/interface/ @canonical/observability
+/interfaces/grafana_datasource_exchange/ruff.toml @canonical/observability
+
+# /interfaces/hydra_endpoints/
+/interfaces/hydra_endpoints/interface/ @canonical/identity
+/interfaces/hydra_endpoints/ruff.toml @canonical/identity
+
+# /interfaces/jwt/
+/interfaces/jwt/interface/ @canonical/data
+/interfaces/jwt/ruff.toml @canonical/data
+
+# /interfaces/k8s-service/
+/interfaces/k8s-service/interface/ @canonical/mlops
+/interfaces/k8s-service/ruff.toml @canonical/mlops
+
+# /interfaces/kafka_client/
+/interfaces/kafka_client/interface/ @canonical/data-bigdata
+/interfaces/kafka_client/ruff.toml @canonical/data-bigdata
+
+# /interfaces/karapace_client/
+/interfaces/karapace_client/interface/ @canonical/data-bigdata
+/interfaces/karapace_client/ruff.toml @canonical/data-bigdata
+
+# /interfaces/kratos_external_idp/
+/interfaces/kratos_external_idp/interface/ @canonical/identity
+/interfaces/kratos_external_idp/ruff.toml @canonical/identity
+
+# /interfaces/kratos_info/
+/interfaces/kratos_info/interface/ @canonical/identity
+/interfaces/kratos_info/ruff.toml @canonical/identity
+
+# /interfaces/kubeflow_dashboard_links/
+/interfaces/kubeflow_dashboard_links/interface/ @canonical/mlops
+/interfaces/kubeflow_dashboard_links/ruff.toml @canonical/mlops
+
+# /interfaces/ldap/
+/interfaces/ldap/interface/ @canonical/identity
+/interfaces/ldap/ruff.toml @canonical/identity
+
+# /interfaces/litmus_auth/
+/interfaces/litmus_auth/interface/ @canonical/tracing-and-profiling
+/interfaces/litmus_auth/ruff.toml @canonical/tracing-and-profiling
+
+# /interfaces/login_ui_endpoints/
+/interfaces/login_ui_endpoints/interface/ @canonical/identity
+/interfaces/login_ui_endpoints/ruff.toml @canonical/identity
+
+# /interfaces/milter/
+/interfaces/milter/interface/ @canonical/platform-engineering
+/interfaces/milter/ruff.toml @canonical/platform-engineering
+
+# /interfaces/mimir_cluster/
+/interfaces/mimir_cluster/interface/ @canonical/observability
+/interfaces/mimir_cluster/ruff.toml @canonical/observability
+
+# /interfaces/mongodb_client/
+/interfaces/mongodb_client/interface/ @canonical/data-nosql
+/interfaces/mongodb_client/ruff.toml @canonical/data-nosql
+
+# /interfaces/mysql_client/
+/interfaces/mysql_client/interface/ @canonical/data-mysql
+/interfaces/mysql_client/ruff.toml @canonical/data-mysql
+
+# /interfaces/nginx-route/
+/interfaces/nginx-route/interface/ @canonical/platform-engineering
+/interfaces/nginx-route/ruff.toml @canonical/platform-engineering
+
+# /interfaces/oauth/
+/interfaces/oauth/interface/ @canonical/identity
+/interfaces/oauth/ruff.toml @canonical/identity
+
+# /interfaces/opencti_connector/
+/interfaces/opencti_connector/interface/ @canonical/platform-engineering
+/interfaces/opencti_connector/ruff.toml @canonical/platform-engineering
+
+# /interfaces/openfga/
+/interfaces/openfga/interface/ @canonical/identity
+/interfaces/openfga/ruff.toml @canonical/identity
+
+# /interfaces/opensearch_client/
+/interfaces/opensearch_client/interface/ @canonical/data-nosql
+/interfaces/opensearch_client/ruff.toml @canonical/data-nosql
+
+# /interfaces/otlp/
+/interfaces/otlp/ @canonical/observability-core
+
+# /interfaces/postgresql_client/
+/interfaces/postgresql_client/interface/ @canonical/data-postgresql
+/interfaces/postgresql_client/ruff.toml @canonical/data-postgresql
+
+# /interfaces/profiling/
+/interfaces/profiling/interface/ @canonical/tracing-and-profiling
+/interfaces/profiling/ruff.toml @canonical/tracing-and-profiling
+
+# /interfaces/prometheus_remote_write/
+/interfaces/prometheus_remote_write/interface/ @canonical/observability-core
+/interfaces/prometheus_remote_write/ruff.toml @canonical/observability-core
+
+# /interfaces/prometheus_scrape/
+/interfaces/prometheus_scrape/interface/ @canonical/observability-core
+/interfaces/prometheus_scrape/ruff.toml @canonical/observability-core
+
+# /interfaces/pyroscope_cluster/
+/interfaces/pyroscope_cluster/interface/ @canonical/tracing-and-profiling
+/interfaces/pyroscope_cluster/ruff.toml @canonical/tracing-and-profiling
+
+# /interfaces/s3/
+/interfaces/s3/interface/ @canonical/data
+/interfaces/s3/ruff.toml @canonical/data
+
+# /interfaces/saml/
+/interfaces/saml/interface/ @canonical/platform-engineering
+/interfaces/saml/ruff.toml @canonical/platform-engineering
+
+# /interfaces/sloth/
+/interfaces/sloth/ @canonical/tracing-and-profiling
+
+# /interfaces/smtp/
+/interfaces/smtp/interface/ @canonical/platform-engineering
+/interfaces/smtp/ruff.toml @canonical/platform-engineering
+
+# /interfaces/tempo_cluster/
+/interfaces/tempo_cluster/interface/ @canonical/tracing-and-profiling
+/interfaces/tempo_cluster/ruff.toml @canonical/tracing-and-profiling
+
+# /interfaces/tls-certificates/
+/interfaces/tls-certificates/ @canonical/tls
+
+# /interfaces/tracing/
+/interfaces/tracing/interface/ @canonical/tracing-and-profiling
+/interfaces/tracing/ruff.toml @canonical/tracing-and-profiling
+
+# /interfaces/vault-autounseal/
+/interfaces/vault-autounseal/interface/ @canonical/tls
+/interfaces/vault-autounseal/ruff.toml @canonical/tls
+
+# /interfaces/vault-kv/
+/interfaces/vault-kv/interface/ @canonical/tls
+/interfaces/vault-kv/ruff.toml @canonical/tls
+
+# /interfaces/valkey_client/
+/interfaces/valkey_client/interface/ @canonical/data-nosql
+/interfaces/valkey_client/ruff.toml @canonical/data-nosql
+
+# /interfaces/k8s_backup_target/
+/interfaces/k8s_backup_target/ @canonical/analytics
+
+# /interfaces/velero_backup_config/
+/interfaces/velero_backup_config/interface/ @canonical/analytics
+/interfaces/velero_backup_config/ruff.toml @canonical/analytics
+
+# /interfaces/wazuh_api_client/
+/interfaces/wazuh_api_client/interface/ @canonical/platform-engineering
+/interfaces/wazuh_api_client/ruff.toml @canonical/platform-engineering

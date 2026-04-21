@@ -81,6 +81,7 @@ def _main() -> None:
     parser.add_argument('new_ref', nargs='?')
     parser.add_argument('--exclude-examples', action='store_true')
     parser.add_argument('--exclude-placeholders', action='store_true')
+    parser.add_argument('--exclude-testing', action='store_true')
     parser.add_argument('--only-if-version-changed', action='store_true')
     parser.add_argument('--indent-json', action='store_true')
     parser.add_argument('--regex', default=None)
@@ -97,6 +98,7 @@ def _main() -> None:
         new_ref=args.new_ref,
         include_examples=not args.exclude_examples,
         include_placeholders=not args.exclude_placeholders,
+        include_testing=not args.exclude_testing,
         only_if_version_changed=args.only_if_version_changed,
         regex=args.regex,
         output=args.output or [single_output],
@@ -118,6 +120,7 @@ def _ls(
     only_if_version_changed: bool,
     include_examples: bool,
     include_placeholders: bool,
+    include_testing: bool,
     regex: str | None,
     output: list[str],
 ) -> list[Info]:
@@ -135,6 +138,8 @@ def _ls(
         include_examples: Whether to include the example libraries.
             Typically included for testing, but excluded from docs and publishing.
         include_placeholders: Whether to include the namespace placeholder packages.
+            Typically included for testing and publishing, but excluded from docs.
+        include_testing: Whether to include library testing packages.
             Typically included for testing and publishing, but excluded from docs.
         regex: Regular expression to match dirs on, or None to skip matching and include all.
         output: List of fields to include in the output, one or more of
@@ -159,6 +164,8 @@ def _ls(
             dirs = _changed_only(root, dirs, ref=old_ref)
             if only_if_version_changed:
                 dirs = _get_changed_versions_only(category, root, dirs, ref=old_ref)
+        if category == 'packages' and include_testing:
+            dirs.extend([t for p in dirs if _is_package(t := p / 'testing')])
         # Calculate only the information needed.
         infos: list[Info] = []
         for path in dirs:
