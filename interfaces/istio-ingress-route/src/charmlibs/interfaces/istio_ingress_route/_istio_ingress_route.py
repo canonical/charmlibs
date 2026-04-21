@@ -178,11 +178,11 @@ class HTTPPathMatch(BaseModel):
 class GRPCMethodMatch(BaseModel):
     """gRPC method matching configuration.
 
-    Matches gRPC methods in the format /service/method where:
-    - service can be a simple name (e.g., "MyService") or package-qualified
-      (e.g., "package.MyService")
-    - method is the RPC method name (optional - if omitted, matches all methods
-      on the service)
+    Matches gRPC methods in the format ``/service/method``.
+
+    The ``service`` can be a simple name (e.g., ``"MyService"``) or
+    package-qualified (e.g., ``"package.MyService"``).  The ``method`` is the
+    RPC method name; if omitted, all methods on the service are matched.
 
     Examples:
         >>> GRPCMethodMatch(service="com.example.UserService")
