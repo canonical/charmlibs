@@ -23,7 +23,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any, cast
 
 from ops.charm import CharmBase, CharmEvents, RelationEvent
-from ops.framework import EventSource, Object, StoredState
+from ops.framework import EventSource, Object
 from pydantic import BaseModel, Field, computed_field, model_serializer, model_validator
 
 if TYPE_CHECKING:
@@ -438,7 +438,6 @@ class IstioIngressRouteProvider(Object):
     """
 
     on = _IstioIngressRouteProviderEvents()  # pyright: ignore[reportIncompatibleMethodOverride, reportAssignmentType]
-    _stored = StoredState()
 
     def __init__(
         self,
@@ -458,14 +457,11 @@ class IstioIngressRouteProvider(Object):
             tls_enabled: Whether TLS is enabled on the gateway.
         """
         super().__init__(charm, relation_name)
-        self._stored.set_default(external_host=None, tls_enabled=None)
 
         self._charm = charm
         self._relation_name = relation_name
-
-        if self._stored.external_host != external_host or self._stored.tls_enabled != tls_enabled:
-            # If istio-ingress endpoint details changed, update
-            self.update_ingress_address(external_host=external_host, tls_enabled=tls_enabled)
+        self._external_host = external_host
+        self._tls_enabled = tls_enabled
 
         self.framework.observe(
             self._charm.on[relation_name].relation_changed, self._on_relation_changed
@@ -477,34 +473,17 @@ class IstioIngressRouteProvider(Object):
     @property
     def external_host(self) -> str:
         """Return the external host set by istio-ingress, if any."""
-        self._update_stored()
-        return self._stored.external_host or ''
+        return self._external_host
 
     @property
     def tls_enabled(self) -> bool:
         """Return whether TLS is enabled on the gateway."""
-        self._update_stored()
-        return self._stored.tls_enabled or False
+        return self._tls_enabled
 
     @property
     def relations(self):
         """The list of Relation instances associated with this endpoint."""
         return list(self._charm.model.relations[self._relation_name])
-
-    def _update_stored(self) -> None:
-        """Ensure that the stored data is up-to-date."""
-        if not self._charm.unit.is_leader():
-            return
-
-        for relation in self._charm.model.relations[self._relation_name]:
-            if not relation.app:
-                self._stored.external_host = ''
-                self._stored.tls_enabled = False
-                return
-            external_host = relation.data[relation.app].get('external_host', '')
-            self._stored.external_host = external_host or self._stored.external_host
-            tls_enabled_str = relation.data[relation.app].get('tls_enabled', 'False')
-            self._stored.tls_enabled = tls_enabled_str == 'True'
 
     def _on_relation_changed(self, event: RelationEvent):
         if self.is_ready(event.relation):
@@ -521,15 +500,15 @@ class IstioIngressRouteProvider(Object):
         if not self._charm.unit.is_leader():
             return
 
-        for relation in self._charm.model.relations[self._relation_name]:
-            relation.data[self._charm.app]['external_host'] = external_host or self.external_host
-            tls_value = tls_enabled if tls_enabled is not None else self.tls_enabled
-            relation.data[self._charm.app]['tls_enabled'] = str(tls_value)
+        host = external_host if external_host is not None else self._external_host
+        tls = tls_enabled if tls_enabled is not None else self._tls_enabled
 
-        # We first attempt to write relation data (which may raise) and only then update stored
-        # state.
-        self._stored.external_host = external_host
-        self._stored.tls_enabled = tls_enabled
+        for relation in self._charm.model.relations[self._relation_name]:
+            relation.data[self._charm.app]['external_host'] = host
+            relation.data[self._charm.app]['tls_enabled'] = str(tls)
+
+        self._external_host = host
+        self._tls_enabled = tls
 
     def wipe_ingress_data(self, relation: 'Relation'):
         """Clear ingress data from relation.
@@ -592,7 +571,6 @@ class IstioIngressRouteRequirer(Object):
     """
 
     on = _IstioIngressRouteRequirerEvents()  # pyright: ignore[reportIncompatibleMethodOverride, reportAssignmentType]
-    _stored = StoredState()
 
     def __init__(
         self,
@@ -606,7 +584,6 @@ class IstioIngressRouteRequirer(Object):
             relation_name: The name of the relation to bind to (defaults to "ingress").
         """
         super().__init__(charm, relation_name)
-        self._stored.set_default(external_host=None, tls_enabled=None)
 
         self._charm = charm
         self._relation_name = relation_name
@@ -621,40 +598,30 @@ class IstioIngressRouteRequirer(Object):
     @property
     def external_host(self) -> str:
         """Return the external host set by istio-ingress, if any."""
-        self._update_stored()
-        return self._stored.external_host or ''
+        for relation in self._charm.model.relations[self._relation_name]:
+            if not relation.app:
+                continue
+            host = relation.data[relation.app].get('external_host', '')
+            if host:
+                return host
+        return ''
 
     @property
     def tls_enabled(self) -> bool:
         """Return whether TLS is enabled on the gateway."""
-        self._update_stored()
-        return self._stored.tls_enabled or False
-
-    def _update_stored(self) -> None:
-        """Ensure that the stored host is up-to-date."""
-        if not self._charm.unit.is_leader():
-            return
-
         for relation in self._charm.model.relations[self._relation_name]:
             if not relation.app:
-                self._stored.external_host = ''
-                self._stored.tls_enabled = False
-                return
-            external_host = relation.data[relation.app].get('external_host', '')
-            self._stored.external_host = external_host or self._stored.external_host
-            tls_enabled_str = relation.data[relation.app].get('tls_enabled', 'False')
-            self._stored.tls_enabled = tls_enabled_str == 'True'
+                continue
+            return relation.data[relation.app].get('tls_enabled', 'False') == 'True'
+        return False
 
     def _on_relation_changed(self, event: RelationEvent) -> None:
-        """Update StoredState with external_host and other information from istio-ingress."""
-        self._update_stored()
+        """Handle relation-changed by emitting ready if leader."""
         if self._charm.unit.is_leader():
             self.on.ready.emit(relation=event.relation, app=event.relation.app)
 
     def _on_relation_broken(self, event: RelationEvent) -> None:
-        """On RelationBroken, clear the stored data if set and emit an event."""
-        self._stored.external_host = ''
-        self._stored.tls_enabled = False
+        """On RelationBroken, emit ready so the charm can react."""
         if self._charm.unit.is_leader():
             self.on.ready.emit(relation=event.relation, app=event.relation.app)
 
