@@ -33,8 +33,10 @@ integration = [  # installed for `just integration interfaces/istio-request-auth
 ]
 
 [project.urls]
-"Repository" = "https://github.com/canonical/charmlibs"
+"Documentation" = "https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/istio-request-auth"
+"Repository" = "https://github.com/canonical/charmlibs/tree/main/interfaces/istio-request-auth"
 "Issues" = "https://github.com/canonical/charmlibs/issues"
+"Changelog" = "https://github.com/canonical/charmlibs/blob/main/interfaces/istio-request-auth/CHANGELOG.md"
 
 [build-system]
 requires = ["hatchling"]
