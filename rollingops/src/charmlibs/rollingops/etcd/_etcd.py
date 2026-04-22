@@ -14,9 +14,8 @@
 
 """Classes that manage etcd concepts."""
 
-import ctypes
 import logging
-import signal
+import os
 import subprocess
 import time
 
@@ -37,11 +36,10 @@ LOCK_LEASE_TTL = '60'
 class EtcdLease:
     """Manage the lifecycle of an etcd lease and its keep-alive process."""
 
-    PR_SET_PDEATHSIG = 1
-
     def __init__(self):
         self.id: str | None = None
         self.keepalive_proc: subprocess.Popen[str] | None = None
+        self._pipe_write_fd: int | None = None
 
     def grant(self) -> None:
         """Create a new lease and start the keep-alive process."""
@@ -75,12 +73,6 @@ class EtcdLease:
             finally:
                 self.id = None
 
-    @staticmethod
-    def _set_parent_death_signal() -> None:
-        """Ask the kernel to send SIGTERM to the child if its parent dies."""
-        libc = ctypes.CDLL('libc.so.6')
-        libc.prctl(EtcdLease.PR_SET_PDEATHSIG, signal.SIGTERM)
-
     def _start_lease_keepalive(self) -> None:
         """Start the background process that keeps the lease alive."""
         lease_id = self.id
@@ -88,18 +80,52 @@ class EtcdLease:
             logger.info('Lease ID is None. Keepalive for this lease cannot be started.')
             return
         etcdctl.ensure_initialized()
-        self.keepalive_proc = subprocess.Popen(
-            [etcdctl.ETCDCTL_CMD, 'lease', 'keep-alive', lease_id],
-            env=etcdctl.load_env(),
-            text=True,
-            preexec_fn=self._set_parent_death_signal,
-        )
+
+        pipe_read_fd, pipe_write_fd = os.pipe()
+        self._pipe_write_fd = pipe_write_fd
+
+        keep_alive_cmd = f'{etcdctl.ETCDCTL_CMD} lease keep-alive {lease_id}  </dev/null & read -r _; kill %1 2>/dev/null; wait'  # noqa: E501
+        try:
+            self.keepalive_proc = subprocess.Popen(
+                ['bash', '-c', keep_alive_cmd],
+                # The pipe read side becomes the child's stdin
+                # so when the parent closes its write side, this stdin gets EOF
+                stdin=pipe_read_fd,
+                env=etcdctl.load_env(),
+                text=True,
+                close_fds=True,
+                preexec_fn=self._close_write_side_in_child,
+            )
+        except Exception:  # OSError perhaps?
+            os.close(pipe_read_fd)
+            os.close(pipe_write_fd)
+            self._pipe_write_fd = None
+            raise
+
+        os.close(pipe_read_fd)
         logger.info('Keepalive started for lease %s.', self.id)
+
+    def _close_write_side_in_child(self) -> None:
+        if self._pipe_write_fd is None:
+            return
+        os.close(self._pipe_write_fd)
 
     def _stop_keepalive(self) -> None:
         """Terminate the keep-alive subprocess if it is running."""
+        # Close the write side of the pipe to set EOF to the child's stdin
+        # and trigger the `read -r _`
+        if self._pipe_write_fd is not None:
+            try:
+                os.close(self._pipe_write_fd)
+            except OSError:
+                pass
+            finally:
+                self._pipe_write_fd = None
+
         if self.keepalive_proc is None:
             return
+
+        # Additional safeguard
         try:
             self.keepalive_proc.terminate()
         except ProcessLookupError:
