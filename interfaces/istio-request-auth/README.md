@@ -8,4 +8,4 @@ To install, add `charmlibs-interfaces-istio-request-auth` to your Python depende
 from charmlibs.interfaces import istio_request_auth
 ```
 
-See the [reference documentation](https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/istio_request_auth) for more.
+See the [reference documentation](https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/istio-request-auth) for more.
