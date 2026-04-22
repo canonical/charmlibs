@@ -110,7 +110,7 @@ class DatabagModel(BaseModel):
                 k: json.loads(v)
                 for k, v in databag.items()
                 # Don't attempt to parse model-external values
-                if k in {(f.alias or n) for n, f in cls.field_names.items()}  # type: ignore
+                if k in {(f.alias or n) for n, f in cls.model_fields.items()}
             }
         except json.JSONDecodeError as e:
             msg = f"invalid databag contents: expecting json. {databag}"
@@ -159,53 +159,27 @@ class DatabagModel(BaseModel):
 
 
 # todo use models from charm-relation-interfaces
-if int(pydantic.version.VERSION.split(".")[0]) < 2:
+class ProtocolType(BaseModel):
+    """Protocol Type."""
 
-    class ProtocolType(BaseModel):  # type: ignore
-        """Protocol Type."""
+    model_config = ConfigDict(
+        # Allow serializing enum values.
+        use_enum_values=True
+    )
+    """Pydantic config."""
 
-        class Config:
-            """Pydantic config."""
+    name: str = Field(
+        ...,
+        description="Receiver protocol name. What protocols are supported "
+        "(and what they are called) may differ per provider.",
+        examples=["otlp_grpc", "otlp_http", "tempo_http"],
+    )
 
-            use_enum_values = True
-            """Allow serializing enum values."""
-
-        name: str = Field(
-            ...,
-            description="Receiver protocol name. What protocols are supported "
-            "(and what they are called) may differ per provider.",
-            examples=["otlp_grpc", "otlp_http", "tempo_http"],
-        )
-
-        type: TransportProtocolType = Field(
-            ...,
-            description="The transport protocol used by this receiver.",
-            examples=["http", "grpc"],
-        )
-
-else:
-
-    class ProtocolType(BaseModel):
-        """Protocol Type."""
-
-        model_config = ConfigDict(
-            # Allow serializing enum values.
-            use_enum_values=True
-        )
-        """Pydantic config."""
-
-        name: str = Field(
-            ...,
-            description="Receiver protocol name. What protocols are supported "
-            "(and what they are called) may differ per provider.",
-            examples=["otlp_grpc", "otlp_http", "tempo_http"],
-        )
-
-        type: TransportProtocolType = Field(
-            ...,
-            description="The transport protocol used by this receiver.",
-            examples=["http", "grpc"],
-        )
+    type: TransportProtocolType = Field(
+        ...,
+        description="The transport protocol used by this receiver.",
+        examples=["http", "grpc"],
+    )
 
 
 class Receiver(BaseModel):
