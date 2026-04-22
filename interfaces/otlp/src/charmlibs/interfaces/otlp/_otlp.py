@@ -34,9 +34,9 @@ from cosl.backends.prometheus import PrometheusRuleBackend
 from cosl.cos_tool import CosTool
 from cosl.juju_topology import JujuTopology
 from cosl.rules import (
-    HOST_METRICS_MISSING_RULE_NAME,  # pyright: ignore[reportPrivateImportUsage]
+    HOST_METRICS_MISSING_RULE_NAME,
     GenericRules,
-    generic_alert_groups,  # pyright: ignore[reportPrivateImportUsage]
+    generic_alert_groups,
 )
 from cosl.types import OfficialRuleFileFormat, OfficialRuleFileItem, SingleRuleFormat
 from cosl.utils import LZMABase64

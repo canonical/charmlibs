@@ -9,7 +9,7 @@ from typing import Any
 import ops
 import pytest
 from cosl.juju_topology import JujuTopology
-from cosl.rules import HOST_METRICS_MISSING_RULE_NAME  # pyright: ignore[reportPrivateImportUsage]
+from cosl.rules import HOST_METRICS_MISSING_RULE_NAME
 from cosl.utils import LZMABase64
 from ops import testing
 from ops.testing import Model, PeerRelation, Relation, State
