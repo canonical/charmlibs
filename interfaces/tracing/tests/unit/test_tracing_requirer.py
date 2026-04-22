@@ -30,7 +30,7 @@ Context: TypeAlias = ops.testing.Context[MyCharm]
 
 
 @pytest.fixture
-def context():
+def context() -> Context:
     return ops.testing.Context(
         charm_type=MyCharm,
         meta={
