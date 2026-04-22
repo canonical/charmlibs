@@ -149,7 +149,7 @@ class DatabagModel(BaseModel):
             return databag
 
         dct = self.model_dump()
-        for key, field in self.model_fields.items():  # type: ignore
+        for key, field in self.__class__.model_fields.items():
             value = dct[key]
             if value == field.default:
                 continue
@@ -679,7 +679,7 @@ class TracingEndpointRequirer(Object):
             return
 
         data = TracingProviderAppData.load(relation.data[relation.app])
-        self.on.endpoint_changed.emit(relation, [i.dict() for i in data.receivers])  # type: ignore
+        self.on.endpoint_changed.emit(relation, [i.model_dump() for i in data.receivers])
 
     def _on_tracing_relation_broken(self, event: RelationBrokenEvent) -> None:
         """Notify the providers that the endpoint is broken."""
