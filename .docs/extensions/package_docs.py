@@ -113,7 +113,8 @@ def _main(docs_dir: pathlib.Path, package: str | None) -> None:
     root = docs_dir.parent
     ref_dir = docs_dir / 'reference'
     (ref_dir / 'charmlibs' / 'interfaces').mkdir(parents=True, exist_ok=True)
-    cmd = [root / '.scripts/ls.py', 'packages', '--exclude-examples', '--exclude-placeholders']
+    ls = root / '.scripts' / 'ls.py'
+    cmd = [ls, 'packages', '--exclude-examples', '--exclude-placeholders', '--exclude-testing']
     packages = json.loads(subprocess.check_output(cmd, text=True))
     for raw_package in packages:
         subdir, _, p = raw_package.rpartition('/')

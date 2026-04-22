@@ -32,8 +32,10 @@ integration = [  # installed for `just integration example`
 ]
 
 [project.urls]
-"Repository" = "https://github.com/canonical/charmlibs"
+"Documentation" = "https://documentation.ubuntu.com/charmlibs/reference/charmlibs/example"
+"Repository" = "https://github.com/canonical/charmlibs/tree/main/example"
 "Issues" = "https://github.com/canonical/charmlibs/issues"
+"Changelog" = "https://github.com/canonical/charmlibs/blob/main/example/CHANGELOG.md"
 
 [build-system]
 requires = ["hatchling"]
