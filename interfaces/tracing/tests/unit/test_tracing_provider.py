@@ -1,5 +1,4 @@
 # Copyright 2026 Canonical Ltd.
-import json
 from typing import TypeAlias
 
 import ops.testing
@@ -30,9 +29,9 @@ class MyCharm(ops.CharmBase):
 
         requested_receivers = set(self.tracing.requested_protocols())
         if self.unit.is_leader():
-            self.tracing.publish_receivers(
-                [(p, self.get_receiver_url(p)) for p in requested_receivers]
-            )
+            self.tracing.publish_receivers([
+                (p, self.get_receiver_url(p)) for p in requested_receivers
+            ])
 
     def get_receiver_url(self, protocol: ReceiverProtocol) -> str:
         if protocol == "otlp_grpc":
@@ -78,7 +77,6 @@ def test_receiver_api(context: Context, leader: bool):
 
     # WHEN any event occurs
     with context(context.on.update_status(), state) as mgr:
-        charm = mgr.charm
         assert mgr.charm.tracing.requested_protocols() == {'otlp_grpc', 'otlp_http'}
         state_out = mgr.run()
 
