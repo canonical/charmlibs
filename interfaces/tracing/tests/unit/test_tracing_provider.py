@@ -1,4 +1,5 @@
 # Copyright 2026 Canonical Ltd.
+import json
 from typing import TypeAlias
 
 import ops.testing
@@ -141,3 +142,29 @@ def test_publish_receivers(context: Context):
     assert sorted([
         r.url for r in TracingProviderAppData.load(relation_out.local_app_data).receivers
     ]) == ["app.hostname:4317", "http://app.hostname:4318"]
+
+
+@pytest.mark.parametrize("hook", ("relation_changed", "relation_created", "relation_joined"))
+def test_tracing_v2_endpoint_published(context: Context, hook: str):
+    tracing = ops.testing.Relation("tracing", remote_app_data={"receivers": "[]"})
+    state = ops.testing.State(leader=True, relations={tracing})
+
+    with context(getattr(context.on, hook)(tracing), state) as mgr:
+        assert len(mgr.charm._requested_receivers) == 1
+        out = mgr.run()
+
+    tracing_out = out.get_relations(tracing.endpoint)[0]
+    expected_data = [
+        {
+            "protocol": {"name": "otlp_http", "type": "http"},
+            "url": "http://default-host.example:4318",
+        },
+    ]
+
+    assert (
+        sorted(
+            json.loads(tracing_out.local_app_data["receivers"]),
+            key=lambda x: x["protocol"]["name"],
+        )
+        == expected_data
+    )
