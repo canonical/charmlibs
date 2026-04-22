@@ -16,9 +16,9 @@ Charms seeking to push traces to Tempo, must do so using the `TracingEndpointReq
 object from this charm library. For the simplest use cases, using the `TracingEndpointRequirer`
 object only requires instantiating it, typically in the constructor of your charm. The
 `TracingEndpointRequirer` constructor requires the name of the relation over which a tracing endpoint
- is exposed by the Tempo charm, and a list of protocols it intends to send traces with.
- This relation must use the `tracing` interface.
- The `TracingEndpointRequirer` object may be instantiated as follows
+is exposed by the Tempo charm, and a list of protocols it intends to send traces with.
+This relation must use the `tracing` interface.
+The `TracingEndpointRequirer` object may be instantiated as follows
 
 
 ```py
