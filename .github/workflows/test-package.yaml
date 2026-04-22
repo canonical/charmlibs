@@ -50,8 +50,8 @@ jobs:
       - name: Ensure package uv.lock is up-to-date
         working-directory: ${{ inputs.package }}
         run: |
-          case "$(basename "$PWD")" in
-            ".example"|".tutorial") echo "Examples don't have a uv.lock file, skipping ..." ;;
+          case "$PWD" in
+            */.example|*/.example/testing|*/.tutorial) echo "Examples don't have a uv.lock file, skipping ..." ;;
             *) uv lock --check ;;
           esac
 

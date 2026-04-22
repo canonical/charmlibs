@@ -17,13 +17,19 @@ dynamic = ["version"]
 dependencies = [
     # "ops",
 ]
-
+{% if cookiecutter._interface %}
+[project.optional-dependencies]
+testing = ["{{ cookiecutter.__dist_pkg }}-testing==0.0.0.dev0"]
+{% endif %}
 [dependency-groups]
 lint = [  # installed for `just lint {{ cookiecutter.__path_prefix }}{{ cookiecutter.project_slug }}` (unit, functional, and integration are also installed)
     # "typing_extensions",
 ]
 unit = [  # installed for `just unit {{ cookiecutter.__path_prefix }}{{ cookiecutter.project_slug }}`
     "ops[testing]",
+{%- if cookiecutter._interface %}
+    "{{ cookiecutter.__dist_pkg }}[testing]",
+{%- endif %}
 ]
 functional = [  # installed for `just functional {{ cookiecutter.__path_prefix }}{{ cookiecutter.project_slug }}`
 ]
@@ -32,8 +38,10 @@ integration = [  # installed for `just integration {{ cookiecutter.__path_prefix
 ]
 
 [project.urls]
-"Repository" = "https://github.com/canonical/charmlibs"
+"Documentation" = "https://documentation.ubuntu.com/charmlibs/reference/charmlibs/{{ cookiecutter.__path_prefix }}{{ cookiecutter.__canonical_name }}"
+"Repository" = "https://github.com/canonical/charmlibs/tree/main/{{ cookiecutter.__path_prefix }}{{ cookiecutter.project_slug }}"
 "Issues" = "https://github.com/canonical/charmlibs/issues"
+"Changelog" = "https://github.com/canonical/charmlibs/blob/main/{{ cookiecutter.__path_prefix }}{{ cookiecutter.project_slug }}/CHANGELOG.md"
 
 [build-system]
 requires = ["hatchling"]
@@ -44,7 +52,10 @@ packages = ["src/charmlibs"]
 
 [tool.hatch.version]
 path = "src/charmlibs/{{ cookiecutter.__path_prefix }}{{ cookiecutter.__pkg}}/_version.py"
-
+{% if cookiecutter._interface %}
+[tool.uv.sources]
+{{ cookiecutter.__dist_pkg }}-testing = { path = "testing", editable = true }
+{% endif %}
 [tool.ruff]
 extend = "{{ '../' if cookiecutter._interface else '' }}../pyproject.toml"
 src = ["src", "tests/unit", "tests/functional", "tests/integration"]  # correctly sort local imports in tests
