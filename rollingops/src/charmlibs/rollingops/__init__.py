@@ -14,17 +14,45 @@
 
 """The charmlibs.rollingops package."""
 
-from ._base_manager import RollingOpsManager
-from ._models import (
-    OperationResult,
-    RollingOpsEtcdNotConfiguredError,
-    RollingOpsInvalidLockRequestError,
-)
+from ._rollingops_manager import RollingOpsManager
 from ._version import __version__ as __version__
+from .common._exceptions import (
+    RollingOpsDecodingError,
+    RollingOpsEtcdctlError,
+    RollingOpsEtcdNotConfiguredError,
+    RollingOpsFileSystemError,
+    RollingOpsInvalidLockRequestError,
+    RollingOpsInvalidSecretContentError,
+    RollingOpsLibMissingError,
+    RollingOpsNoRelationError,
+    RollingOpsSyncLockError,
+)
+from .common._models import (
+    Operation,
+    OperationQueue,
+    OperationResult,
+    ProcessingBackend,
+    RollingOpsState,
+    RollingOpsStatus,
+    SyncLockBackend,
+)
 
 __all__ = (
+    'Operation',
+    'OperationQueue',
     'OperationResult',
+    'ProcessingBackend',
+    'RollingOpsDecodingError',
     'RollingOpsEtcdNotConfiguredError',
+    'RollingOpsEtcdctlError',
+    'RollingOpsFileSystemError',
     'RollingOpsInvalidLockRequestError',
+    'RollingOpsInvalidSecretContentError',
+    'RollingOpsLibMissingError',
     'RollingOpsManager',
+    'RollingOpsNoRelationError',
+    'RollingOpsState',
+    'RollingOpsStatus',
+    'RollingOpsSyncLockError',
+    'SyncLockBackend',
 )

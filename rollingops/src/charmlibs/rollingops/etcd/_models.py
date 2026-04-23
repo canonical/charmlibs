@@ -14,72 +14,15 @@
 
 """etcd rolling ops models."""
 
-from collections.abc import Callable
 from dataclasses import dataclass
-from enum import StrEnum
-from typing import ClassVar, TypeVar
-
-from ops import pebble
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_fixed
+from typing import ClassVar
 
 from charmlibs.interfaces.tls_certificates import Certificate, PrivateKey
-from charmlibs.pathops import LocalPath, PebbleConnectionError
-
-T = TypeVar('T')
-
-
-class RollingOpsNoEtcdRelationError(Exception):
-    """Raised if we are trying to process a lock, but do not appear to have a relation yet."""
-
-
-class RollingOpsEtcdUnreachableError(Exception):
-    """Raised if etcd server is unreachable."""
-
-
-class RollingOpsEtcdNotConfiguredError(Exception):
-    """Raised if etcd client has not been configured yet (env file does not exist)."""
-
-
-class RollingOpsFileSystemError(Exception):
-    """Raised if there is a problem when interacting with the filesystem."""
-
-
-class RollingOpsInvalidLockRequestError(Exception):
-    """Raised if the lock request is invalid."""
-
-
-class RollingOpsDecodingError(Exception):
-    """Raised if json content cannot be processed."""
-
-
-class RollingOpsInvalidSecretContentError(Exception):
-    """Raised if the content of a secret is invalid."""
-
-
-class RollingOpsCharmLibMissingError(Exception):
-    """Raised if the path to the libraries cannot be resolved."""
-
+from charmlibs.pathops import LocalPath
+from charmlibs.rollingops.common._utils import with_pebble_retry
 
 CERT_MODE = 0o644
 KEY_MODE = 0o600
-
-
-@retry(
-    retry=retry_if_exception_type((PebbleConnectionError, pebble.APIError, pebble.ChangeError)),
-    stop=stop_after_attempt(3),
-    wait=wait_fixed(10),
-    reraise=True,
-)
-def with_pebble_retry[T](func: Callable[[], T]) -> T:
-    return func()
-
-
-class OperationResult(StrEnum):
-    """Callback return values."""
-
-    RELEASE = 'release'
-    RETRY_RELEASE = 'retry-release'
-    RETRY_HOLD = 'retry-hold'
 
 
 @dataclass(frozen=True)
@@ -205,6 +148,14 @@ class EtcdConfig:
     cacert_path: str
     cert_path: str
     key_path: str
+
+
+@dataclass
+class EtcdKV:
+    """A single etcd key-value entry."""
+
+    key: str
+    value: dict[str, str]
 
 
 @dataclass(frozen=True)

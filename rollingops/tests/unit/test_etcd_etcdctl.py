@@ -21,7 +21,7 @@ from unittest.mock import patch
 import pytest
 
 from charmlibs.pathops import LocalPath
-from charmlibs.rollingops import RollingOpsEtcdNotConfiguredError
+from charmlibs.rollingops.common._exceptions import RollingOpsEtcdNotConfiguredError
 
 
 def test_etcdctl_write_env(temp_etcdctl: Any) -> None:

@@ -22,7 +22,7 @@ from charmlibs.interfaces.tls_certificates import (
     Certificate,
     PrivateKey,
 )
-from charmlibs.rollingops._models import SharedCertificate
+from charmlibs.rollingops.etcd._models import SharedCertificate
 
 
 def make_shared_certificate() -> SharedCertificate:
@@ -33,7 +33,7 @@ def make_shared_certificate() -> SharedCertificate:
     )
 
 
-def test_certs():
+def test_make_shared_certificate_is_valid():
     Certificate.from_string(VALID_CA_CERT_PEM)
     PrivateKey.from_string(VALID_CLIENT_KEY_PEM)
     Certificate.from_string(VALID_CLIENT_CERT_PEM)
@@ -123,7 +123,7 @@ def test_certificates_manager_generate_does_nothing_when_files_already_exist(
     temp_certificates.CA_CERT_PATH.write_text(VALID_CA_CERT_PEM)
     old_certificates = make_shared_certificate()
 
-    new_certificates = temp_certificates.generate(common_name='unit-1')
+    new_certificates = temp_certificates.generate(model_uuid='model', app_name='unit-1')
 
     written = SharedCertificate.from_strings(
         certificate=temp_certificates.CLIENT_CERT_PATH.read_text(),
@@ -138,7 +138,7 @@ def test_certificates_manager_generate_does_nothing_when_files_already_exist(
 def test_certificates_manager_generate_creates_all_files(
     temp_certificates: Any,
 ) -> None:
-    shared = temp_certificates.generate(common_name='unit-1')
+    shared = temp_certificates.generate(model_uuid='model', app_name='unit-1')
     assert temp_certificates._exists() is True
 
     assert temp_certificates.CA_CERT_PATH.read_text().startswith('-----BEGIN CERTIFICATE-----')

@@ -30,3 +30,15 @@ deferred-restart:
     max-retry:
       description: "Number of times the operation should be retried."
       type: integer
+
+sync-restart:
+  description: Example restart with a custom callback function. Used in testing
+  params:
+    delay:
+      description: "Introduce an artificial delay (for testing)."
+      type: integer
+      default: 0
+    timeout:
+      description: "Time (seconds) to wait before giving up."
+      type: integer
+      default: 60

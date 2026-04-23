@@ -12,12 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Integration tests using real Juju and pre-packed charm(s)."""
+"""Utils for integration tests."""
 
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 
 import jubilant
+
+from charmlibs import pathops
 
 TRACE_FILE = '/var/lib/charm-rolling-ops/transitions.log'
 
@@ -32,7 +34,7 @@ def get_unit_events(juju: jubilant.Juju, unit: str) -> list[dict[str, str]]:
 
 
 def parse_ts(event: dict[str, str]) -> datetime:
-    return datetime.fromisoformat(event['ts'])
+    return datetime.fromtimestamp(float(event['ts']), tz=UTC)
 
 
 def get_leader_unit_name(juju: jubilant.Juju, app: str) -> str:
@@ -50,3 +52,13 @@ def get_leader_unit_name(juju: jubilant.Juju, app: str) -> str:
 
 def remove_transition_file(juju: jubilant.Juju, unit: str):
     juju.exec(f'rm -f {TRACE_FILE}', unit=unit)
+
+
+def is_empty_file(juju: jubilant.Juju, unit: str, path: str) -> bool:
+    pathops_path = pathops.LocalPath(path)
+    try:
+        task = juju.exec(f'test ! -s {pathops_path}', unit=unit)
+    except Exception:
+        return False
+
+    return task.status == 'completed' and task.return_code == 0

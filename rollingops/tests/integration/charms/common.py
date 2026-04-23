@@ -30,6 +30,7 @@ from charmlibs import pathops
 from charmlibs.rollingops import (
     OperationResult,
     RollingOpsManager,
+    SyncLockBackend,
 )
 
 logger = logging.getLogger(__name__)
@@ -38,8 +39,16 @@ TRACE_FILE = pathops.LocalPath('/var/lib/charm-rolling-ops/transitions.log')
 
 
 def _now_timestamp_str() -> str:
-    """UTC timestamp as a string using ISO 8601 format."""
-    return datetime.now(UTC).isoformat()
+    """UTC timestamp as a epoch."""
+    return str(datetime.now(UTC).timestamp())
+
+
+class MySyncBackend(SyncLockBackend):
+    def acquire(self, timeout: int | None) -> None:
+        logger.info('acquiring sync lock')
+
+    def release(self) -> None:
+        logger.info('releasing sync lock')
 
 
 class Charm(CharmBase):
@@ -59,11 +68,15 @@ class Charm(CharmBase):
             etcd_relation_name='etcd',
             cluster_id='cluster-12345',
             callback_targets=callback_targets,
+            sync_lock_targets={
+                'stop': MySyncBackend,
+            },
         )
 
         self.framework.observe(self.on.restart_action, self._on_restart_action)
         self.framework.observe(self.on.failed_restart_action, self._on_failed_restart_action)
         self.framework.observe(self.on.deferred_restart_action, self._on_deferred_restart_action)
+        self.framework.observe(self.on.sync_restart_action, self._on_sync_restart_action)
 
     def _restart(self, delay: int = 0) -> None:
         self._record_transition('_restart:start', delay=delay)
@@ -119,12 +132,37 @@ class Charm(CharmBase):
             max_retry=max_retry,
         )
 
+    def _on_sync_restart_action(self, event: ActionEvent):
+        self.model.unit.status = WaitingStatus('Awaiting _sync_restart operation')
+        timeout = event.params.get('timeout', 60)
+        delay = event.params.get('delay')
+        self._record_transition('action:sync-restart', delay=delay, timeout=timeout)
+
+        try:
+            with self.restart_manager.acquire_sync_lock(backend_id='stop', timeout=timeout):
+                self._record_transition('_sync_restart:start', delay=delay, timeout=timeout)
+                logger.info('Executing _sync_restart.')
+                self.model.unit.status = MaintenanceStatus('Executing _sync_restart operation')
+                time.sleep(int(event.params.get('delay', 0)))
+                self.model.unit.status = ActiveStatus('')
+                logger.info('Finished _sync_restart.')
+                self._record_transition('_sync_restart:done', delay=delay, timeout=timeout)
+                return
+        except TimeoutError:
+            self._record_transition('_sync_restart:timeout', delay=delay, timeout=timeout)
+        event.fail('Timed out acquiring sync lock')
+
     def _record_transition(self, name: str, **data: Any) -> None:
         TRACE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        state = self.restart_manager.state
         payload = {
             'ts': _now_timestamp_str(),
             'unit': self.model.unit.name,
             'event': name,
+            'rollingops_status': state.status.value if state.status else None,
+            'processing_backend': state.processing_backend.value
+            if state.processing_backend
+            else None,
             **data,
         }
         with TRACE_FILE.open('a', encoding='utf-8') as f:

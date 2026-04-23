@@ -15,25 +15,34 @@
 """Background process."""
 
 import argparse
-import subprocess
 import time
+
+from charmlibs.rollingops.common._utils import dispatch_lock_granted, setup_logging
+from charmlibs.rollingops.peer._worker import PEER_LOG_FILENAME
 
 
 def main():
     """Juju hook event dispatcher."""
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--run-cmd', required=True)
-    parser.add_argument('--unit-name', required=True)
-    parser.add_argument('--charm-dir', required=True)
+    parser = argparse.ArgumentParser(description='RollingOps peer worker')
+    parser.add_argument(
+        '--unit-name',
+        type=str,
+        required=True,
+        help='Juju unit name (e.g. app/0)',
+    )
+    parser.add_argument(
+        '--charm-dir',
+        type=str,
+        required=True,
+        help='Path to the charm directory',
+    )
     args = parser.parse_args()
+    setup_logging(PEER_LOG_FILENAME, unit_name=args.unit_name)
 
     # Sleep so that the leader unit can properly leave the hook and start a new one
     time.sleep(10)
-    dispatch_sub_cmd = (
-        f'JUJU_DISPATCH_PATH=hooks/rollingops_lock_granted {args.charm_dir}/dispatch'
-    )
-    res = subprocess.run([args.run_cmd, '-u', args.unit_name, dispatch_sub_cmd])
-    res.check_returncode()
+
+    dispatch_lock_granted(args.unit_name, args.charm_dir)
 
 
 if __name__ == '__main__':

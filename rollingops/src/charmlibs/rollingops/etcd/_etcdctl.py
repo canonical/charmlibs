@@ -27,14 +27,24 @@ import subprocess
 from dataclasses import asdict
 from functools import lru_cache
 
+from tenacity import (
+    before_sleep_log,
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_fixed,
+)
+
 from charmlibs import pathops
-from charmlibs.rollingops._models import (
-    CERT_MODE,
-    EtcdConfig,
+from charmlibs.rollingops.common._exceptions import (
+    RollingOpsEtcdctlFatalError,
+    RollingOpsEtcdctlParseError,
+    RollingOpsEtcdctlRetryableError,
     RollingOpsEtcdNotConfiguredError,
     RollingOpsFileSystemError,
-    with_pebble_retry,
 )
+from charmlibs.rollingops.common._utils import with_pebble_retry
+from charmlibs.rollingops.etcd._models import CERT_MODE, EtcdConfig, EtcdKV
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +52,9 @@ BASE_DIR = pathops.LocalPath('/var/lib/rollingops/etcd')
 SERVER_CA_PATH = BASE_DIR / 'server-ca.pem'
 CONFIG_FILE_PATH = BASE_DIR / 'etcdctl.json'
 ETCDCTL_CMD = 'etcdctl'
+ETCDCTL_TIMEOUT_SECONDS = 15
+ETCDCTL_RETRY_ATTEMPTS = 12
+ETCDCTL_RETRY_WAIT_SECONDS = 5
 
 
 @lru_cache(maxsize=1)
@@ -185,31 +198,210 @@ def cleanup() -> None:
         raise RollingOpsFileSystemError('Failed to remove etcd config file and CA.') from e
 
 
-def run(*args: str) -> str | None:
+def _is_retryable_stderr(stderr: str) -> bool:
+    """Return whether stderr looks like a transient etcd/client failure."""
+    text = stderr.lower()
+    retryable_markers = (
+        'connection refused',
+        'context deadline exceeded',
+        'deadline exceeded',
+        'temporarily unavailable',
+        'transport is closing',
+        'connection reset',
+        'broken pipe',
+        'unavailable',
+        'leader changed',
+        'etcdserver: request timed out',
+    )
+    return any(marker in text for marker in retryable_markers)
+
+
+@retry(
+    retry=retry_if_exception_type(RollingOpsEtcdctlRetryableError),
+    stop=stop_after_attempt(ETCDCTL_RETRY_ATTEMPTS),
+    wait=wait_fixed(ETCDCTL_RETRY_WAIT_SECONDS),
+    before_sleep=before_sleep_log(logger, logging.WARNING),
+    reraise=True,
+)
+def _run_checked(*args: str, cmd_input: str | None = None) -> subprocess.CompletedProcess[str]:
+    """Execute etcdctl and return the completed process.
+
+    Raises:
+        RollingOpsEtcdNotConfiguredError: if etcdctl is not configured.
+        PebbleConnectionError: if the remote container cannot be reached.
+        RollingOpsEtcdctlRetryableError: for transient command failures.
+        RollingOpsEtcdctlFatalError: for non-retryable command failures.
+    """
+    ensure_initialized()
+
+    cmd = [ETCDCTL_CMD, *args]
+
+    try:
+        res = subprocess.run(
+            cmd,
+            env=load_env(),
+            input=cmd_input,
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=ETCDCTL_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as e:
+        logger.warning(
+            'Timed out running etcdctl: cmd=%r stdout=%r stderr=%r', cmd, e.stdout, e.stderr
+        )
+        raise RollingOpsEtcdctlRetryableError(f'Timed out running etcdctl: {cmd!r}') from e
+    except FileNotFoundError as e:
+        logger.exception('etcdctl executable not found: %s', ETCDCTL_CMD)
+        raise RollingOpsEtcdctlFatalError(f'etcdctl executable not found: {ETCDCTL_CMD}') from e
+    except OSError as e:
+        logger.exception('Failed to execute etcdctl: cmd=%r', cmd)
+        raise RollingOpsEtcdctlFatalError(f'Failed to execute etcdctl: {cmd!r}') from e
+
+    if res.returncode != 0:
+        logger.warning(
+            'etcdctl command failed: cmd=%r returncode=%s stdout=%r stderr=%r',
+            cmd,
+            res.returncode,
+            res.stdout,
+            res.stderr,
+        )
+        if _is_retryable_stderr(res.stderr):
+            raise RollingOpsEtcdctlRetryableError(
+                f'Retryable etcdctl failure (rc={res.returncode}): {res.stderr.strip()}'
+            )
+        raise RollingOpsEtcdctlFatalError(
+            f'etcdctl failed (rc={res.returncode}): {res.stderr.strip()}'
+        )
+
+    logger.debug('etcdctl command succeeded: cmd=%r stdout=%r', cmd, res.stdout)
+    return res
+
+
+def run(*args: str, cmd_input: str | None = None) -> str:
     """Execute an etcdctl command.
 
     Args:
         args: List of arguments to pass to etcdctl.
+        cmd_input: value to use as input when running the command.
 
     Returns:
         The stdout of the command, stripped, or None if execution failed.
 
     Raises:
-        RollingOpsEtcdNotConfiguredError: if the etcd config file does not exist.
+        RollingOpsEtcdNotConfiguredError: if etcdctl is not configured.
+        RollingOpsFileSystemError: if configuration cannot be read.
         PebbleConnectionError: if the remote container cannot be reached.
+        RollingOpsEtcdctlError: etcdctl command error.
     """
-    ensure_initialized()
-    cmd = [ETCDCTL_CMD, *args]
+    return _run_checked(*args, cmd_input=cmd_input).stdout.strip()
+
+
+def _get_key_value_pair(key_prefix: str, *extra_args: str) -> EtcdKV | None:
+    """Retrieve the first key and value under a given prefix.
+
+    Args:
+        key_prefix: Key prefix to search for.
+        extra_args: Arguments to the get command
+
+    Returns:
+        A EtcdKV containing:
+        - The key string
+        - The parsed JSON value as a dictionary
+
+        Returns None if no key exists.
+
+    Raises:
+        RollingOpsEtcdctlParseError: if the output is malformed
+
+    """
+    res = run('get', key_prefix, '--prefix', *extra_args)
+    out = res.splitlines()
+    if len(out) < 2:
+        return None
 
     try:
-        result = subprocess.run(
-            cmd, env=load_env(), check=True, text=True, capture_output=True
-        ).stdout.strip()
-    except subprocess.CalledProcessError as e:
-        logger.error('etcdctl command failed: returncode: %s, error: %s', e.returncode, e.stderr)
-        return None
-    except subprocess.TimeoutExpired as e:
-        logger.error('Timed out running etcdctl: %s', e.stderr)
-        return None
+        value = json.loads(out[1])
+    except json.JSONDecodeError as e:
+        raise RollingOpsEtcdctlParseError(
+            f'Failed to parse JSON value for key {out[0]}: {out[1]}'
+        ) from e
 
-    return result
+    return EtcdKV(key=out[0], value=value)
+
+
+def get_first_key_value_pair(key_prefix: str) -> EtcdKV | None:
+    """Retrieve the first key and value under a given prefix.
+
+    Args:
+        key_prefix: Key prefix to search for.
+
+    Returns:
+        A tuple containing:
+        - The key string
+        - The parsed JSON value as a dictionary
+
+        Returns None if no key exists or the command fails.
+
+    Raises:
+        RollingOpsEtcdctlParseError: if the output is malformed
+    """
+    return _get_key_value_pair(key_prefix, '--limit=1')
+
+
+def get_last_key_value_pair(key_prefix: str) -> EtcdKV | None:
+    """Retrieve the last key and value under a given prefix.
+
+    Args:
+        key_prefix: Key prefix to search for.
+
+    Returns:
+        A tuple containing:
+        - The key string
+        - The parsed JSON value as a dictionary
+
+        Returns None if no key exists or the command fails.
+
+    Raises:
+        RollingOpsEtcdctlParseError: if the output is malformed
+    """
+    return _get_key_value_pair(
+        key_prefix,
+        '--sort-by=KEY',
+        '--order=DESCEND',
+        '--limit=1',
+    )
+
+
+def txn(txn_input: str) -> bool:
+    """Execute an etcd transaction.
+
+    The transaction string should follow the etcdctl transaction format
+    where comparison statements are followed by operations.
+
+    Args:
+        txn_input: The transaction specification passed to `etcdctl txn`.
+
+    Returns:
+        True if the transaction succeeded, otherwise False.
+
+    Raises:
+        RollingOpsEtcdNotConfiguredError: if etcdctl is not configured.
+        PebbleConnectionError: if the remote container cannot be reached.
+        RollingOpsEtcdctlError: etcdctl command error.
+        RollingOpsEtcdctlParseError: if invalid response is found
+    """
+    res = _run_checked('txn', cmd_input=txn_input)
+
+    lines = res.stdout.splitlines()
+    if not lines:
+        raise RollingOpsEtcdctlParseError('Empty txn response')
+
+    first_line = lines[0].strip()
+
+    if first_line == 'SUCCESS':
+        return True
+    if first_line == 'FAILURE':
+        return False
+
+    raise RollingOpsEtcdctlParseError(f'Unexpected txn response: {res.stdout}')

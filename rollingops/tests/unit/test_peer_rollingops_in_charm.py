@@ -15,22 +15,18 @@
 # Learn more about testing at: https://juju.is/docs/sdk/testing
 
 
-import logging
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 from ops.testing import Context, PeerRelation, State
 from scenario import RawDataBagContents
-from tests.unit.conftest import PeerRollingOpsCharm
+from tests.unit.conftest import RollingOpsCharm
 
-from charmlibs.rollingops._peer_models import (
-    LockIntent,
-    OperationQueue,
-    RollingOpsInvalidLockRequestError,
-    _now_timestamp_str,
-)
-
-logger = logging.getLogger(__name__)
+from charmlibs.rollingops.common._exceptions import RollingOpsInvalidLockRequestError
+from charmlibs.rollingops.common._models import Operation, OperationQueue
+from charmlibs.rollingops.common._utils import now_timestamp
+from charmlibs.rollingops.peer._models import LockIntent
 
 
 def _unit_databag(state: State, peer: PeerRelation) -> RawDataBagContents:
@@ -45,18 +41,19 @@ def _make_operation_queue(
     callback_id: str, kwargs: dict[str, Any], max_retry: int | None
 ) -> OperationQueue:
     q = OperationQueue()
-    q.enqueue_lock_request(callback_id=callback_id, kwargs=kwargs, max_retry=max_retry)
+    op1 = Operation.create(callback_id=callback_id, kwargs=kwargs, max_retry=max_retry)
+    q.enqueue(op1)
     return q
 
 
 def test_lock_request_enqueues_and_sets_request(
-    peer_ctx: Context[PeerRollingOpsCharm],
+    ctx: Context[RollingOpsCharm],
 ):
     peer = PeerRelation(endpoint='restart')
     state_in = State(leader=False, relations={peer})
 
-    state_out = peer_ctx.run(
-        peer_ctx.on.action('restart', params={'delay': 10}),
+    state_out = ctx.run(
+        ctx.on.action('restart', params={'delay': 10}),
         state_in,
     )
 
@@ -79,14 +76,13 @@ def test_lock_request_enqueues_and_sets_request(
     [
         (-5),
         (-1),
-        ('3'),
     ],
 )
-def test_lock_request_invalid_inputs(peer_ctx: Context[PeerRollingOpsCharm], max_retry: Any):
+def test_lock_request_invalid_inputs(ctx: Context[RollingOpsCharm], max_retry: Any):
     peer = PeerRelation(endpoint='restart')
     state_in = State(leader=False, relations={peer})
 
-    with peer_ctx(peer_ctx.on.update_status(), state_in) as mgr:
+    with ctx(ctx.on.update_status(), state_in) as mgr:
         with pytest.raises(RollingOpsInvalidLockRequestError):
             mgr.charm.restart_manager.request_async_lock(
                 callback_id='_restart',
@@ -103,13 +99,11 @@ def test_lock_request_invalid_inputs(peer_ctx: Context[PeerRollingOpsCharm], max
         ('unknown',),
     ],
 )
-def test_lock_request_invalid_callback_id(
-    peer_ctx: Context[PeerRollingOpsCharm], callback_id: str
-):
+def test_lock_request_invalid_callback_id(ctx: Context[RollingOpsCharm], callback_id: str):
     peer = PeerRelation(endpoint='restart')
     state_in = State(leader=False, relations={peer})
 
-    with peer_ctx(peer_ctx.on.update_status(), state_in) as mgr:
+    with ctx(ctx.on.update_status(), state_in) as mgr:
         with pytest.raises(RollingOpsInvalidLockRequestError, match='Unknown callback_id'):
             mgr.charm.restart_manager.request_async_lock(
                 callback_id=callback_id,
@@ -126,11 +120,11 @@ def test_lock_request_invalid_callback_id(
         ({'x': OperationQueue()}),
     ],
 )
-def test_lock_request_invalid_kwargs(peer_ctx: Context[PeerRollingOpsCharm], kwargs: Any):
+def test_lock_request_invalid_kwargs(ctx: Context[RollingOpsCharm], kwargs: Any):
     peer = PeerRelation(endpoint='restart')
     state_in = State(leader=False, relations={peer})
 
-    with peer_ctx(peer_ctx.on.update_status(), state_in) as mgr:
+    with ctx(ctx.on.update_status(), state_in) as mgr:
         with pytest.raises(
             RollingOpsInvalidLockRequestError, match='Failed to create the lock request'
         ):
@@ -141,7 +135,7 @@ def test_lock_request_invalid_kwargs(peer_ctx: Context[PeerRollingOpsCharm], kwa
             )
 
 
-def test_existing_operation_then_new_request(peer_ctx: Context[PeerRollingOpsCharm]):
+def test_existing_operation_then_new_request(ctx: Context[RollingOpsCharm]):
     queue = _make_operation_queue(callback_id='_failed_restart', kwargs={}, max_retry=3)
     peer = PeerRelation(
         endpoint='restart',
@@ -150,7 +144,7 @@ def test_existing_operation_then_new_request(peer_ctx: Context[PeerRollingOpsCha
 
     state_in = State(leader=False, relations={peer})
 
-    state_out = peer_ctx.run(peer_ctx.on.action('restart', params={'delay': 10}), state_in)
+    state_out = ctx.run(ctx.on.action('restart', params={'delay': 10}), state_in)
 
     databag = _unit_databag(state_out, peer)
     assert databag['state'] == LockIntent.REQUEST
@@ -162,10 +156,10 @@ def test_existing_operation_then_new_request(peer_ctx: Context[PeerRollingOpsCha
 
 
 def test_new_request_does_not_overwrite_state_if_queue_not_empty(
-    peer_ctx: Context[PeerRollingOpsCharm],
+    ctx: Context[RollingOpsCharm],
 ):
     queue = _make_operation_queue(callback_id='_failed_restart', kwargs={}, max_retry=3)
-    executed_at = _now_timestamp_str()
+    executed_at = str(now_timestamp().timestamp())
     peer = PeerRelation(
         endpoint='restart',
         local_unit_data={
@@ -176,7 +170,7 @@ def test_new_request_does_not_overwrite_state_if_queue_not_empty(
     )
     state_in = State(leader=False, relations={peer})
 
-    state_out = peer_ctx.run(peer_ctx.on.action('restart', params={'delay': 10}), state_in)
+    state_out = ctx.run(ctx.on.action('restart', params={'delay': 10}), state_in)
 
     databag = _unit_databag(state_out, peer)
     assert databag['state'] == LockIntent.RETRY_RELEASE
@@ -188,21 +182,22 @@ def test_new_request_does_not_overwrite_state_if_queue_not_empty(
 
 
 def test_relation_changed_without_grant_does_not_run_operation(
-    peer_ctx: Context[PeerRollingOpsCharm],
+    ctx: Context[RollingOpsCharm],
 ):
-    remote_unit_name = f'{peer_ctx.app_name}/1'
+    remote_unit_name = f'{ctx.app_name}/1'
     queue = _make_operation_queue(callback_id='_failed_restart', kwargs={}, max_retry=3)
     peer = PeerRelation(
         endpoint='restart',
         local_unit_data={'state': LockIntent.REQUEST, 'operations': queue.to_string()},
-        local_app_data={'granted_unit': remote_unit_name, 'granted_at': _now_timestamp_str()},
+        local_app_data={
+            'granted_unit': remote_unit_name,
+            'granted_at': str(now_timestamp().timestamp()),
+        },
     )
 
     state_in = State(leader=False, relations={peer})
 
-    state_out = peer_ctx.run(
-        peer_ctx.on.relation_changed(peer, remote_unit=remote_unit_name), state_in
-    )
+    state_out = ctx.run(ctx.on.relation_changed(peer, remote_unit=remote_unit_name), state_in)
 
     databag = _unit_databag(state_out, peer)
     assert databag['state'] == LockIntent.REQUEST
@@ -211,20 +206,21 @@ def test_relation_changed_without_grant_does_not_run_operation(
     assert databag.get('executed_at', '') == ''
 
 
-def test_lock_complete_pops_head(peer_ctx: Context[PeerRollingOpsCharm]):
-    remote_unit_name = f'{peer_ctx.app_name}/1'
-    local_unit_name = f'{peer_ctx.app_name}/0'
+def test_lock_complete_pops_head(ctx: Context[RollingOpsCharm]):
+    remote_unit_name = f'{ctx.app_name}/1'
+    local_unit_name = f'{ctx.app_name}/0'
     queue = _make_operation_queue(callback_id='_restart', kwargs={}, max_retry=0)
     peer = PeerRelation(
         endpoint='restart',
         local_unit_data={'state': LockIntent.REQUEST, 'operations': queue.to_string()},
-        local_app_data={'granted_unit': local_unit_name, 'granted_at': _now_timestamp_str()},
+        local_app_data={
+            'granted_unit': local_unit_name,
+            'granted_at': str(now_timestamp().timestamp()),
+        },
     )
     state_in = State(leader=False, relations={peer})
 
-    state_out = peer_ctx.run(
-        peer_ctx.on.relation_changed(peer, remote_unit=remote_unit_name), state_in
-    )
+    state_out = ctx.run(ctx.on.relation_changed(peer, remote_unit=remote_unit_name), state_in)
 
     databag = _unit_databag(state_out, peer)
     assert databag['state'] == LockIntent.IDLE
@@ -236,25 +232,29 @@ def test_lock_complete_pops_head(peer_ctx: Context[PeerRollingOpsCharm]):
 
 
 def test_successful_operation_leaves_state_request_when_more_ops_remain(
-    peer_ctx: Context[PeerRollingOpsCharm],
+    ctx: Context[RollingOpsCharm],
 ):
-    local_unit_name = f'{peer_ctx.app_name}/0'
-    remote_unit_name = f'{peer_ctx.app_name}/1'
+    local_unit_name = f'{ctx.app_name}/0'
+    remote_unit_name = f'{ctx.app_name}/1'
     queue = OperationQueue()
-    queue.enqueue_lock_request(callback_id='_restart', kwargs={}, max_retry=None)
-    queue.enqueue_lock_request(callback_id='_failed_restart', kwargs={}, max_retry=None)
+    op1 = Operation.create(callback_id='_restart', kwargs={}, max_retry=None)
+    op2 = Operation.create(callback_id='_failed_restart', kwargs={}, max_retry=None)
+
+    queue.enqueue(op1)
+    queue.enqueue(op2)
 
     peer = PeerRelation(
         endpoint='restart',
         local_unit_data={'state': LockIntent.REQUEST, 'operations': queue.to_string()},
-        local_app_data={'granted_unit': local_unit_name, 'granted_at': _now_timestamp_str()},
+        local_app_data={
+            'granted_unit': local_unit_name,
+            'granted_at': str(now_timestamp().timestamp()),
+        },
     )
 
     state_in = State(leader=False, relations={peer})
 
-    state_out = peer_ctx.run(
-        peer_ctx.on.relation_changed(peer, remote_unit=remote_unit_name), state_in
-    )
+    state_out = ctx.run(ctx.on.relation_changed(peer, remote_unit=remote_unit_name), state_in)
 
     databag = _unit_databag(state_out, peer)
     assert databag['state'] == LockIntent.REQUEST
@@ -273,23 +273,24 @@ def test_successful_operation_leaves_state_request_when_more_ops_remain(
     ],
 )
 def test_lock_retry_marks_retry(
-    peer_ctx: Context[PeerRollingOpsCharm],
+    ctx: Context[RollingOpsCharm],
     callback_id: str,
     lock_intent: LockIntent,
 ):
-    remote_unit_name = f'{peer_ctx.app_name}/1'
-    local_unit_name = f'{peer_ctx.app_name}/0'
+    remote_unit_name = f'{ctx.app_name}/1'
+    local_unit_name = f'{ctx.app_name}/0'
     queue = _make_operation_queue(callback_id=callback_id, kwargs={}, max_retry=3)
     peer = PeerRelation(
         endpoint='restart',
         local_unit_data={'state': LockIntent.REQUEST, 'operations': queue.to_string()},
-        local_app_data={'granted_unit': local_unit_name, 'granted_at': _now_timestamp_str()},
+        local_app_data={
+            'granted_unit': local_unit_name,
+            'granted_at': str(now_timestamp().timestamp()),
+        },
     )
     state_in = State(leader=False, relations={peer})
 
-    state_out = peer_ctx.run(
-        peer_ctx.on.relation_changed(peer, remote_unit=remote_unit_name), state_in
-    )
+    state_out = ctx.run(ctx.on.relation_changed(peer, remote_unit=remote_unit_name), state_in)
 
     databag = _unit_databag(state_out, peer)
     assert databag['state'] == lock_intent
@@ -316,14 +317,15 @@ def test_lock_retry_marks_retry(
     ],
 )
 def test_lock_retry_drops_when_max_retry_reached(
-    peer_ctx: Context[PeerRollingOpsCharm],
+    ctx: Context[RollingOpsCharm],
     callback_id: str,
 ):
-    remote_unit_name = f'{peer_ctx.app_name}/1'
-    local_unit_name = f'{peer_ctx.app_name}/0'
+    remote_unit_name = f'{ctx.app_name}/1'
+    local_unit_name = f'{ctx.app_name}/0'
 
     queue = OperationQueue()
-    queue.enqueue_lock_request(callback_id=callback_id, kwargs={}, max_retry=3)
+    op1 = Operation.create(callback_id=callback_id, kwargs={}, max_retry=3)
+    queue.enqueue(op1)
     op = queue.peek()
     assert op is not None
     op.increase_attempt()
@@ -333,13 +335,14 @@ def test_lock_retry_drops_when_max_retry_reached(
     peer = PeerRelation(
         endpoint='restart',
         local_unit_data={'state': LockIntent.REQUEST, 'operations': queue.to_string()},
-        local_app_data={'granted_unit': local_unit_name, 'granted_at': _now_timestamp_str()},
+        local_app_data={
+            'granted_unit': local_unit_name,
+            'granted_at': str(now_timestamp().timestamp()),
+        },
     )
     state_in = State(leader=False, relations={peer})
 
-    state_out = peer_ctx.run(
-        peer_ctx.on.relation_changed(peer, remote_unit=remote_unit_name), state_in
-    )
+    state_out = ctx.run(ctx.on.relation_changed(peer, remote_unit=remote_unit_name), state_in)
 
     databag = _unit_databag(state_out, peer)
     assert databag['state'] == LockIntent.IDLE
@@ -349,7 +352,11 @@ def test_lock_retry_drops_when_max_retry_reached(
     assert len(q) == 0
 
 
-def test_lock_grant_and_release(peer_ctx: Context[PeerRollingOpsCharm]):
+def test_lock_grant_and_release(
+    certificates_manager_patches: dict[str, MagicMock],
+    etcdctl_patch: MagicMock,
+    ctx: Context[RollingOpsCharm],
+):
     queue = _make_operation_queue(callback_id='_failed_restart', kwargs={}, max_retry=3)
     peer = PeerRelation(
         endpoint='restart',
@@ -357,41 +364,47 @@ def test_lock_grant_and_release(peer_ctx: Context[PeerRollingOpsCharm]):
     )
     state_in = State(leader=True, relations={peer})
 
-    state = peer_ctx.run(peer_ctx.on.leader_elected(), state_in)
+    state = ctx.run(ctx.on.leader_elected(), state_in)
     databag = _app_databag(state, peer)
 
-    unit_name = f'{peer_ctx.app_name}/1'
+    unit_name = f'{ctx.app_name}/1'
     assert unit_name in databag['granted_unit']
     assert databag['granted_at'] is not None
 
 
-def test_scheduling_does_nothing_if_lock_already_granted(peer_ctx: Context[PeerRollingOpsCharm]):
+def test_scheduling_does_nothing_if_lock_already_granted(
+    certificates_manager_patches: dict[str, MagicMock],
+    etcdctl_patch: MagicMock,
+    ctx: Context[RollingOpsCharm],
+):
     queue = _make_operation_queue(callback_id='_failed_restart', kwargs={}, max_retry=3)
-    remote_unit_name = f'{peer_ctx.app_name}/1'
-    now_timestamp = _now_timestamp_str()
+    remote_unit_name = f'{ctx.app_name}/1'
+    now_timestamp_str = str(now_timestamp().timestamp())
     peer = PeerRelation(
         endpoint='restart',
         peers_data={
             1: {'state': LockIntent.REQUEST, 'operations': queue.to_string()},
             2: {'state': LockIntent.REQUEST, 'operations': queue.to_string()},
         },
-        local_app_data={'granted_unit': remote_unit_name, 'granted_at': now_timestamp},
+        local_app_data={'granted_unit': remote_unit_name, 'granted_at': now_timestamp_str},
     )
     state_in = State(leader=True, relations={peer})
 
-    state_out = peer_ctx.run(
-        peer_ctx.on.relation_changed(peer, remote_unit=remote_unit_name), state_in
-    )
+    state_out = ctx.run(ctx.on.relation_changed(peer, remote_unit=remote_unit_name), state_in)
 
     databag = _app_databag(state_out, peer)
     assert databag['granted_unit'] == remote_unit_name
-    assert databag['granted_at'] == now_timestamp
+    assert databag['granted_at'] == now_timestamp_str
 
 
-def test_schedule_picks_retry_hold(peer_ctx: Context[PeerRollingOpsCharm]):
-    old_operation = _now_timestamp_str()
+def test_schedule_picks_retry_hold(
+    certificates_manager_patches: dict[str, MagicMock],
+    etcdctl_patch: MagicMock,
+    ctx: Context[RollingOpsCharm],
+):
+    old_operation = str(now_timestamp().timestamp())
     queue = _make_operation_queue(callback_id='_failed_restart', kwargs={}, max_retry=3)
-    new_operation = _now_timestamp_str()
+    new_operation = str(now_timestamp().timestamp())
 
     peer = PeerRelation(
         endpoint='restart',
@@ -415,19 +428,25 @@ def test_schedule_picks_retry_hold(peer_ctx: Context[PeerRollingOpsCharm]):
     )
     state_in = State(leader=True, relations={peer})
 
-    state_out = peer_ctx.run(peer_ctx.on.leader_elected(), state_in)
+    state_out = ctx.run(ctx.on.leader_elected(), state_in)
 
     databag = _app_databag(state_out, peer)
-    remote_unit_name = f'{peer_ctx.app_name}/3'
+    remote_unit_name = f'{ctx.app_name}/3'
     assert databag['granted_unit'] == remote_unit_name
 
 
-def test_schedule_picks_oldest_requested_at_among_requests(peer_ctx: Context[PeerRollingOpsCharm]):
+def test_schedule_picks_oldest_requested_at_among_requests(
+    certificates_manager_patches: dict[str, MagicMock],
+    etcdctl_patch: MagicMock,
+    ctx: Context[RollingOpsCharm],
+):
     old_queue = OperationQueue()
-    old_queue.enqueue_lock_request(callback_id='restart', kwargs={}, max_retry=2)
+    old_op = Operation.create(callback_id='restart', kwargs={}, max_retry=2)
+    old_queue.enqueue(old_op)
 
     new_queue = OperationQueue()
-    new_queue.enqueue_lock_request(callback_id='restart', kwargs={}, max_retry=2)
+    new_op = Operation.create(callback_id='restart', kwargs={}, max_retry=2)
+    new_queue.enqueue(new_op)
 
     peer = PeerRelation(
         endpoint='restart',
@@ -438,18 +457,20 @@ def test_schedule_picks_oldest_requested_at_among_requests(peer_ctx: Context[Pee
     )
     state_in = State(leader=True, relations={peer})
 
-    state_out = peer_ctx.run(peer_ctx.on.leader_elected(), state_in)
+    state_out = ctx.run(ctx.on.leader_elected(), state_in)
     databag = _app_databag(state_out, peer)
-    remote_unit_name = f'{peer_ctx.app_name}/2'
+    remote_unit_name = f'{ctx.app_name}/2'
     assert databag['granted_unit'] == remote_unit_name
 
 
 def test_schedule_picks_oldest_executed_at_among_retries_when_no_requests(
-    peer_ctx: Context[PeerRollingOpsCharm],
+    certificates_manager_patches: dict[str, MagicMock],
+    etcdctl_patch: MagicMock,
+    ctx: Context[RollingOpsCharm],
 ):
-    old_operation = _now_timestamp_str()
+    old_operation = str(now_timestamp().timestamp())
     queue = _make_operation_queue(callback_id='_failed_restart', kwargs={}, max_retry=3)
-    new_operation = _now_timestamp_str()
+    new_operation = str(now_timestamp().timestamp())
 
     peer = PeerRelation(
         endpoint='restart',
@@ -468,14 +489,18 @@ def test_schedule_picks_oldest_executed_at_among_retries_when_no_requests(
     )
     state_in = State(leader=True, relations={peer})
 
-    state_out = peer_ctx.run(peer_ctx.on.leader_elected(), state_in)
+    state_out = ctx.run(ctx.on.leader_elected(), state_in)
 
     databag = _app_databag(state_out, peer)
-    remote_unit_name = f'{peer_ctx.app_name}/2'
+    remote_unit_name = f'{ctx.app_name}/2'
     assert databag['granted_unit'] == remote_unit_name
 
 
-def test_schedule_prioritizes_requests_over_retries(peer_ctx: Context[PeerRollingOpsCharm]):
+def test_schedule_prioritizes_requests_over_retries(
+    certificates_manager_patches: dict[str, MagicMock],
+    etcdctl_patch: MagicMock,
+    ctx: Context[RollingOpsCharm],
+):
     queue = _make_operation_queue(callback_id='_failed_restart', kwargs={}, max_retry=3)
 
     peer = PeerRelation(
@@ -484,28 +509,32 @@ def test_schedule_prioritizes_requests_over_retries(peer_ctx: Context[PeerRollin
             1: {
                 'state': LockIntent.RETRY_RELEASE,
                 'operations': queue.to_string(),
-                'executed_at': _now_timestamp_str(),
+                'executed_at': str(now_timestamp().timestamp()),
             },
             2: {'state': LockIntent.REQUEST, 'operations': queue.to_string()},
         },
     )
     state_in = State(leader=True, relations={peer})
 
-    state_out = peer_ctx.run(peer_ctx.on.leader_elected(), state_in)
+    state_out = ctx.run(ctx.on.leader_elected(), state_in)
 
     databag = _app_databag(state_out, peer)
-    remote_unit_name = f'{peer_ctx.app_name}/2'
+    remote_unit_name = f'{ctx.app_name}/2'
     assert databag['granted_unit'] == remote_unit_name
 
 
-def test_no_unit_is_granted_if_there_are_no_requests(peer_ctx: Context[PeerRollingOpsCharm]):
+def test_no_unit_is_granted_if_there_are_no_requests(
+    certificates_manager_patches: dict[str, MagicMock],
+    etcdctl_patch: MagicMock,
+    ctx: Context[RollingOpsCharm],
+):
     peer = PeerRelation(
         endpoint='restart',
         peers_data={1: {'state': LockIntent.IDLE}, 2: {'state': LockIntent.IDLE}},
     )
     state_in = State(leader=True, relations={peer})
 
-    state_out = peer_ctx.run(peer_ctx.on.leader_elected(), state_in)
+    state_out = ctx.run(ctx.on.leader_elected(), state_in)
 
     databag = _app_databag(state_out, peer)
     assert databag.get('granted_unit', '') == ''
