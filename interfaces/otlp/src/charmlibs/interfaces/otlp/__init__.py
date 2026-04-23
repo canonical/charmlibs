@@ -122,6 +122,39 @@ injected into the charm's RuleStore should reflect that. This is configurable by
 
     OtlpRequirer(..., aggregator_peer_relation_name="my-peers").publish()
 
+Pebble Log Forwarding (K8s charms)
+-----------------------------------
+
+For Kubernetes charms that use Pebble, ``PebbleLogForwarder`` builds a Pebble layer that
+configures `log forwarding <https://documentation.ubuntu.com/pebble/reference/log-forwarding/>`_
+to OTLP endpoints using Pebble's ``opentelemetry`` log target type.
+
+Only endpoints whose ``telemetries`` include ``"logs"`` are forwarded.
+This class is a K8s-only utility; machine charms should configure log forwarding through
+their own mechanism::
+
+    from charmlibs.interfaces.otlp import OtlpRequirer, PebbleLogForwarder
+    from cosl.juju_topology import JujuTopology
+
+    class MyK8sCharm(CharmBase):
+        def __init__(self, framework: ops.Framework):
+            super().__init__(framework)
+            self.framework.observe(
+                self.on["mycontainer"].pebble_ready, self._configure_logging
+            )
+
+        def _configure_logging(self, event: ops.PebbleReadyEvent):
+            otlp_endpoints = OtlpRequirer(
+                self, protocols=["http"], telemetries=["logs"],
+            ).endpoints
+            layer = PebbleLogForwarder.build_otlp_layer(
+                otlp_endpoints,
+                topology=JujuTopology.from_charm(self),
+            )
+            event.workload.add_layer(
+                f"{event.workload.name}-log-forwarding", layer, combine=True,
+            )
+
 Relation Data Format
 ====================
 
@@ -161,6 +194,7 @@ the rules::
     }
 """
 
+from ._log_forwarder import PebbleLogForwarder
 from ._otlp import (
     OtlpEndpoint,
     OtlpProvider,
@@ -175,5 +209,6 @@ __all__ = [
     'OtlpEndpoint',
     'OtlpProvider',
     'OtlpRequirer',
+    'PebbleLogForwarder',
     'RuleStore',
 ]
