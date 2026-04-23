@@ -31,8 +31,8 @@ from tests.integration.utils import (
 
 logger = logging.getLogger(__name__)
 TIMEOUT = 15 * 60.0
-ETCD_PROCESS_LOGS = '/var/log/etcd_rollingops_worker.log'
-PEER_PROCCES_LOGS = '/var/log/peer_rollingops_worker.log'
+ETCD_PROCESS_LOGS = '/var/lib/rollingops/etcd_rollingops_worker.log'
+PEER_PROCCES_LOGS = '/var/lib/rollingops/peer_rollingops_worker.log'
 ETCD_CONFIG_FILE = '/var/lib/rollingops/etcd/etcdctl.json'
 
 

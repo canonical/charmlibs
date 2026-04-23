@@ -24,6 +24,7 @@ from typing import TypeVar
 from ops import pebble
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_fixed
 
+from charmlibs import pathops
 from charmlibs.pathops import PebbleConnectionError
 
 logger = logging.getLogger(__name__)
@@ -61,7 +62,8 @@ def datetime_to_str(dt: datetime) -> str:
 
 
 def setup_logging(
-    log_file: str,
+    base_dir: str,
+    log_filename: str,
     *,
     unit_name: str,
     cluster_id: str | None = None,
@@ -76,11 +78,13 @@ def setup_logging(
     This functions is used in the context of the background process.
 
     Args:
-        log_file: Path to the log file where logs should be written.
+        base_dir: base directory used to write the rollingops files
+        log_filename: name of the file where logs should be written.
         unit_name: Juju unit name associated with the background process.
         cluster_id: Optional etcd cluster identifier.
         owner: Optional worker owner identifier.
     """
+    log_file = pathops.LocalPath(base_dir) / log_filename
     handler = RotatingFileHandler(
         log_file,
         maxBytes=10 * 1024 * 1024,  # 10 MB

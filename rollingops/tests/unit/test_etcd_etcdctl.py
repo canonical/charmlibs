@@ -31,12 +31,12 @@ def test_etcdctl_write_env(temp_etcdctl: Any) -> None:
         client_key_path=LocalPath('PATH2'),
     )
 
-    assert temp_etcdctl.BASE_DIR.exists()
+    assert temp_etcdctl.base_dir.exists()
 
-    config = json.loads(temp_etcdctl.CONFIG_FILE_PATH.read_text())
+    config = json.loads(temp_etcdctl.config_file_path.read_text())
     assert config == {
         'endpoints': 'https://10.0.0.1:2379,https://10.0.0.2:2379',
-        'cacert_path': str(temp_etcdctl.SERVER_CA_PATH),
+        'cacert_path': str(temp_etcdctl.server_ca_path),
         'cert_path': 'PATH1',
         'key_path': 'PATH2',
     }
@@ -48,33 +48,33 @@ def test_etcdctl_ensure_initialized_raises_when_env_missing(temp_etcdctl: Any) -
 
 
 def test_etcdctl_cleanup_removes_env_file_and_server_ca(temp_etcdctl: Any) -> None:
-    temp_etcdctl.BASE_DIR.mkdir(parents=True, exist_ok=True)
-    temp_etcdctl.CONFIG_FILE_PATH.write_text('env')
-    temp_etcdctl.SERVER_CA_PATH.write_text('ca')
+    temp_etcdctl.base_dir.mkdir(parents=True, exist_ok=True)
+    temp_etcdctl.config_file_path.write_text('env')
+    temp_etcdctl.server_ca_path.write_text('ca')
 
-    assert temp_etcdctl.CONFIG_FILE_PATH.exists()
-    assert temp_etcdctl.SERVER_CA_PATH.exists()
+    assert temp_etcdctl.config_file_path.exists()
+    assert temp_etcdctl.server_ca_path.exists()
 
     temp_etcdctl.cleanup()
 
-    assert not temp_etcdctl.CONFIG_FILE_PATH.exists()
-    assert not temp_etcdctl.SERVER_CA_PATH.exists()
+    assert not temp_etcdctl.config_file_path.exists()
+    assert not temp_etcdctl.server_ca_path.exists()
 
 
 def test_etcdctl_cleanup_is_noop_when_files_do_not_exist(temp_etcdctl: Any) -> None:
-    assert not temp_etcdctl.CONFIG_FILE_PATH.exists()
-    assert not temp_etcdctl.SERVER_CA_PATH.exists()
+    assert not temp_etcdctl.config_file_path.exists()
+    assert not temp_etcdctl.server_ca_path.exists()
 
     temp_etcdctl.cleanup()
 
-    assert not temp_etcdctl.CONFIG_FILE_PATH.exists()
-    assert not temp_etcdctl.SERVER_CA_PATH.exists()
+    assert not temp_etcdctl.config_file_path.exists()
+    assert not temp_etcdctl.server_ca_path.exists()
 
 
 def test_etcdctl_load_env_parses_exported_vars(temp_etcdctl: Any) -> None:
-    temp_etcdctl.BASE_DIR.mkdir(parents=True, exist_ok=True)
-    temp_etcdctl.SERVER_CA_PATH.write_text('SERVER CA')
-    temp_etcdctl.CONFIG_FILE_PATH.write_text(
+    temp_etcdctl.base_dir.mkdir(parents=True, exist_ok=True)
+    temp_etcdctl.server_ca_path.write_text('SERVER CA')
+    temp_etcdctl.config_file_path.write_text(
         json.dumps({
             'endpoints': 'https://10.0.0.1:2379',
             'cacert_path': '/a-path/server-ca.pem',

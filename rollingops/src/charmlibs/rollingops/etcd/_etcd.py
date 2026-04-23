@@ -19,13 +19,13 @@ import os
 import subprocess
 import time
 
-import charmlibs.rollingops.etcd._etcdctl as etcdctl
 from charmlibs.rollingops.common._exceptions import (
     RollingOpsEtcdctlFatalError,
     RollingOpsEtcdctlParseError,
     RollingOpsEtcdTransactionError,
 )
 from charmlibs.rollingops.common._models import Operation, OperationResult
+from charmlibs.rollingops.etcd._etcdctl import ETCDCTL_CMD, Etcdctl
 from charmlibs.rollingops.etcd._models import RollingOpsKeys
 
 logger = logging.getLogger(__name__)
@@ -36,14 +36,15 @@ LOCK_LEASE_TTL = '60'
 class EtcdLease:
     """Manage the lifecycle of an etcd lease and its keep-alive process."""
 
-    def __init__(self):
+    def __init__(self, base_dir: str):
         self.id: str | None = None
         self.keepalive_proc: subprocess.Popen[str] | None = None
         self._pipe_write_fd: int | None = None
+        self._etcdctl = Etcdctl(base_dir)
 
     def grant(self) -> None:
         """Create a new lease and start the keep-alive process."""
-        res = etcdctl.run('lease', 'grant', LOCK_LEASE_TTL)
+        res = self._etcdctl.run('lease', 'grant', LOCK_LEASE_TTL)
         # parse: "lease 694d9c9aeca3422a granted with TTL(60s)"
         parts = res.split()
         try:
@@ -61,7 +62,7 @@ class EtcdLease:
         lease_id = self.id
         try:
             if self.id is not None:
-                etcdctl.run('lease', 'revoke', self.id)
+                self._etcdctl.run('lease', 'revoke', self.id)
         except Exception:
             logger.exception('Fail to revoke lease %s.', lease_id)
             raise
@@ -79,19 +80,19 @@ class EtcdLease:
         if lease_id is None:
             logger.info('Lease ID is None. Keepalive for this lease cannot be started.')
             return
-        etcdctl.ensure_initialized()
+        self._etcdctl.ensure_initialized()
 
         pipe_read_fd, pipe_write_fd = os.pipe()
         self._pipe_write_fd = pipe_write_fd
 
-        keep_alive_cmd = f'{etcdctl.ETCDCTL_CMD} lease keep-alive {lease_id}  </dev/null & read -r _; kill %1 2>/dev/null; wait'  # noqa: E501
+        keep_alive_cmd = f'{ETCDCTL_CMD} lease keep-alive {lease_id}  </dev/null & read -r _; kill %1 2>/dev/null; wait'  # noqa: E501
         try:
             self.keepalive_proc = subprocess.Popen(
                 ['bash', '-c', keep_alive_cmd],
                 # The pipe read side becomes the child's stdin
                 # so when the parent closes its write side, this stdin gets EOF
                 stdin=pipe_read_fd,
-                env=etcdctl.load_env(),
+                env=self._etcdctl.load_env(),
                 text=True,
                 close_fds=True,
                 preexec_fn=self._close_write_side_in_child,
@@ -154,9 +155,10 @@ class EtcdLock:
     automatically released if the owner stops refreshing the lease.
     """
 
-    def __init__(self, lock_key: str, owner: str):
+    def __init__(self, lock_key: str, owner: str, base_dir: str):
         self.lock_key = lock_key
         self.owner = owner
+        self._etcdctl = Etcdctl(base_dir)
 
     def try_acquire(self, lease_id: str) -> bool:
         """Attempt to acquire the lock.
@@ -181,7 +183,7 @@ class EtcdLock:
 
 
         """
-        return etcdctl.txn(txn)
+        return self._etcdctl.txn(txn)
 
     def release(self) -> None:
         """Release the lock if it is currently held by this owner.
@@ -200,13 +202,13 @@ class EtcdLock:
 
 
         """
-        etcdctl.txn(txn)
+        self._etcdctl.txn(txn)
 
     def is_held(self) -> bool:
         """Check whether the lock is currently held by the owner."""
         if not self.lock_key or not self.owner:
             raise RollingOpsEtcdctlFatalError('Invalid input for check lock ownership operation.')
-        res = etcdctl.run('get', self.lock_key, '--print-value-only')
+        res = self._etcdctl.run('get', self.lock_key, '--print-value-only')
         return res == self.owner
 
 
@@ -219,21 +221,22 @@ class EtcdOperationQueue:
     the value contains the serialized operation data.
     """
 
-    def __init__(self, prefix: str, lock_key: str, owner: str):
+    def __init__(self, prefix: str, lock_key: str, owner: str, base_dir: str):
         self.prefix = prefix
         self.lock_key = lock_key
         self.owner = owner
+        self._etcdctl = Etcdctl(base_dir)
 
     def peek(self) -> Operation | None:
         """Return the first operation in the queue without removing it."""
-        kv = etcdctl.get_first_key_value_pair(self.prefix)
+        kv = self._etcdctl.get_first_key_value_pair(self.prefix)
         if kv is None:
             return None
         return Operation.model_validate(kv.value)
 
     def _peek_last(self) -> Operation | None:
         """Return the last operation in the queue without removing it."""
-        kv = etcdctl.get_last_key_value_pair(self.prefix)
+        kv = self._etcdctl.get_last_key_value_pair(self.prefix)
         if kv is None:
             return None
         return Operation.model_validate(kv.value)
@@ -252,7 +255,7 @@ class EtcdOperationQueue:
         Returns:
             True if the operation was moved successfully, otherwise False.
         """
-        kv = etcdctl.get_first_key_value_pair(self.prefix)
+        kv = self._etcdctl.get_first_key_value_pair(self.prefix)
         if kv is None:
             return False
 
@@ -270,7 +273,7 @@ class EtcdOperationQueue:
 
 
         """
-        return etcdctl.txn(txn)
+        return self._etcdctl.txn(txn)
 
     def move_operation(self, to_queue_prefix: str, operation: Operation) -> bool:
         """Move a specific operation from this queue to another queue.
@@ -299,12 +302,12 @@ class EtcdOperationQueue:
 
 
         """
-        return etcdctl.txn(txn)
+        return self._etcdctl.txn(txn)
 
     def watch(self) -> Operation:
         """Block until at least one operation exists and return it."""
         while True:
-            kv = etcdctl.get_first_key_value_pair(self.prefix)
+            kv = self._etcdctl.get_first_key_value_pair(self.prefix)
             if kv is not None:
                 return Operation.model_validate(kv.value)
             time.sleep(10)
@@ -318,7 +321,7 @@ class EtcdOperationQueue:
         Returns:
             True if the operation was removed successfully, otherwise False.
         """
-        kv = etcdctl.get_first_key_value_pair(self.prefix)
+        kv = self._etcdctl.get_first_key_value_pair(self.prefix)
         if kv is None:
             return False
 
@@ -330,7 +333,7 @@ class EtcdOperationQueue:
 
 
         """
-        return etcdctl.txn(txn)
+        return self._etcdctl.txn(txn)
 
     def enqueue(self, operation: Operation) -> None:
         """Insert a new operation into the queue.
@@ -353,11 +356,11 @@ class EtcdOperationQueue:
 
         op_str = operation.to_string()
         key = f'{self.prefix}{operation.op_id}'
-        etcdctl.run('put', key, cmd_input=op_str)
+        self._etcdctl.run('put', key, cmd_input=op_str)
         logger.info('Operation %s added to the etcd queue.', operation.callback_id)
 
     def clear(self) -> None:
-        etcdctl.run('del', self.prefix, '--prefix')
+        self._etcdctl.run('del', self.prefix, '--prefix')
 
 
 class WorkerOperationStore:
@@ -378,10 +381,14 @@ class WorkerOperationStore:
     - requeue or delete completed operations
     """
 
-    def __init__(self, keys: RollingOpsKeys, owner: str):
-        self._pending = EtcdOperationQueue(keys.pending, keys.lock_key, owner)
-        self._inprogress = EtcdOperationQueue(keys.inprogress, keys.lock_key, owner)
-        self._completed = EtcdOperationQueue(keys.completed, keys.lock_key, owner)
+    def __init__(self, keys: RollingOpsKeys, owner: str, base_dir: str):
+        self._pending = EtcdOperationQueue(keys.pending, keys.lock_key, owner, base_dir=base_dir)
+        self._inprogress = EtcdOperationQueue(
+            keys.inprogress, keys.lock_key, owner, base_dir=base_dir
+        )
+        self._completed = EtcdOperationQueue(
+            keys.completed, keys.lock_key, owner, base_dir=base_dir
+        )
 
     def has_pending(self) -> bool:
         """Check whether there are pending operations.
@@ -475,10 +482,14 @@ class ManagerOperationStore:
     Queue transitions and storage details remain encapsulated behind this API.
     """
 
-    def __init__(self, keys: RollingOpsKeys, owner: str):
-        self._pending = EtcdOperationQueue(keys.pending, keys.lock_key, owner)
-        self._inprogress = EtcdOperationQueue(keys.inprogress, keys.lock_key, owner)
-        self._completed = EtcdOperationQueue(keys.completed, keys.lock_key, owner)
+    def __init__(self, keys: RollingOpsKeys, owner: str, base_dir: str):
+        self._pending = EtcdOperationQueue(keys.pending, keys.lock_key, owner, base_dir=base_dir)
+        self._inprogress = EtcdOperationQueue(
+            keys.inprogress, keys.lock_key, owner, base_dir=base_dir
+        )
+        self._completed = EtcdOperationQueue(
+            keys.completed, keys.lock_key, owner, base_dir=base_dir
+        )
 
     def request(self, operation: Operation) -> None:
         """Add a new operation to the pending queue.

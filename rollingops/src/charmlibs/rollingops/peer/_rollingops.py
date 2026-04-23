@@ -25,6 +25,12 @@ def main():
     """Juju hook event dispatcher."""
     parser = argparse.ArgumentParser(description='RollingOps peer worker')
     parser.add_argument(
+        '--base-dir',
+        type=str,
+        required=True,
+        help='Base directory used to store all rollingops files.',
+    )
+    parser.add_argument(
         '--unit-name',
         type=str,
         required=True,
@@ -37,7 +43,8 @@ def main():
         help='Path to the charm directory',
     )
     args = parser.parse_args()
-    setup_logging(PEER_LOG_FILENAME, unit_name=args.unit_name)
+    base_dir = args.base_dir
+    setup_logging(base_dir=base_dir, log_filename=PEER_LOG_FILENAME, unit_name=args.unit_name)
 
     # Sleep so that the leader unit can properly leave the hook and start a new one
     time.sleep(10)

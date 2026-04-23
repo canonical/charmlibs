@@ -197,7 +197,11 @@ class PeerRollingOpsBackend(Object):
     """
 
     def __init__(
-        self, charm: CharmBase, relation_name: str, callback_targets: dict[str, Callable[..., Any]]
+        self,
+        charm: CharmBase,
+        relation_name: str,
+        callback_targets: dict[str, Callable[..., Any]],
+        base_dir: str,
     ):
         """Initialize the peer-backed rolling-ops backend.
 
@@ -207,12 +211,15 @@ class PeerRollingOpsBackend(Object):
                 operation state.
             callback_targets: Mapping from callback identifiers to callables
                 executed when this unit is granted the lock.
+            base_dir: base directory where all files related to rollingops will be written.
         """
         super().__init__(charm, 'peer-rolling-ops-manager')
         self._charm = charm
         self.relation_name = relation_name
         self.callback_targets = callback_targets
-        self.worker = PeerRollingOpsAsyncWorker(charm, relation_name=relation_name)
+        self.worker = PeerRollingOpsAsyncWorker(
+            charm, relation_name=relation_name, base_dir=base_dir
+        )
 
         self.framework.observe(
             charm.on[self.relation_name].relation_changed, self._on_relation_changed

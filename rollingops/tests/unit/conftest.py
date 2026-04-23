@@ -14,7 +14,6 @@
 
 """Fixtures for unit tests, typically mocking out parts of the external system."""
 
-import types
 from collections.abc import Generator
 from pathlib import Path
 from typing import Any
@@ -31,7 +30,6 @@ from charmlibs.interfaces.tls_certificates import (
     Certificate,
     PrivateKey,
 )
-from charmlibs.pathops import LocalPath
 from charmlibs.rollingops import RollingOpsManager
 from charmlibs.rollingops.common._models import OperationResult
 from charmlibs.rollingops.etcd._models import SharedCertificate
@@ -104,50 +102,28 @@ VALID_CLIENT_KEY_PEM = """-----BEGIN RSA PRIVATE KEY-----
 
 
 @pytest.fixture
-def temp_certificates(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> types.ModuleType:
-    base_dir = LocalPath(str(tmp_path)) / 'tls'
-    ca_cert = base_dir / 'client-ca.pem'
-    client_key = base_dir / 'client.key'
-    client_cert = base_dir / 'client.pem'
-
-    monkeypatch.setattr(certificates, 'BASE_DIR', base_dir)
-    monkeypatch.setattr(certificates, 'CA_CERT_PATH', ca_cert)
-    monkeypatch.setattr(certificates, 'CLIENT_KEY_PATH', client_key)
-    monkeypatch.setattr(certificates, 'CLIENT_CERT_PATH', client_cert)
-
-    base_dir.mkdir(parents=True, exist_ok=True)
-    return certificates
+def temp_certificates(tmp_path: Path) -> certificates.CertificateStore:
+    client = certificates.CertificateStore(str(tmp_path))
+    client.base_dir.mkdir(parents=True, exist_ok=True)
+    return client
 
 
 @pytest.fixture
-def temp_etcdctl(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> types.ModuleType:
-    base_dir = LocalPath(str(tmp_path)) / 'etcd'
-    server_ca = base_dir / 'server-ca.pem'
-    env_file = base_dir / 'etcdctl.json'
-
-    monkeypatch.setattr(etcdctl, 'BASE_DIR', base_dir)
-    monkeypatch.setattr(etcdctl, 'SERVER_CA_PATH', server_ca)
-    monkeypatch.setattr(etcdctl, 'CONFIG_FILE_PATH', env_file)
-
-    base_dir.mkdir(parents=True, exist_ok=True)
-    return etcdctl
-
-
-@pytest.fixture
-def etcdctl_patch() -> Generator[MagicMock, None, None]:
-    with patch('charmlibs.rollingops.etcd._certificates') as mock_etcdctl:
-        yield mock_etcdctl
+def temp_etcdctl(tmp_path: Path) -> etcdctl.Etcdctl:
+    client = etcdctl.Etcdctl(str(tmp_path))
+    client.base_dir.mkdir(parents=True, exist_ok=True)
+    return client
 
 
 @pytest.fixture
 def certificates_manager_patches() -> Generator[dict[str, MagicMock], None, None]:
     with (
         patch(
-            'charmlibs.rollingops.etcd._certificates._exists',
+            'charmlibs.rollingops.etcd._certificates.CertificateStore._exists',
             return_value=False,
         ),
         patch(
-            'charmlibs.rollingops.etcd._certificates.generate',
+            'charmlibs.rollingops.etcd._certificates.CertificateStore.generate',
             return_value=SharedCertificate(
                 certificate=Certificate.from_string(VALID_CLIENT_CERT_PEM),
                 key=PrivateKey.from_string(VALID_CLIENT_KEY_PEM),
@@ -155,13 +131,13 @@ def certificates_manager_patches() -> Generator[dict[str, MagicMock], None, None
             ),
         ) as mock_generate,
         patch(
-            'charmlibs.rollingops.etcd._certificates.persist_client_cert_key_and_ca',
+            'charmlibs.rollingops.etcd._certificates.CertificateStore.persist_client_cert_key_and_ca',
             return_value=None,
-        ) as mock_persit,
+        ) as mock_persist,
     ):
         yield {
             'generate': mock_generate,
-            'persist': mock_persit,
+            'persist': mock_persist,
         }
 
 
@@ -281,4 +257,27 @@ actions: dict[str, Any] = {
 
 @pytest.fixture
 def ctx(charm_test: type[RollingOpsCharm]) -> Context[RollingOpsCharm]:
+    return Context(charm_test, meta=meta, actions=actions)
+
+
+class StrictPeerRollingOpsCharm(ops.CharmBase):
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
+
+        self.restart_manager = RollingOpsManager(
+            charm=self,
+            peer_relation_name='restart',
+            callback_targets={},
+        )
+
+
+@pytest.fixture
+def strict_peer_charm_test() -> type[StrictPeerRollingOpsCharm]:
+    return StrictPeerRollingOpsCharm
+
+
+@pytest.fixture
+def strict_peer_ctx(
+    charm_test: type[StrictPeerRollingOpsCharm],
+) -> Context[StrictPeerRollingOpsCharm]:
     return Context(charm_test, meta=meta, actions=actions)

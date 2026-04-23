@@ -36,8 +36,8 @@ from charmlibs.rollingops.common._models import (
     RunWithLockStatus,
     UnitBackendState,
 )
-from charmlibs.rollingops.etcd import _etcdctl as etcdctl
 from charmlibs.rollingops.etcd._etcd import EtcdLease, EtcdLock, ManagerOperationStore
+from charmlibs.rollingops.etcd._etcdctl import ETCDCTL_CMD, Etcdctl
 from charmlibs.rollingops.etcd._models import RollingOpsKeys
 from charmlibs.rollingops.etcd._relations import EtcdRequiresV1, SharedClientCertificateManager
 from charmlibs.rollingops.etcd._worker import EtcdRollingOpsAsyncWorker
@@ -63,6 +63,7 @@ class EtcdRollingOpsBackend(Object):
         etcd_relation_name: str,
         cluster_id: str,
         callback_targets: dict[str, Any],
+        base_dir: str,
     ):
         """Initialize the etcd-backed rolling-ops backend.
 
@@ -75,22 +76,31 @@ class EtcdRollingOpsBackend(Object):
                 instance.
             callback_targets: Mapping from callback identifiers to callables
                 executed when an operation is granted the asynchronous lock.
+            base_dir: base directory where all files related to rollingops will be written.
         """
         super().__init__(charm, 'etcd-rolling-ops-manager')
         self._charm = charm
         self.peer_relation_name = peer_relation_name
         self.etcd_relation_name = etcd_relation_name
         self.callback_targets = callback_targets
+        self._base_dir = base_dir
+
+        self.etcdctl = Etcdctl(self._base_dir)
 
         owner = f'{self.model.uuid}-{self.model.unit.name}'.replace('/', '-')
         self.worker = EtcdRollingOpsAsyncWorker(
-            charm, peer_relation_name=peer_relation_name, owner=owner, cluster_id=cluster_id
+            charm,
+            peer_relation_name=peer_relation_name,
+            owner=owner,
+            cluster_id=cluster_id,
+            base_dir=self._base_dir,
         )
         self.keys = RollingOpsKeys.for_owner(cluster_id=cluster_id, owner=owner)
 
         self.shared_certificates = SharedClientCertificateManager(
             charm,
             peer_relation_name=peer_relation_name,
+            base_dir=self._base_dir,
         )
 
         self.etcd = EtcdRequiresV1(
@@ -98,11 +108,16 @@ class EtcdRollingOpsBackend(Object):
             relation_name=etcd_relation_name,
             cluster_id=self.keys.cluster_prefix,
             shared_certificates=self.shared_certificates,
+            base_dir=self._base_dir,
         )
-        self._async_lock = EtcdLock(lock_key=self.keys.lock_key, owner=owner)
-        self._sync_lock = EtcdLock(lock_key=self.keys.lock_key, owner=f'{owner}:sync')
+        self._async_lock = EtcdLock(
+            lock_key=self.keys.lock_key, owner=owner, base_dir=self._base_dir
+        )
+        self._sync_lock = EtcdLock(
+            lock_key=self.keys.lock_key, owner=f'{owner}:sync', base_dir=self._base_dir
+        )
         self._lease: EtcdLease | None = None
-        self.operations_store = ManagerOperationStore(self.keys, owner)
+        self.operations_store = ManagerOperationStore(self.keys, owner, base_dir=self._base_dir)
 
         self.framework.observe(
             charm.on[self.peer_relation_name].relation_departed, self._on_peer_relation_departed
@@ -133,7 +148,7 @@ class EtcdRollingOpsBackend(Object):
         if self._etcd_relation is None:
             return False
         try:
-            etcdctl.ensure_initialized()
+            self.etcdctl.ensure_initialized()
         except Exception:
             return False
         return True
@@ -159,7 +174,7 @@ class EtcdRollingOpsBackend(Object):
         if self._etcd_relation is None:
             raise RollingOpsNoEtcdRelationError
 
-        etcdctl.ensure_initialized()
+        self.etcdctl.ensure_initialized()
 
         backend_state = UnitBackendState(self.model, self.peer_relation_name, self.model.unit)
         if backend_state.cleanup_needed:
@@ -186,8 +201,8 @@ class EtcdRollingOpsBackend(Object):
         Args:
             event: The relation-created event for the etcd relation.
         """
-        if not etcdctl.is_etcdctl_installed():
-            logger.error('%s is not installed.', etcdctl.ETCDCTL_CMD)
+        if not self.etcdctl.is_etcdctl_installed():
+            logger.error('%s is not installed.', ETCDCTL_CMD)
 
     def _on_peer_relation_departed(self, event: RelationDepartedEvent) -> None:
         """Handle removal of a unit from the peer relation.
@@ -240,7 +255,7 @@ class EtcdRollingOpsBackend(Object):
         if not self._etcd_relation:
             raise RollingOpsNoEtcdRelationError
 
-        etcdctl.ensure_initialized()
+        self.etcdctl.ensure_initialized()
 
         if kwargs is None:
             kwargs = {}
@@ -337,7 +352,7 @@ class EtcdRollingOpsBackend(Object):
             TimeoutError: If the lock could not be acquired before the timeout.
             RollingOpsSyncLockError: if there was an error obtaining the lock.
         """
-        self._lease = EtcdLease()
+        self._lease = EtcdLease(self._base_dir)
 
         deadline = None if timeout is None else time.monotonic() + timeout
 

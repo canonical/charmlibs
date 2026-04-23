@@ -26,7 +26,8 @@ from charmlibs.rollingops.common._base_worker import BaseRollingOpsAsyncWorker
 
 logger = logging.getLogger(__name__)
 
-PEER_LOG_FILENAME = '/var/log/peer_rollingops_worker.log'
+PEER_LOG_FILENAME = 'peer_rollingops_worker.log'
+WORKER_PID_FIELD = 'peer-rollingops-worker-pid'
 
 
 class PeerRollingOpsAsyncWorker(BaseRollingOpsAsyncWorker):
@@ -38,11 +39,16 @@ class PeerRollingOpsAsyncWorker(BaseRollingOpsAsyncWorker):
     stop, or restart an existing worker process as needed.
     """
 
-    _pid_field = 'peer-rollingops-worker-pid'
+    _pid_field = WORKER_PID_FIELD
     _log_filename = PEER_LOG_FILENAME
 
-    def __init__(self, charm: CharmBase, relation_name: str):
-        super().__init__(charm, 'peer-rollingops-async-worker', relation_name)
+    def __init__(self, charm: CharmBase, relation_name: str, base_dir: str):
+        super().__init__(
+            charm,
+            'peer-rollingops-async-worker',
+            relation_name,
+            base_dir=base_dir,
+        )
 
     @property
     def _app_data(self) -> RelationDataContent:
