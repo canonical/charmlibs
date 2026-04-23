@@ -478,7 +478,6 @@ class RollingOpsManager(Object):
 
         try:
             check_operation = Operation.create(callback_id=callback_id, kwargs=kwargs)
-            print(operations)
         except ValidationError:
             return False
 
