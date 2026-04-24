@@ -49,9 +49,6 @@ packages = ["src/charmlibs"]
 [tool.hatch.version]
 path = "src/charmlibs/interfaces/service_mesh/_version.py"
 
-[tool.uv.sources]
-canonical-service-mesh = { git = "https://github.com/canonical/service-mesh.git", branch = "feat/lib-migration", subdirectory = "canonical_service_mesh" }
-
 [tool.ruff]
 extend = "../../pyproject.toml"
 src = ["src", "tests/unit"]  # correctly sort local imports in tests

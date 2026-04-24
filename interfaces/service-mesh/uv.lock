@@ -27,13 +27,17 @@ wheels = [
 
 [[package]]
 name = "canonical-service-mesh"
-version = "0.0.0.dev0"
-source = { git = "https://github.com/canonical/service-mesh.git?subdirectory=canonical_service_mesh&branch=feat%2Flib-migration#939c49794780ce3ee199470ec5b0f1b428fd89da" }
+version = "0.0.1"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
     { name = "lightkube" },
     { name = "ops" },
     { name = "pydantic" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/9d/c8/160769d7e8297f6888029abc53dd3107241f9867ec52fd838e06bdb2d694/canonical_service_mesh-0.0.1.tar.gz", hash = "sha256:d271e6c326060540a1aa05fd6ff57b5f8199f54a3aac9871209e5e812980b5e3", size = 67323, upload-time = "2026-04-24T12:44:53.2Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ca/00/8134f6d30f0d8ccd137f15be768ea5513912d595eb601ed7206ea3a4a411/canonical_service_mesh-0.0.1-py3-none-any.whl", hash = "sha256:f764455f965efbf3048cf8879ad09dd1c3f7fc0b4cc3215c14e3f201bd7b04c7", size = 28317, upload-time = "2026-04-24T12:44:51.691Z" },
 ]
 
 [[package]]
@@ -64,7 +68,7 @@ unit = [
 
 [package.metadata]
 requires-dist = [
-    { name = "canonical-service-mesh", git = "https://github.com/canonical/service-mesh.git?subdirectory=canonical_service_mesh&branch=feat%2Flib-migration" },
+    { name = "canonical-service-mesh" },
     { name = "ops" },
     { name = "pydantic", specifier = ">=2" },
 ]
