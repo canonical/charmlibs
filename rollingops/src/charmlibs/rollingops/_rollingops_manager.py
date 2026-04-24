@@ -198,6 +198,9 @@ class RollingOpsManager(Object):
         It is used when etcd becomes unavailable, unhealthy, or inconsistent,
         so that queued operations can continue without being lost.
         """
+        if self._peer_relation is None:
+            logger.info('Peer relation does not exists. Cannot fallback.')
+            return
         self._backend_state.fallback_to_peer()
         if self.etcd_backend is not None:
             self.etcd_backend.worker.stop()
@@ -235,7 +238,7 @@ class RollingOpsManager(Object):
         if callback_id not in self.peer_backend.callback_targets:
             raise RollingOpsInvalidLockRequestError(f'Unknown callback_id: {callback_id}')
 
-        if not self._peer_relation:
+        if self._peer_relation is None:
             raise RollingOpsNoRelationError('No %s peer relation yet.', self.peer_relation_name)
 
         if kwargs is None:
@@ -281,6 +284,9 @@ class RollingOpsManager(Object):
         If the current unit is etcd-managed, the operation is executed through
         the etcd backend.
         """
+        if self._peer_relation is None:
+            logger.error('Peer relation does not exists. Cannot run lock granted.')
+            return
         if self._backend_state.is_peer_managed():
             logger.info('Executing rollingop on peer backend.')
             self.peer_backend._on_rollingops_lock_granted(event)
@@ -331,6 +337,9 @@ class RollingOpsManager(Object):
     def _on_rollingops_etcd_failed(self, event: RollingOpsEtcdFailedEvent) -> None:
         """Fall back to peer when the etcd worker reports a fatal failure."""
         logger.warning('Received %s.', ETCD_FAILED_HOOK_NAME)
+        if self._peer_relation is None:
+            logger.info('Peer relation does not exists. Cannot fallback.')
+            return
         if self._backend_state.is_etcd_managed():
             # No need to stop the background process. This hook means that it stopped.
             self._backend_state.fallback_to_peer()
@@ -492,6 +501,9 @@ class RollingOpsManager(Object):
     def _on_update_status(self, event: EventBase) -> None:
         """Periodic reconciliation of rolling-ops state."""
         logger.info('Received a update-status event.')
+        if self._peer_relation is None:
+            logger.info('Peer relation does not exists. Cannot update status.')
+            return
         if self._backend_state.is_etcd_managed():
             if self.etcd_backend is None or not self.etcd_backend.is_available():
                 logger.warning('etcd unavailable during update_status; falling back.')
