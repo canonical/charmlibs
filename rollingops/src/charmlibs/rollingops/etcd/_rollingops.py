@@ -16,6 +16,7 @@ import argparse
 import logging
 import time
 
+from charmlibs import pathops
 from charmlibs.rollingops.common._models import OperationResult
 from charmlibs.rollingops.common._utils import (
     ETCD_FAILED_HOOK_NAME,
@@ -65,6 +66,12 @@ def main():
     """
     parser = argparse.ArgumentParser(description='RollingOps etcd worker')
     parser.add_argument(
+        '--base-dir',
+        type=pathops.LocalPath,
+        required=True,
+        help='Base directory used to store all rollingops files.',
+    )
+    parser.add_argument(
         '--unit-name',
         type=str,
         required=True,
@@ -91,17 +98,22 @@ def main():
     )
     args = parser.parse_args()
 
+    base_dir = args.base_dir
     setup_logging(
-        ETCD_LOG_FILENAME, unit_name=args.unit_name, owner=args.owner, cluster_id=args.cluster_id
+        base_dir=base_dir,
+        log_filename=ETCD_LOG_FILENAME,
+        unit_name=args.unit_name,
+        owner=args.owner,
+        cluster_id=args.cluster_id,
     )
     logger.info('Starting worker.')
 
     time.sleep(INITIAL_SLEEP)
 
     keys = RollingOpsKeys.for_owner(args.cluster_id, args.owner)
-    lock = EtcdLock(keys.lock_key, args.owner)
-    lease = EtcdLease()
-    operations = WorkerOperationStore(keys, args.owner)
+    lock = EtcdLock(keys.lock_key, args.owner, base_dir)
+    lease = EtcdLease(base_dir)
+    operations = WorkerOperationStore(keys, args.owner, base_dir)
 
     try:
         while True:

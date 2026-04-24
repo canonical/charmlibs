@@ -51,7 +51,6 @@ def _unit_databag(state: State, peer: PeerRelation) -> RawDataBagContents:
 
 def test_leader_elected_creates_shared_secret_and_stores_id(
     certificates_manager_patches: dict[str, MagicMock],
-    etcdctl_patch: MagicMock,
     ctx: Context[RollingOpsCharm],
 ):
     peer_relation = PeerRelation(endpoint='restart')
@@ -68,7 +67,6 @@ def test_leader_elected_creates_shared_secret_and_stores_id(
 
 def test_leader_elected_does_not_regenerate_when_secret_already_exists(
     certificates_manager_patches: dict[str, MagicMock],
-    etcdctl_patch: MagicMock,
     ctx: Context[RollingOpsCharm],
 ):
     peer_relation = PeerRelation(
@@ -95,7 +93,6 @@ def test_leader_elected_does_not_regenerate_when_secret_already_exists(
 
 def test_non_leader_does_not_create_shared_secret(
     certificates_manager_patches: dict[str, MagicMock],
-    etcdctl_patch: MagicMock,
     ctx: Context[RollingOpsCharm],
 ):
     peer_relation = PeerRelation(endpoint='restart')
@@ -110,7 +107,6 @@ def test_non_leader_does_not_create_shared_secret(
 
 def test_relation_changed_syncs_local_certificate_from_secret(
     certificates_manager_patches: dict[str, MagicMock],
-    etcdctl_patch: MagicMock,
     ctx: Context[RollingOpsCharm],
 ):
     peer_relation = PeerRelation(
@@ -138,7 +134,6 @@ def test_relation_changed_syncs_local_certificate_from_secret(
 
 def test_invalid_certificate_secret_content_raises(
     certificates_manager_patches: dict[str, MagicMock],
-    etcdctl_patch: MagicMock,
     ctx: Context[RollingOpsCharm],
 ):
     peer_relation = PeerRelation(
@@ -192,7 +187,7 @@ def test_state_not_initialized(ctx: Context[RollingOpsCharm]):
 
     with ctx(ctx.on.start(), state) as mgr:
         rolling_state = mgr.charm.restart_manager.state
-        assert rolling_state.status == RollingOpsStatus.UNAVAILABLE
+        assert rolling_state.status == RollingOpsStatus.NOT_READY
         assert rolling_state.processing_backend == ProcessingBackend.PEER
         assert len(rolling_state.operations) == 0
 
@@ -334,10 +329,118 @@ def test_state_falls_back_to_peer_if_etcd_status_fails(ctx: Context[RollingOpsCh
 
     with patch(
         'charmlibs.rollingops._rollingops_manager.EtcdRollingOpsBackend.get_status',
-        return_value=RollingOpsStatus.UNAVAILABLE,
+        return_value=RollingOpsStatus.NOT_READY,
     ):
         with ctx(ctx.on.update_status(), state) as mgr:
             rolling_state = mgr.charm.restart_manager.state
             assert rolling_state.status == RollingOpsStatus.WAITING
             assert rolling_state.processing_backend == ProcessingBackend.PEER
             assert len(rolling_state.operations) == 1
+
+
+def test_is_waiting_returns_true_when_matching_operation_exists(ctx: Context[RollingOpsCharm]):
+    peer_rel = PeerRelation(
+        endpoint='restart',
+        interface='rollingops',
+        local_app_data={},
+        local_unit_data={
+            'state': 'request',
+            'operations': OperationQueue([
+                Operation.create('restart', {'delay': 1}),
+                Operation.create('restart', {'delay': 2}),
+            ]).to_string(),
+            'executed_at': '',
+            'processing_backend': 'peer',
+            'etcd_cleanup_needed': 'false',
+        },
+    )
+    state = State(leader=False, relations={peer_rel})
+
+    with ctx(ctx.on.update_status(), state) as mgr:
+        assert mgr.charm.restart_manager.is_waiting('restart', {'delay': 1}) is True
+
+
+def test_is_waiting_returns_false_when_callback_matches_but_kwargs_do_not(
+    ctx: Context[RollingOpsCharm],
+):
+    peer_rel = PeerRelation(
+        endpoint='restart',
+        interface='rollingops',
+        local_app_data={},
+        local_unit_data={
+            'state': 'request',
+            'operations': OperationQueue([
+                Operation.create('restart', {'delay': 1}),
+            ]).to_string(),
+            'executed_at': '',
+            'processing_backend': 'peer',
+            'etcd_cleanup_needed': 'false',
+        },
+    )
+    state = State(leader=False, relations={peer_rel})
+
+    with ctx(ctx.on.update_status(), state) as mgr:
+        assert mgr.charm.restart_manager.is_waiting('restart', {'delay': 2}) is False
+
+
+def test_is_waiting_returns_false_when_callback_does_not_match(ctx: Context[RollingOpsCharm]):
+    peer_rel = PeerRelation(
+        endpoint='restart',
+        interface='rollingops',
+        local_app_data={},
+        local_unit_data={
+            'state': 'request',
+            'operations': OperationQueue([
+                Operation.create('restart', {'delay': 1}),
+            ]).to_string(),
+            'executed_at': '',
+            'processing_backend': 'peer',
+            'etcd_cleanup_needed': 'false',
+        },
+    )
+    state = State(leader=False, relations={peer_rel})
+
+    with ctx(ctx.on.update_status(), state) as mgr:
+        assert mgr.charm.restart_manager.is_waiting('other-callback', {'delay': 1}) is False
+
+
+def test_is_waiting_returns_true_when_kwargs_is_none_and_matching_operation_has_empty_kwargs(
+    ctx: Context[RollingOpsCharm],
+):
+    peer_rel = PeerRelation(
+        endpoint='restart',
+        interface='rollingops',
+        local_app_data={},
+        local_unit_data={
+            'state': 'request',
+            'operations': OperationQueue([
+                Operation.create('restart', {}),
+            ]).to_string(),
+            'executed_at': '',
+            'processing_backend': 'peer',
+            'etcd_cleanup_needed': 'false',
+        },
+    )
+    state = State(leader=False, relations={peer_rel})
+
+    with ctx(ctx.on.update_status(), state) as mgr:
+        assert mgr.charm.restart_manager.is_waiting('restart') is True
+
+
+def test_is_waiting_returns_false_when_operation_validation_fails(ctx: Context[RollingOpsCharm]):
+    peer_rel = PeerRelation(
+        endpoint='restart',
+        interface='rollingops',
+        local_app_data={},
+        local_unit_data={
+            'state': 'request',
+            'operations': OperationQueue([]).to_string(),
+            'executed_at': '',
+            'processing_backend': 'peer',
+            'etcd_cleanup_needed': 'false',
+        },
+    )
+    state = State(leader=False, relations={peer_rel})
+
+    with ctx(ctx.on.update_status(), state) as mgr:
+        assert mgr.charm.restart_manager.is_waiting('restart', 'a') is False  # type: ignore[reportArgumentType]

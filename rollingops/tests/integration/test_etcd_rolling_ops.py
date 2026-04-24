@@ -31,8 +31,8 @@ from tests.integration.utils import (
 
 logger = logging.getLogger(__name__)
 TIMEOUT = 15 * 60.0
-ETCD_PROCESS_LOGS = '/var/log/etcd_rollingops_worker.log'
-PEER_PROCCES_LOGS = '/var/log/peer_rollingops_worker.log'
+ETCD_PROCESS_LOGS = '/var/lib/rollingops/etcd_rollingops_worker.log'
+PEER_PROCCES_LOGS = '/var/lib/rollingops/peer_rollingops_worker.log'
 ETCD_CONFIG_FILE = '/var/lib/rollingops/etcd/etcdctl.json'
 
 
@@ -61,11 +61,7 @@ def test_charm_is_integrated_with_etcd(juju: jubilant.Juju, app_name: str):
         app='self-signed-certificates',
         channel='1/stable',
     )
-    juju.deploy(
-        'charmed-etcd',
-        app='etcd',
-        channel='3.6/stable',
-    )
+    juju.deploy('charmed-etcd', app='etcd', channel='3.6/stable', num_units=3)
     juju.wait(jubilant.all_active, error=jubilant.any_error, timeout=TIMEOUT)
 
     juju.integrate(

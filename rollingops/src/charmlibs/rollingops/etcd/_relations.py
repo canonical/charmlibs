@@ -31,10 +31,11 @@ from ops.charm import (
 )
 from ops.framework import Object
 
+from charmlibs import pathops
 from charmlibs.interfaces.tls_certificates import Certificate, TLSCertificatesError
 from charmlibs.rollingops.common._exceptions import RollingOpsInvalidSecretContentError
-from charmlibs.rollingops.etcd import _certificates as certificates
-from charmlibs.rollingops.etcd import _etcdctl as etcdctl
+from charmlibs.rollingops.etcd._certificates import CertificateStore
+from charmlibs.rollingops.etcd._etcdctl import Etcdctl
 from charmlibs.rollingops.etcd._models import SharedCertificate
 
 logger = logging.getLogger(__name__)
@@ -48,10 +49,13 @@ CLIENT_CA_FIELD = 'client-ca'
 class SharedClientCertificateManager(Object):
     """Manage the shared rollingops client certificate via peer relation secret."""
 
-    def __init__(self, charm: CharmBase, peer_relation_name: str) -> None:
+    def __init__(
+        self, charm: CharmBase, peer_relation_name: str, base_dir: pathops.LocalPath
+    ) -> None:
         super().__init__(charm, 'shared-client-certificate')
         self.charm = charm
         self.peer_relation_name = peer_relation_name
+        self.certificates_store = CertificateStore(base_dir)
 
         self.framework.observe(charm.on.leader_elected, self._on_leader_elected)
         self.framework.observe(
@@ -112,7 +116,7 @@ class SharedClientCertificateManager(Object):
             )
             return
 
-        shared = certificates.generate(self.model.uuid, self.model.app.name)
+        shared = self.certificates_store.generate(self.model.uuid, self.model.app.name)
 
         secret = self.model.app.add_secret(
             content={
@@ -176,7 +180,7 @@ class SharedClientCertificateManager(Object):
             logger.info('Shared rollingops etcd client certificate is not available yet.')
             return
 
-        certificates.persist_client_cert_key_and_ca(shared)
+        self.certificates_store.persist_client_cert_key_and_ca(shared)
 
     def get_local_request_cert(self) -> Certificate | None:
         """Return the cert to place in relation requests."""
@@ -193,11 +197,14 @@ class EtcdRequiresV1(Object):
         relation_name: str,
         cluster_id: str,
         shared_certificates: SharedClientCertificateManager,
+        base_dir: pathops.LocalPath,
     ) -> None:
         super().__init__(charm, f'requirer-{relation_name}')
         self.charm = charm
         self.cluster_id = cluster_id
         self.shared_certificates = shared_certificates
+        self.certificates_store = CertificateStore(base_dir)
+        self.etcdctl = Etcdctl(base_dir)
 
         self.etcd_interface = ResourceRequirerEventHandler(
             self.charm,
@@ -220,7 +227,7 @@ class EtcdRequiresV1(Object):
 
     def _on_relation_broken(self, event: RelationBrokenEvent) -> None:
         """Remove the stored information about the etcd server."""
-        etcdctl.cleanup()
+        self.etcdctl.cleanup()
 
     def _on_endpoints_changed(
         self, event: ResourceEndpointsChangedEvent[ResourceProviderModel]
@@ -240,10 +247,10 @@ class EtcdRequiresV1(Object):
 
         logger.info('etcd endpoints changed: %s', response.endpoints)
 
-        etcdctl.write_config_file(
+        self.etcdctl.write_config_file(
             endpoints=response.endpoints,
-            client_cert_path=certificates.CLIENT_CERT_PATH,
-            client_key_path=certificates.CLIENT_KEY_PATH,
+            client_cert_path=self.certificates_store.cert_path,
+            client_key_path=self.certificates_store.key_path,
         )
 
     def _on_resource_created(self, event: ResourceCreatedEvent[ResourceProviderModel]) -> None:
@@ -260,16 +267,16 @@ class EtcdRequiresV1(Object):
             )
             return
 
-        etcdctl.write_trusted_server_ca(tls_ca_pem=response.tls_ca)
+        self.etcdctl.write_trusted_server_ca(tls_ca_pem=response.tls_ca)
 
         if not response.endpoints:
             logger.error('Received a resource created event but no etcd endpoints available.')
             return
 
-        etcdctl.write_config_file(
+        self.etcdctl.write_config_file(
             endpoints=response.endpoints,
-            client_cert_path=certificates.CLIENT_CERT_PATH,
-            client_key_path=certificates.CLIENT_KEY_PATH,
+            client_cert_path=self.certificates_store.cert_path,
+            client_key_path=self.certificates_store.key_path,
         )
 
     def client_requests(self) -> list[RequirerCommonModel]:

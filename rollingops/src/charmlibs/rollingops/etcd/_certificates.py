@@ -38,136 +38,138 @@ from charmlibs.rollingops.common._exceptions import RollingOpsFileSystemError
 from charmlibs.rollingops.common._utils import with_pebble_retry
 from charmlibs.rollingops.etcd._models import SharedCertificate
 
-BASE_DIR = pathops.LocalPath('/var/lib/rollingops/tls')
-CA_CERT_PATH = BASE_DIR / 'client-ca.pem'
-CLIENT_KEY_PATH = BASE_DIR / 'client.key'
-CLIENT_CERT_PATH = BASE_DIR / 'client.pem'
 VALIDITY_DAYS = 365 * 50
 KEY_SIZE = 4096
 
 
-def persist_client_cert_key_and_ca(shared: SharedCertificate) -> None:
-    """Persist the provided client certificate, key, and CA to disk.
+class CertificateStore:
+    def __init__(self, base_dir: pathops.LocalPath):
+        self.base_dir = base_dir / 'tls'
+        self.cert_path = self.base_dir / 'client.pem'
+        self.key_path = self.base_dir / 'client.key'
+        self.ca_path = self.base_dir / 'client-ca.pem'
 
-    Raises:
-        PebbleConnectionError: if the remote container cannot be reached
-        RollingOpsFileSystemError: if there is a problem when writing the certificates
-    """
-    if _has_client_cert_key_and_ca(shared):
-        return
-    try:
-        with_pebble_retry(lambda: BASE_DIR.mkdir(parents=True, exist_ok=True))
-        shared.write_to_paths(CLIENT_CERT_PATH, CLIENT_KEY_PATH, CA_CERT_PATH)
+    def persist_client_cert_key_and_ca(self, shared: SharedCertificate) -> None:
+        """Persist the provided client certificate, key, and CA to disk.
 
-    except (FileNotFoundError, LookupError, NotADirectoryError, PermissionError) as e:
-        raise RollingOpsFileSystemError('Failed to persist client certificates and key.') from e
+        Raises:
+            PebbleConnectionError: if the remote container cannot be reached
+            RollingOpsFileSystemError: if there is a problem when writing the certificates
+        """
+        if self._has_client_cert_key_and_ca(shared):
+            return
+        try:
+            with_pebble_retry(lambda: self.base_dir.mkdir(parents=True, exist_ok=True))
+            shared.write_to_paths(self.cert_path, self.key_path, self.ca_path)
 
+        except (FileNotFoundError, LookupError, NotADirectoryError, PermissionError) as e:
+            raise RollingOpsFileSystemError(
+                'Failed to persist client certificates and key.'
+            ) from e
 
-def _has_client_cert_key_and_ca(shared: SharedCertificate) -> bool:
-    """Return whether the provided certificate material matches local files.
+    def _has_client_cert_key_and_ca(self, shared: SharedCertificate) -> bool:
+        """Return whether the provided certificate material matches local files.
 
-    Raises:
-        PebbleConnectionError: if the remote container cannot be reached
-        RollingOpsFileSystemError: if there is a problem when writing the certificates
-    """
-    if not _exists():
-        return False
-    try:
-        stored = SharedCertificate.from_paths(
-            CLIENT_CERT_PATH,
-            CLIENT_KEY_PATH,
-            CA_CERT_PATH,
+        Raises:
+            PebbleConnectionError: if the remote container cannot be reached
+            RollingOpsFileSystemError: if there is a problem when writing the certificates
+        """
+        if not self._exists():
+            return False
+        try:
+            stored = SharedCertificate.from_paths(
+                self.cert_path,
+                self.key_path,
+                self.ca_path,
+            )
+            return stored == shared
+
+        except (
+            FileNotFoundError,
+            IsADirectoryError,
+            PermissionError,
+            TLSCertificatesError,
+            ValueError,
+        ) as e:
+            raise RollingOpsFileSystemError('Failed to read certificates and key.') from e
+
+    def generate(self, model_uuid: str, app_name: str) -> SharedCertificate:
+        """Generate a client CA and client certificate if they do not exist.
+
+        This method creates:
+        1. A CA private key and self-signed CA certificate.
+        2. A client private key.
+        3. A certificate signing request (CSR) using the provided common name.
+        4. A client certificate signed by the generated CA.
+
+        The generated files are written to disk and reused in future runs.
+        If the certificates already exist, this method does nothing.
+
+        Args:
+            model_uuid: string used to build the common name.
+            app_name: string used to build the common name.
+
+        Raises:
+            PebbleConnectionError: if the remote container cannot be reached
+            RollingOpsFileSystemError: if there is a problem when writing the certificates
+        """
+        if self._exists():
+            return SharedCertificate.from_paths(
+                self.cert_path,
+                self.key_path,
+                self.ca_path,
+            )
+
+        # Produce a unique <=64-character string
+        raw = f'{model_uuid}-{app_name}'
+        common_name = shortuuid.uuid(name=raw)
+        ca_key = PrivateKey.generate(key_size=KEY_SIZE)
+        ca_attributes = CertificateRequestAttributes(
+            common_name=common_name,
+            is_ca=True,
+            add_unique_id_to_subject_name=False,
         )
-        return stored == shared
-
-    except (
-        FileNotFoundError,
-        IsADirectoryError,
-        PermissionError,
-        TLSCertificatesError,
-        ValueError,
-    ) as e:
-        raise RollingOpsFileSystemError('Failed to read certificates and key.') from e
-
-
-def generate(model_uuid: str, app_name: str) -> SharedCertificate:
-    """Generate a client CA and client certificate if they do not exist.
-
-    This method creates:
-    1. A CA private key and self-signed CA certificate.
-    2. A client private key.
-    3. A certificate signing request (CSR) using the provided common name.
-    4. A client certificate signed by the generated CA.
-
-    The generated files are written to disk and reused in future runs.
-    If the certificates already exist, this method does nothing.
-
-    Args:
-        model_uuid: string used to build the common name.
-        app_name: string used to build the common name.
-
-    Raises:
-        PebbleConnectionError: if the remote container cannot be reached
-        RollingOpsFileSystemError: if there is a problem when writing the certificates
-    """
-    if _exists():
-        return SharedCertificate.from_paths(
-            CLIENT_CERT_PATH,
-            CLIENT_KEY_PATH,
-            CA_CERT_PATH,
+        ca_crt = Certificate.generate_self_signed_ca(
+            attributes=ca_attributes,
+            private_key=ca_key,
+            validity=timedelta(days=VALIDITY_DAYS),
         )
 
-    # Produce a unique <=64-character string
-    raw = f'{model_uuid}-{app_name}'
-    common_name = shortuuid.uuid(name=raw)
-    ca_key = PrivateKey.generate(key_size=KEY_SIZE)
-    ca_attributes = CertificateRequestAttributes(
-        common_name=common_name,
-        is_ca=True,
-        add_unique_id_to_subject_name=False,
-    )
-    ca_crt = Certificate.generate_self_signed_ca(
-        attributes=ca_attributes,
-        private_key=ca_key,
-        validity=timedelta(days=VALIDITY_DAYS),
-    )
+        client_key = PrivateKey.generate(key_size=KEY_SIZE)
 
-    client_key = PrivateKey.generate(key_size=KEY_SIZE)
+        csr_attributes = CertificateRequestAttributes(
+            common_name=common_name, add_unique_id_to_subject_name=False
+        )
+        csr = CertificateSigningRequest.generate(
+            attributes=csr_attributes,
+            private_key=client_key,
+        )
 
-    csr_attributes = CertificateRequestAttributes(
-        common_name=common_name, add_unique_id_to_subject_name=False
-    )
-    csr = CertificateSigningRequest.generate(
-        attributes=csr_attributes,
-        private_key=client_key,
-    )
+        client_crt = Certificate.generate(
+            csr=csr,
+            ca=ca_crt,
+            ca_private_key=ca_key,
+            validity=timedelta(days=VALIDITY_DAYS),
+            is_ca=False,
+        )
 
-    client_crt = Certificate.generate(
-        csr=csr,
-        ca=ca_crt,
-        ca_private_key=ca_key,
-        validity=timedelta(days=VALIDITY_DAYS),
-        is_ca=False,
-    )
+        shared = SharedCertificate(
+            certificate=client_crt,
+            key=client_key,
+            ca=ca_crt,
+        )
 
-    shared = SharedCertificate(
-        certificate=client_crt,
-        key=client_key,
-        ca=ca_crt,
-    )
+        self.persist_client_cert_key_and_ca(shared)
+        return shared
 
-    persist_client_cert_key_and_ca(shared)
-    return shared
+    def _exists(self) -> bool:
+        """Check whether the client certificates and CA certificate already exist.
 
-
-def _exists() -> bool:
-    """Check whether the client certificates and CA certificate already exist.
-
-    Raises:
-        PebbleConnectionError: if the remote container cannot be reached
-    """
-    return (
-        with_pebble_retry(lambda: CA_CERT_PATH.exists())
-        and with_pebble_retry(lambda: CLIENT_KEY_PATH.exists())
-        and with_pebble_retry(lambda: CLIENT_CERT_PATH.exists())
-    )
+        Raises:
+            PebbleConnectionError: if the remote container cannot be reached
+        """
+        return (
+            with_pebble_retry(lambda: self.ca_path.exists())
+            and with_pebble_retry(lambda: self.key_path.exists())
+            and with_pebble_retry(lambda: self.cert_path.exists())
+        )

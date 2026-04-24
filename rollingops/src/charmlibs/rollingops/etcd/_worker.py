@@ -23,7 +23,8 @@ from charmlibs.rollingops.common._base_worker import BaseRollingOpsAsyncWorker
 
 logger = logging.getLogger(__name__)
 
-ETCD_LOG_FILENAME = '/var/log/etcd_rollingops_worker.log'
+ETCD_LOG_FILENAME = 'etcd_rollingops_worker.log'
+WORKER_PID_FIELD = 'etcd-rollingops-worker-pid'
 
 
 class EtcdRollingOpsAsyncWorker(BaseRollingOpsAsyncWorker):
@@ -35,11 +36,23 @@ class EtcdRollingOpsAsyncWorker(BaseRollingOpsAsyncWorker):
     manage its own worker lifecycle.
     """
 
-    _pid_field = 'etcd-rollingops-worker-pid'
+    _pid_field = WORKER_PID_FIELD
     _log_filename = ETCD_LOG_FILENAME
 
-    def __init__(self, charm: CharmBase, peer_relation_name: str, owner: str, cluster_id: str):
-        super().__init__(charm, 'etcd-rollingops-async-worker', peer_relation_name)
+    def __init__(
+        self,
+        charm: CharmBase,
+        peer_relation_name: str,
+        owner: str,
+        cluster_id: str,
+        base_dir: pathops.LocalPath,
+    ):
+        super().__init__(
+            charm,
+            'etcd-rollingops-async-worker',
+            peer_relation_name,
+            base_dir=base_dir,
+        )
         self._owner = owner
         self._cluster_id = cluster_id
 

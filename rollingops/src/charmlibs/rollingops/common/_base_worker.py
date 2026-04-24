@@ -48,7 +48,13 @@ class BaseRollingOpsAsyncWorker(Object):
     _pid_field: str
     _log_filename: str
 
-    def __init__(self, charm: CharmBase, handle_name: str, peer_relation_name: str):
+    def __init__(
+        self,
+        charm: CharmBase,
+        handle_name: str,
+        peer_relation_name: str,
+        base_dir: pathops.LocalPath,
+    ):
         """Initialize the base rolling-ops worker helper.
 
         Args:
@@ -56,12 +62,14 @@ class BaseRollingOpsAsyncWorker(Object):
             handle_name: Framework handle name used for this worker object.
             peer_relation_name: Name of the peer relation used by subclasses
                 to store and retrieve worker state.
+            base_dir: base directory used for logs in the background process.
         """
         super().__init__(charm, handle_name)
         self._charm = charm
         self._charm_dir = charm.charm_dir
         self._peer_relation_name = peer_relation_name
         self._handle_name = handle_name
+        self._base_dir = base_dir
 
     @property
     def _relation(self) -> Relation | None:
@@ -207,12 +215,17 @@ class BaseRollingOpsAsyncWorker(Object):
         worker = self._worker_script_path()
         env = self._build_env()
 
-        with open(f'{self._log_filename}', 'a') as log_out:
+        with_pebble_retry(lambda: self._base_dir.mkdir(parents=True, exist_ok=True))
+
+        log_file = self._base_dir / self._log_filename
+        with open(log_file, 'a') as log_out:
             pid = subprocess.Popen(
                 [
                     '/usr/bin/python3',
                     '-u',
                     str(worker),
+                    '--base-dir',
+                    self._base_dir,
                     '--unit-name',
                     self.model.unit.name,
                     '--charm-dir',

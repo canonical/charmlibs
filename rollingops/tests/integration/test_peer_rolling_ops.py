@@ -215,7 +215,7 @@ def test_retry_release_alternates_execution(juju: jubilant.Juju, app_name: str):
     juju.run(unit_a, 'failed-restart', {'delay': 10, 'max-retry': 2}, wait=TIMEOUT)
     juju.run(unit_b, 'failed-restart', {'delay': 1, 'max-retry': 2}, wait=TIMEOUT)
 
-    time.sleep(60)  # wait for operation execution. TODO: in charm use lock state to clear status.
+    time.sleep(90)  # wait for operation execution. TODO: in charm use lock state to clear status.
 
     all_events: list[dict[str, str]] = []
     all_events.extend(get_unit_events(juju, unit_a))

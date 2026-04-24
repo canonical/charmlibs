@@ -96,23 +96,20 @@ class RollingOpsStatus(StrEnum):
 
     States:
 
-    - UNAVAILABLE:
+    - NOT_READY:
         Rolling-ops cannot be used on this unit. This typically occurs when
         required relations are missing or the selected backend is not reachable.
-            * peer backend: peer relation does not exist
-            * etcd backend: peer or etcd relation missing, or etcd not reachable
+        * peer backend: peer relation does not exist
+        * etcd backend: peer or etcd relation missing, or etcd not reachable
 
-    - WAITING:
-        The unit has pending operations but does not currently hold the lock.
+    - WAITING: The unit has pending operations but does not currently hold the lock.
 
-    - GRANTED:
-        The unit currently holds the lock and may execute operations.
+    - GRANTED: The unit currently holds the lock and may execute operations.
 
-    - IDLE:
-        The unit has no pending operations and is not holding the lock.
+    - IDLE: The unit has no pending operations and is not holding the lock.
     """
 
-    UNAVAILABLE = 'unavailable'
+    NOT_READY = 'not-ready'
     WAITING = 'waiting'
     GRANTED = 'granted'
     IDLE = 'idle'
@@ -452,14 +449,12 @@ class RollingOpsState:
         to peer).
     The `operations` queue always reflects the peer-backed state, which
         acts as the source of truth and fallback mechanism.
-    When `status` is UNAVAILABLE, the unit cannot currently participate
+    When `status` is NOT_READY, the unit cannot currently participate
         in rolling operations due to missing relations or backend failures.
 
-    Attributes:
-        status: High-level rolling-ops status for the unit.
-        processing_backend: Backend currently responsible for executing
-            operations (e.g. ETCD or PEER).
-        operations: The unit's operation queue.
+    status: High-level rolling-ops status for the unit.
+    processing_backend: Backend currently responsible for executing operations (e.g. ETCD or PEER).
+    operations: The unit's operation queue.
     """
 
     status: RollingOpsStatus

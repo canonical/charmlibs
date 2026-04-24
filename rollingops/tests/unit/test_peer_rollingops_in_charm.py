@@ -21,8 +21,9 @@ from unittest.mock import MagicMock
 import pytest
 from ops.testing import Context, PeerRelation, State
 from scenario import RawDataBagContents
-from tests.unit.conftest import RollingOpsCharm
+from tests.unit.conftest import RollingOpsCharm, StrictPeerRollingOpsCharm
 
+from charmlibs.rollingops import ProcessingBackend, RollingOpsStatus
 from charmlibs.rollingops.common._exceptions import RollingOpsInvalidLockRequestError
 from charmlibs.rollingops.common._models import Operation, OperationQueue
 from charmlibs.rollingops.common._utils import now_timestamp
@@ -354,7 +355,6 @@ def test_lock_retry_drops_when_max_retry_reached(
 
 def test_lock_grant_and_release(
     certificates_manager_patches: dict[str, MagicMock],
-    etcdctl_patch: MagicMock,
     ctx: Context[RollingOpsCharm],
 ):
     queue = _make_operation_queue(callback_id='_failed_restart', kwargs={}, max_retry=3)
@@ -374,7 +374,6 @@ def test_lock_grant_and_release(
 
 def test_scheduling_does_nothing_if_lock_already_granted(
     certificates_manager_patches: dict[str, MagicMock],
-    etcdctl_patch: MagicMock,
     ctx: Context[RollingOpsCharm],
 ):
     queue = _make_operation_queue(callback_id='_failed_restart', kwargs={}, max_retry=3)
@@ -399,7 +398,6 @@ def test_scheduling_does_nothing_if_lock_already_granted(
 
 def test_schedule_picks_retry_hold(
     certificates_manager_patches: dict[str, MagicMock],
-    etcdctl_patch: MagicMock,
     ctx: Context[RollingOpsCharm],
 ):
     old_operation = str(now_timestamp().timestamp())
@@ -437,7 +435,6 @@ def test_schedule_picks_retry_hold(
 
 def test_schedule_picks_oldest_requested_at_among_requests(
     certificates_manager_patches: dict[str, MagicMock],
-    etcdctl_patch: MagicMock,
     ctx: Context[RollingOpsCharm],
 ):
     old_queue = OperationQueue()
@@ -465,7 +462,6 @@ def test_schedule_picks_oldest_requested_at_among_requests(
 
 def test_schedule_picks_oldest_executed_at_among_retries_when_no_requests(
     certificates_manager_patches: dict[str, MagicMock],
-    etcdctl_patch: MagicMock,
     ctx: Context[RollingOpsCharm],
 ):
     old_operation = str(now_timestamp().timestamp())
@@ -498,7 +494,6 @@ def test_schedule_picks_oldest_executed_at_among_retries_when_no_requests(
 
 def test_schedule_prioritizes_requests_over_retries(
     certificates_manager_patches: dict[str, MagicMock],
-    etcdctl_patch: MagicMock,
     ctx: Context[RollingOpsCharm],
 ):
     queue = _make_operation_queue(callback_id='_failed_restart', kwargs={}, max_retry=3)
@@ -525,7 +520,6 @@ def test_schedule_prioritizes_requests_over_retries(
 
 def test_no_unit_is_granted_if_there_are_no_requests(
     certificates_manager_patches: dict[str, MagicMock],
-    etcdctl_patch: MagicMock,
     ctx: Context[RollingOpsCharm],
 ):
     peer = PeerRelation(
@@ -539,3 +533,40 @@ def test_no_unit_is_granted_if_there_are_no_requests(
     databag = _app_databag(state_out, peer)
     assert databag.get('granted_unit', '') == ''
     assert databag.get('granted_at', '') == ''
+
+
+def test_strict_peer_no_unit_is_granted_if_there_are_no_requests(
+    certificates_manager_patches: dict[str, MagicMock],
+    strict_peer_ctx: Context[StrictPeerRollingOpsCharm],
+):
+    peer = PeerRelation(
+        endpoint='restart',
+        peers_data={1: {'state': LockIntent.IDLE}, 2: {'state': LockIntent.IDLE}},
+    )
+    state_in = State(leader=True, relations={peer})
+
+    state_out = strict_peer_ctx.run(strict_peer_ctx.on.leader_elected(), state_in)
+
+    databag = _app_databag(state_out, peer)
+    assert databag.get('granted_unit', '') == ''
+    assert databag.get('granted_at', '') == ''
+
+
+def test_state_peer_idle(strict_peer_ctx: Context[StrictPeerRollingOpsCharm]):
+    peer_rel = PeerRelation(
+        endpoint='restart',
+        local_unit_data={
+            'state': '',
+            'operations': '',
+            'executed_at': '',
+            'processing_backend': 'peer',
+            'etcd_cleanup_needed': 'false',
+        },
+    )
+    state = State(leader=False, relations={peer_rel})
+
+    with strict_peer_ctx(strict_peer_ctx.on.update_status(), state) as mgr:
+        rolling_state = mgr.charm.restart_manager.state
+        assert rolling_state.status == RollingOpsStatus.IDLE
+        assert rolling_state.processing_backend == ProcessingBackend.PEER
+        assert len(rolling_state.operations) == 0
