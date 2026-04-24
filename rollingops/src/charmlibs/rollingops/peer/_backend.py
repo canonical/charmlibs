@@ -571,6 +571,18 @@ class PeerRollingOpsBackend(Object):
                     f'Unsupported run-with-lock outcome: {outcome.status}'
                 )
 
+    def is_ready(self) -> bool:
+        """Return whether the peer backend is ready.
+
+        It is ready if all the units in the relation have started and joined
+        the relation.
+        """
+        if self._relation is None:
+            return False
+        planned_units = self.model.app.planned_units()
+        units_in_relation = len(self._relation.units)
+        return planned_units == (units_in_relation + 1)
+
     def get_status(self) -> RollingOpsStatus:
         """Return the current rolling-ops status for this unit in peer mode.
 
@@ -578,7 +590,7 @@ class PeerRollingOpsBackend(Object):
         and from the shared peer lock state.
 
         Returned values:
-            - UNAVAILABLE: the peer relation does not exist
+            - NOT_READY: the peer relation does not exist
             - GRANTED: the current unit holds the peer lock
             - WAITING: the current unit has queued work but does not hold the lock
             - IDLE: the current unit has no pending work
@@ -586,8 +598,8 @@ class PeerRollingOpsBackend(Object):
         Returns:
             The current rolling-ops status for this unit.
         """
-        if self._relation is None:
-            return RollingOpsStatus.UNAVAILABLE
+        if not self.is_ready():
+            return RollingOpsStatus.NOT_READY
 
         lock = self._lock()
         operations = self._operations(self.model.unit)

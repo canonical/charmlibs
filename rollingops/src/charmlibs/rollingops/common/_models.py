@@ -96,10 +96,10 @@ class RollingOpsStatus(StrEnum):
 
     States:
 
-    - UNAVAILABLE:
+    - NOT_READY:
         Rolling-ops cannot be used on this unit. This typically occurs when
         required relations are missing or the selected backend is not reachable.
-        * peer backend: peer relation does not exist
+        * peer backend: peer relation does not exist or it is waiting for all the units to join
         * etcd backend: peer or etcd relation missing, or etcd not reachable
 
     - WAITING: The unit has pending operations but does not currently hold the lock.
@@ -109,7 +109,7 @@ class RollingOpsStatus(StrEnum):
     - IDLE: The unit has no pending operations and is not holding the lock.
     """
 
-    UNAVAILABLE = 'unavailable'
+    NOT_READY = 'not-ready'
     WAITING = 'waiting'
     GRANTED = 'granted'
     IDLE = 'idle'
@@ -449,7 +449,7 @@ class RollingOpsState:
         to peer).
     The `operations` queue always reflects the peer-backed state, which
         acts as the source of truth and fallback mechanism.
-    When `status` is UNAVAILABLE, the unit cannot currently participate
+    When `status` is NOT_READY, the unit cannot currently participate
         in rolling operations due to missing relations or backend failures.
 
     status: High-level rolling-ops status for the unit.

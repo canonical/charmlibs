@@ -395,7 +395,7 @@ class EtcdRollingOpsBackend(Object):
         unit's queued operation state.
 
         Returned values:
-            - UNAVAILABLE: etcd backend is not available
+            - NOT_READY: etcd backend is not available
             - GRANTED: the async lock is currently held by this unit
             - WAITING: this unit has queued work but does not hold the lock
             - IDLE: this unit has no pending work
@@ -404,7 +404,7 @@ class EtcdRollingOpsBackend(Object):
             The current rolling-ops status for this unit.
         """
         if self._peer_relation is None or self._etcd_relation is None or not self.is_available():
-            return RollingOpsStatus.UNAVAILABLE
+            return RollingOpsStatus.NOT_READY
 
         if self._async_lock.is_held():
             return RollingOpsStatus.GRANTED
