@@ -99,7 +99,7 @@ class RollingOpsStatus(StrEnum):
     - NOT_READY:
         Rolling-ops cannot be used on this unit. This typically occurs when
         required relations are missing or the selected backend is not reachable.
-        * peer backend: peer relation does not exist or it is waiting for all the units to join
+        * peer backend: peer relation does not exist
         * etcd backend: peer or etcd relation missing, or etcd not reachable
 
     - WAITING: The unit has pending operations but does not currently hold the lock.

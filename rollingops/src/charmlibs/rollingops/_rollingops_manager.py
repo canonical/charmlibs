@@ -135,8 +135,6 @@ class RollingOpsManager(Object):
         self.framework.observe(charm.on.rollingops_etcd_failed, self._on_rollingops_etcd_failed)
         self.framework.observe(charm.on.update_status, self._on_update_status)
 
-        self.is_ready()
-
     @property
     def _peer_relation(self) -> Relation | None:
         """Return the peer relation for this charm."""
@@ -452,7 +450,7 @@ class RollingOpsManager(Object):
             A snapshot of the current rolling-ops status, backend selection,
             and queued operations for this unit.
         """
-        if not self.peer_backend.is_ready():
+        if self._peer_relation is None:
             return RollingOpsState(
                 status=RollingOpsStatus.NOT_READY,
                 processing_backend=ProcessingBackend.PEER,
@@ -473,10 +471,6 @@ class RollingOpsManager(Object):
             processing_backend=self._backend_state.backend,
             operations=operations.queue,
         )
-
-    def is_ready(self) -> bool:
-        """Return whether the rollingops manager can be used on this unit."""
-        return self.state.status != RollingOpsStatus.NOT_READY
 
     def is_waiting(self, callback_id: str, kwargs: dict[str, Any] | None = None) -> bool:
         """Return whether the current unit has a pending operation matching callback and kwargs."""

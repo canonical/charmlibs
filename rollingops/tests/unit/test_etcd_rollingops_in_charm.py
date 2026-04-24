@@ -190,7 +190,6 @@ def test_state_not_initialized(ctx: Context[RollingOpsCharm]):
         assert rolling_state.status == RollingOpsStatus.NOT_READY
         assert rolling_state.processing_backend == ProcessingBackend.PEER
         assert len(rolling_state.operations) == 0
-        assert mgr.charm.restart_manager.is_ready() is False
 
 
 def test_state_peer_idle(ctx: Context[RollingOpsCharm]):
@@ -211,7 +210,6 @@ def test_state_peer_idle(ctx: Context[RollingOpsCharm]):
         assert rolling_state.status == RollingOpsStatus.IDLE
         assert rolling_state.processing_backend == ProcessingBackend.PEER
         assert len(rolling_state.operations) == 0
-        assert mgr.charm.restart_manager.is_ready() is True
 
 
 def test_state_peer_waiting(ctx: Context[RollingOpsCharm]):
@@ -234,7 +232,6 @@ def test_state_peer_waiting(ctx: Context[RollingOpsCharm]):
         assert rolling_state.status == RollingOpsStatus.WAITING
         assert rolling_state.processing_backend == ProcessingBackend.PEER
         assert len(rolling_state.operations) == 1
-        assert mgr.charm.restart_manager.is_ready() is True
 
 
 def test_state_peer_is_granted(ctx: Context[RollingOpsCharm]):
@@ -260,7 +257,6 @@ def test_state_peer_is_granted(ctx: Context[RollingOpsCharm]):
         assert rolling_state.status == RollingOpsStatus.GRANTED
         assert rolling_state.processing_backend == ProcessingBackend.PEER
         assert len(rolling_state.operations) == 1
-        assert mgr.charm.restart_manager.is_ready() is True
 
 
 def test_state_peer_waiting_retry(ctx: Context[RollingOpsCharm]):
@@ -286,7 +282,6 @@ def test_state_peer_waiting_retry(ctx: Context[RollingOpsCharm]):
         assert rolling_state.status == RollingOpsStatus.WAITING
         assert rolling_state.processing_backend == ProcessingBackend.PEER
         assert len(rolling_state.operations) == 1
-        assert mgr.charm.restart_manager.is_ready() is True
 
 
 def test_state_etcd_status(ctx: Context[RollingOpsCharm]):
@@ -315,7 +310,6 @@ def test_state_etcd_status(ctx: Context[RollingOpsCharm]):
             assert rolling_state.status == RollingOpsStatus.GRANTED
             assert rolling_state.processing_backend == ProcessingBackend.ETCD
             assert len(rolling_state.operations) == 1
-            assert mgr.charm.restart_manager.is_ready() is True
 
 
 def test_state_falls_back_to_peer_if_etcd_status_fails(ctx: Context[RollingOpsCharm]):
@@ -342,7 +336,6 @@ def test_state_falls_back_to_peer_if_etcd_status_fails(ctx: Context[RollingOpsCh
             assert rolling_state.status == RollingOpsStatus.WAITING
             assert rolling_state.processing_backend == ProcessingBackend.PEER
             assert len(rolling_state.operations) == 1
-            assert mgr.charm.restart_manager.is_ready() is True
 
 
 def test_is_waiting_returns_true_when_matching_operation_exists(ctx: Context[RollingOpsCharm]):
@@ -365,7 +358,6 @@ def test_is_waiting_returns_true_when_matching_operation_exists(ctx: Context[Rol
 
     with ctx(ctx.on.update_status(), state) as mgr:
         assert mgr.charm.restart_manager.is_waiting('restart', {'delay': 1}) is True
-        assert mgr.charm.restart_manager.is_ready() is True
 
 
 def test_is_waiting_returns_false_when_callback_matches_but_kwargs_do_not(
@@ -389,7 +381,6 @@ def test_is_waiting_returns_false_when_callback_matches_but_kwargs_do_not(
 
     with ctx(ctx.on.update_status(), state) as mgr:
         assert mgr.charm.restart_manager.is_waiting('restart', {'delay': 2}) is False
-        assert mgr.charm.restart_manager.is_ready() is True
 
 
 def test_is_waiting_returns_false_when_callback_does_not_match(ctx: Context[RollingOpsCharm]):
@@ -411,7 +402,6 @@ def test_is_waiting_returns_false_when_callback_does_not_match(ctx: Context[Roll
 
     with ctx(ctx.on.update_status(), state) as mgr:
         assert mgr.charm.restart_manager.is_waiting('other-callback', {'delay': 1}) is False
-        assert mgr.charm.restart_manager.is_ready() is True
 
 
 def test_is_waiting_returns_true_when_kwargs_is_none_and_matching_operation_has_empty_kwargs(
@@ -435,7 +425,6 @@ def test_is_waiting_returns_true_when_kwargs_is_none_and_matching_operation_has_
 
     with ctx(ctx.on.update_status(), state) as mgr:
         assert mgr.charm.restart_manager.is_waiting('restart') is True
-        assert mgr.charm.restart_manager.is_ready() is True
 
 
 def test_is_waiting_returns_false_when_operation_validation_fails(ctx: Context[RollingOpsCharm]):
@@ -455,4 +444,3 @@ def test_is_waiting_returns_false_when_operation_validation_fails(ctx: Context[R
 
     with ctx(ctx.on.update_status(), state) as mgr:
         assert mgr.charm.restart_manager.is_waiting('restart', 'a') is False  # type: ignore[reportArgumentType]
-        assert mgr.charm.restart_manager.is_ready() is True
