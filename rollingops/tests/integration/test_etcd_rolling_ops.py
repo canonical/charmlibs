@@ -61,11 +61,7 @@ def test_charm_is_integrated_with_etcd(juju: jubilant.Juju, app_name: str):
         app='self-signed-certificates',
         channel='1/stable',
     )
-    juju.deploy(
-        'charmed-etcd',
-        app='etcd',
-        channel='3.6/stable',
-    )
+    juju.deploy('charmed-etcd', app='etcd', channel='3.6/stable', num_units=3)
     juju.wait(jubilant.all_active, error=jubilant.any_error, timeout=TIMEOUT)
 
     juju.integrate(
