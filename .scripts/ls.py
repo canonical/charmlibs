@@ -86,12 +86,14 @@ def _main() -> None:
     parser.add_argument('--indent-json', action='store_true')
     parser.add_argument('--regex', default=None)
     group = parser.add_mutually_exclusive_group()
-    group.add_argument(
-        '--output', action='append', choices=[f.name for f in dataclasses.fields(Info)]
-    )
+    all_fields = [f.name for f in dataclasses.fields(Info)]
+    group.add_argument('--output', action='append', choices=all_fields)
+    group.add_argument('--output-all', action='store_const', const=all_fields, default=[])
     group.add_argument('--name-only', action='store_true')
+    group.add_argument('--path-only', action='store_true')  # default behaviour
     args = parser.parse_args()
-    single_output = 'name' if args.name_only else 'path'  # used if --output isn't specified
+    output = args.output or args.output_all
+    single_output = 'name' if args.name_only else 'path'
     infos = _ls(
         category=args.category,
         old_ref=args.old_ref,
@@ -101,11 +103,11 @@ def _main() -> None:
         include_testing=not args.exclude_testing,
         only_if_version_changed=args.only_if_version_changed,
         regex=args.regex,
-        output=args.output or [single_output],
+        output=output or [single_output],
     )
-    if args.output:
+    if output:
         result = sorted(
-            (info.to_dict(*args.output) for info in infos),
+            (info.to_dict(*output) for info in infos),
             key=lambda di: tuple(di.items()),
         )
     else:
