@@ -53,7 +53,7 @@ class BaseRollingOpsAsyncWorker(Object):
         charm: CharmBase,
         handle_name: str,
         peer_relation_name: str,
-        base_dir: str,
+        base_dir: pathops.LocalPath,
     ):
         """Initialize the base rolling-ops worker helper.
 
@@ -215,10 +215,9 @@ class BaseRollingOpsAsyncWorker(Object):
         worker = self._worker_script_path()
         env = self._build_env()
 
-        base_dir_path = pathops.LocalPath(self._base_dir)
-        with_pebble_retry(lambda: base_dir_path.mkdir(parents=True, exist_ok=True))
+        with_pebble_retry(lambda: self._base_dir.mkdir(parents=True, exist_ok=True))
 
-        log_file = base_dir_path / self._log_filename
+        log_file = self._base_dir / self._log_filename
         with open(log_file, 'a') as log_out:
             pid = subprocess.Popen(
                 [

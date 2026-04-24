@@ -43,8 +43,8 @@ KEY_SIZE = 4096
 
 
 class CertificateStore:
-    def __init__(self, base_dir: str):
-        self.base_dir = pathops.LocalPath(base_dir) / 'tls'
+    def __init__(self, base_dir: pathops.LocalPath):
+        self.base_dir = base_dir / 'tls'
         self.cert_path = self.base_dir / 'client.pem'
         self.key_path = self.base_dir / 'client.key'
         self.ca_path = self.base_dir / 'client-ca.pem'

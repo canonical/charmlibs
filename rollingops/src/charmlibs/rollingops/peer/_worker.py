@@ -42,7 +42,7 @@ class PeerRollingOpsAsyncWorker(BaseRollingOpsAsyncWorker):
     _pid_field = WORKER_PID_FIELD
     _log_filename = PEER_LOG_FILENAME
 
-    def __init__(self, charm: CharmBase, relation_name: str, base_dir: str):
+    def __init__(self, charm: CharmBase, relation_name: str, base_dir: pathops.LocalPath):
         super().__init__(
             charm,
             'peer-rollingops-async-worker',

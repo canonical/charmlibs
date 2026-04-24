@@ -26,6 +26,7 @@ from ops.testing import Context
 
 import charmlibs.rollingops.etcd._certificates as certificates
 import charmlibs.rollingops.etcd._etcdctl as etcdctl
+from charmlibs import pathops
 from charmlibs.interfaces.tls_certificates import (
     Certificate,
     PrivateKey,
@@ -103,14 +104,16 @@ VALID_CLIENT_KEY_PEM = """-----BEGIN RSA PRIVATE KEY-----
 
 @pytest.fixture
 def temp_certificates(tmp_path: Path) -> certificates.CertificateStore:
-    client = certificates.CertificateStore(str(tmp_path))
+    path = pathops.LocalPath(str(tmp_path))
+    client = certificates.CertificateStore(path)
     client.base_dir.mkdir(parents=True, exist_ok=True)
     return client
 
 
 @pytest.fixture
 def temp_etcdctl(tmp_path: Path) -> etcdctl.Etcdctl:
-    client = etcdctl.Etcdctl(str(tmp_path))
+    path = pathops.LocalPath(str(tmp_path))
+    client = etcdctl.Etcdctl(path)
     client.base_dir.mkdir(parents=True, exist_ok=True)
     return client
 

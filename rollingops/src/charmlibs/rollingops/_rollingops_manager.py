@@ -22,6 +22,7 @@ from ops import CharmBase, Object, Relation, RelationBrokenEvent
 from ops.framework import EventBase
 from pydantic import ValidationError
 
+from charmlibs import pathops
 from charmlibs.rollingops.common._exceptions import (
     RollingOpsDecodingError,
     RollingOpsInvalidLockRequestError,
@@ -72,7 +73,7 @@ class RollingOpsManager(Object):
         etcd_relation_name: str | None = None,
         cluster_id: str | None = None,
         sync_lock_targets: dict[str, type[SyncLockBackend]] | None = None,
-        base_dir: str = '/var/lib/rollingops',
+        base_dir: pathops.LocalPath | None = None,
     ):
         """Create a rolling operations manager with etcd and peer backends.
 
@@ -102,6 +103,9 @@ class RollingOpsManager(Object):
             base_dir: base directory where all files related to rollingops will be written.
         """
         super().__init__(charm, 'rolling-ops-manager')
+
+        if base_dir is None:
+            base_dir = pathops.LocalPath('/var/lib/rollingops')
 
         self.charm = charm
         self.peer_relation_name = peer_relation_name

@@ -16,6 +16,7 @@ import argparse
 import logging
 import time
 
+from charmlibs import pathops
 from charmlibs.rollingops.common._models import OperationResult
 from charmlibs.rollingops.common._utils import (
     ETCD_FAILED_HOOK_NAME,
@@ -66,7 +67,7 @@ def main():
     parser = argparse.ArgumentParser(description='RollingOps etcd worker')
     parser.add_argument(
         '--base-dir',
-        type=str,
+        type=pathops.LocalPath,
         required=True,
         help='Base directory used to store all rollingops files.',
     )

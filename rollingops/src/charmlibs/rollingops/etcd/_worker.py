@@ -40,7 +40,12 @@ class EtcdRollingOpsAsyncWorker(BaseRollingOpsAsyncWorker):
     _log_filename = ETCD_LOG_FILENAME
 
     def __init__(
-        self, charm: CharmBase, peer_relation_name: str, owner: str, cluster_id: str, base_dir: str
+        self,
+        charm: CharmBase,
+        peer_relation_name: str,
+        owner: str,
+        cluster_id: str,
+        base_dir: pathops.LocalPath,
     ):
         super().__init__(
             charm,

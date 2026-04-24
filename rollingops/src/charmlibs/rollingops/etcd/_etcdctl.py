@@ -54,8 +54,8 @@ ETCDCTL_RETRY_WAIT_SECONDS = 5
 
 
 class Etcdctl:
-    def __init__(self, base_dir: str):
-        self.base_dir = pathops.LocalPath(base_dir) / 'etcd'
+    def __init__(self, base_dir: pathops.LocalPath):
+        self.base_dir = base_dir / 'etcd'
         self.server_ca_path = self.base_dir / 'server-ca.pem'
         self.config_file_path = self.base_dir / 'etcdctl.json'
 

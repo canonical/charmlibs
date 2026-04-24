@@ -31,6 +31,7 @@ from ops.charm import (
 )
 from ops.framework import Object
 
+from charmlibs import pathops
 from charmlibs.interfaces.tls_certificates import Certificate, TLSCertificatesError
 from charmlibs.rollingops.common._exceptions import RollingOpsInvalidSecretContentError
 from charmlibs.rollingops.etcd._certificates import CertificateStore
@@ -48,7 +49,9 @@ CLIENT_CA_FIELD = 'client-ca'
 class SharedClientCertificateManager(Object):
     """Manage the shared rollingops client certificate via peer relation secret."""
 
-    def __init__(self, charm: CharmBase, peer_relation_name: str, base_dir: str) -> None:
+    def __init__(
+        self, charm: CharmBase, peer_relation_name: str, base_dir: pathops.LocalPath
+    ) -> None:
         super().__init__(charm, 'shared-client-certificate')
         self.charm = charm
         self.peer_relation_name = peer_relation_name
@@ -194,7 +197,7 @@ class EtcdRequiresV1(Object):
         relation_name: str,
         cluster_id: str,
         shared_certificates: SharedClientCertificateManager,
-        base_dir: str,
+        base_dir: pathops.LocalPath,
     ) -> None:
         super().__init__(charm, f'requirer-{relation_name}')
         self.charm = charm

@@ -23,6 +23,7 @@ from ops.charm import (
     RelationDepartedEvent,
 )
 
+from charmlibs import pathops
 from charmlibs.rollingops.common._exceptions import (
     RollingOpsInvalidLockRequestError,
     RollingOpsNoEtcdRelationError,
@@ -63,7 +64,7 @@ class EtcdRollingOpsBackend(Object):
         etcd_relation_name: str,
         cluster_id: str,
         callback_targets: dict[str, Any],
-        base_dir: str,
+        base_dir: pathops.LocalPath,
     ):
         """Initialize the etcd-backed rolling-ops backend.
 

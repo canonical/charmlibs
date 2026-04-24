@@ -19,6 +19,7 @@ import os
 import subprocess
 import time
 
+from charmlibs import pathops
 from charmlibs.rollingops.common._exceptions import (
     RollingOpsEtcdctlFatalError,
     RollingOpsEtcdctlParseError,
@@ -36,7 +37,7 @@ LOCK_LEASE_TTL = '60'
 class EtcdLease:
     """Manage the lifecycle of an etcd lease and its keep-alive process."""
 
-    def __init__(self, base_dir: str):
+    def __init__(self, base_dir: pathops.LocalPath):
         self.id: str | None = None
         self.keepalive_proc: subprocess.Popen[str] | None = None
         self._pipe_write_fd: int | None = None
@@ -155,7 +156,7 @@ class EtcdLock:
     automatically released if the owner stops refreshing the lease.
     """
 
-    def __init__(self, lock_key: str, owner: str, base_dir: str):
+    def __init__(self, lock_key: str, owner: str, base_dir: pathops.LocalPath):
         self.lock_key = lock_key
         self.owner = owner
         self._etcdctl = Etcdctl(base_dir)
@@ -221,7 +222,7 @@ class EtcdOperationQueue:
     the value contains the serialized operation data.
     """
 
-    def __init__(self, prefix: str, lock_key: str, owner: str, base_dir: str):
+    def __init__(self, prefix: str, lock_key: str, owner: str, base_dir: pathops.LocalPath):
         self.prefix = prefix
         self.lock_key = lock_key
         self.owner = owner
@@ -381,7 +382,7 @@ class WorkerOperationStore:
     - requeue or delete completed operations
     """
 
-    def __init__(self, keys: RollingOpsKeys, owner: str, base_dir: str):
+    def __init__(self, keys: RollingOpsKeys, owner: str, base_dir: pathops.LocalPath):
         self._pending = EtcdOperationQueue(keys.pending, keys.lock_key, owner, base_dir=base_dir)
         self._inprogress = EtcdOperationQueue(
             keys.inprogress, keys.lock_key, owner, base_dir=base_dir
@@ -482,7 +483,7 @@ class ManagerOperationStore:
     Queue transitions and storage details remain encapsulated behind this API.
     """
 
-    def __init__(self, keys: RollingOpsKeys, owner: str, base_dir: str):
+    def __init__(self, keys: RollingOpsKeys, owner: str, base_dir: pathops.LocalPath):
         self._pending = EtcdOperationQueue(keys.pending, keys.lock_key, owner, base_dir=base_dir)
         self._inprogress = EtcdOperationQueue(
             keys.inprogress, keys.lock_key, owner, base_dir=base_dir

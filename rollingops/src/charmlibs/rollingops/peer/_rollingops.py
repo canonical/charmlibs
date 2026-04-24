@@ -17,6 +17,7 @@
 import argparse
 import time
 
+from charmlibs import pathops
 from charmlibs.rollingops.common._utils import dispatch_lock_granted, setup_logging
 from charmlibs.rollingops.peer._worker import PEER_LOG_FILENAME
 
@@ -26,7 +27,7 @@ def main():
     parser = argparse.ArgumentParser(description='RollingOps peer worker')
     parser.add_argument(
         '--base-dir',
-        type=str,
+        type=pathops.LocalPath,
         required=True,
         help='Base directory used to store all rollingops files.',
     )

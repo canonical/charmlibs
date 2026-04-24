@@ -160,6 +160,7 @@ from ops.charm import (
 )
 from ops.framework import EventBase
 
+from charmlibs import pathops
 from charmlibs.rollingops.common._exceptions import (
     RollingOpsDecodingError,
     RollingOpsInvalidLockRequestError,
@@ -201,7 +202,7 @@ class PeerRollingOpsBackend(Object):
         charm: CharmBase,
         relation_name: str,
         callback_targets: dict[str, Callable[..., Any]],
-        base_dir: str,
+        base_dir: pathops.LocalPath,
     ):
         """Initialize the peer-backed rolling-ops backend.
 

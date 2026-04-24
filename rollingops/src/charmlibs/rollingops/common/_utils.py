@@ -62,7 +62,7 @@ def datetime_to_str(dt: datetime) -> str:
 
 
 def setup_logging(
-    base_dir: str,
+    base_dir: pathops.LocalPath,
     log_filename: str,
     *,
     unit_name: str,
@@ -84,7 +84,7 @@ def setup_logging(
         cluster_id: Optional etcd cluster identifier.
         owner: Optional worker owner identifier.
     """
-    log_file = pathops.LocalPath(base_dir) / log_filename
+    log_file = base_dir / log_filename
     handler = RotatingFileHandler(
         log_file,
         maxBytes=10 * 1024 * 1024,  # 10 MB
