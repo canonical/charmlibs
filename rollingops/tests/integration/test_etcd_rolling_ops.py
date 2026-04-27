@@ -43,7 +43,7 @@ def etcdctl_file_exits(juju: jubilant.Juju, unit: str) -> bool:
     return True
 
 
-@retry(wait=wait_fixed(10), stop=stop_after_delay(60), reraise=True)
+@retry(wait=wait_fixed(10), stop=stop_after_delay(120), reraise=True)
 def wait_for_etcdctl_config_file(juju: jubilant.Juju, unit: str) -> None:
     if not etcdctl_file_exits(juju, unit):
         raise RuntimeError('etcdctl config file not ready')
@@ -73,12 +73,11 @@ def test_charm_is_integrated_with_etcd(juju: jubilant.Juju, app_name: str):
     juju.integrate(f'{app_name}:etcd', 'etcd:etcd-client')
     juju.wait(jubilant.all_active, error=jubilant.any_error, timeout=TIMEOUT)
 
-    wait_for_etcdctl_config_file(juju, f'{app_name}/0')
-
 
 @pytest.mark.machine_only
 def test_restart_action_one_unit_single_app(juju: jubilant.Juju, app_name: str):
     unit = f'{app_name}/0'
+    wait_for_etcdctl_config_file(juju, unit)
 
     juju.run(unit, 'restart', {'delay': 1}, wait=TIMEOUT)
     juju.wait(jubilant.all_active, error=jubilant.any_error, timeout=TIMEOUT)

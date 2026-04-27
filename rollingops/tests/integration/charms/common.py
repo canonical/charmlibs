@@ -62,6 +62,7 @@ class Charm(CharmBase):
             '_deferred_restart': self._deferred_restart,
         }
 
+        a_sync_backend = MySyncBackend()
         self.restart_manager = RollingOpsManager(
             charm=self,
             peer_relation_name='restart',
@@ -69,7 +70,7 @@ class Charm(CharmBase):
             cluster_id='cluster-12345',
             callback_targets=callback_targets,
             sync_lock_targets={
-                'stop': MySyncBackend,
+                'stop': a_sync_backend,
             },
         )
 

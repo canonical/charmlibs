@@ -72,7 +72,7 @@ class RollingOpsManager(Object):
         peer_relation_name: str,
         etcd_relation_name: str | None = None,
         cluster_id: str | None = None,
-        sync_lock_targets: dict[str, type[SyncLockBackend]] | None = None,
+        sync_lock_targets: dict[str, SyncLockBackend] | None = None,
         base_dir: pathops.LocalPath | None = None,
     ):
         """Create a rolling operations manager with etcd and peer backends.
@@ -365,7 +365,7 @@ class RollingOpsManager(Object):
         if backend_cls is None:
             raise RollingOpsSyncLockError(f'Unknown sync lock backend: {backend_id}.')
 
-        return backend_cls()
+        return backend_cls
 
     @contextmanager
     def acquire_sync_lock(self, backend_id: str, timeout: int):
