@@ -63,7 +63,7 @@ class EtcdRollingOpsAsyncWorker(BaseRollingOpsAsyncWorker):
         processing for the etcd backend.
         """
         return pathops.LocalPath(
-            self._venv_site_packages() / 'charmlibs' / 'rollingops' / 'etcd' / '_rollingops.py'
+            self._venv_site_packages() / 'charmlibs' / 'rollingops' / '_etcd' / '_rollingops.py'
         )
 
     def _worker_args(self) -> list[str]:
