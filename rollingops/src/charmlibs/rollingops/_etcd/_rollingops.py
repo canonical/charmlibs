@@ -17,20 +17,20 @@ import logging
 import time
 
 from charmlibs import pathops
-from charmlibs.rollingops.common._models import OperationResult
-from charmlibs.rollingops.common._utils import (
+from charmlibs.rollingops._common._models import OperationResult
+from charmlibs.rollingops._common._utils import (
     ETCD_FAILED_HOOK_NAME,
     dispatch_etcd_failed,
     dispatch_lock_granted,
     setup_logging,
 )
-from charmlibs.rollingops.etcd._etcd import (
+from charmlibs.rollingops._etcd._etcd import (
     EtcdLease,
     EtcdLock,
     WorkerOperationStore,
 )
-from charmlibs.rollingops.etcd._models import RollingOpsKeys
-from charmlibs.rollingops.etcd._worker import ETCD_LOG_FILENAME
+from charmlibs.rollingops._etcd._models import RollingOpsKeys
+from charmlibs.rollingops._etcd._worker import ETCD_LOG_FILENAME
 
 logger = logging.getLogger(__name__)
 

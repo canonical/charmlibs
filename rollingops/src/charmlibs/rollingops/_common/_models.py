@@ -32,11 +32,11 @@ from pydantic import (
     field_validator,
 )
 
-from charmlibs.rollingops.common._exceptions import (
+from charmlibs.rollingops._common._exceptions import (
     RollingOpsDecodingError,
     RollingOpsNoRelationError,
 )
-from charmlibs.rollingops.common._utils import datetime_to_str, now_timestamp, parse_timestamp
+from charmlibs.rollingops._common._utils import datetime_to_str, now_timestamp, parse_timestamp
 
 logger = logging.getLogger(__name__)
 
@@ -447,19 +447,16 @@ class RollingOpsState:
     The `processing_backend` reflects the backend currently selected
         for execution. It may change dynamically (e.g. fallback from etcd
         to peer).
-    The `operations` queue always reflects the peer-backed state, which
-        acts as the source of truth and fallback mechanism.
+
     When `status` is NOT_READY, the unit cannot currently participate
         in rolling operations due to missing relations or backend failures.
 
     status: High-level rolling-ops status for the unit.
     processing_backend: Backend currently responsible for executing operations (e.g. ETCD or PEER).
-    operations: The unit's operation queue.
     """
 
     status: RollingOpsStatus
     processing_backend: ProcessingBackend
-    operations: OperationQueue
 
 
 class SyncLockBackend(ABC):

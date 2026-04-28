@@ -35,15 +35,15 @@ from tenacity import (
 )
 
 from charmlibs import pathops
-from charmlibs.rollingops.common._exceptions import (
+from charmlibs.rollingops._common._exceptions import (
     RollingOpsEtcdctlFatalError,
     RollingOpsEtcdctlParseError,
     RollingOpsEtcdctlRetryableError,
     RollingOpsEtcdNotConfiguredError,
     RollingOpsFileSystemError,
 )
-from charmlibs.rollingops.common._utils import with_pebble_retry
-from charmlibs.rollingops.etcd._models import CERT_MODE, EtcdConfig, EtcdKV
+from charmlibs.rollingops._common._utils import with_pebble_retry
+from charmlibs.rollingops._etcd._models import CERT_MODE, EtcdConfig, EtcdKV
 
 logger = logging.getLogger(__name__)
 

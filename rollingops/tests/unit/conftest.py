@@ -24,16 +24,16 @@ import pytest
 from ops import ActionEvent
 from ops.testing import Context
 
-import charmlibs.rollingops.etcd._certificates as certificates
-import charmlibs.rollingops.etcd._etcdctl as etcdctl
+import charmlibs.rollingops._etcd._certificates as certificates
+import charmlibs.rollingops._etcd._etcdctl as etcdctl
 from charmlibs import pathops
 from charmlibs.interfaces.tls_certificates import (
     Certificate,
     PrivateKey,
 )
 from charmlibs.rollingops import RollingOpsManager
-from charmlibs.rollingops.common._models import OperationResult
-from charmlibs.rollingops.etcd._models import SharedCertificate
+from charmlibs.rollingops._common._models import OperationResult
+from charmlibs.rollingops._etcd._models import SharedCertificate
 
 VALID_CA_CERT_PEM = """-----BEGIN CERTIFICATE-----
       MIIC6DCCAdCgAwIBAgIUW42TU9LSjEZLMCclWrvSwAsgRtcwDQYJKoZIhvcNAQEL
@@ -122,11 +122,11 @@ def temp_etcdctl(tmp_path: Path) -> etcdctl.Etcdctl:
 def certificates_manager_patches() -> Generator[dict[str, MagicMock], None, None]:
     with (
         patch(
-            'charmlibs.rollingops.etcd._certificates.CertificateStore._exists',
+            'charmlibs.rollingops._etcd._certificates.CertificateStore._exists',
             return_value=False,
         ),
         patch(
-            'charmlibs.rollingops.etcd._certificates.CertificateStore.generate',
+            'charmlibs.rollingops._etcd._certificates.CertificateStore.generate',
             return_value=SharedCertificate(
                 certificate=Certificate.from_string(VALID_CLIENT_CERT_PEM),
                 key=PrivateKey.from_string(VALID_CLIENT_KEY_PEM),
@@ -134,7 +134,7 @@ def certificates_manager_patches() -> Generator[dict[str, MagicMock], None, None
             ),
         ) as mock_generate,
         patch(
-            'charmlibs.rollingops.etcd._certificates.CertificateStore.persist_client_cert_key_and_ca',
+            'charmlibs.rollingops._etcd._certificates.CertificateStore.persist_client_cert_key_and_ca',
             return_value=None,
         ) as mock_persist,
     ):

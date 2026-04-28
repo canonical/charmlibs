@@ -15,7 +15,7 @@
 # Learn more about testing at: https://juju.is/docs/sdk/testing
 
 
-from charmlibs.rollingops.etcd._models import RollingOpsKeys
+from charmlibs.rollingops._etcd._models import RollingOpsKeys
 
 
 def test_rollingopskeys_paths() -> None:

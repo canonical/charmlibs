@@ -23,8 +23,8 @@ from sys import version_info
 from ops import CharmBase, Object, Relation
 
 from charmlibs import pathops
-from charmlibs.rollingops.common._exceptions import RollingOpsLibMissingError
-from charmlibs.rollingops.common._utils import with_pebble_retry
+from charmlibs.rollingops._common._exceptions import RollingOpsLibMissingError
+from charmlibs.rollingops._common._utils import with_pebble_retry
 
 logger = logging.getLogger(__name__)
 

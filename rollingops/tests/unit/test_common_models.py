@@ -20,8 +20,8 @@ from typing import Any
 
 import pytest
 
-from charmlibs.rollingops.common._exceptions import RollingOpsDecodingError
-from charmlibs.rollingops.common._models import (
+from charmlibs.rollingops._common._exceptions import RollingOpsDecodingError
+from charmlibs.rollingops._common._models import (
     Operation,
     OperationQueue,
     OperationResult,

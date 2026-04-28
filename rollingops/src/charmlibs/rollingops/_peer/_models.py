@@ -21,17 +21,17 @@ from enum import StrEnum
 
 from ops import Model, Unit
 
-from charmlibs.rollingops.common._exceptions import (
+from charmlibs.rollingops._common._exceptions import (
     RollingOpsDecodingError,
     RollingOpsNoRelationError,
 )
-from charmlibs.rollingops.common._models import (
+from charmlibs.rollingops._common._models import (
     Operation,
     OperationQueue,
     OperationResult,
     UnitBackendState,
 )
-from charmlibs.rollingops.common._utils import datetime_to_str, now_timestamp, parse_timestamp
+from charmlibs.rollingops._common._utils import datetime_to_str, now_timestamp, parse_timestamp
 
 logger = logging.getLogger(__name__)
 

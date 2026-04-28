@@ -24,12 +24,12 @@ from ops.charm import (
 )
 
 from charmlibs import pathops
-from charmlibs.rollingops.common._exceptions import (
+from charmlibs.rollingops._common._exceptions import (
     RollingOpsInvalidLockRequestError,
     RollingOpsNoEtcdRelationError,
     RollingOpsSyncLockError,
 )
-from charmlibs.rollingops.common._models import (
+from charmlibs.rollingops._common._models import (
     Operation,
     OperationResult,
     RollingOpsStatus,
@@ -37,16 +37,16 @@ from charmlibs.rollingops.common._models import (
     RunWithLockStatus,
     UnitBackendState,
 )
-from charmlibs.rollingops.etcd._etcd import EtcdLease, EtcdLock, ManagerOperationStore
-from charmlibs.rollingops.etcd._etcdctl import ETCDCTL_CMD, Etcdctl
-from charmlibs.rollingops.etcd._models import RollingOpsKeys
-from charmlibs.rollingops.etcd._relations import EtcdRequiresV1, SharedClientCertificateManager
-from charmlibs.rollingops.etcd._worker import EtcdRollingOpsAsyncWorker
+from charmlibs.rollingops._etcd._etcd import EtcdLease, EtcdLock, ManagerOperationStore
+from charmlibs.rollingops._etcd._etcdctl import ETCDCTL_CMD, Etcdctl
+from charmlibs.rollingops._etcd._models import RollingOpsKeys
+from charmlibs.rollingops._etcd._relations import EtcdRequiresV1, SharedClientCertificateManager
+from charmlibs.rollingops._etcd._worker import EtcdRollingOpsAsyncWorker
 
 logger = logging.getLogger(__name__)
 
 
-class EtcdRollingOpsBackend(Object):
+class _EtcdRollingOpsBackend(Object):  # pyright: ignore[reportUnusedClass]
     """Manage rolling operations using etcd-backed coordination.
 
     This backend stores operation state in etcd, coordinates asynchronous

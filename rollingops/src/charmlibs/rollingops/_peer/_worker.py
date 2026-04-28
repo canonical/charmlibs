@@ -22,7 +22,7 @@ from ops.charm import (
 )
 
 from charmlibs import pathops
-from charmlibs.rollingops.common._base_worker import BaseRollingOpsAsyncWorker
+from charmlibs.rollingops._common._base_worker import BaseRollingOpsAsyncWorker
 
 logger = logging.getLogger(__name__)
 

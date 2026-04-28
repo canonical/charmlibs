@@ -22,7 +22,7 @@ from charmlibs.interfaces.tls_certificates import (
     Certificate,
     PrivateKey,
 )
-from charmlibs.rollingops.etcd._models import SharedCertificate
+from charmlibs.rollingops._etcd._models import SharedCertificate
 
 
 def make_shared_certificate() -> SharedCertificate:

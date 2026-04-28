@@ -18,8 +18,8 @@ import argparse
 import time
 
 from charmlibs import pathops
-from charmlibs.rollingops.common._utils import dispatch_lock_granted, setup_logging
-from charmlibs.rollingops.peer._worker import PEER_LOG_FILENAME
+from charmlibs.rollingops._common._utils import dispatch_lock_granted, setup_logging
+from charmlibs.rollingops._peer._worker import PEER_LOG_FILENAME
 
 
 def main():

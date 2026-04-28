@@ -20,14 +20,14 @@ import subprocess
 import time
 
 from charmlibs import pathops
-from charmlibs.rollingops.common._exceptions import (
+from charmlibs.rollingops._common._exceptions import (
     RollingOpsEtcdctlFatalError,
     RollingOpsEtcdctlParseError,
     RollingOpsEtcdTransactionError,
 )
-from charmlibs.rollingops.common._models import Operation, OperationResult
-from charmlibs.rollingops.etcd._etcdctl import ETCDCTL_CMD, Etcdctl
-from charmlibs.rollingops.etcd._models import RollingOpsKeys
+from charmlibs.rollingops._common._models import Operation, OperationResult
+from charmlibs.rollingops._etcd._etcdctl import ETCDCTL_CMD, Etcdctl
+from charmlibs.rollingops._etcd._models import RollingOpsKeys
 
 logger = logging.getLogger(__name__)
 

@@ -34,9 +34,9 @@ from charmlibs.interfaces.tls_certificates import (
     PrivateKey,
     TLSCertificatesError,
 )
-from charmlibs.rollingops.common._exceptions import RollingOpsFileSystemError
-from charmlibs.rollingops.common._utils import with_pebble_retry
-from charmlibs.rollingops.etcd._models import SharedCertificate
+from charmlibs.rollingops._common._exceptions import RollingOpsFileSystemError
+from charmlibs.rollingops._common._utils import with_pebble_retry
+from charmlibs.rollingops._etcd._models import SharedCertificate
 
 VALIDITY_DAYS = 365 * 50
 KEY_SIZE = 4096

@@ -4,7 +4,7 @@ description = "The charmlibs.rollingops package."
 readme = "README.md"
 requires-python = ">=3.12"
 authors = [
-    {name="Data Platform"},
+    {name="The Data Platform team at Canonical"},
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -40,8 +40,10 @@ integration = [  # installed for `just integration rollingops`
 ]
 
 [project.urls]
-"Repository" = "https://github.com/canonical/charmlibs"
+"Documentation" = "https://documentation.ubuntu.com/charmlibs/reference/charmlibs/rollingops"
+"Repository" = "https://github.com/canonical/charmlibs/tree/main/rollingops"
 "Issues" = "https://github.com/canonical/charmlibs/issues"
+"Changelog" = "https://github.com/canonical/charmlibs/blob/main/rollingops/CHANGELOG.md"
 
 [build-system]
 requires = ["hatchling"]
@@ -55,7 +57,7 @@ path = "src/charmlibs/rollingops/_version.py"
 
 [tool.ruff]
 extend = "../pyproject.toml"
-src = ["src", "tests/unit", "tests/functional", "tests/integration"]  # correctly sort local imports in tests
+src = ["src", "tests/unit", "tests/integration"]  # correctly sort local imports in tests
 
 [tool.ruff.lint.extend-per-file-ignores]
 # add additional per-file-ignores here to avoid overriding repo-level config

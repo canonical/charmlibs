@@ -12,142 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Rolling Ops v1 — coordinated rolling operations for Juju charms.
-
-This library provides a reusable mechanism for coordinating rolling operations
-across units of a Juju application using a peer-relation distributed lock.
-
-The library guarantees that at most one unit executes a rolling operation at any
-time, while allowing multiple units to enqueue operations and participate
-in a coordinated rollout.
-
-## Data model (peer relation)
-
-### Unit databag
-
-Each unit maintains a FIFO queue of operations it wishes to execute.
-
-Keys:
-- `operations`: JSON-encoded list of queued `Operation` objects
-- `state`: `"idle"` | `"request"` | `"retry-release"` | `"retry-hold"`
-- `executed_at`: UTC timestamp string indicating when the current operation last ran
-
-Each `Operation` contains:
-- `callback_id`: identifier of the callback to execute
-- `kwargs`: JSON-serializable arguments for the callback
-- `requested_at`: UTC timestamp when the operation was enqueued
-- `max_retry (optional)`: maximum retry count. `None` means unlimited
-- `attempt`: current attempt number
-
-### Application databag
-
-The application databag represents the global lock state.
-
-Keys:
-- `granted_unit`: unit identifier (unit name), or empty
-- `granted_at`: UTC timestamp indicating when the lock was granted
-
-## Operation semantics
-
-- Units enqueue operations instead of overwriting a single pending request.
-- Duplicate operations (same `callback_id` and `kwargs`) are ignored if they are
-  already the last queued operation.
-- When granted the lock, a unit executes exactly one operation (the queue head).
-- After execution, the lock is released so that other units may proceed.
-
-## Retry semantics
-
-- If a callback returns `OperationResult.RETRY_RELEASE` the unit will release the
-lock and retry the operation later.
-- If a callback returns `OperationResult.RETRY_HOLD` the unit will keep the
-lock and retry immediately.
-- Retry state (`attempt`) is tracked per operation.
-- When `max_retry` is exceeded, the failing operation is dropped and the unit
-  proceeds to the next queued operation, if any.
-
-## Scheduling semantics
-
-- Only the leader schedules lock grants.
-- If a valid lock grant exists, no new unit is scheduled.
-- Requests are preferred over retries.
-- Among requests, the operation with the oldest `requested_at` timestamp is selected.
-- Among retries, the operation with the oldest `executed_at` timestamp is selected.
-- Stale grants (e.g., pointing to departed units) are automatically released.
-
-All timestamps are stored in UTC using ISO 8601 format.
-
-## Using the library in a charm
-
-### 1. Declare a peer relation
-
-```yaml
-peers:
-  restart:
-    interface: rolling_op
-```
-
-Import this library into src/charm.py, and initialize a PeerRollingOpsBackend in the Charm's
-`__init__`. The Charm should also define a callback routine, which will be executed when
-a unit holds the distributed lock:
-
-src/charm.py
-```python
-from charms.rolling_ops.v1.rollingops import PeerRollingOpsBackend, OperationResult
-
-class SomeCharm(CharmBase):
-    def __init__(self, *args):
-        super().__init__(*args)
-
-        self.rolling_ops = PeerRollingOpsBackend(
-            charm=self,
-            relation_name="restart",
-            callback_targets={
-                "restart": self._restart,
-                "failed_restart": self._failed_restart,
-                "defer_restart": self._defer_restart,
-            },
-        )
-
-    def _restart(self, force: bool) -> OperationResult:
-        # perform restart logic
-        return OperationResult.RELEASE
-
-    def _failed_restart(self) -> OperationResult:
-        # perform restart logic
-        return OperationResult.RETRY_RELEASE
-
-    def _defer_restart(self) -> OperationResult:
-        if not self.some_condition():
-            return OperationResult.RETRY_HOLD
-        # do restart logic
-        return OperationResult.RELEASE
-```
-
-Request a rolling operation
-
-```python
-
-    def _on_restart_action(self, event) -> None:
-        self.rolling_ops.request_async_lock(
-            callback_id="restart",
-            kwargs={"force": True},
-            max_retry=3,
-    )
-```
-
-All participating units must enqueue the operation in order to be included
-in the rolling execution.
-
-Units that do not enqueue the operation will be skipped, allowing operators
-to recover from partial failures by reissuing requests selectively.
-
-Do not include sensitive information in the kwargs of the callback.
-These values will be stored in the databag.
-
-Make sure that callback_targets is not dynamic and that the mapping
-contains the expected values at the moment of the callback execution.
-"""
-
 import logging
 from collections.abc import Callable
 from typing import Any
@@ -161,31 +25,31 @@ from ops.charm import (
 from ops.framework import EventBase
 
 from charmlibs import pathops
-from charmlibs.rollingops.common._exceptions import (
+from charmlibs.rollingops._common._exceptions import (
     RollingOpsDecodingError,
     RollingOpsInvalidLockRequestError,
     RollingOpsNoRelationError,
 )
-from charmlibs.rollingops.common._models import (
+from charmlibs.rollingops._common._models import (
     Operation,
     OperationResult,
     RollingOpsStatus,
     RunWithLockOutcome,
     RunWithLockStatus,
 )
-from charmlibs.rollingops.peer._models import (
+from charmlibs.rollingops._peer._models import (
     PeerAppLock,
     PeerUnitOperations,
     iter_peer_units,
     pick_oldest_completed,
     pick_oldest_request,
 )
-from charmlibs.rollingops.peer._worker import PeerRollingOpsAsyncWorker
+from charmlibs.rollingops._peer._worker import PeerRollingOpsAsyncWorker
 
 logger = logging.getLogger(__name__)
 
 
-class PeerRollingOpsBackend(Object):
+class _PeerRollingOpsBackend(Object):  # pyright: ignore[reportUnusedClass]
     """Manage rolling operations using the peer-relation backend.
 
     This backend stores operation queues in the peer relation and relies

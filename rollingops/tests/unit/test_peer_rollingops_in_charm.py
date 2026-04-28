@@ -20,21 +20,20 @@ from unittest.mock import MagicMock
 
 import pytest
 from ops.testing import Context, PeerRelation, State
-from scenario import RawDataBagContents
 from tests.unit.conftest import RollingOpsCharm, StrictPeerRollingOpsCharm
 
 from charmlibs.rollingops import ProcessingBackend, RollingOpsStatus
-from charmlibs.rollingops.common._exceptions import RollingOpsInvalidLockRequestError
-from charmlibs.rollingops.common._models import Operation, OperationQueue
-from charmlibs.rollingops.common._utils import now_timestamp
-from charmlibs.rollingops.peer._models import LockIntent
+from charmlibs.rollingops._common._exceptions import RollingOpsInvalidLockRequestError
+from charmlibs.rollingops._common._models import Operation, OperationQueue
+from charmlibs.rollingops._common._utils import now_timestamp
+from charmlibs.rollingops._peer._models import LockIntent
 
 
-def _unit_databag(state: State, peer: PeerRelation) -> RawDataBagContents:
+def _unit_databag(state: State, peer: PeerRelation):
     return state.get_relation(peer.id).local_unit_data
 
 
-def _app_databag(state: State, peer: PeerRelation) -> RawDataBagContents:
+def _app_databag(state: State, peer: PeerRelation):
     return state.get_relation(peer.id).local_app_data
 
 
@@ -569,4 +568,3 @@ def test_state_peer_idle(strict_peer_ctx: Context[StrictPeerRollingOpsCharm]):
         rolling_state = mgr.charm.restart_manager.state
         assert rolling_state.status == RollingOpsStatus.IDLE
         assert rolling_state.processing_backend == ProcessingBackend.PEER
-        assert len(rolling_state.operations) == 0
