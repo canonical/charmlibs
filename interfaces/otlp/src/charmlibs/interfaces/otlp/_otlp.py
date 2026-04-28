@@ -24,14 +24,21 @@ import json
 import logging
 import re
 from collections import OrderedDict
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Final, Literal
+from typing import Any, Final, Literal, cast
 
+from cosl.backends.loki import LokiRuleBackend
+from cosl.backends.prometheus import PrometheusRuleBackend
+from cosl.cos_tool import CosTool
 from cosl.juju_topology import JujuTopology
-from cosl.rules import HOST_METRICS_MISSING_RULE_NAME, Rules, generic_alert_groups
-from cosl.types import OfficialRuleFileFormat, SingleRuleFormat
+from cosl.rules import (
+    HOST_METRICS_MISSING_RULE_NAME,
+    GenericRules,
+    generic_alert_groups,
+)
+from cosl.types import OfficialRuleFileFormat, OfficialRuleFileItem, SingleRuleFormat
 from cosl.utils import LZMABase64
 from ops import CharmBase
 from pydantic import (
@@ -56,12 +63,12 @@ class RuleStore:
     """An API for users to provide rules of different types to the OtlpRequirer."""
 
     topology: JujuTopology
-    logql: Rules = field(init=False)
-    promql: Rules = field(init=False)
+    logql: GenericRules[OfficialRuleFileItem] = field(init=False)
+    promql: GenericRules[OfficialRuleFileItem] = field(init=False)
 
     def __post_init__(self):
-        self.logql = Rules(query_type='logql', topology=self.topology)
-        self.promql = Rules(query_type='promql', topology=self.topology)
+        self.logql = GenericRules(backend=LokiRuleBackend(topology=self.topology))
+        self.promql = GenericRules(backend=PrometheusRuleBackend(topology=self.topology))
 
     def add_logql(
         self,
@@ -319,7 +326,9 @@ class OtlpRequirer:
                     for juju_unit in sorted(peer_unit_names):
                         rule_copy = copy.deepcopy(rule)
                         rule_copy.get('labels', {})['juju_unit'] = juju_unit
-                        rule_copy['expr'] = self._rules.promql.tool.inject_label_matchers(
+                        rule_copy['expr'] = CosTool(
+                            default_query_type='promql'
+                        ).inject_label_matchers(
                             expression=re.sub(r'%%juju_unit%%,?', '', rule_copy['expr']),
                             topology={'juju_unit': juju_unit},
                         )
@@ -488,13 +497,13 @@ class OtlpProvider:
                 logger.error('OTLP databag failed validation: %s', e)
                 continue
 
-            # Create a RuleStore for this relation's rules, and inject topology labels
+            # Validate and build RuleStore from requirer rules
             rules = RuleStore(self._topology)
-            logql_result = rules.logql.inject_and_validate_rules(
-                requirer.rules.logql, requirer.metadata
+            logql_result = rules.logql.validate(
+                cast('Mapping[str, list[OfficialRuleFileItem]]', requirer.rules.logql)
             )
-            promql_result = rules.promql.inject_and_validate_rules(
-                requirer.rules.promql, requirer.metadata
+            promql_result = rules.promql.validate(
+                cast('Mapping[str, list[OfficialRuleFileItem]]', requirer.rules.promql)
             )
             if logql_result.rules and not logql_result.errmsg:
                 rules.logql.add(logql_result.rules)

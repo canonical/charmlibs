@@ -39,7 +39,7 @@ unit = [
 
 [package.metadata]
 requires-dist = [
-    { name = "cosl", specifier = ">=1.6.1" },
+    { name = "cosl", git = "https://github.com/swetha1654/cos-lib?rev=feat%2Frewrite-rules" },
     { name = "requests" },
 ]
 
@@ -152,18 +152,14 @@ wheels = [
 
 [[package]]
 name = "cosl"
-version = "1.9.0"
-source = { registry = "https://pypi.org/simple" }
+version = "1.10.0"
+source = { git = "https://github.com/swetha1654/cos-lib?rev=feat%2Frewrite-rules#c2ba23ace7b1951a6bd68d0053dcd44c7b271dc1" }
 dependencies = [
     { name = "ops" },
     { name = "pydantic" },
     { name = "pyyaml" },
     { name = "tenacity" },
     { name = "typing-extensions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/21/96/bf85615902a6cc36bfe1c72b1dbc4e97076c6e05a28fa675a124146fc67c/cosl-1.9.0.tar.gz", hash = "sha256:360491aa2b6d37be36cefbeb31855aea19bf61ce36d6078dc1d09a51b5eefa92", size = 149850, upload-time = "2026-03-30T20:42:17.642Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/68/7e/65837d35b2dab96b70fe55aa4a4b4fb7d2cd902e87c6074493392de769d3/cosl-1.9.0-py3-none-any.whl", hash = "sha256:026700e712cae75a5db038710997b0ffa27612fddc736a5a23d94111dec1f533", size = 37936, upload-time = "2026-03-30T20:42:16.487Z" },
 ]
 
 [[package]]

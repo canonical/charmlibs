@@ -204,23 +204,8 @@ def test_metadata(otlp_requirer_ctx: testing.Context[ops.CharmBase]):
         }
 
 
-@pytest.mark.parametrize(
-    'metadata',
-    [
-        {},
-        {
-            'model': MODEL_NAME,
-            'model_uuid': MODEL_UUID,
-            'application': 'otlp-requirer',
-            'charm_name': 'otlp-requirer',
-            'unit': 'otlp-requirer/0',
-        },
-    ],
-)
-def test_provider_rules(
-    otlp_provider_ctx: testing.Context[ops.CharmBase], metadata: dict[str, Any]
-):
-    # GIVEN a requirer offers unlabeled rules (of various types) in the databag
+def test_provider_rules(otlp_provider_ctx: testing.Context[ops.CharmBase]):
+    # GIVEN a requirer offers rules in the databag
     rules = {
         'logql': {
             'groups': [
@@ -236,7 +221,7 @@ def test_provider_rules(
         },
     }
     receiver = Relation(
-        RECEIVE, remote_app_data={'rules': json.dumps(rules), 'metadata': json.dumps(metadata)}
+        RECEIVE, remote_app_data={'rules': json.dumps(rules), 'metadata': json.dumps({})}
     )
     state = State(leader=True, relations=[receiver], model=MODEL)
     with otlp_provider_ctx(otlp_provider_ctx.on.update_status(), state=state) as mgr:
@@ -247,23 +232,8 @@ def test_provider_rules(
         # THEN LogQL and PromQL rules exist in the RuleStore
         assert logql
         assert promql
-        for result in [logql, promql]:
-            app = metadata['application'] if metadata else 'otlp-provider'
-            charm = metadata['charm_name'] if metadata else 'otlp-provider'
-            groups = result.get('groups', [])
-            assert groups
-            for group in groups:
-                for rule in group.get('rules', []):
-                    # AND the rules are labeled with the provider's topology
-                    assert rule.get('labels', {}).get('juju_model') == MODEL_NAME
-                    assert rule.get('labels', {}).get('juju_model_uuid') == MODEL_UUID
-                    assert rule.get('labels', {}).get('juju_application') == app
-                    assert rule.get('labels', {}).get('juju_charm') == charm
-
-                    # AND the expressions are labeled
-                    assert f'juju_model="{MODEL_NAME}"' in rule['expr']
-                    assert f'juju_model_uuid="{MODEL_UUID}"' in rule['expr']
-                    assert f'juju_application="{app}"' in rule['expr']
+        assert logql.get('groups')
+        assert promql.get('groups')
 
 
 def _make_store() -> RuleStore:

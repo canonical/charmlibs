@@ -16,7 +16,7 @@ classifiers = [
 dynamic = ["version"]
 dependencies = [
     # "ops",
-    "cosl>=1.6.1",
+    "cosl @ git+https://github.com/swetha1654/cos-lib@feat/rewrite-rules",
     "requests",
 ]
 
@@ -41,6 +41,9 @@ integration = [  # installed for `just integration otlp`
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/charmlibs"]
