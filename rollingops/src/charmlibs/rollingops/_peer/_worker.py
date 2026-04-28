@@ -62,7 +62,7 @@ class PeerRollingOpsAsyncWorker(BaseRollingOpsAsyncWorker):
         processing for the peer backend.
         """
         return pathops.LocalPath(
-            self._venv_site_packages() / 'charmlibs' / 'rollingops' / 'peer' / '_rollingops.py'
+            self._venv_site_packages() / 'charmlibs' / 'rollingops' / '_peer' / '_rollingops.py'
         )
 
     @property
