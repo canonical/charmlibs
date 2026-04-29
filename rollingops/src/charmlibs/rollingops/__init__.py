@@ -163,6 +163,18 @@ The relations can be added to the charm as follows::
         limit: 1
         optional: true
 
+Cluster identifier
+^^^^^^^^^^^^^^^^^^
+
+The ``cluster_id`` parameter is used to scope etcd-backed coordination.
+It does not need to be hardcoded and may be provided dynamically at runtime.
+
+The ``RollingOpsManager`` can be initialized without a ``cluster_id`` and will
+operate using the peer backend until the identifier becomes available.
+
+Once the ``cluster_id`` is set, etcd-backed coordination will be used
+automatically if the etcd relation is configured.
+
 Callback definition and registration
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
