@@ -16,6 +16,20 @@ parts:
     plugin: uv
     build-snaps: [astral-uv]
 
+  etcdctl:
+    plugin: make
+    source: https://git.launchpad.net/etcd
+    source-type: git
+    source-tag: lp-v3.6.7
+    build-snaps:
+      - go/latest/stable
+    override-build: |
+      set -eux
+      make build
+      install -Dm755 bin/etcdctl "${CRAFT_PART_INSTALL}/usr/bin/etcdctl"
+    prime:
+      - usr/bin/etcdctl
+
 peers:
   restart:
       interface: rolling_op

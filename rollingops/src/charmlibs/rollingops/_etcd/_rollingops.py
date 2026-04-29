@@ -79,7 +79,7 @@ def main():
     )
     parser.add_argument(
         '--charm-dir',
-        type=str,
+        type=pathops.LocalPath,
         required=True,
         help='Path to the charm directory',
     )
@@ -111,9 +111,9 @@ def main():
     time.sleep(INITIAL_SLEEP)
 
     keys = RollingOpsKeys.for_owner(args.cluster_id, args.owner)
-    lock = EtcdLock(keys.lock_key, args.owner, base_dir)
-    lease = EtcdLease(base_dir)
-    operations = WorkerOperationStore(keys, args.owner, base_dir)
+    lock = EtcdLock(keys.lock_key, args.owner, base_dir, args.charm_dir)
+    lease = EtcdLease(base_dir, args.charm_dir)
+    operations = WorkerOperationStore(keys, args.owner, base_dir, args.charm_dir)
 
     try:
         while True:

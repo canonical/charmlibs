@@ -86,7 +86,8 @@ class _EtcdRollingOpsBackend(Object):  # pyright: ignore[reportUnusedClass]
         self.callback_targets = callback_targets
         self._base_dir = base_dir
 
-        self.etcdctl = Etcdctl(self._base_dir)
+        charm_dir = pathops.LocalPath(charm.charm_dir)
+        self.etcdctl = Etcdctl(self._base_dir, charm_dir)
 
         owner = f'{self.model.uuid}-{self.model.unit.name}'.replace('/', '-')
         self.worker = EtcdRollingOpsAsyncWorker(
@@ -112,13 +113,21 @@ class _EtcdRollingOpsBackend(Object):  # pyright: ignore[reportUnusedClass]
             base_dir=self._base_dir,
         )
         self._async_lock = EtcdLock(
-            lock_key=self.keys.lock_key, owner=owner, base_dir=self._base_dir
+            lock_key=self.keys.lock_key,
+            owner=owner,
+            base_dir=self._base_dir,
+            charm_dir=charm_dir,
         )
         self._sync_lock = EtcdLock(
-            lock_key=self.keys.lock_key, owner=f'{owner}:sync', base_dir=self._base_dir
+            lock_key=self.keys.lock_key,
+            owner=f'{owner}:sync',
+            base_dir=self._base_dir,
+            charm_dir=charm_dir,
         )
         self._lease: EtcdLease | None = None
-        self.operations_store = ManagerOperationStore(self.keys, owner, base_dir=self._base_dir)
+        self.operations_store = ManagerOperationStore(
+            self.keys, owner, base_dir=self._base_dir, charm_dir=charm_dir
+        )
 
         self.framework.observe(
             charm.on[self.peer_relation_name].relation_departed, self._on_peer_relation_departed
@@ -353,7 +362,8 @@ class _EtcdRollingOpsBackend(Object):  # pyright: ignore[reportUnusedClass]
             TimeoutError: If the lock could not be acquired before the timeout.
             RollingOpsSyncLockError: if there was an error obtaining the lock.
         """
-        self._lease = EtcdLease(self._base_dir)
+        charm_dir = pathops.LocalPath(self._charm.charm_dir)
+        self._lease = EtcdLease(self._base_dir, charm_dir)
 
         deadline = None if timeout is None else time.monotonic() + timeout
 
