@@ -20,7 +20,7 @@ parts:
     plugin: make
     source: https://git.launchpad.net/etcd
     source-type: git
-    source-tag: lp-v3.6.7
+    source-tag: lp-v3.6.10
     build-snaps:
       - go/latest/stable
     override-build: |
