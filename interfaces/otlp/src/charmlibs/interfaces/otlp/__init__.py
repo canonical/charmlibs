@@ -165,8 +165,8 @@ from ._otlp import (
     OtlpEndpoint,
     OtlpProvider,
     OtlpRequirer,
-    RuleStore,
 )
+from ._rules import RuleStore
 from ._version import __version__ as __version__
 
 __all__ = [
