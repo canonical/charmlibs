@@ -39,6 +39,7 @@ from pydantic import (
 from ._rules import (
     RuleStore,
     _RulesModel,
+    inject_extra_labels_to_alert_rules,
     inject_generic_rules,
 )
 
@@ -129,6 +130,7 @@ class OtlpRequirer:
             aggregator rules are used instead of application-level rules.
         rules: Rules of different types e.g., logql or promql, that the
             requirer will publish for the provider.
+        extra_alert_labels: Dict of extra labels to inject alert rules with.
     """
 
     def __init__(
@@ -140,6 +142,7 @@ class OtlpRequirer:
         *,
         aggregator_peer_relation_name: str | None = None,
         rules: RuleStore | None = None,
+        extra_alert_labels: dict | None = None,
     ):
         self._charm = charm
         self._topology = JujuTopology.from_charm(charm)
@@ -152,6 +155,7 @@ class OtlpRequirer:
         )
         self._aggregator_peer_relation_name = aggregator_peer_relation_name
         self._rules = rules if rules is not None else RuleStore(self._topology)
+        self._extra_alert_labels = extra_alert_labels or {}
 
     def _filter_endpoints(self, endpoints: list[_OtlpEndpoint]) -> list[_OtlpEndpoint]:
         """Filter out unsupported OtlpEndpoints.
@@ -190,6 +194,16 @@ class OtlpRequirer:
         modern_score: Final = {'grpc': 2, 'http': 1}
         return max(endpoints, key=lambda e: modern_score.get(e.protocol, 0))
 
+    def _handle_alert_rules(self) -> RuleStore:
+        """Maintain the rule store with common alert rule operations."""
+        inject_generic_rules(
+            self._charm,
+            self._rules,
+            self._topology,
+            self._aggregator_peer_relation_name,
+        )
+        inject_extra_labels_to_alert_rules(self._rules, self._extra_alert_labels)
+
     def publish(self):
         """Triggers programmatically the update of the relation data.
 
@@ -201,13 +215,7 @@ class OtlpRequirer:
             # Only the leader unit can write to app data.
             return
 
-        # Add generic rules
-        inject_generic_rules(
-            self._charm,
-            self._rules,
-            self._topology,
-            self._aggregator_peer_relation_name,
-        )
+        self._handle_alert_rules()
 
         # Publish to databag
         databag = _OtlpRequirerAppData.model_validate({

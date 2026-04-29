@@ -196,6 +196,7 @@ def inject_generic_rules(
             charm. When provided, generic aggregator rules are used instead
             of application-level rules.
     """
+    # TODO: Make this method not side-effect by copying the RuleStore
     if aggregator_peer_relation_name:
         if not (peer_relations := charm.model.get_relation(aggregator_peer_relation_name)):
             logger.warning(
@@ -220,3 +221,15 @@ def inject_generic_rules(
             generic_alert_groups.application_rules,
             group_name_prefix=topology.identifier,
         )
+
+
+def inject_extra_labels_to_alert_rules(rules: RuleStore, extra_alert_labels: dict) -> dict:
+    """Return a copy of the rules dict with extra labels injected."""
+    # TODO: Make this method not side-effect by copying the RuleStore
+    if not extra_alert_labels:
+        return rules
+    result = copy.deepcopy(rules)
+    for group in result.get('groups', []):
+        for rule in group.get('rules', []):
+            rule.setdefault('labels', {}).update(extra_alert_labels)
+    return result
