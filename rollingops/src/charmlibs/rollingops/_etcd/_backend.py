@@ -30,12 +30,12 @@ from charmlibs.rollingops._common._exceptions import (
     RollingOpsSyncLockError,
 )
 from charmlibs.rollingops._common._models import (
-    Operation,
     OperationResult,
     RollingOpsStatus,
-    RunWithLockOutcome,
-    RunWithLockStatus,
-    UnitBackendState,
+    _Operation,
+    _RunWithLockOutcome,
+    _RunWithLockStatus,
+    _UnitBackendState,
 )
 from charmlibs.rollingops._etcd._etcd import EtcdLease, EtcdLock, ManagerOperationStore
 from charmlibs.rollingops._etcd._etcdctl import ETCDCTL_CMD, Etcdctl
@@ -154,7 +154,7 @@ class _EtcdRollingOpsBackend(Object):  # pyright: ignore[reportUnusedClass]
             return False
         return True
 
-    def enqueue_operation(self, operation: Operation) -> None:
+    def enqueue_operation(self, operation: _Operation) -> None:
         """Persist an operation in etcd for this unit.
 
         Before storing the operation, this method clears any pending fallback
@@ -177,7 +177,7 @@ class _EtcdRollingOpsBackend(Object):  # pyright: ignore[reportUnusedClass]
 
         self.etcdctl.ensure_initialized()
 
-        backend_state = UnitBackendState(self.model, self.peer_relation_name, self.model.unit)
+        backend_state = _UnitBackendState(self.model, self.peer_relation_name, self.model.unit)
         if backend_state.cleanup_needed:
             self.operations_store.clean_up()
         backend_state.clear_fallback()
@@ -261,11 +261,11 @@ class _EtcdRollingOpsBackend(Object):  # pyright: ignore[reportUnusedClass]
         if kwargs is None:
             kwargs = {}
 
-        operation = Operation.create(callback_id, kwargs, max_retry)
+        operation = _Operation.create(callback_id, kwargs, max_retry)
         self.operations_store.request(operation)
         self.worker.start()
 
-    def _on_run_with_lock(self) -> RunWithLockOutcome:
+    def _on_run_with_lock(self) -> _RunWithLockOutcome:
         """Execute the current operation while holding the distributed lock.
 
         This method is triggered when the worker determines that the current
@@ -285,11 +285,11 @@ class _EtcdRollingOpsBackend(Object):  # pyright: ignore[reportUnusedClass]
         """
         if not self._async_lock.is_held():
             logger.info('Lock is not granted. Operation will not run.')
-            return RunWithLockOutcome(status=RunWithLockStatus.NOT_GRANTED)
+            return _RunWithLockOutcome(status=_RunWithLockStatus.NOT_GRANTED)
 
         if not (operation := self.operations_store.peek_current()):
             logger.info('Lock granted but there is no operation to run.')
-            return RunWithLockOutcome(status=RunWithLockStatus.NO_OPERATION)
+            return _RunWithLockOutcome(status=_RunWithLockStatus.NO_OPERATION)
 
         if not (callback := self.callback_targets.get(operation.callback_id)):
             logger.error(
@@ -297,8 +297,8 @@ class _EtcdRollingOpsBackend(Object):  # pyright: ignore[reportUnusedClass]
                 operation.callback_id,
             )
             self.operations_store.finalize(operation, OperationResult.RELEASE)
-            return RunWithLockOutcome(
-                status=RunWithLockStatus.MISSING_CALLBACK,
+            return _RunWithLockOutcome(
+                status=_RunWithLockStatus.MISSING_CALLBACK,
                 op_id=operation.op_id,
                 result=OperationResult.RELEASE,
             )
@@ -327,13 +327,13 @@ class _EtcdRollingOpsBackend(Object):  # pyright: ignore[reportUnusedClass]
             self.operations_store.finalize(operation, result)
         except Exception:
             logger.exception('Failed to commit operation %s to etcd.', operation.callback_id)
-            return RunWithLockOutcome(
-                status=RunWithLockStatus.EXECUTED_NOT_COMMITTED,
+            return _RunWithLockOutcome(
+                status=_RunWithLockStatus.EXECUTED_NOT_COMMITTED,
                 op_id=operation.op_id,
                 result=result,
             )
-        return RunWithLockOutcome(
-            status=RunWithLockStatus.EXECUTED,
+        return _RunWithLockOutcome(
+            status=_RunWithLockStatus.EXECUTED,
             op_id=operation.op_id,
             result=result,
         )

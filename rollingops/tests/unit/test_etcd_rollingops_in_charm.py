@@ -35,10 +35,10 @@ from charmlibs.rollingops._common._exceptions import (
     RollingOpsInvalidSecretContentError,
 )
 from charmlibs.rollingops._common._models import (
-    Operation,
-    OperationQueue,
     ProcessingBackend,
     RollingOpsStatus,
+    _Operation,
+    _OperationQueue,
 )
 from charmlibs.rollingops._etcd._models import SharedCertificate
 from charmlibs.rollingops._etcd._relations import CERT_SECRET_FIELD
@@ -172,7 +172,7 @@ def test_on_restart_action_lock_fallbacks_to_peer(
     assert databag['processing_backend'] == ProcessingBackend.PEER
     assert databag['etcd_cleanup_needed'] == 'true'
 
-    q = OperationQueue.from_string(databag['operations'])
+    q = _OperationQueue.from_string(databag['operations'])
     assert len(q) == 1
     operation = q.peek()
     assert operation is not None
@@ -215,8 +215,8 @@ def test_state_peer_waiting(ctx: Context[RollingOpsCharm]):
         endpoint='restart',
         local_unit_data={
             'state': 'request',
-            'operations': OperationQueue([
-                Operation.create('restart', {'delay': 1}, max_retry=2)
+            'operations': _OperationQueue([
+                _Operation.create('restart', {'delay': 1}, max_retry=2)
             ]).to_string(),
             'executed_at': '',
             'processing_backend': 'peer',
@@ -239,8 +239,8 @@ def test_state_peer_is_granted(ctx: Context[RollingOpsCharm]):
         },
         local_unit_data={
             'state': 'retry-release',
-            'operations': OperationQueue([
-                Operation.create('restart', {'delay': 1}, max_retry=2)
+            'operations': _OperationQueue([
+                _Operation.create('restart', {'delay': 1}, max_retry=2)
             ]).to_string(),
             'executed_at': '2026-04-09T10:01:00+00:00',
             'processing_backend': 'peer',
@@ -263,8 +263,8 @@ def test_state_peer_waiting_retry(ctx: Context[RollingOpsCharm]):
         },
         local_unit_data={
             'state': 'retry-release',
-            'operations': OperationQueue([
-                Operation.create('restart', {'delay': 1}, max_retry=2)
+            'operations': _OperationQueue([
+                _Operation.create('restart', {'delay': 1}, max_retry=2)
             ]).to_string(),
             'executed_at': '2026-04-09T10:01:00+00:00',
             'processing_backend': 'peer',
@@ -286,8 +286,8 @@ def test_state_etcd_status(ctx: Context[RollingOpsCharm]):
         local_app_data={},
         local_unit_data={
             'state': '',
-            'operations': OperationQueue([
-                Operation.create('restart', {'delay': 1}, max_retry=2)
+            'operations': _OperationQueue([
+                _Operation.create('restart', {'delay': 1}, max_retry=2)
             ]).to_string(),
             'executed_at': '',
             'processing_backend': 'etcd',
@@ -313,7 +313,9 @@ def test_state_falls_back_to_peer_if_etcd_status_fails(ctx: Context[RollingOpsCh
         local_app_data={},
         local_unit_data={
             'state': 'request',
-            'operations': OperationQueue([Operation.create('restart', {'delay': 1})]).to_string(),
+            'operations': _OperationQueue([
+                _Operation.create('restart', {'delay': 1})
+            ]).to_string(),
             'executed_at': '',
             'processing_backend': 'etcd',
             'etcd_cleanup_needed': 'false',
@@ -338,9 +340,9 @@ def test_is_waiting_returns_true_when_matching_operation_exists(ctx: Context[Rol
         local_app_data={},
         local_unit_data={
             'state': 'request',
-            'operations': OperationQueue([
-                Operation.create('restart', {'delay': 1}),
-                Operation.create('restart', {'delay': 2}),
+            'operations': _OperationQueue([
+                _Operation.create('restart', {'delay': 1}),
+                _Operation.create('restart', {'delay': 2}),
             ]).to_string(),
             'executed_at': '',
             'processing_backend': 'peer',
@@ -362,8 +364,8 @@ def test_is_waiting_returns_false_when_callback_matches_but_kwargs_do_not(
         local_app_data={},
         local_unit_data={
             'state': 'request',
-            'operations': OperationQueue([
-                Operation.create('restart', {'delay': 1}),
+            'operations': _OperationQueue([
+                _Operation.create('restart', {'delay': 1}),
             ]).to_string(),
             'executed_at': '',
             'processing_backend': 'peer',
@@ -383,8 +385,8 @@ def test_is_waiting_returns_false_when_callback_does_not_match(ctx: Context[Roll
         local_app_data={},
         local_unit_data={
             'state': 'request',
-            'operations': OperationQueue([
-                Operation.create('restart', {'delay': 1}),
+            'operations': _OperationQueue([
+                _Operation.create('restart', {'delay': 1}),
             ]).to_string(),
             'executed_at': '',
             'processing_backend': 'peer',
@@ -406,8 +408,8 @@ def test_is_waiting_returns_true_when_kwargs_is_none_and_matching_operation_has_
         local_app_data={},
         local_unit_data={
             'state': 'request',
-            'operations': OperationQueue([
-                Operation.create('restart', {}),
+            'operations': _OperationQueue([
+                _Operation.create('restart', {}),
             ]).to_string(),
             'executed_at': '',
             'processing_backend': 'peer',
@@ -427,7 +429,7 @@ def test_is_waiting_returns_false_when_operation_validation_fails(ctx: Context[R
         local_app_data={},
         local_unit_data={
             'state': 'request',
-            'operations': OperationQueue([]).to_string(),
+            'operations': _OperationQueue([]).to_string(),
             'executed_at': '',
             'processing_backend': 'peer',
             'etcd_cleanup_needed': 'false',

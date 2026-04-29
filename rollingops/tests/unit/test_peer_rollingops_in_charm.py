@@ -24,7 +24,7 @@ from tests.unit.conftest import RollingOpsCharm, StrictPeerRollingOpsCharm
 
 from charmlibs.rollingops import ProcessingBackend, RollingOpsStatus
 from charmlibs.rollingops._common._exceptions import RollingOpsInvalidLockRequestError
-from charmlibs.rollingops._common._models import Operation, OperationQueue
+from charmlibs.rollingops._common._models import _Operation, _OperationQueue
 from charmlibs.rollingops._common._utils import now_timestamp
 from charmlibs.rollingops._peer._models import LockIntent
 
@@ -39,9 +39,9 @@ def _app_databag(state: State, peer: PeerRelation):
 
 def _make_operation_queue(
     callback_id: str, kwargs: dict[str, Any], max_retry: int | None
-) -> OperationQueue:
-    q = OperationQueue()
-    op1 = Operation.create(callback_id=callback_id, kwargs=kwargs, max_retry=max_retry)
+) -> _OperationQueue:
+    q = _OperationQueue()
+    op1 = _Operation.create(callback_id=callback_id, kwargs=kwargs, max_retry=max_retry)
     q.enqueue(op1)
     return q
 
@@ -61,7 +61,7 @@ def test_lock_request_enqueues_and_sets_request(
     assert databag['state'] == LockIntent.REQUEST
     assert databag['operations']
 
-    q = OperationQueue.from_string(databag['operations'])
+    q = _OperationQueue.from_string(databag['operations'])
     assert len(q) == 1
     operation = q.peek()
     assert operation is not None
@@ -117,7 +117,7 @@ def test_lock_request_invalid_callback_id(ctx: Context[RollingOpsCharm], callbac
     [
         ('nope'),
         ([]),
-        ({'x': OperationQueue()}),
+        ({'x': _OperationQueue()}),
     ],
 )
 def test_lock_request_invalid_kwargs(ctx: Context[RollingOpsCharm], kwargs: Any):
@@ -148,7 +148,7 @@ def test_existing_operation_then_new_request(ctx: Context[RollingOpsCharm]):
 
     databag = _unit_databag(state_out, peer)
     assert databag['state'] == LockIntent.REQUEST
-    result = OperationQueue.from_string(databag['operations'])
+    result = _OperationQueue.from_string(databag['operations'])
 
     assert len(result) == 2
     assert result.operations[0].callback_id == '_failed_restart'
@@ -175,7 +175,7 @@ def test_new_request_does_not_overwrite_state_if_queue_not_empty(
     databag = _unit_databag(state_out, peer)
     assert databag['state'] == LockIntent.RETRY_RELEASE
     assert databag['executed_at'] == executed_at
-    result = OperationQueue.from_string(databag['operations'])
+    result = _OperationQueue.from_string(databag['operations'])
     assert len(result) == 2
     assert result.operations[0].callback_id == '_failed_restart'
     assert result.operations[1].callback_id == '_restart'
@@ -201,7 +201,7 @@ def test_relation_changed_without_grant_does_not_run_operation(
 
     databag = _unit_databag(state_out, peer)
     assert databag['state'] == LockIntent.REQUEST
-    result = OperationQueue.from_string(databag['operations'])
+    result = _OperationQueue.from_string(databag['operations'])
     assert len(result) == 1
     assert databag.get('executed_at', '') == ''
 
@@ -227,7 +227,7 @@ def test_lock_complete_pops_head(ctx: Context[RollingOpsCharm]):
     assert databag['executed_at'] is not None
     assert databag.get('operations', None) == '[]'
 
-    q = OperationQueue.from_string(databag['operations'])
+    q = _OperationQueue.from_string(databag['operations'])
     assert len(q) == 0
 
 
@@ -236,9 +236,9 @@ def test_successful_operation_leaves_state_request_when_more_ops_remain(
 ):
     local_unit_name = f'{ctx.app_name}/0'
     remote_unit_name = f'{ctx.app_name}/1'
-    queue = OperationQueue()
-    op1 = Operation.create(callback_id='_restart', kwargs={}, max_retry=None)
-    op2 = Operation.create(callback_id='_failed_restart', kwargs={}, max_retry=None)
+    queue = _OperationQueue()
+    op1 = _Operation.create(callback_id='_restart', kwargs={}, max_retry=None)
+    op2 = _Operation.create(callback_id='_failed_restart', kwargs={}, max_retry=None)
 
     queue.enqueue(op1)
     queue.enqueue(op2)
@@ -258,7 +258,7 @@ def test_successful_operation_leaves_state_request_when_more_ops_remain(
 
     databag = _unit_databag(state_out, peer)
     assert databag['state'] == LockIntent.REQUEST
-    q = OperationQueue.from_string(databag['operations'])
+    q = _OperationQueue.from_string(databag['operations'])
     assert len(q) == 1
     current_operation = q.peek()
     assert current_operation is not None
@@ -296,7 +296,7 @@ def test_lock_retry_marks_retry(
     assert databag['state'] == lock_intent
     assert databag['executed_at'] is not None
 
-    q = OperationQueue.from_string(databag['operations'])
+    q = _OperationQueue.from_string(databag['operations'])
     assert len(q) == 1
     current_operation = q.peek()
     initial_operation = queue.peek()
@@ -323,8 +323,8 @@ def test_lock_retry_drops_when_max_retry_reached(
     remote_unit_name = f'{ctx.app_name}/1'
     local_unit_name = f'{ctx.app_name}/0'
 
-    queue = OperationQueue()
-    op1 = Operation.create(callback_id=callback_id, kwargs={}, max_retry=3)
+    queue = _OperationQueue()
+    op1 = _Operation.create(callback_id=callback_id, kwargs={}, max_retry=3)
     queue.enqueue(op1)
     op = queue.peek()
     assert op is not None
@@ -348,7 +348,7 @@ def test_lock_retry_drops_when_max_retry_reached(
     assert databag['state'] == LockIntent.IDLE
     assert databag['executed_at'] is not None
 
-    q = OperationQueue.from_string(databag['operations'])
+    q = _OperationQueue.from_string(databag['operations'])
     assert len(q) == 0
 
 
@@ -436,12 +436,12 @@ def test_schedule_picks_oldest_requested_at_among_requests(
     certificates_manager_patches: dict[str, MagicMock],
     ctx: Context[RollingOpsCharm],
 ):
-    old_queue = OperationQueue()
-    old_op = Operation.create(callback_id='restart', kwargs={}, max_retry=2)
+    old_queue = _OperationQueue()
+    old_op = _Operation.create(callback_id='restart', kwargs={}, max_retry=2)
     old_queue.enqueue(old_op)
 
-    new_queue = OperationQueue()
-    new_op = Operation.create(callback_id='restart', kwargs={}, max_retry=2)
+    new_queue = _OperationQueue()
+    new_op = _Operation.create(callback_id='restart', kwargs={}, max_retry=2)
     new_queue.enqueue(new_op)
 
     peer = PeerRelation(

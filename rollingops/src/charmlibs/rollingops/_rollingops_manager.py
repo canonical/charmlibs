@@ -30,13 +30,13 @@ from charmlibs.rollingops._common._exceptions import (
     RollingOpsSyncLockError,
 )
 from charmlibs.rollingops._common._models import (
-    Operation,
     ProcessingBackend,
     RollingOpsState,
     RollingOpsStatus,
-    RunWithLockStatus,
     SyncLockBackend,
-    UnitBackendState,
+    _Operation,
+    _RunWithLockStatus,
+    _UnitBackendState,
 )
 from charmlibs.rollingops._common._utils import ETCD_FAILED_HOOK_NAME, LOCK_GRANTED_HOOK_NAME
 from charmlibs.rollingops._etcd._backend import _EtcdRollingOpsBackend
@@ -46,11 +46,11 @@ from charmlibs.rollingops._peer._models import PeerUnitOperations
 logger = logging.getLogger(__name__)
 
 
-class RollingOpsLockGrantedEvent(EventBase):
+class _RollingOpsLockGrantedEvent(EventBase):
     """Custom event emitted when the background worker grants the lock."""
 
 
-class RollingOpsEtcdFailedEvent(EventBase):
+class _RollingOpsEtcdFailedEvent(EventBase):
     """Custom event emitted when the etcd worker hits a fatal error."""
 
 
@@ -118,8 +118,8 @@ class RollingOpsManager(Object):
         self.peer_relation_name = peer_relation_name
         self.etcd_relation_name = etcd_relation_name
         self._sync_lock_targets = sync_lock_targets or {}
-        charm.on.define_event(LOCK_GRANTED_HOOK_NAME, RollingOpsLockGrantedEvent)
-        charm.on.define_event(ETCD_FAILED_HOOK_NAME, RollingOpsEtcdFailedEvent)
+        charm.on.define_event(LOCK_GRANTED_HOOK_NAME, _RollingOpsLockGrantedEvent)
+        charm.on.define_event(ETCD_FAILED_HOOK_NAME, _RollingOpsEtcdFailedEvent)
 
         self._peer_backend = _PeerRollingOpsBackend(
             charm=charm,
@@ -152,14 +152,14 @@ class RollingOpsManager(Object):
         return self.model.get_relation(self.peer_relation_name)
 
     @property
-    def _backend_state(self) -> UnitBackendState:
+    def _backend_state(self) -> _UnitBackendState:
         """Return the backend selection state stored for the current unit.
 
         This state determines whether the current unit is managed by the etcd
         backend or the peer backend, and is used to control fallback and
         recovery decisions.
         """
-        return UnitBackendState(self.model, self.peer_relation_name, self.model.unit)
+        return _UnitBackendState(self.model, self.peer_relation_name, self.model.unit)
 
     def _on_etcd_relation_broken(self, event: RelationBrokenEvent) -> None:
         """Handle the etcd relation being fully removed.
@@ -256,7 +256,7 @@ class RollingOpsManager(Object):
         backend = self._select_processing_backend()
 
         try:
-            operation = Operation.create(callback_id, kwargs, max_retry)
+            operation = _Operation.create(callback_id, kwargs, max_retry)
         except (RollingOpsDecodingError, ValueError) as e:
             logger.error('Failed to create operation: %s', e)
             raise RollingOpsInvalidLockRequestError('Failed to create the lock request') from e
@@ -284,7 +284,7 @@ class RollingOpsManager(Object):
         else:
             self._fallback_current_unit_to_peer()
 
-    def _on_rollingops_lock_granted(self, event: RollingOpsLockGrantedEvent) -> None:
+    def _on_rollingops_lock_granted(self, event: _RollingOpsLockGrantedEvent) -> None:
         """Handle a granted rolling lock and dispatch execution to the active backend.
 
         If the current unit is peer-managed, the operation is executed through
@@ -339,11 +339,11 @@ class RollingOpsManager(Object):
             self._fallback_current_unit_to_peer()
             return
         logger.info('Execution mirrored to peer relation.')
-        if outcome.status == RunWithLockStatus.EXECUTED_NOT_COMMITTED:
+        if outcome.status == _RunWithLockStatus.EXECUTED_NOT_COMMITTED:
             self._fallback_current_unit_to_peer()
             logger.info('Fell back to peer backend.')
 
-    def _on_rollingops_etcd_failed(self, event: RollingOpsEtcdFailedEvent) -> None:
+    def _on_rollingops_etcd_failed(self, event: _RollingOpsEtcdFailedEvent) -> None:
         """Fall back to peer when the etcd worker reports a fatal failure."""
         logger.warning('Received %s.', ETCD_FAILED_HOOK_NAME)
         if self._peer_relation is None:
@@ -494,7 +494,7 @@ class RollingOpsManager(Object):
         kwargs = kwargs or {}
 
         try:
-            check_operation = Operation.create(callback_id=callback_id, kwargs=kwargs)
+            check_operation = _Operation.create(callback_id=callback_id, kwargs=kwargs)
         except ValidationError:
             return False
 

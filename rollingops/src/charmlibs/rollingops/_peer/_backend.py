@@ -31,11 +31,11 @@ from charmlibs.rollingops._common._exceptions import (
     RollingOpsNoRelationError,
 )
 from charmlibs.rollingops._common._models import (
-    Operation,
     OperationResult,
     RollingOpsStatus,
-    RunWithLockOutcome,
-    RunWithLockStatus,
+    _Operation,
+    _RunWithLockOutcome,
+    _RunWithLockStatus,
 )
 from charmlibs.rollingops._peer._models import (
     PeerAppLock,
@@ -118,7 +118,7 @@ class _PeerRollingOpsBackend(Object):  # pyright: ignore[reportUnusedClass]
         """
         return PeerUnitOperations(self.model, self.relation_name, unit)
 
-    def enqueue_operation(self, operation: Operation) -> None:
+    def enqueue_operation(self, operation: _Operation) -> None:
         """Persist an operation in the current unit's peer-backed queue.
 
         Args:
@@ -347,7 +347,7 @@ class _PeerRollingOpsBackend(Object):  # pyright: ignore[reportUnusedClass]
         try:
             if kwargs is None:
                 kwargs = {}
-            operation = Operation.create(callback_id, kwargs, max_retry)
+            operation = _Operation.create(callback_id, kwargs, max_retry)
             operations = self._operations(self.model.unit)
             operations.request(operation)
 
@@ -400,7 +400,7 @@ class _PeerRollingOpsBackend(Object):  # pyright: ignore[reportUnusedClass]
         logger.info('Operation %s executed with result %s.', operation.callback_id, result)
         operations.finish(result)
 
-    def mirror_outcome(self, outcome: RunWithLockOutcome) -> None:
+    def mirror_outcome(self, outcome: _RunWithLockOutcome) -> None:
         """Apply the execution result to the mirrored peer queue.
 
         This keeps the peer standby queue aligned with the backend that
@@ -413,11 +413,11 @@ class _PeerRollingOpsBackend(Object):  # pyright: ignore[reportUnusedClass]
             RollingOpsDecodingError: If theres is an inconsistency found.
         """
         match outcome.status:
-            case RunWithLockStatus.NOT_GRANTED:
+            case _RunWithLockStatus.NOT_GRANTED:
                 logger.info('Skipping mirror: etcd lock was not granted.')
                 return
 
-            case RunWithLockStatus.NO_OPERATION:
+            case _RunWithLockStatus.NO_OPERATION:
                 if not self._operations(self.model.unit).has_pending_work():
                     logger.info('Skipping mirror: no operation.')
                     return
@@ -426,9 +426,9 @@ class _PeerRollingOpsBackend(Object):  # pyright: ignore[reportUnusedClass]
                 )
 
             case (
-                RunWithLockStatus.MISSING_CALLBACK
-                | RunWithLockStatus.EXECUTED
-                | RunWithLockStatus.EXECUTED_NOT_COMMITTED
+                _RunWithLockStatus.MISSING_CALLBACK
+                | _RunWithLockStatus.EXECUTED
+                | _RunWithLockStatus.EXECUTED_NOT_COMMITTED
             ):
                 self._operations(self.model.unit).mirror_result(outcome.op_id, outcome.result)  # type: ignore[reportArgumentType]
             case _:

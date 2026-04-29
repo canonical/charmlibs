@@ -74,7 +74,7 @@ class ProcessingBackend(StrEnum):
     ETCD = 'etcd'
 
 
-class RunWithLockStatus(StrEnum):
+class _RunWithLockStatus(StrEnum):
     """Status of an attempt to execute an operation under a distributed lock.
 
     These values describe what happened when a unit tried to run an
@@ -116,7 +116,7 @@ class RollingOpsStatus(StrEnum):
 
 
 @dataclass(frozen=True)
-class RunWithLockOutcome:
+class _RunWithLockOutcome:  # pyright: ignore[reportUnusedClass]
     """Result of attempting to execute an operation under a distributed lock.
 
     This object captures both whether an operation was executed and, if so,
@@ -124,13 +124,13 @@ class RunWithLockOutcome:
     execution outcomes across backends (e.g. etcd → peer mirroring).
     """
 
-    status: RunWithLockStatus
+    status: _RunWithLockStatus
     op_id: str | None = None
     result: OperationResult | None = None
 
 
 @dataclass
-class BackendState:
+class _BackendState:
     """Unit-scoped backend ownership and recovery state."""
 
     processing_backend: str = ProcessingBackend.PEER
@@ -159,7 +159,7 @@ class BackendState:
         self.processing_backend = value
 
 
-class UnitBackendState:
+class _UnitBackendState:  # pyright: ignore[reportUnusedClass]
     """Manage backend ownership and fallback state for one unit queue."""
 
     def __init__(self, model: Model, relation_name: str, unit: Unit):
@@ -170,9 +170,9 @@ class UnitBackendState:
         self._relation = relation
         self.unit = unit
 
-        self._backend_state = self._relation.load(BackendState, self.unit, decoder=lambda s: s)
+        self._backend_state = self._relation.load(_BackendState, self.unit, decoder=lambda s: s)
 
-    def _save(self, data: BackendState) -> None:
+    def _save(self, data: _BackendState) -> None:
         self._relation.save(data, self.unit, encoder=str)
 
     @property
@@ -206,7 +206,7 @@ class UnitBackendState:
         return self.backend == ProcessingBackend.ETCD
 
 
-class Operation(BaseModel):
+class _Operation(BaseModel):
     """A single queued operation."""
 
     model_config = ConfigDict(use_enum_values=True)
@@ -270,7 +270,7 @@ class Operation(BaseModel):
         callback_id: str,
         kwargs: dict[str, Any],
         max_retry: int | None = None,
-    ) -> 'Operation':
+    ) -> '_Operation':
         """Create a new operation from a callback id and kwargs."""
         return cls(
             callback_id=callback_id,
@@ -286,14 +286,14 @@ class Operation(BaseModel):
         return self.model_dump_json()
 
     @classmethod
-    def from_string(cls, data: str) -> 'Operation':
+    def from_string(cls, data: str) -> '_Operation':
         """Deserialize from a JSON string."""
         try:
             return cls.model_validate_json(data)
         except Exception as e:
-            logger.error('Failed to deserialize Operation from %s: %s', data, e)
+            logger.error('Failed to deserialize _Operation from %s: %s', data, e)
             raise RollingOpsDecodingError(
-                'Failed to deserialize data to create an Operation'
+                'Failed to deserialize data to create an _Operation'
             ) from e
 
     def increase_attempt(self) -> None:
@@ -348,7 +348,7 @@ class Operation(BaseModel):
 
     def __eq__(self, other: object) -> bool:
         """Equal for the operation."""
-        if not isinstance(other, Operation):
+        if not isinstance(other, _Operation):
             return False
         return self.callback_id == other.callback_id and self.kwargs == other.kwargs
 
@@ -357,14 +357,14 @@ class Operation(BaseModel):
         return hash((self.callback_id, self._kwargs_to_json()))
 
 
-class OperationQueue(RootModel[list[Operation]]):
+class _OperationQueue(RootModel[list[_Operation]]):
     """In-memory FIFO queue of Operations with encode/decode helpers for storing in a databag."""
 
-    def __init__(self, operations: list[Operation] | None = None) -> None:
+    def __init__(self, operations: list[_Operation] | None = None) -> None:
         super().__init__(root=operations or [])  # pyright: ignore[reportUnknownMemberType]
 
     @property
-    def operations(self) -> list[Operation]:
+    def operations(self) -> list[_Operation]:
         """Return the underlying list of operations."""
         return self.root
 
@@ -377,15 +377,15 @@ class OperationQueue(RootModel[list[Operation]]):
         """Return True if there are no queued operations."""
         return not self.root
 
-    def peek(self) -> Operation | None:
+    def peek(self) -> _Operation | None:
         """Return the first operation in the queue if it exists."""
         return self.operations[0] if self.operations else None
 
-    def _peek_last(self) -> Operation | None:
+    def _peek_last(self) -> _Operation | None:
         """Return the last operation in the queue if it exists."""
         return self.operations[-1] if self.operations else None
 
-    def dequeue(self) -> Operation | None:
+    def dequeue(self) -> _Operation | None:
         """Drop the first operation in the queue if it exists and return it."""
         return self.operations.pop(0) if self.operations else None
 
@@ -395,7 +395,7 @@ class OperationQueue(RootModel[list[Operation]]):
             return
         self.operations[0].increase_attempt()
 
-    def enqueue(self, operation: Operation) -> None:
+    def enqueue(self, operation: _Operation) -> None:
         """Append operation only if it is not equal to the tail operation."""
         last_operation = self._peek_last()
         if last_operation is not None and last_operation == operation:
@@ -407,7 +407,7 @@ class OperationQueue(RootModel[list[Operation]]):
         return self.model_dump_json()
 
     @classmethod
-    def from_string(cls, data: str) -> 'OperationQueue':
+    def from_string(cls, data: str) -> '_OperationQueue':
         """Decode a queue from a JSON string.
 
         Args:

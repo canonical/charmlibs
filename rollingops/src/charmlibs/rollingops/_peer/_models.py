@@ -26,10 +26,10 @@ from charmlibs.rollingops._common._exceptions import (
     RollingOpsNoRelationError,
 )
 from charmlibs.rollingops._common._models import (
-    Operation,
-    OperationQueue,
     OperationResult,
-    UnitBackendState,
+    _Operation,
+    _OperationQueue,
+    _UnitBackendState,
 )
 from charmlibs.rollingops._common._utils import datetime_to_str, now_timestamp, parse_timestamp
 
@@ -82,12 +82,12 @@ class PeerUnitData:
         self.state = value
 
     @property
-    def queue(self) -> OperationQueue:
+    def queue(self) -> _OperationQueue:
         """Return the stored operation queue."""
-        return OperationQueue.from_string(self.operations)
+        return _OperationQueue.from_string(self.operations)
 
     @queue.setter
-    def queue(self, value: OperationQueue) -> None:
+    def queue(self, value: _OperationQueue) -> None:
         """Store the operation queue."""
         self.operations = value.to_string()
 
@@ -154,7 +154,7 @@ class PeerUnitOperations:
 
         self._relation = relation
         self.unit = unit
-        self._backend_state = UnitBackendState(model, relation_name, unit)
+        self._backend_state = _UnitBackendState(model, relation_name, unit)
         self._unit_data = self._relation.load(PeerUnitData, self.unit, decoder=lambda s: s)
 
     def _save(self, data: PeerUnitData) -> None:
@@ -175,10 +175,10 @@ class PeerUnitOperations:
         return self._unit_data.executed_at_dt
 
     @property
-    def queue(self) -> OperationQueue:
+    def queue(self) -> _OperationQueue:
         return self._unit_data.queue
 
-    def get_current(self) -> Operation | None:
+    def get_current(self) -> _Operation | None:
         """Return the head operation, if any."""
         return self._unit_data.queue.peek()
 
@@ -186,7 +186,7 @@ class PeerUnitOperations:
         """Return whether this unit still has queued work."""
         return self.get_current() is not None
 
-    def request(self, operation: Operation) -> None:
+    def request(self, operation: _Operation) -> None:
         """Enqueue an operation and mark this unit as requesting the lock."""
         data = self._unit_data
         queue = data.queue

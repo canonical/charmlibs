@@ -30,40 +30,46 @@ units of a Juju application. It supports two execution modes:
    operations without blocking Juju hooks. This is suitable for long-running
    tasks across a cluster.
 
-Core concepts
--------------
-
-Asynchronous lock (primary mechanism)
-    The main functionality of this library is the asynchronous lock.
-    Callers enqueue an operation by providing a callback target. The library
-    ensures that the operation is executed later, in mutual exclusion,
-    without blocking the current Juju hook. This is the recommended approach
-    for most operations.
-
-Synchronous lock (special-case mechanism)
-    A synchronous lock is provided for scenarios where deferring is not
-    possible (e.g. teardown or finalization paths). In this mode, the hook is
-    blocked until the lock is granted, and the critical section is executed
-    directly by the charm's code rather than by the library. Because this
-    blocks hook execution, it should be used carefully.
-
-    When etcd is integrated, it provides the synchronous locking mechanism.
-    If etcd is not integrated (or a fallback to peer coordination is required),
-    the library will attempt to use a peer-based backend. However, the peer
-    backend does not provide a native synchronous lock, as peer relations
-    cannot be relied upon during teardown.
-
-    To support these cases, users can optionally provide custom synchronous
-    lock backends via the ``sync_lock_targets`` parameter when initializing
-    ``RollingOpsManager``. Each backend must implement ``SyncLockBackend``.
-
-Typical use cases:
+Typical use cases::
 - Rolling restarts of application units
 - Safe configuration changes requiring sequential execution
 - Maintenance tasks that must not run concurrently
 - Cluster-wide operations coordinated via etcd
 
-Basic usage:
+
+Core concepts
+-------------
+
+Asynchronous lock (primary mechanism)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The main functionality of this library is the asynchronous lock.
+Callers enqueue an operation by providing a callback target. The library
+ensures that the operation is executed later, in mutual exclusion,
+without blocking the current Juju hook. This is the recommended approach
+for most operations.
+
+Synchronous lock (special-case mechanism)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+A synchronous lock is provided for scenarios where deferring is not
+possible (e.g. teardown or finalization paths). In this mode, the hook is
+blocked until the lock is granted, and the critical section is executed
+directly by the charm's code rather than by the library. Because this
+blocks hook execution, it should be used carefully.
+
+When etcd is integrated, it provides the synchronous locking mechanism.
+If etcd is not integrated (or a fallback to peer coordination is required),
+the library will attempt to use a peer-based backend. However, the peer
+backend does not provide a native synchronous lock, as peer relations
+cannot be relied upon during teardown.
+
+To support these cases, users can optionally provide custom synchronous
+lock backends via the ``sync_lock_targets`` parameter when initializing
+``RollingOpsManager``. Each backend must implement ``SyncLockBackend``.
+
+
+Basic usage::
 
     from charmlibs.rollingops import RollingOpsManager, SyncLockBackend, OperationResult
 
@@ -144,7 +150,7 @@ always be configured.
 When etcd is configured, the library will prefer etcd-backed coordination
 and fall back to the peer-based mechanism if etcd is unavailable.
 
-The relations can be added to the charm as follows:
+The relations can be added to the charm as follows::
 
 
     peers:
@@ -157,6 +163,34 @@ The relations can be added to the charm as follows:
         limit: 1
         optional: true
 
+
+Callback definition and registration
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Asynchronous operations are defined as callbacks and registered through the
+``callback_targets`` parameter when initializing ``RollingOpsManager``.
+This parameter is a mapping of string identifiers to bound methods on the
+charm. Each identifier is used when requesting a lock and determines which
+callback will be executed once the lock is granted.
+
+Callbacks are invoked on the unit holding the lock and must follow this
+signature:
+
+    def <callback>(self, **kwargs) -> OperationResult
+
+The ``kwargs`` provided when requesting the lock are passed to the callback
+at execution time. These arguments must be JSON-serializable, as they are
+stored in the peer relation databag.
+
+Callbacks must be idempotent and safe to run multiple times, as they may be
+retried due to failures or hook replays. They must not interact directly with
+the locking mechanism (e.g. requesting locks, mutating the peer relation
+databag used by the library, emitting relation events, or deferring execution).
+
+The callback must return an ``OperationResult`` indicating how the library
+should proceed (e.g. release the lock or retry execution). If the callback
+raises an unexpected exception or returns an invalid value, the library will
+log the issue and release the lock.
 """
 
 from ._common._exceptions import (
@@ -172,8 +206,6 @@ from ._common._exceptions import (
     RollingOpsSyncLockError,
 )
 from ._common._models import (
-    Operation,
-    OperationQueue,
     OperationResult,
     ProcessingBackend,
     RollingOpsState,
@@ -184,8 +216,6 @@ from ._rollingops_manager import RollingOpsManager
 from ._version import __version__ as __version__
 
 __all__ = (
-    'Operation',
-    'OperationQueue',
     'OperationResult',
     'ProcessingBackend',
     'RollingOpsDecodingError',

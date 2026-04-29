@@ -25,7 +25,7 @@ from charmlibs.rollingops._common._exceptions import (
     RollingOpsEtcdctlParseError,
     RollingOpsEtcdTransactionError,
 )
-from charmlibs.rollingops._common._models import Operation, OperationResult
+from charmlibs.rollingops._common._models import OperationResult, _Operation
 from charmlibs.rollingops._etcd._etcdctl import ETCDCTL_CMD, Etcdctl
 from charmlibs.rollingops._etcd._models import RollingOpsKeys
 
@@ -228,19 +228,19 @@ class EtcdOperationQueue:
         self.owner = owner
         self._etcdctl = Etcdctl(base_dir)
 
-    def peek(self) -> Operation | None:
+    def peek(self) -> _Operation | None:
         """Return the first operation in the queue without removing it."""
         kv = self._etcdctl.get_first_key_value_pair(self.prefix)
         if kv is None:
             return None
-        return Operation.model_validate(kv.value)
+        return _Operation.model_validate(kv.value)
 
-    def _peek_last(self) -> Operation | None:
+    def _peek_last(self) -> _Operation | None:
         """Return the last operation in the queue without removing it."""
         kv = self._etcdctl.get_last_key_value_pair(self.prefix)
         if kv is None:
             return None
-        return Operation.model_validate(kv.value)
+        return _Operation.model_validate(kv.value)
 
     def move_head(self, to_queue_prefix: str) -> bool:
         """Move the first operation in the queue to another queue.
@@ -262,7 +262,7 @@ class EtcdOperationQueue:
 
         op_id = kv.key.split('/')[-1]
         new_key = f'{to_queue_prefix}{op_id}'
-        op = Operation.model_validate(kv.value)
+        op = _Operation.model_validate(kv.value)
         data = op.to_string()
 
         txn = f"""\
@@ -276,7 +276,7 @@ class EtcdOperationQueue:
         """
         return self._etcdctl.txn(txn)
 
-    def move_operation(self, to_queue_prefix: str, operation: Operation) -> bool:
+    def move_operation(self, to_queue_prefix: str, operation: _Operation) -> bool:
         """Move a specific operation from this queue to another queue.
 
         The operation is identified using its operation ID and moved
@@ -305,12 +305,12 @@ class EtcdOperationQueue:
         """
         return self._etcdctl.txn(txn)
 
-    def watch(self) -> Operation:
+    def watch(self) -> _Operation:
         """Block until at least one operation exists and return it."""
         while True:
             kv = self._etcdctl.get_first_key_value_pair(self.prefix)
             if kv is not None:
-                return Operation.model_validate(kv.value)
+                return _Operation.model_validate(kv.value)
             time.sleep(10)
 
     def dequeue(self) -> bool:
@@ -336,14 +336,14 @@ class EtcdOperationQueue:
         """
         return self._etcdctl.txn(txn)
 
-    def enqueue(self, operation: Operation) -> None:
+    def enqueue(self, operation: _Operation) -> None:
         """Insert a new operation into the queue.
 
         The method avoids inserting duplicate operations by comparing
         the new operation with the last operation currently in the queue.
 
         Args:
-            operation: Operation to insert.
+            operation: _Operation to insert.
         """
         old_operation = self._peek_last()
 
@@ -439,7 +439,7 @@ class WorkerOperationStore:
             raise RollingOpsEtcdTransactionError('Failed to get the ID of the next operation.')
         return operation.op_id
 
-    def wait_until_completed(self) -> Operation:
+    def wait_until_completed(self) -> _Operation:
         """Block until at least one operation appears in the completed queue."""
         return self._completed.watch()
 
@@ -492,7 +492,7 @@ class ManagerOperationStore:
             keys.completed, keys.lock_key, owner, base_dir=base_dir
         )
 
-    def request(self, operation: Operation) -> None:
+    def request(self, operation: _Operation) -> None:
         """Add a new operation to the pending queue.
 
         Duplicate operations (same callback_id and kwargs as the last queued
@@ -503,7 +503,7 @@ class ManagerOperationStore:
         """
         self._pending.enqueue(operation)
 
-    def finalize(self, operation: Operation, result: OperationResult) -> None:
+    def finalize(self, operation: _Operation, result: OperationResult) -> None:
         """Move an in-progress operation to the completed queue.
 
         This should be called after the operation has been executed and its
@@ -528,7 +528,7 @@ class ManagerOperationStore:
         if not self._inprogress.move_operation(self._completed.prefix, operation):
             raise RollingOpsEtcdTransactionError('Failed to set the operation as completed.')
 
-    def peek_current(self) -> Operation | None:
+    def peek_current(self) -> _Operation | None:
         """Return the current in-progress operation without modifying state.
 
         Returns:

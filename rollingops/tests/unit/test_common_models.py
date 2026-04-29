@@ -22,14 +22,14 @@ import pytest
 
 from charmlibs.rollingops._common._exceptions import RollingOpsDecodingError
 from charmlibs.rollingops._common._models import (
-    Operation,
-    OperationQueue,
     OperationResult,
+    _Operation,
+    _OperationQueue,
 )
 
 
 def test_operation_create_sets_fields():
-    op = Operation.create('restart', {'b': 2, 'a': 1}, max_retry=3)
+    op = _Operation.create('restart', {'b': 2, 'a': 1}, max_retry=3)
 
     assert op.kwargs == {'b': 2, 'a': 1}
     assert op.callback_id == 'restart'
@@ -39,7 +39,7 @@ def test_operation_create_sets_fields():
 
 def test_operation_to_string():
     ts = datetime(2026, 2, 23, 12, 0, 0, 123456, tzinfo=UTC)
-    op = Operation(
+    op = _Operation(
         callback_id='cb',
         kwargs={'b': 2, 'a': 1},
         requested_at=ts,
@@ -63,7 +63,7 @@ def test_operation_to_string():
 
 def test_operation_to_string_zero_max_retry():
     ts = datetime(2026, 2, 23, 4, 0, 0, 123456, tzinfo=UTC)
-    op = Operation(
+    op = _Operation(
         callback_id='cb',
         kwargs={'b': 2, 'a': 1},
         requested_at=ts,
@@ -86,7 +86,7 @@ def test_operation_to_string_zero_max_retry():
 
 def test_operation_to_string_none_max_retry():
     ts = datetime(2026, 2, 23, 4, 0, 0, 123456, tzinfo=UTC)
-    op = Operation(
+    op = _Operation(
         callback_id='cb',
         kwargs={'b': 2, 'a': 1},
         requested_at=ts,
@@ -109,7 +109,7 @@ def test_operation_to_string_none_max_retry():
 
 
 def test_operation_is_max_retry_reached_on_zero_max_retry():
-    op = Operation.create('restart', {'a': 1, 'b': 2}, max_retry=0)
+    op = _Operation.create('restart', {'a': 1, 'b': 2}, max_retry=0)
     assert not op.is_max_retry_reached()
     op.increase_attempt()
     assert op.is_max_retry_reached()
@@ -117,31 +117,31 @@ def test_operation_is_max_retry_reached_on_zero_max_retry():
 
 def test_operation_equality_and_hash_ignore_timestamp_and_max_retry():
     # Equality only depends on (callback_id, kwargs)
-    op1 = Operation.create('restart', {'a': 1, 'b': 2}, max_retry=0)
-    op2 = Operation.create('restart', {'b': 2, 'a': 1}, max_retry=999)
+    op1 = _Operation.create('restart', {'a': 1, 'b': 2}, max_retry=0)
+    op2 = _Operation.create('restart', {'b': 2, 'a': 1}, max_retry=999)
 
     assert op1 == op2
     assert hash(op1) == hash(op2)
 
-    op3 = Operation.create('restart', {'a': 2}, max_retry=0)
+    op3 = _Operation.create('restart', {'a': 2}, max_retry=0)
     assert op1 != op3
 
 
 def test_operation_equality_and_hash_empty_arguments():
     # Equality only depends on (callback_id, kwargs)
-    op1 = Operation.create('restart', {}, max_retry=0)
-    op2 = Operation.create('restart', {}, max_retry=999)
+    op1 = _Operation.create('restart', {}, max_retry=0)
+    op2 = _Operation.create('restart', {}, max_retry=999)
 
     assert op1 == op2
     assert hash(op1) == hash(op2)
 
-    op3 = Operation.create('restart', {'a': 2}, max_retry=0)
+    op3 = _Operation.create('restart', {'a': 2}, max_retry=0)
     assert op1 != op3
 
 
 def test_operation_to_string_and_from_string():
     ts = datetime(2026, 2, 23, 12, 0, 0, 0, tzinfo=UTC)
-    op1 = Operation(
+    op1 = _Operation(
         callback_id='cb',
         kwargs={'x': 1, 'y': 'z'},
         requested_at=ts,
@@ -151,7 +151,7 @@ def test_operation_to_string_and_from_string():
     )
 
     s = op1.to_string()
-    op2 = Operation.from_string(s)
+    op2 = _Operation.from_string(s)
 
     assert op2.callback_id == op1.callback_id
     assert op2.kwargs == op1.kwargs
@@ -170,7 +170,7 @@ def test_operation_from_string_valid_payload():
         'attempt': '2',
     })
 
-    op = Operation.from_string(payload)
+    op = _Operation.from_string(payload)
 
     assert op is not None
     assert op.callback_id == 'cb-123'
@@ -188,7 +188,7 @@ def test_from_string_valid_payload_with_empty_kwargs_and_no_max_retry():
         'attempt': '0',
     })
 
-    op = Operation.from_string(payload)
+    op = _Operation.from_string(payload)
 
     assert op is not None
     assert op.callback_id == 'cb-123'
@@ -208,7 +208,7 @@ def test_from_string_valid_payload_with_empty_kwargs_and_0_max_retry():
         'attempt': '0',
     })
 
-    op = Operation.from_string(payload)
+    op = _Operation.from_string(payload)
 
     assert op is not None
     assert op.callback_id == 'cb-123'
@@ -280,12 +280,12 @@ def test_from_string_valid_payload_with_empty_kwargs_and_0_max_retry():
 )
 def test_operation_from_string_invalid_inputs_return_none(payload: Any):
     with pytest.raises(RollingOpsDecodingError, match='Failed to deserialize'):
-        Operation.from_string(payload)
+        _Operation.from_string(payload)
 
 
 def test_op_id_returns_timestamp_and_callback_id() -> None:
     requested_at = datetime(2025, 1, 2, 3, 4, 5)
-    operation = Operation(
+    operation = _Operation(
         callback_id='restart',
         kwargs={'delay': 2},
         requested_at=requested_at,
@@ -298,7 +298,7 @@ def test_op_id_returns_timestamp_and_callback_id() -> None:
 
 
 def test_complete_increments_attempt_and_sets_release() -> None:
-    operation = Operation(
+    operation = _Operation(
         callback_id='restart',
         kwargs={},
         requested_at=datetime(2025, 1, 1, 0, 0, 0),
@@ -314,7 +314,7 @@ def test_complete_increments_attempt_and_sets_release() -> None:
 
 
 def test_retry_hold_sets_retry_hold_when_max_retry_not_reached() -> None:
-    operation = Operation(
+    operation = _Operation(
         callback_id='restart',
         kwargs={},
         requested_at=datetime(2025, 1, 1, 0, 0, 0),
@@ -330,7 +330,7 @@ def test_retry_hold_sets_retry_hold_when_max_retry_not_reached() -> None:
 
 
 def test_retry_hold_sets_release_when_max_retry_reached() -> None:
-    operation = Operation(
+    operation = _Operation(
         callback_id='restart',
         kwargs={},
         requested_at=datetime(2025, 1, 1, 0, 0, 0),
@@ -346,7 +346,7 @@ def test_retry_hold_sets_release_when_max_retry_reached() -> None:
 
 
 def test_retry_release_sets_retry_release_when_max_retry_not_reached() -> None:
-    operation = Operation(
+    operation = _Operation(
         callback_id='restart',
         kwargs={},
         requested_at=datetime(2025, 1, 1, 0, 0, 0),
@@ -362,7 +362,7 @@ def test_retry_release_sets_retry_release_when_max_retry_not_reached() -> None:
 
 
 def test_retry_release_sets_release_when_max_retry_reached() -> None:
-    operation = Operation(
+    operation = _Operation(
         callback_id='restart',
         kwargs={},
         requested_at=datetime(2025, 1, 1, 0, 0, 0),
@@ -378,7 +378,7 @@ def test_retry_release_sets_release_when_max_retry_reached() -> None:
 
 
 def test_retry_hold_with_no_max_retry_sets_retry_hold() -> None:
-    operation = Operation(
+    operation = _Operation(
         callback_id='restart',
         kwargs={},
         requested_at=datetime(2025, 1, 1, 0, 0, 0),
@@ -394,7 +394,7 @@ def test_retry_hold_with_no_max_retry_sets_retry_hold() -> None:
 
 
 def test_retry_release_with_no_max_retry_sets_retry_release() -> None:
-    operation = Operation(
+    operation = _Operation(
         callback_id='restart',
         kwargs={},
         requested_at=datetime(2025, 1, 1, 0, 0, 0),
@@ -410,7 +410,7 @@ def test_retry_release_with_no_max_retry_sets_retry_release() -> None:
 
 
 def test_queue_empty_behaviour():
-    q = OperationQueue()
+    q = _OperationQueue()
 
     assert len(q) == 0
     assert q.empty is True
@@ -421,9 +421,9 @@ def test_queue_empty_behaviour():
 
 
 def test_queue_enqueue_and_fifo_order():
-    q = OperationQueue()
-    op1 = Operation.create('a', {'x': 2})
-    op2 = Operation.create('b', {'i': 2})
+    q = _OperationQueue()
+    op1 = _Operation.create('a', {'x': 2})
+    op2 = _Operation.create('b', {'i': 2})
     q.enqueue(op1)
     q.enqueue(op2)
 
@@ -447,10 +447,10 @@ def test_queue_enqueue_and_fifo_order():
 
 
 def test_queue_deduplicates_only_against_last_item():
-    q = OperationQueue()
-    op1 = Operation.create('a', {'x': 2})
-    op2 = Operation.create('a', {'x': 2})
-    op3 = Operation.create('a', {'x': 4})
+    q = _OperationQueue()
+    op1 = _Operation.create('a', {'x': 2})
+    op2 = _Operation.create('a', {'x': 2})
+    op3 = _Operation.create('a', {'x': 4})
 
     q.enqueue(op1)
     assert len(q) == 1
@@ -466,9 +466,9 @@ def test_queue_deduplicates_only_against_last_item():
 
 
 def test_queue_to_string_and_from_string():
-    q1 = OperationQueue()
+    q1 = _OperationQueue()
     ts1 = datetime(2026, 2, 23, 12, 0, 0, 123456, tzinfo=UTC)
-    op1 = Operation(
+    op1 = _Operation(
         callback_id='a',
         kwargs={'x': 1},
         requested_at=ts1,
@@ -477,7 +477,7 @@ def test_queue_to_string_and_from_string():
         result=None,
     )
     ts2 = datetime(2026, 2, 20, 12, 0, 0, 123456, tzinfo=UTC)
-    op2 = Operation(
+    op2 = _Operation(
         callback_id='b',
         kwargs={'y': 'z'},
         requested_at=ts2,
@@ -506,7 +506,7 @@ def test_queue_to_string_and_from_string():
 
     assert encoded == expected
 
-    q2 = OperationQueue.from_string(encoded)
+    q2 = _OperationQueue.from_string(encoded)
 
     assert len(q2) == 2
     op = q2.peek()
@@ -524,7 +524,7 @@ def test_queue_to_string_and_from_string():
 
 
 def test_queue_from_string_empty_string_is_empty_queue():
-    q = OperationQueue.from_string('')
+    q = _OperationQueue.from_string('')
     assert q.empty
     assert q.peek() is None
 
@@ -533,11 +533,11 @@ def test_queue_from_string_rejects_non_list_json():
     with pytest.raises(
         RollingOpsDecodingError, match='Failed to deserialize data to create an OperationQueue'
     ):
-        OperationQueue.from_string('{"not": "a list"}')
+        _OperationQueue.from_string('{"not": "a list"}')
 
 
 def test_queue_from_string_rejects_invalid_json():
     with pytest.raises(
         RollingOpsDecodingError, match='Failed to deserialize data to create an OperationQueue'
     ):
-        OperationQueue.from_string('{invalid')
+        _OperationQueue.from_string('{invalid')
