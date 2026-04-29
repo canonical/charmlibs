@@ -137,7 +137,7 @@ class OtlpRequirer:
         *,
         aggregator_peer_relation_name: str | None = None,
         rules: RuleStore | None = None,
-        extra_alert_labels: dict | None = None,
+        extra_alert_labels: dict[str, str] | None = None,
     ):
         self._charm = charm
         self._topology = JujuTopology.from_charm(charm)

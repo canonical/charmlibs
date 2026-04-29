@@ -224,7 +224,9 @@ def inject_generic_rules(
     return rules_copy
 
 
-def inject_extra_labels_into_rules(rules: RuleStore, extra_alert_labels: dict) -> RuleStore:
+def inject_extra_labels_into_rules(
+    rules: RuleStore, extra_alert_labels: dict[str, str]
+) -> RuleStore:
     """Return a copy of the rules dict with extra labels injected."""
     if not extra_alert_labels:
         return rules

@@ -140,12 +140,10 @@ def otlp_requirer_ctx(request: pytest.FixtureRequest) -> testing.Context[OtlpReq
         'requires': {'send-otlp': {'interface': 'otlp'}},
         'peers': {PEERS_ENDPOINT: {'interface': 'aggregator_peers'}},
     }
-    # We want to be able to test generic aggregator rules injection and the application rules
-    # injection case, which is toggled by an aggregator peer relation name input.
-    param = getattr(request, 'param', False)
+    param: dict[str, object] | bool = getattr(request, 'param', False)
     if isinstance(param, dict):
-        generic_aggregator_rules = param.get('aggregator', False)
-        extra_alert_labels = param.get('extra_alert_labels', {})
+        generic_aggregator_rules: bool = bool(param.get('aggregator', False))
+        extra_alert_labels: dict[str, str] = dict(param.get('extra_alert_labels', {}))  # type: ignore[arg-type]
     else:
         generic_aggregator_rules = param
         extra_alert_labels = {}
