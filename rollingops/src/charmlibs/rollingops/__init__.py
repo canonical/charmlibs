@@ -163,6 +163,36 @@ The relations can be added to the charm as follows::
         limit: 1
         optional: true
 
+Including etcdctl in your charm
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The etcd-backed functionality relies on the ``etcdctl`` binary being available
+inside the charm container/machine. This binary is not provided automatically
+and must be included as part of your charm build.
+
+You can add it in your ``charmcraft.yaml`` using a build part::
+
+    parts:
+      etcdctl:
+        plugin: make
+        source: https://git.launchpad.net/etcd
+        source-type: git
+        source-tag: lp-v3.6.10
+        build-snaps:
+          - go/latest/stable
+        override-build: |
+          set -eux
+          make build
+          install -Dm755 bin/etcdctl "${CRAFT_PART_INSTALL}/usr/bin/etcdctl"
+        prime:
+          - usr/bin/etcdctl
+
+This will make ``etcdctl`` available at runtime under ``<charm-dir>/usr/bin/etcdctl``
+inside the charm.
+
+Make sure the binary is present and executable, as it is required for
+communication with the etcd backend.
+
 Cluster identifier
 ^^^^^^^^^^^^^^^^^^
 
