@@ -68,9 +68,9 @@ unit = [
 
 [package.metadata]
 requires-dist = [
-    { name = "canonical-service-mesh" },
-    { name = "ops" },
-    { name = "pydantic", specifier = ">=2" },
+    { name = "canonical-service-mesh", specifier = "<1" },
+    { name = "ops", specifier = ">=2,<3" },
+    { name = "pydantic", specifier = ">=2,<3" },
 ]
 
 [package.metadata.requires-dev]
@@ -222,29 +222,30 @@ wheels = [
 
 [[package]]
 name = "opentelemetry-api"
-version = "1.41.0"
+version = "1.41.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "importlib-metadata" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/47/8e/3778a7e87801d994869a9396b9fc2a289e5f9be91ff54a27d41eace494b0/opentelemetry_api-1.41.0.tar.gz", hash = "sha256:9421d911326ec12dee8bc933f7839090cad7a3f13fcfb0f9e82f8174dc003c09", size = 71416, upload-time = "2026-04-09T14:38:34.544Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/fa/fc/b7564cbef36601aef0d6c9bc01f7badb64be8e862c2e1c3c5c3b43b53e4f/opentelemetry_api-1.41.1.tar.gz", hash = "sha256:0ad1814d73b875f84494387dae86ce0b12c68556331ce6ce8fe789197c949621", size = 71416, upload-time = "2026-04-24T13:15:38.262Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/58/ee/99ab786653b3bda9c37ade7e24a7b607a1b1f696063172768417539d876d/opentelemetry_api-1.41.0-py3-none-any.whl", hash = "sha256:0e77c806e6a89c9e4f8d372034622f3e1418a11bdbe1c80a50b3d3397ad0fa4f", size = 69007, upload-time = "2026-04-09T14:38:11.833Z" },
+    { url = "https://files.pythonhosted.org/packages/29/59/3e7118ed140f76b0982ba4321bdaed1997a0473f9720de2d10788a577033/opentelemetry_api-1.41.1-py3-none-any.whl", hash = "sha256:a22df900e75c76dc08440710e51f52f1aa6b451b429298896023e60db5b3139f", size = 69007, upload-time = "2026-04-24T13:15:15.662Z" },
 ]
 
 [[package]]
 name = "ops"
-version = "3.7.0"
+version = "2.23.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
+    { name = "importlib-metadata" },
     { name = "opentelemetry-api" },
     { name = "pyyaml" },
     { name = "websocket-client" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/7b/af/57895c8b7c23bf98e07d6306d24d2775a1e89fc2a4c8c1bd934dba3acdc2/ops-3.7.0.tar.gz", hash = "sha256:15f04b2fcf1d8bc966cd4405b68a2c71fa24c06f234d5003e89cc4f18ee51a45", size = 580141, upload-time = "2026-03-30T05:17:16.285Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/93/98/84789a5e15ad76e043301bbd70b4d39cffaa717ae6eecb662fd0dd0cc7af/ops-2.23.2.tar.gz", hash = "sha256:a69b0c5bc65ebd91720fc96459e81b969df851f3a6c9c855ee73de7004205987", size = 528074, upload-time = "2026-02-11T03:58:15.565Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/35/b0/19722b4b51696fbca41d3454f3dd3a73e89951303487b47280c6f3e277d4/ops-3.7.0-py3-none-any.whl", hash = "sha256:7050d5e629ac17de9d443e64f4ad09857e8012c9012c8ba66c9e765899d50bd1", size = 211865, upload-time = "2026-03-30T05:17:11.644Z" },
+    { url = "https://files.pythonhosted.org/packages/e0/00/65da7c96d0f9e13c4de3bdd2e3717259fe723ff4bd4e5dc714164f851032/ops-2.23.2-py3-none-any.whl", hash = "sha256:9cab0c6bc46eeff2e96777128200c3ef872b55641b12f07dc4fd6fe3103954be", size = 188415, upload-time = "2026-02-11T03:58:13.693Z" },
 ]
 
 [package.optional-dependencies]
@@ -254,16 +255,15 @@ testing = [
 
 [[package]]
 name = "ops-scenario"
-version = "8.7.0"
+version = "7.23.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "ops" },
     { name = "pyyaml" },
-    { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/59/38/389a21258f32ecb3513686de889cdea9b02753cfa7f2becff4cef7e6350f/ops_scenario-8.7.0.tar.gz", hash = "sha256:0f17bbcac19e31cd0a408542c517fb22cf532bda1dc4f6133e50bafae0901e41", size = 78410, upload-time = "2026-03-30T05:17:17.573Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ee/e7/1514b9c27b9364ec1d04791b0fb76d1a629c8cc73f90fbf6dd867457c914/ops_scenario-7.23.2.tar.gz", hash = "sha256:327dda8b3c871ccf16246ed4f8c7e093526af42093549976596cede58cbc8488", size = 70017, upload-time = "2026-02-11T03:58:16.553Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/7d/f1/f292922d8ff9273fbc51b42aedfcde30cc7d76b40fc620ed2421028fa854/ops_scenario-8.7.0-py3-none-any.whl", hash = "sha256:2245bf9127e2f455d05ee0e75345a86fa83cbd44aaa253320aeb0d68433e34de", size = 69231, upload-time = "2026-03-30T05:17:13.334Z" },
+    { url = "https://files.pythonhosted.org/packages/01/15/3b59993cad1b2838c9bb20f6f2ed5297fcf490025b1ffecc27d06be1daba/ops_scenario-7.23.2-py3-none-any.whl", hash = "sha256:024b638e0ea94e8f2e3c642d4f96031b0c7ac4f39117b97107dc9a09503651b4", size = 64328, upload-time = "2026-02-11T03:58:14.916Z" },
 ]
 
 [[package]]

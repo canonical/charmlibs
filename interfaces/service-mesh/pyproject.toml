@@ -15,9 +15,9 @@ classifiers = [
 ]
 dynamic = ["version"]
 dependencies = [
-    "ops",
-    "pydantic>=2",
-    "canonical-service-mesh",
+    "ops>=2,<3",
+    "pydantic>=2,<3",
+    "canonical-service-mesh<1",
 ]
 
 [dependency-groups]
