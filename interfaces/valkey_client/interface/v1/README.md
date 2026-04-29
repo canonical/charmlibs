@@ -1,8 +1,8 @@
-# `valkey_client/v0`
+# `valkey_client/v1`
 
 ## Usage
 
-This relation interface describes the expected behaviour of any charm interfacing with [Valkey Operator](https://github.com/canonical/valkey-operator) using the `valkey-client` relation.  
+This relation interface describes the expected behaviour of any charm interfacing with [Valkey Operator](https://github.com/canonical/valkey-operator) using the `valkey-client` relation.
 
 In most cases, this will be accomplished using the [data_interfaces library](https://pypi.org/project/dpcharmlibs-interfaces/), although charm developers are free to provide alternative libraries as long as they fulfil the behavioural and schematic requirements described in this document.
 
