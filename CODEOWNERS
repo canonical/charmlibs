@@ -221,6 +221,9 @@
 # /interfaces/sloth/
 /interfaces/sloth/ @canonical/tracing-and-profiling
 
+# /interfaces/service-mesh/
+/interfaces/service-mesh @canonical/service-mesh
+
 # /interfaces/smtp/
 /interfaces/smtp/interface/ @canonical/platform-engineering
 /interfaces/smtp/ruff.toml @canonical/platform-engineering
