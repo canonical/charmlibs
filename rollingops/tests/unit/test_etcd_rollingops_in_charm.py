@@ -352,30 +352,8 @@ def test_is_waiting_returns_true_when_matching_operation_exists(ctx: Context[Rol
     state = State(leader=False, relations={peer_rel})
 
     with ctx(ctx.on.update_status(), state) as mgr:
-        assert mgr.charm.restart_manager.is_waiting('restart', {'delay': 1}) is True
-
-
-def test_is_waiting_returns_false_when_callback_matches_but_kwargs_do_not(
-    ctx: Context[RollingOpsCharm],
-):
-    peer_rel = PeerRelation(
-        endpoint='restart',
-        interface='rollingops',
-        local_app_data={},
-        local_unit_data={
-            'state': 'request',
-            'operations': _OperationQueue([
-                _Operation.create('restart', {'delay': 1}),
-            ]).to_string(),
-            'executed_at': '',
-            'processing_backend': 'peer',
-            'etcd_cleanup_needed': 'false',
-        },
-    )
-    state = State(leader=False, relations={peer_rel})
-
-    with ctx(ctx.on.update_status(), state) as mgr:
-        assert mgr.charm.restart_manager.is_waiting('restart', {'delay': 2}) is False
+        assert mgr.charm.restart_manager.is_waiting_callback('restart') is True
+        assert mgr.charm.restart_manager.is_waiting() is True
 
 
 def test_is_waiting_returns_false_when_callback_does_not_match(ctx: Context[RollingOpsCharm]):
@@ -396,33 +374,11 @@ def test_is_waiting_returns_false_when_callback_does_not_match(ctx: Context[Roll
     state = State(leader=False, relations={peer_rel})
 
     with ctx(ctx.on.update_status(), state) as mgr:
-        assert mgr.charm.restart_manager.is_waiting('other-callback', {'delay': 1}) is False
+        assert mgr.charm.restart_manager.is_waiting_callback('other-callback') is False
+        assert mgr.charm.restart_manager.is_waiting() is True
 
 
-def test_is_waiting_returns_true_when_kwargs_is_none_and_matching_operation_has_empty_kwargs(
-    ctx: Context[RollingOpsCharm],
-):
-    peer_rel = PeerRelation(
-        endpoint='restart',
-        interface='rollingops',
-        local_app_data={},
-        local_unit_data={
-            'state': 'request',
-            'operations': _OperationQueue([
-                _Operation.create('restart', {}),
-            ]).to_string(),
-            'executed_at': '',
-            'processing_backend': 'peer',
-            'etcd_cleanup_needed': 'false',
-        },
-    )
-    state = State(leader=False, relations={peer_rel})
-
-    with ctx(ctx.on.update_status(), state) as mgr:
-        assert mgr.charm.restart_manager.is_waiting('restart') is True
-
-
-def test_is_waiting_returns_false_when_operation_validation_fails(ctx: Context[RollingOpsCharm]):
+def test_is_waiting_returns_false_when_no_operations(ctx: Context[RollingOpsCharm]):
     peer_rel = PeerRelation(
         endpoint='restart',
         interface='rollingops',
@@ -438,4 +394,5 @@ def test_is_waiting_returns_false_when_operation_validation_fails(ctx: Context[R
     state = State(leader=False, relations={peer_rel})
 
     with ctx(ctx.on.update_status(), state) as mgr:
-        assert mgr.charm.restart_manager.is_waiting('restart', 'a') is False  # type: ignore[reportArgumentType]
+        assert mgr.charm.restart_manager.is_waiting_callback('restart') is False
+        assert mgr.charm.restart_manager.is_waiting() is False

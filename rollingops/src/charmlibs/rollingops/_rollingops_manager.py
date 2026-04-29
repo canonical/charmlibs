@@ -20,7 +20,6 @@ from typing import Any
 
 from ops import CharmBase, Object, Relation, RelationBrokenEvent
 from ops.framework import EventBase
-from pydantic import ValidationError
 
 from charmlibs import pathops
 from charmlibs.rollingops._common._exceptions import (
@@ -486,8 +485,8 @@ class RollingOpsManager(Object):
             processing_backend=self._backend_state.backend,
         )
 
-    def is_waiting(self, callback_id: str, kwargs: dict[str, Any] | None = None) -> bool:
-        """Return whether the current unit has a pending operation matching callback and kwargs."""
+    def is_waiting_callback(self, callback_id: str) -> bool:
+        """Return whether the current unit has a pending operation matching callback."""
         if self._peer_relation is None:
             return False
 
@@ -497,14 +496,20 @@ class RollingOpsManager(Object):
             self.model.unit,
         ).queue.operations
 
-        kwargs = kwargs or {}
+        return any(op.callback_id == callback_id for op in operations)
 
-        try:
-            check_operation = _Operation.create(callback_id=callback_id, kwargs=kwargs)
-        except ValidationError:
+    def is_waiting(self) -> bool:
+        """Return whether the current unit has a pending operations."""
+        if self._peer_relation is None:
             return False
 
-        return any(op == check_operation for op in operations)
+        operations = PeerUnitOperations(
+            self.model,
+            self.peer_relation_name,
+            self.model.unit,
+        ).queue.operations
+
+        return bool(operations)
 
     def _on_update_status(self, event: EventBase) -> None:
         """Periodic reconciliation of rolling-ops state."""
