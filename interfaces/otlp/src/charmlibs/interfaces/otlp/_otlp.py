@@ -36,12 +36,7 @@ from pydantic import (
     field_validator,
 )
 
-from ._rules import (
-    RuleStore,
-    _RulesModel,
-    inject_extra_labels_to_alert_rules,
-    inject_generic_rules,
-)
+from ._rules import RuleStore, _RulesModel, inject_extra_labels_into_rules, inject_generic_rules
 
 DEFAULT_REQUIRER_RELATION_NAME = 'send-otlp'
 DEFAULT_PROVIDER_RELATION_NAME = 'receive-otlp'
@@ -196,13 +191,14 @@ class OtlpRequirer:
 
     def _handle_alert_rules(self) -> RuleStore:
         """Maintain the rule store with common alert rule operations."""
-        inject_generic_rules(
+        rule_store = inject_generic_rules(
             self._charm,
             self._rules,
             self._topology,
             self._aggregator_peer_relation_name,
         )
-        inject_extra_labels_to_alert_rules(self._rules, self._extra_alert_labels)
+        rule_store = inject_extra_labels_into_rules(rule_store, self._extra_alert_labels)
+        return rule_store
 
     def publish(self):
         """Triggers programmatically the update of the relation data.
@@ -215,7 +211,7 @@ class OtlpRequirer:
             # Only the leader unit can write to app data.
             return
 
-        self._handle_alert_rules()
+        self._rules = self._handle_alert_rules()
 
         # Publish to databag
         databag = _OtlpRequirerAppData.model_validate({
