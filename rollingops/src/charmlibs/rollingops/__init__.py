@@ -163,7 +163,6 @@ The relations can be added to the charm as follows::
         limit: 1
         optional: true
 
-
 Callback definition and registration
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -174,7 +173,7 @@ charm. Each identifier is used when requesting a lock and determines which
 callback will be executed once the lock is granted.
 
 Callbacks are invoked on the unit holding the lock and must follow this
-signature:
+signature::
 
     def <callback>(self, **kwargs) -> OperationResult
 

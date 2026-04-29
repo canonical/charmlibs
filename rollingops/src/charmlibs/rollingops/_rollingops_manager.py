@@ -108,10 +108,16 @@ class RollingOpsManager(Object):
         if base_dir is None:
             base_dir = pathops.LocalPath('/var/lib/rollingops')
 
-        if (etcd_relation_name and not cluster_id) or (not etcd_relation_name and cluster_id):
-            raise ValueError(
-                "'etcd_relation_name' and 'cluster_id' must either both be set (non-empty)"
-                ' or both be omitted.'
+        if cluster_id and not etcd_relation_name:
+            raise ValueError('cluster_id provided without etcd_relation_name.')
+
+        if not etcd_relation_name:
+            logger.debug('No etcd relation configured. Using peer backend only.')
+
+        elif not cluster_id:
+            logger.info(
+                'Etcd relation configured but no cluster_id yet. '
+                'Using peer backend until cluster_id provided.'
             )
 
         self._charm = charm
