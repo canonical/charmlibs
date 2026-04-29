@@ -113,7 +113,7 @@ def temp_certificates(tmp_path: Path) -> certificates.CertificateStore:
 @pytest.fixture
 def temp_etcdctl(tmp_path: Path) -> etcdctl.Etcdctl:
     path = pathops.LocalPath(str(tmp_path))
-    client = etcdctl.Etcdctl(path)
+    client = etcdctl.Etcdctl(path, path)
     client.base_dir.mkdir(parents=True, exist_ok=True)
     return client
 

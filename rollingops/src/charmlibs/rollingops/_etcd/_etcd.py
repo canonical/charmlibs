@@ -37,11 +37,11 @@ LOCK_LEASE_TTL = '60'
 class EtcdLease:
     """Manage the lifecycle of an etcd lease and its keep-alive process."""
 
-    def __init__(self, base_dir: pathops.LocalPath):
+    def __init__(self, base_dir: pathops.LocalPath, charm_dir: pathops.LocalPath):
         self.id: str | None = None
         self.keepalive_proc: subprocess.Popen[str] | None = None
         self._pipe_write_fd: int | None = None
-        self._etcdctl = Etcdctl(base_dir)
+        self._etcdctl = Etcdctl(base_dir, charm_dir)
 
     def grant(self) -> None:
         """Create a new lease and start the keep-alive process."""
@@ -156,10 +156,12 @@ class EtcdLock:
     automatically released if the owner stops refreshing the lease.
     """
 
-    def __init__(self, lock_key: str, owner: str, base_dir: pathops.LocalPath):
+    def __init__(
+        self, lock_key: str, owner: str, base_dir: pathops.LocalPath, charm_dir: pathops.LocalPath
+    ):
         self.lock_key = lock_key
         self.owner = owner
-        self._etcdctl = Etcdctl(base_dir)
+        self._etcdctl = Etcdctl(base_dir, charm_dir)
 
     def try_acquire(self, lease_id: str) -> bool:
         """Attempt to acquire the lock.
@@ -222,11 +224,18 @@ class EtcdOperationQueue:
     the value contains the serialized operation data.
     """
 
-    def __init__(self, prefix: str, lock_key: str, owner: str, base_dir: pathops.LocalPath):
+    def __init__(
+        self,
+        prefix: str,
+        lock_key: str,
+        owner: str,
+        base_dir: pathops.LocalPath,
+        charm_dir: pathops.LocalPath,
+    ):
         self.prefix = prefix
         self.lock_key = lock_key
         self.owner = owner
-        self._etcdctl = Etcdctl(base_dir)
+        self._etcdctl = Etcdctl(base_dir, charm_dir)
 
     def peek(self) -> _Operation | None:
         """Return the first operation in the queue without removing it."""
@@ -382,13 +391,21 @@ class WorkerOperationStore:
     - requeue or delete completed operations
     """
 
-    def __init__(self, keys: RollingOpsKeys, owner: str, base_dir: pathops.LocalPath):
-        self._pending = EtcdOperationQueue(keys.pending, keys.lock_key, owner, base_dir=base_dir)
+    def __init__(
+        self,
+        keys: RollingOpsKeys,
+        owner: str,
+        base_dir: pathops.LocalPath,
+        charm_dir: pathops.LocalPath,
+    ):
+        self._pending = EtcdOperationQueue(
+            keys.pending, keys.lock_key, owner, base_dir=base_dir, charm_dir=charm_dir
+        )
         self._inprogress = EtcdOperationQueue(
-            keys.inprogress, keys.lock_key, owner, base_dir=base_dir
+            keys.inprogress, keys.lock_key, owner, base_dir=base_dir, charm_dir=charm_dir
         )
         self._completed = EtcdOperationQueue(
-            keys.completed, keys.lock_key, owner, base_dir=base_dir
+            keys.completed, keys.lock_key, owner, base_dir=base_dir, charm_dir=charm_dir
         )
 
     def has_pending(self) -> bool:
@@ -483,13 +500,21 @@ class ManagerOperationStore:
     Queue transitions and storage details remain encapsulated behind this API.
     """
 
-    def __init__(self, keys: RollingOpsKeys, owner: str, base_dir: pathops.LocalPath):
-        self._pending = EtcdOperationQueue(keys.pending, keys.lock_key, owner, base_dir=base_dir)
+    def __init__(
+        self,
+        keys: RollingOpsKeys,
+        owner: str,
+        base_dir: pathops.LocalPath,
+        charm_dir: pathops.LocalPath,
+    ):
+        self._pending = EtcdOperationQueue(
+            keys.pending, keys.lock_key, owner, base_dir=base_dir, charm_dir=charm_dir
+        )
         self._inprogress = EtcdOperationQueue(
-            keys.inprogress, keys.lock_key, owner, base_dir=base_dir
+            keys.inprogress, keys.lock_key, owner, base_dir=base_dir, charm_dir=charm_dir
         )
         self._completed = EtcdOperationQueue(
-            keys.completed, keys.lock_key, owner, base_dir=base_dir
+            keys.completed, keys.lock_key, owner, base_dir=base_dir, charm_dir=charm_dir
         )
 
     def request(self, operation: _Operation) -> None:

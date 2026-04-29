@@ -204,7 +204,8 @@ class EtcdRequiresV1(Object):
         self.cluster_id = cluster_id
         self.shared_certificates = shared_certificates
         self.certificates_store = CertificateStore(base_dir)
-        self.etcdctl = Etcdctl(base_dir)
+        charm_dir = pathops.LocalPath(charm.charm_dir)
+        self.etcdctl = Etcdctl(base_dir, charm_dir)
 
         self.etcd_interface = ResourceRequirerEventHandler(
             self.charm,

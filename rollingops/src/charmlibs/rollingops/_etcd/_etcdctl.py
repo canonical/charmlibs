@@ -22,7 +22,6 @@ convenience functions for executing commands and retrieving structured results.
 import json
 import logging
 import os
-import shutil
 import subprocess
 from dataclasses import asdict
 
@@ -47,21 +46,22 @@ from charmlibs.rollingops._etcd._models import CERT_MODE, EtcdConfig, EtcdKV
 
 logger = logging.getLogger(__name__)
 
-ETCDCTL_CMD = 'etcdctl'
+ETCDCTL_CMD = 'usr/bin/etcdctl'
 ETCDCTL_TIMEOUT_SECONDS = 15
 ETCDCTL_RETRY_ATTEMPTS = 12
 ETCDCTL_RETRY_WAIT_SECONDS = 5
 
 
 class Etcdctl:
-    def __init__(self, base_dir: pathops.LocalPath):
+    def __init__(self, base_dir: pathops.LocalPath, charm_dir: pathops.LocalPath):
         self.base_dir = base_dir / 'etcd'
         self.server_ca_path = self.base_dir / 'server-ca.pem'
         self.config_file_path = self.base_dir / 'etcdctl.json'
+        self.etcdctl_path = charm_dir / ETCDCTL_CMD
 
     def is_etcdctl_installed(self) -> bool:
-        """Return whether the snap-provided etcdctl command is available."""
-        return shutil.which(ETCDCTL_CMD) is not None
+        """Return whether the charm-shipped etcdctl binary is available."""
+        return self.etcdctl_path.exists() and self.etcdctl_path.is_file()
 
     def write_trusted_server_ca(self, tls_ca_pem: str) -> None:
         """Persist the etcd server CA certificate to disk.
