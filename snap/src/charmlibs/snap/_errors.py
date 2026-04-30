@@ -72,6 +72,10 @@ class SnapAlreadyInstalledError(SnapError):
     """Raised via the API when an install is attempted for a snap that is already installed."""
 
 
+class SnapAppNotFoundError(SnapError):
+    """Raised via the API when a specified app is not found within an installed snap."""
+
+
 class SnapNotFoundError(SnapError):
     """Raised when a snap is not found, either in the store or as an installed snap."""
 
@@ -103,6 +107,8 @@ def _error_type_from_result_kind(kind: str) -> type[SnapError]:  # pyright: igno
     match kind:
         case 'snap-already-installed':
             return SnapAlreadyInstalledError
+        case 'app-not-found':
+            return SnapAppNotFoundError
         case 'option-not-found':
             return SnapOptionNotFoundError
         case 'snap-needs-classic':

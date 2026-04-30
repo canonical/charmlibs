@@ -41,18 +41,18 @@ def ensure(
     # Install if the snap is not already installed.
     info = _snapd.info(snap, missing_ok=True)
     if info is None:
-        logger.debug('ensure:Snap %r is not installed: installing ...', snap)
+        logger.debug('ensure: Snap %r is not installed: installing ...', snap)
         _snapd.install(snap, channel=channel, revision=revision, classic=classic)
         return True
-    # Refresh if the snap installed with a different channel or revision than requested.
+    # Refresh if the snap is installed with a different channel or revision than requested.
     different_channel = channel is not None and info.channel != _utils._normalize_channel(channel)
     different_revision = revision is not None and info.revision != revision
     if different_channel or different_revision:
-        msg = 'ensure:Snap %r is installed with channel=%r and revision=%d but requested (channel=%r, revision=%r): refreshing ...'  # noqa: E501
+        msg = 'ensure: Snap %r is installed with channel=%r and revision=%d but requested (channel=%r, revision=%r): refreshing ...'  # noqa: E501
         logger.debug(msg, snap, info.channel, info.revision, channel, revision)
         _snapd.refresh(snap, channel=channel, revision=revision)
         return True
     # Return False if no operations were performed.
-    msg = 'ensure:Snap %r is already installed with classic=%s, channel=%r and revision=%d'
+    msg = 'ensure: Snap %r is already installed with classic=%s, channel=%r and revision=%d'
     logger.debug(msg, snap, info.classic, info.channel, info.revision)
     return False

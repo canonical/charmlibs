@@ -33,23 +33,49 @@ def ensure_removed(*snaps: str):
 
 
 def test_snap_install():
-    ensure_removed('juju')
-    assert not get_command_path('juju')
-    snap.install('juju')
-    assert get_command_path('juju') == '/snap/bin/juju'
+    # GIVEN a snap is not installed
+    ensure_removed('hello-world')
+    assert not get_command_path('hello-world')
+    assert snap.info('hello-world', missing_ok=True) is None
+    # WHEN we run snap.install
+    snap.install('hello-world')
+    # THEN the snap is installed
+    assert get_command_path('hello-world') == '/snap/bin/hello-world'
+    assert snap.info('hello-world').name == 'hello-world'
 
 
 def test_snap_remove():
-    snap.ensure('charmcraft', classic=True)
-    assert get_command_path('charmcraft') == '/snap/bin/charmcraft'
-    snap.remove('charmcraft')
-    assert get_command_path('charmcraft') == ''
+    # GIVEN a snap is installed
+    snap.ensure('hello-world')
+    assert snap.info('hello-world').name == 'hello-world'
+    assert get_command_path('hello-world') == '/snap/bin/hello-world'
+    # WHEN we run snap.remove
+    snap.remove('hello-world')
+    # THEN the snap is removed
+    assert not get_command_path('hello-world')
+    assert snap.info('hello-world', missing_ok=True) is None
+
+
+def test_snap_refresh_no_change():
+    # GIVEN a snap is installed and up to date
+    snap.ensure('hello-world')
+    info = snap.info('hello-world')
+    assert info.channel == 'latest/stable'
+    # WHEN we run snap.refresh with the same channel
+    snap.refresh('hello-world', channel=info.channel)
+    # THEN the snap remains at the same revision
+    new_info = snap.info('hello-world')
+    assert new_info.channel == info.channel
+    assert new_info.revision == info.revision
 
 
 def test_snap_refresh():
+    # GIVEN a snap is installed
     snap.ensure('hello-world', channel='latest/stable')
     assert snap.info('hello-world').channel == 'latest/stable'
+    # WHEN we run snap.refresh with a different channel
     snap.refresh('hello-world', channel='latest/candidate')
+    # THEN the snap is refreshed to the new channel
     assert snap.info('hello-world').channel == 'latest/candidate'
 
 
@@ -117,25 +143,28 @@ def test_snap_ensure():
     did_something = snap.ensure('charmcraft', classic=True)
     assert did_something
     assert snap.info('charmcraft').channel == 'latest/stable'
-    with pytest.raises(ValueError):
-        # No changes because classic confinement was wrong.
-        snap.ensure('charmcraft')  # classic=False by default
-    # We're still installed as requested.
+    # Although the confinement is wrong, no change is needed, so we do nothing.
+    did_something = snap.ensure('charmcraft', classic=False)
+    assert not did_something
+    # We're still installed as requested, with clasic confinment.
+    assert snap.info('charmcraft').classic is True
     did_something = snap.ensure('charmcraft', classic=True)
     assert not did_something
     # We installed latest/stable by default.
     did_something = snap.ensure('charmcraft', classic=True, channel='latest/stable')
     assert not did_something
     assert snap.info('charmcraft').channel == 'latest/stable'
+    # We normalize the channel name, following the snapd CLI.
     did_something = snap.ensure('charmcraft', classic=True, channel='latest')
     assert not did_something
     assert snap.info('charmcraft').channel == 'latest/stable'
     did_something = snap.ensure('charmcraft', classic=True, channel='stable')
     assert not did_something
     assert snap.info('charmcraft').channel == 'latest/stable'
+    # If we use a different channel, we'll refresh to it.
     did_something = snap.ensure('charmcraft', classic=True, channel='beta')
     assert did_something
-    assert snap.info('charmcraft').channel == 'beta'
+    assert snap.info('charmcraft').channel == 'latest/beta'
 
 
 def test_new_snap_ensure():
@@ -143,50 +172,64 @@ def test_new_snap_ensure():
 
 
 def test_snap_ensure_revision():
-    if snap.info('juju', missing_ok=True) is not None:
-        snap.remove('juju')
+    snap.ensure('hello-world')
+    original_revision = snap.info('hello-world').revision
 
-    channels = snap._snapd._list_channels('juju')
-    info = channels['3/stable']
-    snap.install('juju', revision=info.revision)
-
-    assert get_command_path('juju') == '/snap/bin/juju'
-
-    info = snap.info('juju')
-    assert info.revision == info.revision
+    revision = original_revision - 1
+    snap.ensure('hello-world', revision=revision)
+    assert snap.info('hello-world').revision == revision
 
 
 def test_snap_start():
-    ensure_removed('kube-proxy')
+    # GIVEN an installed snap with an inactive service
     snap.ensure('kube-proxy', classic=True, channel='latest/stable')
-    services = snap._snapd_apps._list_services('kube-proxy')
-    assert services
-    daemon = next(s for s in services if s['name'] == 'daemon')
-    assert daemon.get('active')
-
     snap.stop('kube-proxy', 'daemon')
     services = snap._snapd_apps._list_services('kube-proxy')
     assert services
     daemon = next(s for s in services if s['name'] == 'daemon')
-    assert not daemon.get('active')
-
+    assert 'active' not in daemon
+    # WHEN we run snap.start
     snap.start('kube-proxy', 'daemon')
+    # THEN the service is active
     services = snap._snapd_apps._list_services('kube-proxy')
     assert services
     daemon = next(s for s in services if s['name'] == 'daemon')
     assert daemon['active']
 
-    with pytest.raises(snap.SnapError):
-        snap.start('kube-proxy', 'foobar')
+
+def test_snap_start_nonexistent_service():
+    # GIVEN an installed snap
+    snap.ensure('hello-world')
+    # WHEN we run snap.start with a non-existent service
+    # THEN we get an appropriate error
+    with pytest.raises(snap.SnapAppNotFoundError):
+        snap.start('hello-world', 'foobar')
 
 
 def test_snap_stop():
+    # GIVEN a snap with active services
     snap.ensure('kube-proxy', classic=True, channel='latest/stable')
+    snap.start('kube-proxy', 'daemon')
+    services = snap._snapd_apps._list_services('kube-proxy')
+    assert services
+    daemon = next(s for s in services if s['name'] == 'daemon')
+    assert daemon['active']
+    # WHEN we run snap.stop with disable=True
     snap.stop('kube-proxy', 'daemon', disable=True)
+    # THEN the service is stopped and disabled
     services = snap._snapd_apps._list_services('kube-proxy')
     daemon = next(s for s in services if s['name'] == 'daemon')
-    assert not daemon.get('active')
-    assert not daemon.get('enabled')
+    assert 'active' not in daemon
+    assert 'enabled' not in daemon
+
+
+def test_snap_stop_nonexistent_service():
+    # GIVEN an installed snap
+    snap.ensure('hello-world')
+    # WHEN we run snap.stop with a non-existent service
+    # THEN we get an appropriate error
+    with pytest.raises(snap.SnapAppNotFoundError):
+        snap.stop('hello-world', 'foobar')
 
 
 def test_snap_logs():
@@ -222,8 +265,7 @@ def test_snap_hold_refresh():
     snap.hold('hello-world', duration=datetime.timedelta(days=2))
     info = snap.info('hello-world')
     assert info.hold is not None
-    hold = snap._snapd_logs._parse_timestamp(info.hold)
-    assert hold - datetime.datetime.now().astimezone() > datetime.timedelta(days=1)
+    assert info.hold - datetime.datetime.now().astimezone() > datetime.timedelta(days=1)
 
 
 def test_snap_unhold_refresh():

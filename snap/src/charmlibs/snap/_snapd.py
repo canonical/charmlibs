@@ -167,7 +167,7 @@ def refresh(snap: str, channel: str | None = None, revision: int | None = None) 
         SnapError: (or a subtype) if the snap could not be refreshed as requested.
     """
     if channel is not None and revision is not None:
-        # Note: If we passed both, revision would silently take precedence over channel.
+        # NOTE: If we passed both then revision would silently take precedence over channel.
         raise ValueError('Only one of channel or revision may be specified')
     data = {'action': 'refresh'}
     if channel:
