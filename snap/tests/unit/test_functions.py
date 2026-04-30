@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from charmlibs.snap import _functions, _snapd
-from charmlibs.snap._functions import _normalize_channel
+from charmlibs.snap._utils import _normalize_channel
 
 if TYPE_CHECKING:
     from unittest.mock import MagicMock

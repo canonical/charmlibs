@@ -84,12 +84,14 @@ from ._snapd_interfaces import (
     disconnect,
 )
 from ._snapd_logs import (
+    LogEntry,
     logs,
 )
 from ._version import __version__ as __version__
 
 __all__ = [
     'Info',
+    'LogEntry',
     'SnapAPIError',
     'SnapAlreadyInstalledError',
     'SnapChangeError',

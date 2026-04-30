@@ -5,7 +5,7 @@
 
 import datetime
 import logging
-from subprocess import CalledProcessError, check_output
+import subprocess
 
 import pytest
 
@@ -21,12 +21,20 @@ snap_logger.addHandler(handler)
 
 def get_command_path(command: str) -> str:
     try:
-        return check_output(['which', command]).decode().strip()
-    except CalledProcessError:
+        return subprocess.check_output(['which', command]).decode().strip()
+    except subprocess.CalledProcessError:
         return ''
 
 
+def ensure_removed(*snaps: str):
+    for snap_name in snaps:
+        if snap.info(snap_name, missing_ok=True) is not None:
+            snap.remove(snap_name)
+
+
 def test_snap_install():
+    ensure_removed('juju')
+    assert not get_command_path('juju')
     snap.install('juju')
     assert get_command_path('juju') == '/snap/bin/juju'
 
@@ -41,96 +49,93 @@ def test_snap_remove():
 def test_snap_refresh():
     snap.ensure('hello-world', channel='latest/stable')
     assert snap.info('hello-world').channel == 'latest/stable'
-
-    snap.ensure('hello-world', channel='latest/candidate')
+    snap.refresh('hello-world', channel='latest/candidate')
     assert snap.info('hello-world').channel == 'latest/candidate'
 
 
-def test_snap_set_and_get_with_typed():
-    configs = {
+def test_snap_set_and_get():
+    simple_types = {
         'true': True,
         'false': False,
         'null': None,
         'integer': 1,
         'float': 2.0,
-        'list': [1, 2.0, True, False, None],
-        'dict': {
-            'true': True,
-            'false': False,
-            'null': None,
-            'integer': 1,
-            'float': 2.0,
-            'list': [1, 2.0, True, False, None],
-        },
-        'criu.enable': 'true',
-        'ceph.external': 'false',
+        'string': 'true',
     }
+    list_value = list(simple_types.values())
+    dict_value = {**simple_types, 'list': list_value, 'dict': {'hello': 'world'}}
+    config_to_set = {**simple_types, 'list': list_value, 'dict': dict_value}
 
-    snap.ensure('lxd')
-    snap.set('lxd', configs)
+    snap_name = 'lxd'
+    snap.ensure(snap_name)
+    snap.set(snap_name, config_to_set)
 
-    lxd = snap.get('lxd')
-    assert lxd
+    # Test the full config retrieval.
+    snap_config = snap.get(snap_name)
+    assert snap_config
+    assert snap_config.get('true') is True
+    assert snap_config.get('false') is False
+    assert 'null' not in snap_config
+    assert snap_config['integer'] == 1
+    assert snap_config['float'] == 2.0
+    assert snap_config['string'] == 'true'
+    assert snap_config['list'] == list_value
+    assert {**snap_config['dict'], 'null': None} == dict_value
 
-    assert lxd.get('true') is True
-    assert lxd.get('false') is False
-    assert 'null' not in lxd
-    assert lxd['integer'] == 1
-    assert lxd['float'] == 2.0
-    assert lxd['list'] == [1, 2.0, True, False, None]
-
-    # Note that `"null": None` will be missing here because `key=null` will not
-    # be set (because it means unset in snap). However, `key=[null]` will be
-    # okay, and that's why `None` exists in "list".
-    assert lxd['dict'] == {
-        'true': True,
-        'false': False,
-        'integer': 1,
-        'float': 2.0,
-        'list': [1, 2.0, True, False, None],
-    }
-
-    assert snap._snapd_conf._get_one('lxd', 'dict.true') is True
-    assert snap._snapd_conf._get_one('lxd', 'dict.false') is False
-    with pytest.raises(snap.SnapError):
-        snap._snapd_conf._get_one('lxd', 'dict.null')
-    assert snap._snapd_conf._get_one('lxd', 'dict.integer') == 1
-    assert snap._snapd_conf._get_one('lxd', 'dict.float') == 2.0
-    assert snap._snapd_conf._get_one('lxd', 'dict.list') == [1, 2.0, True, False, None]
-
-    assert snap._snapd_conf._get_one('lxd', 'criu.enable') == 'true'
-    assert snap._snapd_conf._get_one('lxd', 'ceph.external') == 'false'
+    # Null values in containers will be preserved, but a top-level null means unset.
+    with pytest.raises(snap.SnapOptionNotFoundError):
+        snap.get(snap_name, 'dict.null')
+    # Test retrieval of specific keys.
+    snap_config_subset = snap.get(snap_name, 'true', 'integer', 'dict.dict')
+    assert snap_config_subset['true'] is True
+    assert snap_config_subset['integer'] == 1
+    assert snap_config_subset['dict.dict'] == {'hello': 'world'}
+    # Test retrieval of individual nested keys.
+    assert snap._snapd_conf._get_one(snap_name, 'dict.true') is True
+    assert snap._snapd_conf._get_one(snap_name, 'dict.false') is False
+    assert snap._snapd_conf._get_one(snap_name, 'dict.integer') == 1
+    assert snap._snapd_conf._get_one(snap_name, 'dict.float') == 2.0
+    assert snap._snapd_conf._get_one(snap_name, 'dict.list') == list_value
+    assert snap._snapd_conf._get_one(snap_name, 'dict.dict') == {'hello': 'world'}
+    assert snap._snapd_conf._get_one(snap_name, 'dict.dict.hello') == 'world'
 
 
 def test_unset_key_raises_snap_error():
     snap.ensure('lxd')
     # Verify that the correct exception gets raised in the case of an unset key.
-    key = 'keythatdoesntexist01'
-    with pytest.raises(snap.SnapError) as ctx:
+    key = 'keythatshouldntexist01'
+    snap.unset('lxd', key)  # Succeeds regardless of whether the key exists or not.
+    with pytest.raises(snap.SnapOptionNotFoundError) as ctx:
         snap.get('lxd', key)
     assert key in ctx.value.message
-
-    # FIXME: We should probably continue to offer this functionality as it was requested recently.
-    # but I don't think we should be including the latest logs in the error message by default,
-    # since it can be very expensive to retrieve them and is not usually relevant to the error.
-    # Maybe we could use an env var, require an option, or have a separate method
-    # for retrieving logs explicitly that charms can use in error cases.
-
-    # assert '\nLatest logs:\n' in ctx.value.message  # journalctl log retrieval on SnapError
-
-    # We can make the above work w/ arbitrary config.
     snap.set('lxd', {key: 'true'})
     assert snap._snapd_conf._get_one('lxd', key) == 'true'
 
 
 def test_snap_ensure():
-    snap.ensure('charmcraft', classic=True)
+    ensure_removed('charmcraft')
     did_something = snap.ensure('charmcraft', classic=True)
-    assert not did_something
+    assert did_something
+    assert snap.info('charmcraft').channel == 'latest/stable'
     with pytest.raises(ValueError):
-        snap.ensure('charmcraft')  # classic=False
+        # No changes because classic confinement was wrong.
+        snap.ensure('charmcraft')  # classic=False by default
+    # We're still installed as requested.
     did_something = snap.ensure('charmcraft', classic=True)
     assert not did_something
+    # We installed latest/stable by default.
+    did_something = snap.ensure('charmcraft', classic=True, channel='latest/stable')
+    assert not did_something
+    assert snap.info('charmcraft').channel == 'latest/stable'
+    did_something = snap.ensure('charmcraft', classic=True, channel='latest')
+    assert not did_something
+    assert snap.info('charmcraft').channel == 'latest/stable'
+    did_something = snap.ensure('charmcraft', classic=True, channel='stable')
+    assert not did_something
+    assert snap.info('charmcraft').channel == 'latest/stable'
+    did_something = snap.ensure('charmcraft', classic=True, channel='beta')
+    assert did_something
+    assert snap.info('charmcraft').channel == 'beta'
 
 
 def test_new_snap_ensure():
@@ -152,6 +157,7 @@ def test_snap_ensure_revision():
 
 
 def test_snap_start():
+    ensure_removed('kube-proxy')
     snap.ensure('kube-proxy', classic=True, channel='latest/stable')
     services = snap._snapd_apps._list_services('kube-proxy')
     assert services
@@ -252,7 +258,6 @@ def test_snap_connect_and_disconnect():
 def test_alias():
     snap.ensure('lxd')
     snap.alias('lxd', 'lxc', 'testlxc')
-
-    result = check_output(['snap', 'aliases'], text=True)
+    result = subprocess.check_output(['snap', 'aliases'], text=True)
     found = any(line.split() == ['lxd.lxc', 'testlxc', 'manual'] for line in result.splitlines())
     assert found, result

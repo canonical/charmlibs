@@ -12,9 +12,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from charmlibs.snap import _snapd_logs
-from charmlibs.snap._errors import SnapError
-from charmlibs.snap._snapd_logs import LogEntry, _parse_timestamp
+from charmlibs.snap import _snapd_logs, SnapError, LogEntry
+from charmlibs.snap._utils import _parse_timestamp
 from conftest import result_of
 
 if TYPE_CHECKING:

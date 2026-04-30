@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 # /v2/snaps/{snap}/conf
 
 
-def get(snap: str, *keys: str) -> dict[str, Any]:
+def get(snap: str, /, *keys: str) -> dict[str, Any]:
     """Get snap configuration."""
     params = {'keys': ','.join(keys)} if keys else None
     config = _client.get(f'/v2/snaps/{snap}/conf', query=params)
@@ -35,18 +35,23 @@ def get(snap: str, *keys: str) -> dict[str, Any]:
     return config
 
 
-def _get_one(snap: str, key: str) -> Any:  # pyright: ignore[reportUnusedFunction]
+def _get_one(snap: str, key: str, /) -> Any:  # pyright: ignore[reportUnusedFunction]
     """Get a single snap configuration key."""
     config = get(snap, key)
     return config[key]
 
 
-def unset(snap: str, key: str, *keys: str) -> None:
+def unset(snap: str, key: str, /, *keys: str) -> None:
     """Unset snap configuration keys."""
     _client.put(f'/v2/snaps/{snap}/conf', body=dict.fromkeys((key, *keys)))
 
 
+def _unset_all(snap: str) -> None:  # pyright: ignore[reportUnusedFunction]
+    """Unset all snap configuration keys."""
+    _client.put(f'/v2/snaps/{snap}/conf', body={})
+
+
 # Defined last to minimise the chance of meaningfully shadowing the built-in set type.
-def set(snap: str, config: dict[str, Any]) -> None:  # noqa: A001 (shadowing a Python builtin)
+def set(snap: str, config: dict[str, Any], /) -> None:  # noqa: A001 (shadowing a Python builtin)
     """Set snap configuration."""
     _client.put(f'/v2/snaps/{snap}/conf', body=config)

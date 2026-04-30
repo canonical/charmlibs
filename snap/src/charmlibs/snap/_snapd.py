@@ -16,13 +16,12 @@
 
 from __future__ import annotations
 
-import dataclasses
 import datetime
 import logging
 import typing
 from typing import Any, Literal
 
-from . import _client, _errors
+from . import _client, _errors, _utils
 
 if typing.TYPE_CHECKING:
     from typing_extensions import Self
@@ -33,28 +32,57 @@ logger = logging.getLogger(__name__)
 # /v2/snaps/{snap}
 
 
-@dataclasses.dataclass
 class Info:
-    name: str
-    classic: bool
-    channel: str
-    revision: int
-    version: str
-    hold: str | None
+    def __init__(
+        self,
+        name: str,
+        classic: bool,
+        channel: str,
+        revision: int,
+        version: str,
+        hold: datetime.datetime | str | None,
+    ):
+        self._name = name
+        self._classic = classic
+        self._channel = _utils._normalize_channel(channel)
+        self._revision = revision
+        self._version = version
+        self._hold = _utils._parse_timestamp(hold) if isinstance(hold, str) else hold
 
     @classmethod
-    def _from_dict(cls, info_dict: dict[str, Any]) -> Self:
+    def _from_dict(cls, info_dict: dict[str, str]) -> Self:
         return cls(
             name=info_dict['name'],
             channel=info_dict['channel'],
             revision=int(info_dict['revision']),
             version=info_dict['version'],
             classic=info_dict['confinement'] == 'classic',
-            # TODO: should we convert hold to a datetime.datetime?
-            # see the functional tests for the code that would be involved
-            # depends on both the Python version and the snapd version
             hold=info_dict.get('hold'),
         )
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def classic(self) -> bool:
+        return self._classic
+
+    @property
+    def channel(self) -> str:
+        return self._channel
+
+    @property
+    def revision(self) -> int:
+        return self._revision
+
+    @property
+    def version(self) -> str:
+        return self._version
+
+    @property
+    def hold(self) -> datetime.datetime | None:
+        return self._hold
 
 
 @typing.overload
@@ -113,6 +141,7 @@ def install(
         data['revision'] = str(revision)
     if classic:
         data['classic'] = True
+    # NOTE: Unlike the API, the CLI doesn't error if it's already installed (just prints a msg).
     _client.post(f'/v2/snaps/{snap}', body=data)
 
 
@@ -126,6 +155,7 @@ def remove(snap: str, *, purge: bool = False) -> None:
     data: dict[str, Any] = {'action': 'remove'}
     if purge:
         data['purge'] = True
+    # NOTE: Unlike the API, the CLI doesn't error if the snap isn't installed (just prints a msg).
     _client.post(f'/v2/snaps/{snap}', body=data)
 
 
@@ -144,6 +174,7 @@ def refresh(snap: str, channel: str | None = None, revision: int | None = None) 
         data['channel'] = channel
     if revision:
         data['revision'] = str(revision)
+    # NOTE: Unlike the API, the CLI doesn't error if there are no updates (just prints a msg).
     try:
         _client.post(f'/v2/snaps/{snap}', body=data)
     except _errors._SnapNoUpdatesAvailableError:

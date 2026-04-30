@@ -69,8 +69,7 @@ class TestInfoFromDict:
 
     def test_hold_present(self):
         info = _snapd.Info._from_dict(result_of('snap_info_hello_world_held.json'))
-        assert info.hold is not None
-        assert '2318' in info.hold
+        assert info.hold.year == 2318
 
     def test_hold_absent(self):
         info = _snapd.Info._from_dict(_minimal_info_dict())

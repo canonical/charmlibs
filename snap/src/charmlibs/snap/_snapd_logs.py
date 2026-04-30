@@ -19,10 +19,10 @@ from __future__ import annotations
 import dataclasses
 import datetime
 import logging
-import sys
 from typing import Any
 
 from . import _client
+from . import _utils
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +56,7 @@ def logs(*snaps: str, num_lines: int = 10) -> list[LogEntry]:
     for obj in result:
         try:
             log_entry = LogEntry(
-                timestamp=_parse_timestamp(obj['timestamp']),
+                timestamp=_utils._parse_timestamp(obj['timestamp']),
                 message=obj['message'],
                 sid=obj['sid'],
                 pid=int(obj['pid']),
@@ -65,23 +65,3 @@ def logs(*snaps: str, num_lines: int = 10) -> list[LogEntry]:
         except (KeyError, TypeError, ValueError) as e:  # noqa: PERF203
             logger.warning('Skipping log entry with unexpected format: %r (error: %r)', obj, e)
     return log_entries
-
-
-def _parse_timestamp(timestamp: str) -> datetime.datetime:
-    if sys.version_info >= (3, 11):
-        return datetime.datetime.fromisoformat(timestamp)
-    # Python 3.10 can't parse the fractional seconds with fromisoformat.
-    # We parse the format manually here for Ubuntu 22.04 based charms.
-    #
-    # The snapd version that comes with Ubuntu 22.04 emits Z-suffixed timestamps, e.g.
-    # 2026-02-27T03:01:19.488008Z
-    #
-    # Note: Newer snapd versions emit RFC3339 timestamps with timezone offsets, but we don't
-    # need to handle them here since they're covered by fromisoformat in Python 3.11+.
-    dt, ms = timestamp.removesuffix('Z').split('.')
-    base = datetime.datetime.fromisoformat(dt).replace(tzinfo=datetime.timezone.utc)
-    # datetime.timedelta only supports microsecond precision (first 6 digits of fractional secs).
-    # Snapd timestamps may have higher precision (truncated) or fewer than 6 digits (right-padded
-    # with zeros). E.g. '.13454' is 134540 μs, not 13454 μs. This matches fromisoformat in 3.11+.
-    microseconds = datetime.timedelta(microseconds=int(ms[:6].ljust(6, '0')))
-    return base + microseconds

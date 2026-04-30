@@ -16,7 +16,7 @@
 
 import logging
 
-from . import _snapd
+from . import _snapd, _utils
 
 logger = logging.getLogger(__name__)
 
@@ -44,10 +44,8 @@ def ensure(
         logger.debug('ensure:Snap %r is not installed: installing ...', snap)
         _snapd.install(snap, channel=channel, revision=revision, classic=classic)
         return True
-    # Refresh is the snap installed with a different channel or revision than requested.
-    different_channel = channel is not None and (
-        _normalize_channel(info.channel) != _normalize_channel(channel)
-    )
+    # Refresh if the snap installed with a different channel or revision than requested.
+    different_channel = channel is not None and info.channel != _utils._normalize_channel(channel)
     different_revision = revision is not None and info.revision != revision
     if different_channel or different_revision:
         msg = 'ensure:Snap %r is installed with channel=%r and revision=%d but requested (channel=%r, revision=%r): refreshing ...'  # noqa: E501
@@ -58,19 +56,3 @@ def ensure(
     msg = 'ensure:Snap %r is already installed with classic=%s, channel=%r and revision=%d'
     logger.debug(msg, snap, info.classic, info.channel, info.revision)
     return False
-
-
-def _normalize_channel(channel: str) -> str:
-    """Normalize a snap channel string to the form "track/risk".
-
-    Channels may be specified as track or risk only, or as "track/risk" or "track/risk/branch".
-    Snapd uses default values internally, but will record the *requested* value in the snap info.
-    This function normalizes channels with no "/" to the form "track/risk" for easier comparison.
-    """
-    if '/' not in channel:
-        if channel not in ('edge', 'beta', 'candidate', 'stable'):
-            # track only, append default risk
-            return f'{channel}/stable'
-        # risk only, prepend default track
-        return f'latest/{channel}'
-    return channel
