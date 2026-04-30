@@ -185,7 +185,7 @@ def inject_generic_rules(
     rules: RuleStore,
     topology: JujuTopology,
     aggregator_peer_relation_name: str | None = None,
-) -> None:
+) -> RuleStore:
     """Inject generic rules into the charm's RuleStore.
 
     Args:
@@ -196,6 +196,7 @@ def inject_generic_rules(
             charm. When provided, generic aggregator rules are used instead
             of application-level rules.
     """
+    rules_copy = copy.deepcopy(rules)
     if aggregator_peer_relation_name:
         if not (peer_relations := charm.model.get_relation(aggregator_peer_relation_name)):
             logger.warning(
@@ -211,12 +212,27 @@ def inject_generic_rules(
             generic_alert_groups.aggregator_rules,
             rule_names_to_duplicate=[HOST_METRICS_MISSING_RULE_NAME],
             peer_unit_names=unit_names,
-            rules_tool=rules.promql.tool,
+            rules_tool=rules_copy.promql.tool,
             is_subordinate=charm.meta.subordinate,
         )
-        rules.add_promql(agg_rules, group_name_prefix=topology.identifier)
+        rules_copy.add_promql(agg_rules, group_name_prefix=topology.identifier)
     else:
-        rules.add_promql(
+        rules_copy.add_promql(
             generic_alert_groups.application_rules,
             group_name_prefix=topology.identifier,
         )
+    return rules_copy
+
+
+def inject_extra_labels_into_rules(
+    rules: RuleStore, extra_alert_labels: dict[str, str]
+) -> RuleStore:
+    """Return a copy of the rules dict with extra labels injected."""
+    if not extra_alert_labels:
+        return rules
+    rules_copy = copy.deepcopy(rules)
+    for rule_groups in [rules_copy.logql.as_dict(), rules_copy.promql.as_dict()]:
+        for group in rule_groups.get('groups', []):
+            for rule in group.get('rules', []):
+                rule.setdefault('labels', {}).update(extra_alert_labels)
+    return rules_copy
