@@ -146,17 +146,15 @@ class SharedClientCertificateManager(Object):
             return None
 
         try:
-            app_data = relation.data[self.model.app]
+            if not (secret_id := relation.data[self.model.app].get(CERT_SECRET_FIELD)):
+                logger.info('Shared certificate secret ID does not exist in the databag yet.')
+                return None
         except ModelError:
             logger.exception(
                 'Cannot read local app databag for relation %s/%s',
                 relation.name,
                 relation.id,
             )
-            return None
-
-        if not (secret_id := app_data.get(CERT_SECRET_FIELD)):
-            logger.info('Shared certificate secret ID does not exist in the databag yet.')
             return None
 
         secret = self.model.get_secret(id=secret_id)
