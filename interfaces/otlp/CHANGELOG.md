@@ -39,3 +39,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Updated
 
 - `OtlpProvider.rules` now returns a mapping of relation ID to a RuleStore object
+
+## [0.5.0]
+
+### Updated
+
+- Separated the package into 2 private modules: _otlp and _rules
+- Enable user-defined rule labels
