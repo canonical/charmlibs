@@ -15,7 +15,14 @@ classifiers = [
 ]
 dynamic = ["version"]
 dependencies = [
-    # "ops",
+    # Libraries should use clear but wide dependency bounds to avoid overly constraining charms.
+    # Ops 3 is backwards compatible with Ops 2, but drops Python 3.8 support.
+    # Ops 3 has new features not present in Ops 2.23 (the last Ops 2 feature release).
+    # See the Ops 2.23 maintenance branch changelog and the Ops 3 changelog for current information:
+    # - https://github.com/canonical/operator/blob/2.23-maintenance/CHANGES.md
+    # - https://github.com/canonical/operator/blob/main/CHANGES.md
+    # Set the dependency bounds according to the features and fixes your library needs.
+    # "ops>=2.23.1,<4",
 ]
 {% if cookiecutter._interface %}
 [project.optional-dependencies]
