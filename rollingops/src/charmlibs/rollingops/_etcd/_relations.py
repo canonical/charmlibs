@@ -30,6 +30,7 @@ from ops.charm import (
     SecretChangedEvent,
 )
 from ops.framework import Object
+from ops.model import ModelError
 
 from charmlibs import pathops
 from charmlibs.interfaces.tls_certificates import Certificate, TLSCertificatesError
@@ -144,7 +145,17 @@ class SharedClientCertificateManager(Object):
             logger.debug('Peer relation is not available yet.')
             return None
 
-        if not (secret_id := relation.data[self.model.app].get(CERT_SECRET_FIELD)):
+        try:
+            app_data = relation.data[self.model.app]
+        except ModelError:
+            logger.exception(
+                'Cannot read local app databag for relation %s/%s',
+                relation.name,
+                relation.id,
+            )
+            return None
+
+        if not (secret_id := app_data.get(CERT_SECRET_FIELD)):
             logger.info('Shared certificate secret ID does not exist in the databag yet.')
             return None
 
