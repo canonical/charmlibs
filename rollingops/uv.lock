@@ -134,7 +134,7 @@ requires-dist = [
     { name = "charmlibs-interfaces-tls-certificates", specifier = ">=1.8.1" },
     { name = "charmlibs-pathops", specifier = ">=1.2.1" },
     { name = "dpcharmlibs-interfaces", specifier = "==1.0.0" },
-    { name = "ops" },
+    { name = "ops", specifier = ">=2.23.1,<4" },
     { name = "pydantic", specifier = ">=2.12.5" },
     { name = "shortuuid", specifier = ">=1.0.13" },
     { name = "tenacity" },
