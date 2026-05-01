@@ -39,6 +39,7 @@ def ensure(
     """Ensure the snap is installed and up-to-date on the specified channel.
 
     The action taken depends on the current state of the snap:
+
     - If the snap is not installed, it will be installed on the specified channel
       (defaulting to latest/stable).
     - If the snap is installed on a different channel, it will be refreshed to the
