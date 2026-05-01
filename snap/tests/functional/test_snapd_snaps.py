@@ -2,13 +2,13 @@
 # Copyright 2026 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-"""Functional tests for _snapd: info, install, remove, refresh, hold, unhold."""
+"""Functional tests for _snapd_snaps: info, install, remove, refresh, hold, unhold."""
 
 import datetime
 
 import pytest
 
-from charmlibs.snap import _errors, _snapd
+from charmlibs.snap import _errors, _snapd_snaps as _snapd
 from conftest import ensure_installed, ensure_removed
 
 # ---------------------------------------------------------------------------

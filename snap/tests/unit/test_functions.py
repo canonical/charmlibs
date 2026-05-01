@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from charmlibs.snap import _functions, _snapd
+from charmlibs.snap import _functions, _snapd_snaps as _snapd
 from charmlibs.snap._utils import _normalize_channel
 
 if TYPE_CHECKING:
@@ -43,9 +43,9 @@ class MockSnapd:
 @pytest.fixture
 def mock_snapd(mocker: MockerFixture) -> MockSnapd:
     return MockSnapd(
-        info=mocker.patch('charmlibs.snap._snapd.info'),
-        install=mocker.patch('charmlibs.snap._snapd.install'),
-        refresh=mocker.patch('charmlibs.snap._snapd.refresh'),
+        info=mocker.patch('charmlibs.snap._snapd_snaps.info'),
+        install=mocker.patch('charmlibs.snap._snapd_snaps.install'),
+        refresh=mocker.patch('charmlibs.snap._snapd_snaps.refresh'),
     )
 
 

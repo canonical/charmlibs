@@ -60,15 +60,6 @@ from ._errors import (
 from ._functions import (
     ensure,
 )
-from ._snapd import (
-    Info,
-    hold,
-    info,
-    install,
-    refresh,
-    remove,
-    unhold,
-)
 from ._snapd_aliases import (
     alias,
     unalias,
@@ -90,6 +81,15 @@ from ._snapd_interfaces import (
 from ._snapd_logs import (
     LogEntry,
     logs,
+)
+from ._snapd_snaps import (
+    Info,
+    hold,
+    info,
+    install,
+    refresh,
+    remove,
+    unhold,
 )
 from ._version import __version__ as __version__
 

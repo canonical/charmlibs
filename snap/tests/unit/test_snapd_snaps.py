@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from charmlibs.snap import _snapd
+from charmlibs.snap import _snapd_snaps as _snapd
 from charmlibs.snap._errors import SnapError, SnapNotFoundError, _SnapNoUpdatesAvailableError
 from conftest import result_of
 

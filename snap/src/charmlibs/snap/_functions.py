@@ -16,7 +16,7 @@
 
 import logging
 
-from . import _snapd, _utils
+from . import _snapd_snaps, _utils
 
 logger = logging.getLogger(__name__)
 
@@ -39,10 +39,10 @@ def ensure(
         raise ValueError('Only one of channel or revision may be specified')
     logger.debug('ensure:Querying info for snap %r', snap)
     # Install if the snap is not already installed.
-    info = _snapd.info(snap, missing_ok=True)
+    info = _snapd_snaps.info(snap, missing_ok=True)
     if info is None:
         logger.debug('ensure: Snap %r is not installed: installing ...', snap)
-        _snapd.install(snap, channel=channel, revision=revision, classic=classic)
+        _snapd_snaps.install(snap, channel=channel, revision=revision, classic=classic)
         return True
     # Refresh if the snap is installed with a different channel or revision than requested.
     different_channel = channel is not None and info.channel != _utils._normalize_channel(channel)
@@ -50,7 +50,7 @@ def ensure(
     if different_channel or different_revision:
         msg = 'ensure: Snap %r is installed with channel=%r and revision=%d but requested (channel=%r, revision=%r): refreshing ...'  # noqa: E501
         logger.debug(msg, snap, info.channel, info.revision, channel, revision)
-        _snapd.refresh(snap, channel=channel, revision=revision)
+        _snapd_snaps.refresh(snap, channel=channel, revision=revision)
         return True
     # Return False if no operations were performed.
     msg = 'ensure: Snap %r is already installed with classic=%s, channel=%r and revision=%d'
