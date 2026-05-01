@@ -8,7 +8,14 @@ These tests exercise the HTTP transport layer directly against the real snapd so
 verifying response decoding, async change waiting, error mapping, and edge cases.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import pytest
+
+if TYPE_CHECKING:
+    from pytest import MonkeyPatch
 
 from charmlibs.snap import _client, _errors
 from conftest import ensure_installed, ensure_removed
@@ -174,6 +181,20 @@ def test_put_empty_body_succeeds():
     # PUT with an empty body dict ({}) is accepted by snapd and is a no-op.
     ensure_installed('lxd')
     _client.put('/v2/snaps/lxd/conf', body={})  # should not raise
+
+
+def test_change_timeout_raises_snap_timeout_error(monkeypatch: MonkeyPatch):
+    # With _CHANGE_TIMEOUT=0 the deadline fires before the first poll, exercising the
+    # change-timeout path with a real async operation (local conf PUT, no store needed).
+    ensure_installed('lxd')
+    monkeypatch.setattr(_client, '_CHANGE_TIMEOUT', 0)
+    with pytest.raises(_errors.SnapTimeoutError) as ctx:
+        _client.put('/v2/snaps/lxd/conf', body={'test-change-timeout-key': 'value'})
+    assert ctx.value.kind == 'charmlibs-snap-change-timeout'
+    assert isinstance(ctx.value, TimeoutError)
+    # snapd will still complete the change; clean up the key.
+    _client.put('/v2/snaps/lxd/conf', body={'test-change-timeout-key': None})
+    assert not _client.get('/v2/snaps/lxd/conf', query={'keys': 'test-change-timeout-key'})
 
 
 # ---------------------------------------------------------------------------

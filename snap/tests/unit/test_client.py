@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 if TYPE_CHECKING:
+    from pathlib import Path
     from unittest.mock import MagicMock
 
     from pytest import LogCaptureFixture
@@ -252,11 +253,11 @@ class TestErrorResponses:
         assert exc_info.value.kind == 'charmlibs-snap-request-timeout'
         assert isinstance(exc_info.value, TimeoutError)
 
-    def test_socket_not_found_raises_snap_connection_error(self, mocker: MockerFixture):
-        mocker.patch(
-            'urllib.request.OpenerDirector.open',
-            side_effect=urllib.error.URLError(FileNotFoundError('no such file')),
-        )
+    def test_socket_not_found_raises_snap_connection_error(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ):
+        # Point _SOCKET_PATH at a real non-existent path so the real URLError fires.
+        monkeypatch.setattr(_client, '_SOCKET_PATH', str(tmp_path / 'does-not-exist'))
         with pytest.raises(SnapConnectionError) as exc_info:
             _client.get('/v2/snaps/hello-world')
         assert exc_info.value.kind == 'charmlibs-snap-socket-not-found'
