@@ -69,6 +69,14 @@ class SnapAPIError(SnapError):
     """
 
 
+class SnapTimeoutError(SnapError, TimeoutError):
+    """Raised when a request to or change in snapd times out.
+
+    This typically indicates that snapd is waiting on the snap store, which is unreachable.
+    Callers may want to catch this for retry logic or to surface a user-friendly message.
+    """
+
+
 class SnapAlreadyInstalledError(SnapError):
     """Raised via the API when an install is attempted for a snap that is already installed."""
 

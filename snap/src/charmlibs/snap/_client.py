@@ -165,6 +165,14 @@ def _request_raw(
     # opener.add_handler(urllib.request.HTTPErrorProcessor())
     try:
         return opener.open(request, timeout=_REQUEST_TIMEOUT)
+    except TimeoutError:
+        raise _errors.SnapTimeoutError(
+            f'Request to snapd timed out after {_REQUEST_TIMEOUT}s: {method} {path}',
+            kind='charmlibs-snap-request-timeout',
+            value='',
+            status_code=None,
+            status=None,
+        ) from None
     except urllib.error.URLError as e:
         if e.args and isinstance(e.args[0], FileNotFoundError):
             msg = f'Could not connect to server: socket not found at {_SOCKET_PATH!r}'
@@ -181,7 +189,13 @@ def _wait_for_change(change_id: str) -> dict[str, Any]:
     deadline = time.time() + _CHANGE_TIMEOUT
     while True:
         if time.time() > deadline:
-            raise TimeoutError(f'timeout waiting for snap change: {change_id}')
+            raise _errors.SnapTimeoutError(
+                f'Timed out after {_CHANGE_TIMEOUT}s waiting for snap change {change_id}',
+                kind='charmlibs-snap-change-timeout',
+                value='',
+                status_code=None,
+                status=None,
+            )
         response = _request('GET', f'/v2/changes/{change_id}', log=False)
         if not isinstance(response, dict):
             raise _errors.SnapAPIError(

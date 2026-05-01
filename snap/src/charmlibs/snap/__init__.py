@@ -53,6 +53,7 @@ from ._errors import (
     SnapNeedsClassicError,
     SnapNotFoundError,
     SnapOptionNotFoundError,
+    SnapTimeoutError,
 )
 from ._functions import (
     ensure,
@@ -101,6 +102,7 @@ __all__ = [
     'SnapNeedsClassicError',
     'SnapNotFoundError',
     'SnapOptionNotFoundError',
+    'SnapTimeoutError',
     'alias',
     'connect',
     'disconnect',

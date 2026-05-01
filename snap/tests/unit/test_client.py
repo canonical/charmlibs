@@ -27,6 +27,7 @@ from charmlibs.snap._errors import (
     SnapNeedsClassicError,
     SnapNotFoundError,
     SnapOptionNotFoundError,
+    SnapTimeoutError,
 )
 from conftest import FIXTURES_DIR, load_fixture
 
@@ -241,6 +242,14 @@ class TestErrorResponses:
             _client.get('/v2/snaps/hello-world')
         assert 'Unexpected response type' in exc_info.value.message
 
+    def test_request_timeout_raises_snap_timeout_error(self, mocker: MockerFixture):
+        # Patch opener.open inside _request_raw to raise TimeoutError, exercising the conversion.
+        mocker.patch('urllib.request.OpenerDirector.open', side_effect=TimeoutError('timed out'))
+        with pytest.raises(SnapTimeoutError) as exc_info:
+            _client.get('/v2/snaps/hello-world')
+        assert exc_info.value.kind == 'charmlibs-snap-request-timeout'
+        assert isinstance(exc_info.value, TimeoutError)
+
 
 class TestAsyncChange:
     def test_async_triggers_poll(self, mock_raw: MagicMock):
@@ -420,8 +429,11 @@ class TestAsyncChange:
             _fake_response(load_fixture('async_hold.json'), status=202, reason='Accepted'),
             _fake_response(doing_envelope),
         ]
-        with pytest.raises(TimeoutError):
+        with pytest.raises(SnapTimeoutError) as exc_info:
             _client.post('/v2/snaps/hello-world', body={'action': 'hold'})
+        assert exc_info.value.kind == 'charmlibs-snap-change-timeout'
+        assert 'snap change' in exc_info.value.message
+        assert isinstance(exc_info.value, TimeoutError)
 
 
 class TestLogsEndpoint:
