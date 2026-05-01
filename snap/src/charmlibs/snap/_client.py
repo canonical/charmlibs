@@ -104,8 +104,9 @@ def _request(
                 response_dict = logs[0]
             else:
                 return logs
-        # otherwise we expect a single JSON object
-        response_dict: dict[str, Any] = json.loads(response_bytes)
+        else:
+            # otherwise we expect a single JSON object
+            response_dict: dict[str, Any] = json.loads(response_bytes)
     except json.JSONDecodeError as e:
         raise _errors.SnapBadResponseError(
             message=f'Invalid JSON in response for path {path!r}: {e}',
