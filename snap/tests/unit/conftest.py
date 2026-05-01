@@ -24,6 +24,16 @@ class MockClient:
     put: MagicMock
 
 
+@pytest.fixture
+def mock_client(mocker: MockerFixture) -> MockClient:
+    """Patch _client.get, .post, and .put for use in _snapd_*.py tests."""
+    return MockClient(
+        get=mocker.patch('charmlibs.snap._client.get'),
+        post=mocker.patch('charmlibs.snap._client.post'),
+        put=mocker.patch('charmlibs.snap._client.put'),
+    )
+
+
 def load_fixture(name: str) -> Any:
     """Load a fixture file. Returns the full API envelope dict, or a list for logs_lxd.json."""
     return json.loads((FIXTURES_DIR / name).read_text())
@@ -35,13 +45,3 @@ def result_of(name: str) -> Any:
     if isinstance(data, list):
         return data  # pyright: ignore[reportUnknownVariableType]
     return data['result']
-
-
-@pytest.fixture
-def mock_client(mocker: MockerFixture) -> MockClient:
-    """Patch _client.get, .post, and .put for use in _snapd_*.py tests."""
-    return MockClient(
-        get=mocker.patch('charmlibs.snap._client.get'),
-        post=mocker.patch('charmlibs.snap._client.post'),
-        put=mocker.patch('charmlibs.snap._client.put'),
-    )
