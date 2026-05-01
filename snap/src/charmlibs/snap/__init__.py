@@ -54,6 +54,7 @@ from ._errors import (
     SnapError,
     SnapNeedsClassicError,
     SnapNotFoundError,
+    SnapNoUpdatesAvailableError,
     SnapOptionNotFoundError,
     SnapTimeoutError,
 )
@@ -104,6 +105,7 @@ __all__ = [
     'SnapConnectionError',
     'SnapError',
     'SnapNeedsClassicError',
+    'SnapNoUpdatesAvailableError',
     'SnapNotFoundError',
     'SnapOptionNotFoundError',
     'SnapTimeoutError',

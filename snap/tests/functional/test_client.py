@@ -137,7 +137,7 @@ def test_post_async_change_error_raises_snap_change_error():
 def test_post_snap_no_update_available():
     # snap-no-update-available is raised (not suppressed) at the _client level.
     ensure_installed('hello-world', channel='latest/stable')
-    with pytest.raises(_errors._SnapNoUpdatesAvailableError) as ctx:
+    with pytest.raises(_errors.SnapNoUpdatesAvailableError) as ctx:
         _client.post(
             '/v2/snaps/hello-world', body={'action': 'refresh', 'channel': 'latest/stable'}
         )

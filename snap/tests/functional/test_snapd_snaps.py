@@ -178,7 +178,7 @@ def test_hold_forever():
 def test_hold_not_installed_raises_base_snap_error():
     # The API returns an error with no 'kind' when holding a non-installed snap.
     ensure_removed('hello-world')
-    with pytest.raises(_errors.SnapError) as ctx:
+    with pytest.raises(_errors.SnapAPIError) as ctx:
         _snapd.hold('hello-world')
     assert not ctx.value.kind
     assert 'not installed' in ctx.value.message

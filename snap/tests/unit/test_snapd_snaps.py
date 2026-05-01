@@ -11,10 +11,17 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 from charmlibs.snap import _snapd_snaps as _snapd
-from charmlibs.snap._errors import SnapError, SnapNotFoundError, _SnapNoUpdatesAvailableError
+from charmlibs.snap._errors import (
+    SnapAlreadyInstalledError,
+    SnapError,
+    SnapNotFoundError,
+    SnapNoUpdatesAvailableError,
+)
 from conftest import result_of
 
 if TYPE_CHECKING:
+    from pytest_mock import MockerFixture
+
     from conftest import MockClient
 
 
@@ -164,6 +171,15 @@ class TestInstall:
             _snapd.install('hello-world', channel='edge', revision=5)
         mock_client.post.assert_not_called()
 
+    def test_install_already_installed_suppressed_by_default(self, mock_client: MockClient):
+        mock_client.post.side_effect = SnapAlreadyInstalledError('', kind='', value='')
+        _snapd.install('hello-world')  # should not raise
+
+    def test_install_already_installed_strict_raises(self, mock_client: MockClient):
+        mock_client.post.side_effect = SnapAlreadyInstalledError('', kind='', value='')
+        with pytest.raises(SnapAlreadyInstalledError):
+            _snapd.install('hello-world', strict=True)
+
 
 class TestRemove:
     def test_remove(self, mock_client: MockClient):
@@ -181,6 +197,15 @@ class TestRemove:
         _snapd.remove('hello-world', purge=True)
         body = mock_client.post.call_args.kwargs['body']
         assert body['purge'] is True
+
+    def test_remove_not_installed_suppressed_by_default(self, mock_client: MockClient):
+        mock_client.post.side_effect = SnapNotFoundError('', kind='', value='')
+        _snapd.remove('hello-world')  # should not raise
+
+    def test_remove_not_installed_strict_raises(self, mock_client: MockClient):
+        mock_client.post.side_effect = SnapNotFoundError('', kind='', value='')
+        with pytest.raises(SnapNotFoundError):
+            _snapd.remove('hello-world', strict=True)
 
 
 class TestRefresh:
@@ -204,7 +229,7 @@ class TestRefresh:
             _snapd.refresh('hello-world', channel='edge', revision=42)
 
     def test_refresh_suppresses_no_updates(self, mock_client: MockClient):
-        mock_client.post.side_effect = _SnapNoUpdatesAvailableError(
+        mock_client.post.side_effect = SnapNoUpdatesAvailableError(
             'snap "hello-world" has no updates available',
             kind='snap-no-update-available',
             value='',
@@ -213,8 +238,21 @@ class TestRefresh:
         )
         _snapd.refresh('hello-world')  # should not raise
 
+    def test_refresh_no_updates_suppressed_by_default(self, mock_client: MockClient):
+        mock_client.post.side_effect = SnapNoUpdatesAvailableError('', kind='', value='')
+        _snapd.refresh('hello-world')  # should not raise
+
+    def test_refresh_no_updates_strict_raises(self, mock_client: MockClient):
+        mock_client.post.side_effect = SnapNoUpdatesAvailableError('', kind='', value='')
+        with pytest.raises(SnapNoUpdatesAvailableError):
+            _snapd.refresh('hello-world', strict=True)
+
 
 class TestHold:
+    @pytest.fixture(autouse=True)
+    def mock_info(self, mocker: MockerFixture):
+        mocker.patch('charmlibs.snap._snapd_snaps.info')
+
     def test_hold_forever(self, mock_client: MockClient):
         _snapd.hold('hello-world')
         body = mock_client.post.call_args.kwargs['body']
@@ -247,6 +285,13 @@ class TestHold:
         body = mock_client.post.call_args.kwargs['body']
         hold_time = datetime.datetime.fromisoformat(body['time'])
         assert hold_time > before + datetime.timedelta(days=1)
+
+    def test_hold_not_installed(self, mock_client: MockClient, mocker: MockerFixture):
+        snap_not_found = SnapNotFoundError('', kind='', value='')
+        mocker.patch('charmlibs.snap._snapd_snaps.info', side_effect=snap_not_found)
+        with pytest.raises(SnapNotFoundError):
+            _snapd.hold('hello-world')
+        mock_client.post.assert_not_called()
 
 
 class TestUnhold:

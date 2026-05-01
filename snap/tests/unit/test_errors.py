@@ -13,10 +13,10 @@ from charmlibs.snap._errors import (
     SnapError,
     SnapNeedsClassicError,
     SnapNotFoundError,
+    SnapNoUpdatesAvailableError,
     SnapOptionNotFoundError,
     _error_type_from_result_kind,
     _SnapInterfacesUnchangedError,
-    _SnapNoUpdatesAvailableError,
 )
 
 
@@ -38,8 +38,7 @@ class TestErrorTypeFromResultKind:
 
     def test_snap_no_update_available(self):
         assert (
-            _error_type_from_result_kind('snap-no-update-available')
-            is _SnapNoUpdatesAvailableError
+            _error_type_from_result_kind('snap-no-update-available') is SnapNoUpdatesAvailableError
         )
 
     def test_interfaces_unchanged(self):
@@ -147,7 +146,7 @@ class TestSnapError:
             SnapNotFoundError,
             SnapNeedsClassicError,
             SnapOptionNotFoundError,
-            _SnapNoUpdatesAvailableError,
+            SnapNoUpdatesAvailableError,
             _SnapInterfacesUnchangedError,
         ]:
             assert issubclass(cls, SnapAPIError), cls

@@ -124,6 +124,7 @@ def install(
     channel: str | None = None,
     revision: int | None = None,
     classic: bool = False,
+    strict: bool = False,
 ) -> None:
     """Install a snap.
 
@@ -142,10 +143,14 @@ def install(
     if classic:
         data['classic'] = True
     # NOTE: Unlike the API, the CLI doesn't error if it's already installed (just prints a msg).
-    _client.post(f'/v2/snaps/{snap}', body=data)
+    try:
+        _client.post(f'/v2/snaps/{snap}', body=data)
+    except _errors.SnapAlreadyInstalledError:
+        if strict:
+            raise
 
 
-def remove(snap: str, *, purge: bool = False) -> None:
+def remove(snap: str, *, purge: bool = False, strict: bool = False) -> None:
     """Remove a snap.
 
     Raises:
@@ -156,10 +161,16 @@ def remove(snap: str, *, purge: bool = False) -> None:
     if purge:
         data['purge'] = True
     # NOTE: Unlike the API, the CLI doesn't error if the snap isn't installed (just prints a msg).
-    _client.post(f'/v2/snaps/{snap}', body=data)
+    try:
+        _client.post(f'/v2/snaps/{snap}', body=data)
+    except _errors.SnapNotFoundError:
+        if strict:
+            raise
 
 
-def refresh(snap: str, channel: str | None = None, revision: int | None = None) -> None:
+def refresh(
+    snap: str, channel: str | None = None, revision: int | None = None, strict: bool = False
+) -> None:
     """Refresh a snap.
 
     Raises:
@@ -177,8 +188,9 @@ def refresh(snap: str, channel: str | None = None, revision: int | None = None) 
     # NOTE: Unlike the API, the CLI doesn't error if there are no updates (just prints a msg).
     try:
         _client.post(f'/v2/snaps/{snap}', body=data)
-    except _errors._SnapNoUpdatesAvailableError:
-        pass  # Follow the snap CLI's lead and suppress this error.
+    except _errors.SnapNoUpdatesAvailableError:
+        if strict:
+            raise
 
 
 def hold(snap: str, duration: datetime.timedelta | int | float | None = None) -> None:
@@ -196,11 +208,15 @@ def hold(snap: str, duration: datetime.timedelta | int | float | None = None) ->
             delta = datetime.timedelta(seconds=duration)
         until = (datetime.datetime.now(datetime.timezone.utc) + delta).isoformat()
     data = {'action': 'hold', 'hold-level': 'general', 'time': until}
+    # NOTE: The API returns an error with no 'kind' when holding a non-installed snap.
+    # The CLI raises an error in this case, so we pre-emptively check if the snap is installed.
+    info(snap)  # Raise SnapNotFoundError if not installed.
     _client.post(f'/v2/snaps/{snap}', body=data)
 
 
 def unhold(snap: str) -> None:
     """Unhold a snap to allow it to be refreshed."""
+    # NOTE: Neither the API nor CLI error if the snap isn't installed or held.
     _client.post(f'/v2/snaps/{snap}', body={'action': 'unhold'})
 
 
