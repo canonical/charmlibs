@@ -197,9 +197,9 @@ def _wait_for_change(change_id: str) -> dict[str, Any]:
     The poll time is 100 milliseconds, the same as in snap clients.
     """
     logger.debug('_wait_for_change(%r)', change_id)
-    deadline = time.time() + _CHANGE_TIMEOUT
+    deadline = time.monotonic() + _CHANGE_TIMEOUT
     while True:
-        if time.time() > deadline:
+        if time.monotonic() > deadline:
             raise _errors.SnapTimeoutError(
                 f'Timed out after {_CHANGE_TIMEOUT}s waiting for snap change {change_id}',
                 kind='charmlibs-snap-change-timeout',
