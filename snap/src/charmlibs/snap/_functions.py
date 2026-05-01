@@ -28,13 +28,13 @@ def ensure_revision(snap: str, revision: int, *, classic: bool = False) -> bool:
         True if the snap was installed or updated, False otherwise.
     """
     info = _snapd_snaps.info(snap, missing_ok=True)
-    if info is None:
+    if info is None:  # Not installed.
         _snapd_snaps.install(snap, revision=revision, classic=classic)
         return True
-    if info.revision != revision:
+    if info.revision != revision:  # Installed but at different revision.
         _snapd_snaps.refresh(snap, revision=revision)
         return True
-    return False
+    return False  # Already installed at the requested revision.
 
 
 def ensure_channel(
@@ -54,19 +54,21 @@ def ensure_channel(
         True if the snap was installed or updated, False otherwise.
     """
     info = _snapd_snaps.info(snap, missing_ok=True)
-    if info is None:
+    if info is None:  # Not installed.
         _snapd_snaps.install(snap, channel=channel, classic=classic)
         return True
     if channel is not None and info.channel != _utils._normalize_channel(channel):
+        # Installed but on a different channel.
         _snapd_snaps.refresh(snap, channel=channel)
         return True
-    if not update:
+    # Already installed on the requested channel (or any channel if none was specified).
+    if not update:  # User explicitly requested no update in this case.
         return False
-    try:
+    try:  # Refresh to get the latest revision on the current channel, if possible.
         _snapd_snaps.refresh(snap, channel=channel, strict=True)
+        return True
     except _errors.SnapNoUpdatesAvailableError:
-        return False
-    return True
+        return False  # No updates available, so no changes were made.
 
 
 def ensure(
