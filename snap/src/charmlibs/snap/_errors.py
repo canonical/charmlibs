@@ -38,8 +38,8 @@ class SnapError(Exception):
         *,
         kind: str,
         value: object,
-        status_code: int | None,
-        status: str | None,
+        status_code: int | None = None,
+        status: str | None = None,
     ):
         super().__init__(message)
         self.message = message

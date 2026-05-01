@@ -170,8 +170,6 @@ def _request_raw(
             f'Request to snapd timed out after {_REQUEST_TIMEOUT}s: {method} {path}',
             kind='charmlibs-snap-request-timeout',
             value='',
-            status_code=None,
-            status=None,
         ) from None
     except urllib.error.URLError as e:
         if e.args and isinstance(e.args[0], FileNotFoundError):
@@ -179,15 +177,11 @@ def _request_raw(
                 f'Could not connect to snapd: socket not found at {_SOCKET_PATH!r}',
                 kind='charmlibs-snap-socket-not-found',
                 value='',
-                status_code=None,
-                status=None,
             ) from None
         raise _errors.SnapConnectionError(
             str(e.reason),
             kind='charmlibs-snap-connection-error',
             value='',
-            status_code=None,
-            status=None,
         ) from e
 
 
@@ -204,8 +198,6 @@ def _wait_for_change(change_id: str) -> dict[str, Any]:
                 f'Timed out after {_CHANGE_TIMEOUT}s waiting for snap change {change_id}',
                 kind='charmlibs-snap-change-timeout',
                 value='',
-                status_code=None,
-                status=None,
             )
         response = _request('GET', f'/v2/changes/{change_id}', log=False)
         if not isinstance(response, dict):
@@ -213,8 +205,6 @@ def _wait_for_change(change_id: str) -> dict[str, Any]:
                 message=f'Unexpected response type {type(response).__name__} while waiting for change {change_id}',  # noqa: E501
                 kind='charmlibs-snap',
                 value=str(response),
-                status_code=None,
-                status=None,
             )
         match response.get('status'):
             case 'Do' | 'Doing':
@@ -230,7 +220,6 @@ def _wait_for_change(change_id: str) -> dict[str, Any]:
                     message=response.get('err', ''),
                     kind='charmlibs-snap-change-error',
                     value=response.get('id', ''),
-                    status_code=None,
                     status=response.get('status'),
                 )
 
