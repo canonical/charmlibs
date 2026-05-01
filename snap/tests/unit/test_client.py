@@ -23,6 +23,7 @@ if TYPE_CHECKING:
 from charmlibs.snap import _client
 from charmlibs.snap._errors import (
     SnapAlreadyInstalledError,
+    SnapAPIError,
     SnapBadResponseError,
     SnapChangeError,
     SnapConnectionError,
@@ -199,9 +200,9 @@ class TestErrorResponses:
             'result': {'message': 'something unexpected', 'kind': 'unknown-kind', 'value': ''},
         }
         mock_raw.return_value = _fake_response(fixture, status=500, reason='Internal Server Error')
-        with pytest.raises(SnapError) as exc_info:
+        with pytest.raises(SnapAPIError) as exc_info:
             _client.get('/v2/snaps/hello-world')
-        assert type(exc_info.value) is SnapError
+        assert type(exc_info.value) is SnapAPIError
 
     def test_error_preserves_status_code(self, mock_raw: MagicMock):
         mock_raw.return_value = _fake_response(

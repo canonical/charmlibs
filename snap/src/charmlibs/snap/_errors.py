@@ -18,7 +18,7 @@ from __future__ import annotations
 
 
 class SnapError(Exception):
-    """Base class for all library errors, raised directly when a more specific type isn't defined.
+    """Base class for all library errors, not raised directly.
 
     Args:
         message: Typically the 'message' field from a snapd API response.
@@ -70,42 +70,42 @@ class SnapBadResponseError(SnapError):
 
 
 class SnapConnectionError(SnapError, ConnectionError):
-    """Raised when a connection to the snapd socket fails.
-
-    A 'charmlibs-snap-socket-not-found' kind indicates the socket does not exist, most likely
-    because snap is not installed on this system. A 'charmlibs-snap-connection-error' kind
-    indicates some other connection failure (e.g. permission denied, broken pipe).
-    """
+    """Raised when a connection to the snapd socket fails."""
 
 
 class SnapTimeoutError(SnapError, TimeoutError):
-    """Raised when a request to or change in snapd times out.
+    """Raised when a snapd request or change times out.
 
-    This typically indicates that snapd is waiting on the snap store, which is unreachable.
+    This typically indicates that snapd is waiting on the snap store, which may indicate
+    a transient issue with the store or a problem with the system's network connection.
     Callers may want to catch this for retry logic or to surface a user-friendly message.
     """
 
 
-class SnapAlreadyInstalledError(SnapError):
+class SnapAPIError(SnapError):
+    """Raised when the snapd API returns an error response."""
+
+
+class SnapAlreadyInstalledError(SnapAPIError):
     """Raised via the API when an install is attempted for a snap that is already installed."""
 
 
-class SnapAppNotFoundError(SnapError):
+class SnapAppNotFoundError(SnapAPIError):
     """Raised via the API when a specified app is not found within an installed snap."""
 
 
-class SnapNotFoundError(SnapError):
+class SnapNotFoundError(SnapAPIError):
     """Raised when a snap is not found, either in the store or as an installed snap."""
 
 
-class SnapNeedsClassicError(SnapError):
+class SnapNeedsClassicError(SnapAPIError):
     """Raised via the API if classic is not specified for a classic confinement snap.
 
     This can occur for a snap install or refresh.
     """
 
 
-class _SnapNoUpdatesAvailableError(SnapError):
+class _SnapNoUpdatesAvailableError(SnapAPIError):
     """Raised via the API when a refresh is attempted but no updates are available.
 
     This class is private because the public refresh function suppresses this error,
@@ -113,7 +113,7 @@ class _SnapNoUpdatesAvailableError(SnapError):
     """
 
 
-class _SnapInterfacesUnchangedError(SnapError):
+class _SnapInterfacesUnchangedError(SnapAPIError):
     """Raised via the API when a connect/disconnect would result in no change.
 
     This class is private because the public disconnect function suppresses this error,
@@ -121,7 +121,7 @@ class _SnapInterfacesUnchangedError(SnapError):
     """
 
 
-class SnapOptionNotFoundError(SnapError):
+class SnapOptionNotFoundError(SnapAPIError):
     """Raised via the API when the specified snap config option is not found.
 
     Note that ``SnapOptionNotFoundError.value`` is typically a ``dict``,
@@ -131,7 +131,7 @@ class SnapOptionNotFoundError(SnapError):
     """
 
 
-class SnapChangeError(SnapError):
+class SnapChangeError(SnapAPIError):
     """Raised manually when a snap change has an unexpected status (including failures)."""
 
 
@@ -152,4 +152,4 @@ def _error_type_from_result_kind(kind: str) -> type[SnapError]:  # pyright: igno
         case 'interfaces-unchanged':
             return _SnapInterfacesUnchangedError
         case _:
-            return SnapError
+            return SnapAPIError

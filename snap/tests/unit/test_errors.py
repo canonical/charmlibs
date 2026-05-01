@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from charmlibs.snap._errors import (
     SnapAlreadyInstalledError,
+    SnapAPIError,
     SnapBadResponseError,
     SnapChangeError,
     SnapError,
@@ -47,10 +48,26 @@ class TestErrorTypeFromResultKind:
         )
 
     def test_unknown_kind(self):
-        assert _error_type_from_result_kind('bogus-kind') is SnapError
+        assert _error_type_from_result_kind('bogus-kind') is SnapAPIError
 
     def test_empty_string(self):
-        assert _error_type_from_result_kind('') is SnapError
+        assert _error_type_from_result_kind('') is SnapAPIError
+
+    def test_all_results_are_snap_api_error_subclasses(self):
+        kinds = [
+            'snap-already-installed',
+            'app-not-found',
+            'option-not-found',
+            'snap-needs-classic',
+            'snap-not-found',
+            'snap-not-installed',
+            'snap-no-update-available',
+            'interfaces-unchanged',
+            'bogus-kind',
+            '',
+        ]
+        for kind in kinds:
+            assert issubclass(_error_type_from_result_kind(kind), SnapAPIError), kind
 
 
 class TestSnapError:
@@ -113,8 +130,25 @@ class TestSnapError:
         )
         assert 'SnapNotFoundError' in repr(err)
 
-    def test_snap_api_error_is_subclass(self):
+    def test_snap_api_error_is_subclass_of_snap_error(self):
+        assert issubclass(SnapAPIError, SnapError)
+
+    def test_snap_bad_response_error_is_subclass(self):
         assert issubclass(SnapBadResponseError, SnapError)
+        assert not issubclass(SnapBadResponseError, SnapAPIError)
 
     def test_snap_change_error_is_subclass(self):
+        assert issubclass(SnapChangeError, SnapAPIError)
         assert issubclass(SnapChangeError, SnapError)
+
+    def test_specific_errors_are_snap_api_error_subclasses(self):
+        for cls in [
+            SnapAlreadyInstalledError,
+            SnapNotFoundError,
+            SnapNeedsClassicError,
+            SnapOptionNotFoundError,
+            _SnapNoUpdatesAvailableError,
+            _SnapInterfacesUnchangedError,
+        ]:
+            assert issubclass(cls, SnapAPIError), cls
+            assert issubclass(cls, SnapError), cls
