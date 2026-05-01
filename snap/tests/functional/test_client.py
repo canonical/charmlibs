@@ -161,6 +161,21 @@ def test_put_sync_error_snap_not_found():
     assert ctx.value.kind == 'snap-not-found'
 
 
+def test_put_no_body_raises():
+    # PUT with no body (None) raises a base SnapError: snapd can't decode EOF as patch values.
+    ensure_installed('lxd')
+    with pytest.raises(_errors.SnapError) as ctx:
+        _client.put('/v2/snaps/lxd/conf')
+    assert 'EOF' in ctx.value.message
+    assert not ctx.value.kind
+
+
+def test_put_empty_body_succeeds():
+    # PUT with an empty body dict ({}) is accepted by snapd and is a no-op.
+    ensure_installed('lxd')
+    _client.put('/v2/snaps/lxd/conf', body={})  # should not raise
+
+
 # ---------------------------------------------------------------------------
 # GET /v2/logs (special-cased streaming response)
 # ---------------------------------------------------------------------------
