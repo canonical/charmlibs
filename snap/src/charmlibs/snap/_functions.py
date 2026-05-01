@@ -33,7 +33,7 @@ def ensure_revision(snap: str, revision: int, *, classic: bool = False) -> bool:
     return False  # Already installed at the requested revision.
 
 
-def ensure_channel(
+def ensure(
     snap: str, channel: str | None = None, *, classic: bool = False, update: bool = True
 ) -> bool:
     """Ensure the snap is installed and up-to-date on the specified channel.

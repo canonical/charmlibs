@@ -32,4 +32,4 @@ def ensure_removed(*snaps: str) -> None:
 
 def ensure_installed(*snaps: str, channel: str | None = None, classic: bool = False) -> None:
     for snap_name in snaps:
-        snap.ensure_channel(snap_name, channel=channel, classic=classic, update=False)
+        snap.ensure(snap_name, channel=channel, classic=classic, update=False)
