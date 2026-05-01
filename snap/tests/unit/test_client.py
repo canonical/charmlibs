@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 from charmlibs.snap import _client
 from charmlibs.snap._errors import (
     SnapAlreadyInstalledError,
-    SnapAPIError,
+    SnapBadResponseError,
     SnapChangeError,
     SnapConnectionError,
     SnapError,
@@ -229,19 +229,19 @@ class TestErrorResponses:
 
     def test_invalid_json_raises_snap_api_error(self, mock_raw: MagicMock):
         mock_raw.return_value = _fake_response(b'not json at all', status=200, reason='OK')
-        with pytest.raises(SnapAPIError) as exc_info:
+        with pytest.raises(SnapBadResponseError) as exc_info:
             _client.get('/v2/snaps/hello-world')
         assert 'Invalid JSON' in exc_info.value.message
 
     def test_missing_type_key_raises_snap_api_error(self, mock_raw: MagicMock):
         mock_raw.return_value = _fake_response({'status-code': 200, 'result': {}})
-        with pytest.raises(SnapAPIError) as exc_info:
+        with pytest.raises(SnapBadResponseError) as exc_info:
             _client.get('/v2/snaps/hello-world')
         assert 'Missing expected key' in exc_info.value.message
 
     def test_non_dict_response_raises_snap_api_error(self, mock_raw: MagicMock):
         mock_raw.return_value = _fake_response(b'[1, 2, 3]', status=200, reason='OK')
-        with pytest.raises(SnapAPIError) as exc_info:
+        with pytest.raises(SnapBadResponseError) as exc_info:
             _client.get('/v2/snaps/hello-world')
         assert 'Unexpected response type' in exc_info.value.message
 
@@ -428,7 +428,7 @@ class TestAsyncChange:
             _fake_response(load_fixture('async_hold.json'), status=202, reason='Accepted'),
             _fake_response(poll_envelope),
         ]
-        with pytest.raises(SnapAPIError) as exc_info:
+        with pytest.raises(SnapBadResponseError) as exc_info:
             _client.post('/v2/snaps/hello-world', body={'action': 'hold'})
         assert 'Unexpected response type' in exc_info.value.message
 

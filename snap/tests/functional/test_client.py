@@ -116,7 +116,7 @@ def test_post_sync_error_no_kind():
     with pytest.raises(_errors.SnapError) as ctx:
         _client.post('/v2/snaps/hello-world', body={'action': 'invalid-action'})
     assert not ctx.value.kind
-    assert not isinstance(ctx.value, _errors.SnapAPIError)
+    assert not isinstance(ctx.value, _errors.SnapBadResponseError)
 
 
 def test_post_async_change_error_raises_snap_change_error():

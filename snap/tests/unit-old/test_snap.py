@@ -152,10 +152,10 @@ class TestSnapCache(unittest.TestCase):
     def test_raises_error_if_snap_not_running(self, mock_exists: MagicMock):
         mock_exists.return_value = False
         s = SnapCacheTester()
-        s._snap_client.get_installed_snaps.side_effect = snap.SnapAPIError(
+        s._snap_client.get_installed_snaps.side_effect = snap.SnapBadResponseError(
             {}, 400, 'error', 'snapd is not running'
         )
-        with pytest.raises(snap.SnapAPIError) as ctx:
+        with pytest.raises(snap.SnapBadResponseError) as ctx:
             s._load_installed_snaps()
         repr(ctx.value)  # ensure custom __repr__ doesn't error
         assert 'SnapAPIError' in ctx.value.name
@@ -546,18 +546,18 @@ def test_refresh_classic(
 class TestSocketClient(unittest.TestCase):
     def test_socket_not_found(self):
         client = snap.SnapClient(socket_path='/does/not/exist')
-        with pytest.raises(snap.SnapAPIError) as ctx:
+        with pytest.raises(snap.SnapBadResponseError) as ctx:
             client.get_installed_snaps()
-        assert isinstance(ctx.value, snap.SnapAPIError)
+        assert isinstance(ctx.value, snap.SnapBadResponseError)
 
     def test_fake_socket(self):
         shutdown, socket_path = fake_snapd.start_server()
 
         try:
             client = snap.SnapClient(socket_path)
-            with pytest.raises(snap.SnapAPIError) as ctx:
+            with pytest.raises(snap.SnapBadResponseError) as ctx:
                 client.get_installed_snaps()
-            assert isinstance(ctx.value, snap.SnapAPIError)
+            assert isinstance(ctx.value, snap.SnapBadResponseError)
         finally:
             shutdown()
 
@@ -579,7 +579,7 @@ class TestSocketClient(unittest.TestCase):
                 '_request_raw',
                 side_effect=client._request_raw,
             ) as mock_raw:
-                with pytest.raises(snap.SnapAPIError):
+                with pytest.raises(snap.SnapBadResponseError):
                     client._request('GET', 'snaps', body=body)
                 mock_raw.assert_called_with(
                     'GET',  # method
@@ -599,7 +599,7 @@ class TestSocketClient(unittest.TestCase):
             with patch.object(
                 _snap.urllib.request, 'Request', side_effect=_snap.urllib.request.Request
             ) as mock_request:
-                with pytest.raises(snap.SnapAPIError):
+                with pytest.raises(snap.SnapBadResponseError):
                     client._request_raw('GET', 'snaps')
             assert mock_request.call_args.kwargs['headers'] == {}
         finally:
@@ -611,7 +611,7 @@ class TestSocketClient(unittest.TestCase):
         try:
             client = snap.SnapClient(socket_path)
             with patch.object(_snap.json, 'loads', return_value={}):
-                with pytest.raises(snap.SnapAPIError) as ctx:
+                with pytest.raises(snap.SnapBadResponseError) as ctx:
                     client._request_raw('GET', 'snaps')
             # the return_value was correctly patched in
             assert ctx.value.body == {}
@@ -1151,7 +1151,7 @@ class TestSnapBareMethods(unittest.TestCase):
 
         class APIErrorCache:
             def __getitem__(self, key: object):
-                raise snap.SnapAPIError(
+                raise snap.SnapBadResponseError(
                     body={}, status_code=123, status='status', message='message'
                 )
 

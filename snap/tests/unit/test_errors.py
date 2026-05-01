@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from charmlibs.snap._errors import (
     SnapAlreadyInstalledError,
-    SnapAPIError,
+    SnapBadResponseError,
     SnapChangeError,
     SnapError,
     SnapNeedsClassicError,
@@ -114,7 +114,7 @@ class TestSnapError:
         assert 'SnapNotFoundError' in repr(err)
 
     def test_snap_api_error_is_subclass(self):
-        assert issubclass(SnapAPIError, SnapError)
+        assert issubclass(SnapBadResponseError, SnapError)
 
     def test_snap_change_error_is_subclass(self):
         assert issubclass(SnapChangeError, SnapError)

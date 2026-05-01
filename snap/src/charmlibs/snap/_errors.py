@@ -61,7 +61,7 @@ class SnapError(Exception):
         )
 
 
-class SnapAPIError(SnapError):
+class SnapBadResponseError(SnapError):
     """Raised manually when the snapd API returns a response we don't understand.
 
     Callers will not be able to resolve this error directly, but may want to catch it for logging,
