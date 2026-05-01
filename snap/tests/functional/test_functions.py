@@ -6,7 +6,8 @@
 
 import pytest
 
-from charmlibs.snap import _functions, _snapd_snaps as _snapd
+from charmlibs.snap import _functions
+from charmlibs.snap import _snapd_snaps as _snapd
 from conftest import ensure_removed
 
 # ---------------------------------------------------------------------------

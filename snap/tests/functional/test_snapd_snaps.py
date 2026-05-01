@@ -8,7 +8,8 @@ import datetime
 
 import pytest
 
-from charmlibs.snap import _errors, _snapd_snaps as _snapd
+from charmlibs.snap import _errors
+from charmlibs.snap import _snapd_snaps as _snapd
 from conftest import ensure_installed, ensure_removed
 
 # ---------------------------------------------------------------------------

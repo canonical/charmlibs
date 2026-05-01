@@ -8,7 +8,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from charmlibs.snap import _functions, _snapd_snaps as _snapd
+from charmlibs.snap import _functions
+from charmlibs.snap import _snapd_snaps as _snapd
 from charmlibs.snap._utils import _normalize_channel
 
 if TYPE_CHECKING:

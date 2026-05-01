@@ -207,7 +207,7 @@ def _wait_for_change(change_id: str) -> dict[str, Any]:
                 kind='charmlibs-snap',
                 value=str(response),
             )
-        match (status := response.get('status')):
+        match status := response.get('status'):
             case 'Do' | 'Doing':
                 time.sleep(0.1)
                 continue
