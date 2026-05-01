@@ -87,22 +87,19 @@ def _request(
     response = _request_raw(method, path, query=query, headers=headers, data=data)
     response_bytes = response.read()
     try:
-        match path:
-            case '/v2/logs':
-                # /v2/logs returns a stream of JSON objects separated by \n\x1e
-                logs = [
-                    json.loads(s)
-                    for line in response_bytes.split(b'\n\x1e')
-                    if (s := line.decode().strip())
-                ]
-                if len(logs) == 1 and logs[0].get('type') == 'error':
-                    # Error responses are a single JSON object, which we wrapped in a list above.
-                    response_dict = logs[0]
-                else:
-                    return logs
-            case _:
-                # otherwise we expect a single JSON object
-                response_dict: dict[str, Any] = json.loads(response_bytes)
+        if path == '/v2/logs':
+            # /v2/logs returns a stream of JSON objects separated by \n\x1e
+            logs = [
+                json.loads(s)
+                for line in response_bytes.split(b'\n\x1e')
+                if (s := line.decode().strip())
+            ]
+            if len(logs) == 1 and logs[0].get('type') == 'error':
+                # Error responses are a single JSON object, which we wrapped in a list above.
+                raise _make_error(logs[0])
+            return logs
+        # otherwise we expect a single JSON object
+        response_dict: dict[str, Any] = json.loads(response_bytes)
     except json.JSONDecodeError as e:
         raise _errors.SnapBadResponseError(
             message=f'Invalid JSON in response for path {path!r}: {e}',
