@@ -98,7 +98,7 @@ class SnapAppNotFoundError(SnapAPIError):
 
 
 class SnapNotFoundError(SnapAPIError):
-    """Raised when a snap is not found, either in the store or as an installed snap."""
+    """Raised via the API when a snap is not found, either in the store or as an installed snap."""
 
 
 class SnapNeedsClassicError(SnapAPIError):
@@ -135,7 +135,7 @@ class SnapOptionNotFoundError(SnapAPIError):
 
 
 class SnapChangeError(SnapAPIError):
-    """Raised manually when a snap change has an unexpected status (including failures)."""
+    """Raised when a snap change results in an error or has an unexpected status."""
 
 
 def _error_type_from_result_kind(kind: str) -> type[SnapAPIError]:  # pyright: ignore[reportUnusedFunction]

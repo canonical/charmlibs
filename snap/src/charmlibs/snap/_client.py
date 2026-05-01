@@ -206,7 +206,7 @@ def _wait_for_change(change_id: str) -> dict[str, Any]:
                 kind='charmlibs-snap',
                 value=str(response),
             )
-        match response.get('status'):
+        match (status := response.get('status')):
             case 'Do' | 'Doing':
                 time.sleep(0.1)
                 continue
@@ -215,12 +215,19 @@ def _wait_for_change(change_id: str) -> dict[str, Any]:
             case 'Wait':
                 logger.warning("snap change %s succeeded with status 'Wait'", change_id)
                 return response.get('data', {})
-            case _:  # Including the specific 'Error' status.
+            case 'Error':
                 raise _errors.SnapChangeError(
                     message=response.get('err', ''),
                     kind='charmlibs-snap-change-error',
-                    value=response.get('id', ''),
-                    status=response.get('status'),
+                    value=change_id,
+                    status=status,
+                )
+            case _:
+                raise _errors.SnapChangeError(
+                    message=f'Unexpected status {status!r} for snap change {change_id}',
+                    kind='charmlibs-snap-change-unknown',
+                    value=change_id,
+                    status=status,
                 )
 
 
