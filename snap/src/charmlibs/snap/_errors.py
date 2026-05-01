@@ -135,7 +135,7 @@ class SnapChangeError(SnapAPIError):
     """Raised manually when a snap change has an unexpected status (including failures)."""
 
 
-def _error_type_from_result_kind(kind: str) -> type[SnapError]:  # pyright: ignore[reportUnusedFunction]
+def _error_type_from_result_kind(kind: str) -> type[SnapAPIError]:  # pyright: ignore[reportUnusedFunction]
     match kind:
         case 'snap-already-installed':
             return SnapAlreadyInstalledError

@@ -235,7 +235,7 @@ def _wait_for_change(change_id: str) -> dict[str, Any]:
                 )
 
 
-def _make_error(response: dict[str, Any]) -> _errors.SnapError:
+def _make_error(response: dict[str, Any]) -> _errors.SnapAPIError:
     result = response.get('result', {})
     kind = result.get('kind', '')
     error_type = _errors._error_type_from_result_kind(kind)
