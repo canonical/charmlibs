@@ -70,7 +70,10 @@ class SnapBadResponseError(SnapError):
 
 
 class SnapConnectionError(SnapError, ConnectionError):
-    """Raised when a connection to the snapd socket fails."""
+    """Raised when a connection to the snapd socket fails.
+
+    This typically indicates that snapd is not installed or running.
+    """
 
 
 class SnapTimeoutError(SnapError, TimeoutError):
