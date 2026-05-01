@@ -364,6 +364,7 @@ class TestAsyncChange:
                 },
             )
         assert 'nonexistent' in exc_info.value.message
+        assert exc_info.value.kind == 'charmlibs-snap-change-error'
 
     def test_async_error_message_from_err_field(self, mock_raw: MagicMock):
         error_envelope = {
@@ -389,6 +390,7 @@ class TestAsyncChange:
         change_result = load_fixture('change_error.json')['result']
         assert exc_info.value.message == change_result['err']
         assert exc_info.value.value == change_result['id']
+        assert exc_info.value.kind == 'charmlibs-snap-change-error'
 
     def test_async_wait_status_logs_warning(self, mock_raw: MagicMock, caplog: LogCaptureFixture):
         wait_result: dict[str, Any] = {

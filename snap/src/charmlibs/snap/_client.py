@@ -228,7 +228,7 @@ def _wait_for_change(change_id: str) -> dict[str, Any]:
             case _:  # Including the specific 'Error' status.
                 raise _errors.SnapChangeError(
                     message=response.get('err', ''),
-                    kind='charmlibs-snap',
+                    kind='charmlibs-snap-change-error',
                     value=response.get('id', ''),
                     status_code=None,
                     status=response.get('status'),
