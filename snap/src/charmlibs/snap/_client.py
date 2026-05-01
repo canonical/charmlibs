@@ -175,9 +175,20 @@ def _request_raw(
         ) from None
     except urllib.error.URLError as e:
         if e.args and isinstance(e.args[0], FileNotFoundError):
-            msg = f'Could not connect to server: socket not found at {_SOCKET_PATH!r}'
-            raise ConnectionError(msg) from None
-        raise ConnectionError(e.reason) from e
+            raise _errors.SnapConnectionError(
+                f'Could not connect to snapd: socket not found at {_SOCKET_PATH!r}',
+                kind='charmlibs-snap-socket-not-found',
+                value='',
+                status_code=None,
+                status=None,
+            ) from None
+        raise _errors.SnapConnectionError(
+            str(e.reason),
+            kind='charmlibs-snap-connection-error',
+            value='',
+            status_code=None,
+            status=None,
+        ) from e
 
 
 def _wait_for_change(change_id: str) -> dict[str, Any]:

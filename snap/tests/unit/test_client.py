@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import logging
+import urllib.error
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 
@@ -23,6 +24,7 @@ from charmlibs.snap._errors import (
     SnapAlreadyInstalledError,
     SnapAPIError,
     SnapChangeError,
+    SnapConnectionError,
     SnapError,
     SnapNeedsClassicError,
     SnapNotFoundError,
@@ -249,6 +251,26 @@ class TestErrorResponses:
             _client.get('/v2/snaps/hello-world')
         assert exc_info.value.kind == 'charmlibs-snap-request-timeout'
         assert isinstance(exc_info.value, TimeoutError)
+
+    def test_socket_not_found_raises_snap_connection_error(self, mocker: MockerFixture):
+        mocker.patch(
+            'urllib.request.OpenerDirector.open',
+            side_effect=urllib.error.URLError(FileNotFoundError('no such file')),
+        )
+        with pytest.raises(SnapConnectionError) as exc_info:
+            _client.get('/v2/snaps/hello-world')
+        assert exc_info.value.kind == 'charmlibs-snap-socket-not-found'
+        assert isinstance(exc_info.value, ConnectionError)
+
+    def test_other_url_error_raises_snap_connection_error(self, mocker: MockerFixture):
+        mocker.patch(
+            'urllib.request.OpenerDirector.open',
+            side_effect=urllib.error.URLError('connection refused'),
+        )
+        with pytest.raises(SnapConnectionError) as exc_info:
+            _client.get('/v2/snaps/hello-world')
+        assert exc_info.value.kind == 'charmlibs-snap-connection-error'
+        assert isinstance(exc_info.value, ConnectionError)
 
 
 class TestAsyncChange:

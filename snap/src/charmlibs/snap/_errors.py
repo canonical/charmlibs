@@ -69,6 +69,15 @@ class SnapAPIError(SnapError):
     """
 
 
+class SnapConnectionError(SnapError, ConnectionError):
+    """Raised when a connection to the snapd socket fails.
+
+    A 'charmlibs-snap-socket-not-found' kind indicates the socket does not exist, most likely
+    because snap is not installed on this system. A 'charmlibs-snap-connection-error' kind
+    indicates some other connection failure (e.g. permission denied, broken pipe).
+    """
+
+
 class SnapTimeoutError(SnapError, TimeoutError):
     """Raised when a request to or change in snapd times out.
 
