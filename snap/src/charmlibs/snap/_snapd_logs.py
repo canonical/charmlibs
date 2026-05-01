@@ -17,12 +17,14 @@
 from __future__ import annotations
 
 import dataclasses
-import datetime
 import logging
+import typing
 from typing import Any
 
-from . import _client
-from . import _utils
+from . import _client, _utils
+
+if typing.TYPE_CHECKING:
+    import datetime
 
 logger = logging.getLogger(__name__)
 

@@ -45,8 +45,8 @@ something is badly wrong with the system, and user intervention is almost certai
 """
 
 from ._errors import (
-    SnapAlreadyInstalledError,
     SnapAPIError,
+    SnapAlreadyInstalledError,
     SnapAppNotFoundError,
     SnapChangeError,
     SnapError,
@@ -93,8 +93,8 @@ from ._version import __version__ as __version__
 __all__ = [
     'Info',
     'LogEntry',
-    'SnapAlreadyInstalledError',
     'SnapAPIError',
+    'SnapAlreadyInstalledError',
     'SnapAppNotFoundError',
     'SnapChangeError',
     'SnapError',
