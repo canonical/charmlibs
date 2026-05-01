@@ -16,9 +16,57 @@
 
 import logging
 
-from . import _snapd_snaps, _utils
+from . import _errors, _snapd_snaps, _utils
 
 logger = logging.getLogger(__name__)
+
+
+def ensure_revision(snap: str, revision: int, *, classic: bool = False) -> bool:
+    """Ensure the snap is installed at the specified revision.
+
+    Returns:
+        True if the snap was installed or updated, False otherwise.
+    """
+    info = _snapd_snaps.info(snap, missing_ok=True)
+    if info is None:
+        _snapd_snaps.install(snap, revision=revision, classic=classic)
+        return True
+    if info.revision != revision:
+        _snapd_snaps.refresh(snap, revision=revision)
+        return True
+    return False
+
+
+def ensure_channel(
+    snap: str, channel: str | None = None, *, classic: bool = False, update: bool = True
+) -> bool:
+    """Ensure the snap is installed and up-to-date on the specified channel.
+
+    The action taken depends on the current state of the snap:
+    - If the snap is not installed, it will be installed on the specified channel
+      (defaulting to latest/stable).
+    - If the snap is installed on a different channel, it will be refreshed to the
+      specified channel.
+    - If the snap is already installed on the specified channel (or installed at all if no
+      channel is specified), it will be refreshed only if update = ``True`` (default).
+
+    Returns:
+        True if the snap was installed or updated, False otherwise.
+    """
+    info = _snapd_snaps.info(snap, missing_ok=True)
+    if info is None:
+        _snapd_snaps.install(snap, channel=channel, classic=classic)
+        return True
+    if channel is not None and info.channel != _utils._normalize_channel(channel):
+        _snapd_snaps.refresh(snap, channel=channel)
+        return True
+    if not update:
+        return False
+    try:
+        _snapd_snaps.refresh(snap, channel=channel, strict=True)
+    except _errors.SnapNoUpdatesAvailableError:
+        return False
+    return True
 
 
 def ensure(
