@@ -2,127 +2,141 @@
 # Copyright 2026 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-"""Functional tests for _functions: ensure."""
+"""Functional tests for _functions: ensure_channel, ensure_revision."""
 
 import pytest
 
-from charmlibs.snap import _functions
+from charmlibs.snap import _errors, _functions
 from charmlibs.snap import _snapd_snaps as _snapd
-from conftest import ensure_removed
+from conftest import ensure_installed, ensure_removed
 
 # ---------------------------------------------------------------------------
-# ensure: install path
+# ensure_revision: install path
 # ---------------------------------------------------------------------------
 
 
-def test_ensure_installs_if_not_present():
+def test_ensure_revision_installs_if_not_present():
     ensure_removed('hello-world')
-    did_something = _functions.ensure('hello-world')
+    did_something = _functions.ensure_revision('hello-world', revision=28)
     assert did_something is True
-    assert _snapd.info('hello-world').name == 'hello-world'
-
-
-def test_ensure_installs_at_default_channel():
-    ensure_removed('hello-world')
-    _functions.ensure('hello-world')
-    assert _snapd.info('hello-world').channel == 'latest/stable'
-
-
-def test_ensure_installs_at_specified_channel():
-    ensure_removed('hello-world')
-    _functions.ensure('hello-world', channel='latest/candidate')
-    assert _snapd.info('hello-world').channel == 'latest/candidate'
-
-
-def test_ensure_installs_at_specified_revision():
-    ensure_removed('hello-world')
-    _functions.ensure('hello-world', revision=28)
     assert _snapd.info('hello-world').revision == 28
 
 
-def test_ensure_installs_classic():
+def test_ensure_revision_installs_classic():
     ensure_removed('charmcraft')
-    _functions.ensure('charmcraft', classic=True)
+    _functions.ensure_revision('charmcraft', revision=0, classic=True)
     assert _snapd.info('charmcraft').classic is True
 
 
 # ---------------------------------------------------------------------------
-# ensure: no-op path (already installed, no change needed)
+# ensure_revision: no-op path
 # ---------------------------------------------------------------------------
 
 
-def test_ensure_no_op_if_already_installed():
-    _functions.ensure('hello-world')
-    did_something = _functions.ensure('hello-world')
-    assert did_something is False
-
-
-def test_ensure_no_op_returns_false():
-    _functions.ensure('hello-world', channel='latest/stable')
-    result = _functions.ensure('hello-world', channel='latest/stable')
+def test_ensure_revision_no_op_if_same_revision():
+    ensure_installed('hello-world')
+    current_revision = _snapd.info('hello-world').revision
+    result = _functions.ensure_revision('hello-world', revision=current_revision)
     assert result is False
-
-
-def test_ensure_no_op_with_normalized_channel_latest():
-    _functions.ensure('hello-world', channel='latest/stable')
-    # 'latest' normalizes to 'latest/stable'
-    result = _functions.ensure('hello-world', channel='latest')
-    assert result is False
-
-
-def test_ensure_no_op_with_normalized_channel_stable():
-    _functions.ensure('hello-world', channel='latest/stable')
-    # 'stable' normalizes to 'latest/stable'
-    result = _functions.ensure('hello-world', channel='stable')
-    assert result is False
-
-
-def test_ensure_no_op_wrong_classic_flag():
-    # If confinement doesn't match requested classic, ensure does nothing
-    # (it doesn't refresh when only the classic flag differs).
-    _functions.ensure('charmcraft', classic=True)
-    assert _snapd.info('charmcraft').classic is True
-    # Passing classic=False when snap is installed classic → no change (returns False).
-    result = _functions.ensure('charmcraft', classic=False)
-    assert result is False
-    # Snap is still installed as classic.
-    assert _snapd.info('charmcraft').classic is True
 
 
 # ---------------------------------------------------------------------------
-# ensure: refresh path (installed but wrong channel/revision)
+# ensure_revision: refresh path
 # ---------------------------------------------------------------------------
 
 
-def test_ensure_refreshes_on_different_channel():
-    _functions.ensure('hello-world', channel='latest/stable')
-    assert _snapd.info('hello-world').channel == 'latest/stable'
-    did_something = _functions.ensure('hello-world', channel='latest/candidate')
-    assert did_something is True
-    assert _snapd.info('hello-world').channel == 'latest/candidate'
-
-
-def test_ensure_refreshes_on_different_revision():
-    _functions.ensure('hello-world')
+def test_ensure_revision_refreshes_on_different_revision():
+    ensure_installed('hello-world')
     original_revision = _snapd.info('hello-world').revision
     older_revision = original_revision - 1
-    did_something = _functions.ensure('hello-world', revision=older_revision)
+    did_something = _functions.ensure_revision('hello-world', revision=older_revision)
     assert did_something is True
     assert _snapd.info('hello-world').revision == older_revision
 
 
-def test_ensure_no_op_same_revision():
-    _functions.ensure('hello-world')
-    current_revision = _snapd.info('hello-world').revision
-    did_something = _functions.ensure('hello-world', revision=current_revision)
-    assert did_something is False
-
-
 # ---------------------------------------------------------------------------
-# ensure: error path
+# ensure_channel: install path
 # ---------------------------------------------------------------------------
 
 
-def test_ensure_channel_and_revision_raises():
-    with pytest.raises(ValueError):
-        _functions.ensure('hello-world', channel='latest/stable', revision=28)
+def test_ensure_channel_installs_if_not_present():
+    ensure_removed('hello-world')
+    did_something = _functions.ensure_channel('hello-world')
+    assert did_something is True
+    assert _snapd.info('hello-world').name == 'hello-world'
+
+
+def test_ensure_channel_installs_at_default_channel():
+    ensure_removed('hello-world')
+    _functions.ensure_channel('hello-world')
+    assert _snapd.info('hello-world').channel == 'latest/stable'
+
+
+def test_ensure_channel_installs_at_specified_channel():
+    ensure_removed('hello-world')
+    _functions.ensure_channel('hello-world', channel='latest/candidate')
+    assert _snapd.info('hello-world').channel == 'latest/candidate'
+
+
+def test_ensure_channel_installs_classic():
+    ensure_removed('charmcraft')
+    _functions.ensure_channel('charmcraft', classic=True)
+    assert _snapd.info('charmcraft').classic is True
+
+
+# ---------------------------------------------------------------------------
+# ensure_channel: no-op path (update=False)
+# ---------------------------------------------------------------------------
+
+
+def test_ensure_channel_no_op_update_false():
+    ensure_installed('hello-world', channel='latest/stable')
+    result = _functions.ensure_channel('hello-world', channel='latest/stable', update=False)
+    assert result is False
+
+
+def test_ensure_channel_no_op_normalized_channel():
+    ensure_installed('hello-world', channel='latest/stable')
+    result = _functions.ensure_channel('hello-world', channel='latest', update=False)
+    assert result is False
+
+
+def test_ensure_channel_no_op_stable_normalized():
+    ensure_installed('hello-world', channel='latest/stable')
+    result = _functions.ensure_channel('hello-world', channel='stable', update=False)
+    assert result is False
+
+
+# ---------------------------------------------------------------------------
+# ensure_channel: refresh path (channel mismatch)
+# ---------------------------------------------------------------------------
+
+
+def test_ensure_channel_refreshes_on_different_channel():
+    ensure_installed('hello-world', channel='latest/stable')
+    did_something = _functions.ensure_channel('hello-world', channel='latest/candidate')
+    assert did_something is True
+    assert _snapd.info('hello-world').channel == 'latest/candidate'
+
+
+# ---------------------------------------------------------------------------
+# ensure_channel: update path (same channel, update=True)
+# ---------------------------------------------------------------------------
+
+
+def test_ensure_channel_no_updates_available_returns_false():
+    ensure_installed('hello-world', channel='latest/stable')
+    # Already up-to-date — no updates available.
+    result = _functions.ensure_channel('hello-world', channel='latest/stable')
+    assert result is False
+
+
+# ---------------------------------------------------------------------------
+# error paths
+# ---------------------------------------------------------------------------
+
+
+def test_ensure_channel_needs_classic_raises():
+    ensure_removed('charmcraft')
+    with pytest.raises(_errors.SnapNeedsClassicError):
+        _functions.ensure_channel('charmcraft')

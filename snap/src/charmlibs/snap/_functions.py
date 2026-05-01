@@ -14,11 +14,7 @@
 
 """High level helper functions that build on top of the basic snap operations."""
 
-import logging
-
 from . import _errors, _snapd_snaps, _utils
-
-logger = logging.getLogger(__name__)
 
 
 def ensure_revision(snap: str, revision: int, *, classic: bool = False) -> bool:
@@ -69,40 +65,3 @@ def ensure_channel(
         return True
     except _errors.SnapNoUpdatesAvailableError:
         return False  # No updates available, so no changes were made.
-
-
-def ensure(
-    snap: str, *, channel: str | None = None, revision: int | None = None, classic: bool = False
-) -> bool:
-    """Ensure that the specified snap is installed with the specified channel or revision.
-
-    If neither is specified, ensure that it is installed at all, or install latest/stable if not.
-
-    Returns:
-        True if any action was taken (install or refresh), False otherwise.
-
-    Raises:
-        ValueError: if both channel and revision are specified.
-        SnapError: (or a subtype) if the snap could not be installed or refreshed as requested.
-    """
-    if channel is not None and revision is not None:
-        raise ValueError('Only one of channel or revision may be specified')
-    logger.debug('ensure:Querying info for snap %r', snap)
-    # Install if the snap is not already installed.
-    info = _snapd_snaps.info(snap, missing_ok=True)
-    if info is None:
-        logger.debug('ensure: Snap %r is not installed: installing ...', snap)
-        _snapd_snaps.install(snap, channel=channel, revision=revision, classic=classic)
-        return True
-    # Refresh if the snap is installed with a different channel or revision than requested.
-    different_channel = channel is not None and info.channel != _utils._normalize_channel(channel)
-    different_revision = revision is not None and info.revision != revision
-    if different_channel or different_revision:
-        msg = 'ensure: Snap %r is installed with channel=%r and revision=%d but requested (channel=%r, revision=%r): refreshing ...'  # noqa: E501
-        logger.debug(msg, snap, info.channel, info.revision, channel, revision)
-        _snapd_snaps.refresh(snap, channel=channel, revision=revision)
-        return True
-    # Return False if no operations were performed.
-    msg = 'ensure: Snap %r is already installed with classic=%s, channel=%r and revision=%d'
-    logger.debug(msg, snap, info.classic, info.channel, info.revision)
-    return False
