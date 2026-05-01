@@ -59,10 +59,15 @@ def test_install():
     assert info.channel == 'latest/stable'
 
 
-def test_install_already_installed_raises():
+def test_install_already_installed_suppressed_by_default():
+    ensure_installed('hello-world')
+    _snapd.install('hello-world')  # should not raise
+
+
+def test_install_already_installed_strict_raises():
     ensure_installed('hello-world')
     with pytest.raises(_errors.SnapAlreadyInstalledError) as ctx:
-        _snapd.install('hello-world')
+        _snapd.install('hello-world', strict=True)
     assert ctx.value.kind == 'snap-already-installed'
 
 
@@ -111,10 +116,15 @@ def test_remove():
     assert _snapd.info('hello-world', missing_ok=True) is None
 
 
-def test_remove_not_installed_raises():
+def test_remove_not_installed_suppressed_by_default():
+    ensure_removed('hello-world')
+    _snapd.remove('hello-world')  # should not raise
+
+
+def test_remove_not_installed_strict_raises():
     ensure_removed('hello-world')
     with pytest.raises(_errors.SnapNotFoundError) as ctx:
-        _snapd.remove('hello-world')
+        _snapd.remove('hello-world', strict=True)
     assert ctx.value.kind in ('snap-not-found', 'snap-not-installed')
 
 
@@ -136,6 +146,13 @@ def test_refresh_no_updates_suppressed():
     _snapd.refresh('hello-world', channel='latest/stable')
     # Still installed and unchanged.
     assert _snapd.info('hello-world').channel == 'latest/stable'
+
+
+def test_refresh_no_updates_strict_raises():
+    ensure_installed('hello-world', channel='latest/stable')
+    with pytest.raises(_errors.SnapNoUpdatesAvailableError) as ctx:
+        _snapd.refresh('hello-world', channel='latest/stable', strict=True)
+    assert ctx.value.kind == 'snap-no-update-available'
 
 
 def test_refresh_not_installed_raises_base_snap_error():
@@ -175,13 +192,12 @@ def test_hold_forever():
     assert info.hold is not None
 
 
-def test_hold_not_installed_raises_base_snap_error():
-    # The API returns an error with no 'kind' when holding a non-installed snap.
+def test_hold_not_installed_raises_snap_not_found_error():
+    # hold() calls info() first, which raises SnapNotFoundError with a proper kind.
     ensure_removed('hello-world')
-    with pytest.raises(_errors.SnapAPIError) as ctx:
+    with pytest.raises(_errors.SnapNotFoundError) as ctx:
         _snapd.hold('hello-world')
-    assert not ctx.value.kind
-    assert 'not installed' in ctx.value.message
+    assert ctx.value.kind == 'snap-not-found'
 
 
 def test_unhold():
