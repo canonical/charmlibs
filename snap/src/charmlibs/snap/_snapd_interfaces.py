@@ -19,7 +19,7 @@ from __future__ import annotations
 import dataclasses
 from typing import Any
 
-from . import _client
+from . import _client, _errors
 
 # /v2/interfaces
 
@@ -58,7 +58,12 @@ def disconnect(
         data['slots'] = [{'snap': slot_snap, 'slot': slot or ''}]
     if forget:
         data['forget'] = True
-    _client.post('/v2/interfaces', body=data)
+    # NOTE: Unlike connect, the API raises interfaces-unchanged if already disconnected.
+    # We suppress this to make disconnect symmetric with connect (following the snap CLI).
+    try:
+        _client.post('/v2/interfaces', body=data)
+    except _errors._SnapInterfacesUnchangedError:
+        pass  # Follow the snap CLI's lead and suppress this error.
 
 
 def _list_interfaces(

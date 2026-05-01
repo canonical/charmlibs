@@ -25,6 +25,7 @@ class SnapError(Exception):
         kind: The 'kind' field from a snapd API response, used to derive the specific error type.
             Manually constructed errors have the kind 'charmlibs-snap'.
         value: The 'value' field from a snapd API response, which may contain additional details.
+            Almost always a string, but can be any JSON value.
         status_code: The HTTP status code from the snapd API response, if applicable.
             Stored privately for logging and debugging, not part of the public error API.
         status: The 'status' field from a snapd API response, if applicable.
@@ -36,7 +37,7 @@ class SnapError(Exception):
         message: str,
         *,
         kind: str,
-        value: str,
+        value: object,
         status_code: int | None,
         status: str | None,
     ):
@@ -95,8 +96,22 @@ class _SnapNoUpdatesAvailableError(SnapError):
     """
 
 
+class _SnapInterfacesUnchangedError(SnapError):
+    """Raised via the API when a connect/disconnect would result in no change.
+
+    This class is private because the public disconnect function suppresses this error,
+    following the snap CLI's lead.
+    """
+
+
 class SnapOptionNotFoundError(SnapError):
-    """Raised via the API when the specified snap config option is not found."""
+    """Raised via the API when the specified snap config option is not found.
+
+    Note that ``SnapOptionNotFoundError.value`` is typically a ``dict``,
+    rather than the usual ``str``::
+
+        {'SnapName': snap_name, 'Key': key}.
+    """
 
 
 class SnapChangeError(SnapError):
@@ -117,5 +132,7 @@ def _error_type_from_result_kind(kind: str) -> type[SnapError]:  # pyright: igno
             return SnapNotFoundError
         case 'snap-no-update-available':
             return _SnapNoUpdatesAvailableError
+        case 'interfaces-unchanged':
+            return _SnapInterfacesUnchangedError
         case _:
             return SnapError
