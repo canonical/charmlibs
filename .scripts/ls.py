@@ -85,15 +85,13 @@ def _main() -> None:
     parser.add_argument('--only-if-version-changed', action='store_true')
     parser.add_argument('--indent-json', action='store_true')
     parser.add_argument('--regex', default=None)
+    parser.add_argument('--no-json', action='store_true')
     group = parser.add_mutually_exclusive_group()
     all_fields = [f.name for f in dataclasses.fields(Info)]
-    group.add_argument('--output', action='append', choices=all_fields)
-    group.add_argument('--output-all', action='store_const', const=all_fields, default=[])
-    group.add_argument('--name-only', action='store_true')
-    group.add_argument('--path-only', action='store_true')  # default behaviour
+    group.add_argument('--output', action='append', choices=all_fields, dest='output')
+    group.add_argument('--output-all', action='store_const', const=all_fields, dest='output')
+    group.add_argument('--output-only', action='store', default='path')  # default behaviour
     args = parser.parse_args()
-    output = args.output or args.output_all
-    single_output = 'name' if args.name_only else 'path'
     infos = _ls(
         category=args.category,
         old_ref=args.old_ref,
@@ -103,16 +101,19 @@ def _main() -> None:
         include_testing=not args.exclude_testing,
         only_if_version_changed=args.only_if_version_changed,
         regex=args.regex,
-        output=output or [single_output],
+        output=args.output or [args.output_only],
     )
-    if output:
+    if args.output:
         result = sorted(
-            (info.to_dict(*output) for info in infos),
+            (info.to_dict(*args.output) for info in infos),
             key=lambda di: tuple(di.items()),
         )
     else:
-        result = sorted(getattr(info, single_output) for info in infos)
-    print(json.dumps(result, indent=2 if args.indent_json else None))
+        result = sorted(getattr(info, args.output_only) for info in infos)
+    if args.no_json:
+        print('\n'.join(str(r) for r in result))
+    else:
+        print(json.dumps(result, indent=2 if args.indent_json else None))
 
 
 def _ls(

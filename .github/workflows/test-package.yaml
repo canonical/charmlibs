@@ -32,6 +32,7 @@ jobs:
   init:
     runs-on: ubuntu-latest
     outputs:
+      package-name: ${{ steps.package-info.outputs.name }}
       tests: ${{ steps.tests.outputs.tests }}
       python: ${{ steps.python.outputs.versions }}
       min_python_version: ${{ steps.python.outputs.min_version }}
@@ -54,6 +55,14 @@ jobs:
             */.example|*/.example/testing|*/.tutorial) echo "Examples don't have a uv.lock file, skipping ..." ;;
             *) uv lock --check ;;
           esac
+
+      - name: Get package info
+        id: package-info
+        run: |
+          set -xueo pipefail
+          NAME=$(.scripts/ls.py packages --no-json --exclude-testing --output-only name --regex "$PACKAGE")
+          echo "name=$NAME"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
 
       - name: Check which Python versions this package supports
         id: python
@@ -222,10 +231,22 @@ jobs:
 
       - name: Pack charms
         if: ${{ hashFiles(format('{0}/tests/integration/pack.sh', inputs.package)) != '' }}
+        id: pack
         env:
           TAG: ${{ matrix.tag }}
           SUBSTRATE: ${{ matrix.substrate }}
-        run: uvx --from rust-just just tag="$TAG" "pack-$SUBSTRATE" "$PACKAGE"
+        # Retry once to work around snap startup issues with charmcraft pack.
+        # Drop the retry when the issue is resolved.
+        # https://github.com/canonical/charmcraft/issues/2515
+        run: uvx --from rust-just just tag="$TAG" "pack-$SUBSTRATE" "$PACKAGE" || uvx --from rust-just just tag="$TAG" "pack-$SUBSTRATE" "$PACKAGE"
+
+      - name: Upload Charmcraft logs
+        if: ${{ !cancelled() && steps.pack.conclusion != 'skipped' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ needs.init.outputs.package-name }}-charmcraft-logs-${{ matrix.substrate }}-${{ matrix.tag }}
+          path: /home/runner/.local/state/charmcraft/log/charmcraft-*.log
+          if-no-files-found: warn
 
       - name: Run Juju integration tests
         env:
