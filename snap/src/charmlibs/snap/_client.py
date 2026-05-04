@@ -191,7 +191,7 @@ def _wait_for_change(change_id: str) -> dict[str, Any]:
             raise _errors.SnapTimeoutError(
                 f'Timed out after {_CHANGE_TIMEOUT}s waiting for snap change {change_id}',
                 kind='charmlibs-snap-change-timeout',
-                value='',
+                value=change_id,
             )
         response = _request('GET', f'/v2/changes/{change_id}', log=False)
         if not isinstance(response, dict):

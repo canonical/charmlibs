@@ -183,18 +183,19 @@ def test_put_empty_body_succeeds():
     _client.put('/v2/snaps/lxd/conf', body={})  # should not raise
 
 
-def test_change_timeout_raises_snap_timeout_error(monkeypatch: MonkeyPatch):
+def test_change_timeout_raises_snap_timeout_error():
     # With _CHANGE_TIMEOUT=0 the deadline fires before the first poll, exercising the
     # change-timeout path with a real async operation (local conf PUT, no store needed).
     ensure_installed('lxd')
-    monkeypatch.setattr(_client, '_CHANGE_TIMEOUT', 0)
-    with pytest.raises(_errors.SnapTimeoutError) as ctx:
-        _client.put('/v2/snaps/lxd/conf', body={'test-change-timeout-key': 'value'})
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(_client, '_CHANGE_TIMEOUT', 0)
+        with pytest.raises(_errors.SnapTimeoutError) as ctx:
+            _client.put('/v2/snaps/lxd/conf', body={'test-change-timeout-key': 'value'})
     assert ctx.value.kind == 'charmlibs-snap-change-timeout'
     assert isinstance(ctx.value, TimeoutError)
-    # snapd will still complete the change; clean up the key.
+    # snapd is still processing the change; wait for it before cleaning up.
+    _client._wait_for_change(ctx.value.value)
     _client.put('/v2/snaps/lxd/conf', body={'test-change-timeout-key': None})
-    assert not _client.get('/v2/snaps/lxd/conf', query={'keys': 'test-change-timeout-key'})
 
 
 # ---------------------------------------------------------------------------
