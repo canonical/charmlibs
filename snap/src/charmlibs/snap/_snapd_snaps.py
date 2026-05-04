@@ -134,6 +134,8 @@ def install(
         SnapError: (or a subtype) if the snap could not be installed as requested.
     """
     if channel is not None and revision is not None:
+        # NOTE: Revision silently takes precedence over channel in the snapd API.
+        # The CLI instead returns an error if the specified revision doesn't exist on that channel.
         raise ValueError('Only one of channel or revision may be specified')
     data: dict[str, Any] = {'action': 'install'}
     if channel:
@@ -169,7 +171,7 @@ def remove(snap: str, *, purge: bool = False, strict: bool = False) -> None:
 
 
 def refresh(
-    snap: str, channel: str | None = None, revision: int | None = None, strict: bool = False
+    snap: str, channel: str | None = None, *, revision: int | None = None, strict: bool = False
 ) -> None:
     """Refresh a snap.
 
@@ -178,7 +180,8 @@ def refresh(
         SnapError: (or a subtype) if the snap could not be refreshed as requested.
     """
     if channel is not None and revision is not None:
-        # NOTE: If we passed both then revision would silently take precedence over channel.
+        # NOTE: Revision silently takes precedence over channel in the snapd API.
+        # The CLI instead returns an error if the specified revision doesn't exist on that channel.
         raise ValueError('Only one of channel or revision may be specified')
     data = {'action': 'refresh'}
     if channel:
