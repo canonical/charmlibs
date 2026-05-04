@@ -83,9 +83,13 @@ ALL_TELEMETRIES: list[Literal['logs', 'metrics', 'traces']] = ['logs', 'metrics'
 
 class OtlpRequirerCharm(CharmBase):
     _aggregator_peer_relation_name: str | None = None
+    _extra_alert_labels: dict[str, str] | None = None
 
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
+        self._extra_alert_labels = (
+            {} if self._extra_alert_labels is None else self._extra_alert_labels
+        )
         self.framework.observe(self.on.update_status, self._publish_rules)
 
     def _publish_rules(self, _: ops.EventBase) -> None:
@@ -105,6 +109,7 @@ class OtlpRequirerCharm(CharmBase):
             telemetries=ALL_TELEMETRIES,
             aggregator_peer_relation_name=self._aggregator_peer_relation_name,
             rules=rules,
+            extra_alert_labels=self._extra_alert_labels,
         ).publish()
 
 
@@ -135,13 +140,20 @@ def otlp_requirer_ctx(request: pytest.FixtureRequest) -> testing.Context[OtlpReq
         'requires': {'send-otlp': {'interface': 'otlp'}},
         'peers': {PEERS_ENDPOINT: {'interface': 'aggregator_peers'}},
     }
-    # We want to be able to test generic aggregator rules injection and the application rules
-    # injection case, which is toggled by an aggregator peer relation name input.
-    generic_aggregator_rules: bool = getattr(request, 'param', False)
+    param: dict[str, object] | bool = getattr(request, 'param', False)
+    if isinstance(param, dict):
+        generic_aggregator_rules: bool = bool(param.get('aggregator', False))
+        extra_alert_labels: dict[str, str] = dict(param.get('extra_alert_labels', {}))  # type: ignore[arg-type]
+    else:
+        generic_aggregator_rules = param
+        extra_alert_labels = {}
     charm_cls = type(
         'OtlpRequirerCharm',
         (OtlpRequirerCharm,),
-        {'_aggregator_peer_relation_name': PEERS_ENDPOINT if generic_aggregator_rules else None},
+        {
+            '_aggregator_peer_relation_name': PEERS_ENDPOINT if generic_aggregator_rules else None,
+            '_extra_alert_labels': extra_alert_labels,
+        },
     )
     return testing.Context(charm_cls, meta=meta)
 

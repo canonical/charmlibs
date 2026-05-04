@@ -1,10 +1,10 @@
 [project]
-name = "charmlibs-example"
-description = "The charmlibs.example package."
+name = "charmlibs-rollingops"
+description = "The charmlibs.rollingops package."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 authors = [
-    {name="The Charm Tech team at Canonical"},
+    {name="The Data Platform team at Canonical"},
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -15,34 +15,35 @@ classifiers = [
 ]
 dynamic = ["version"]
 dependencies = [
-    # Libraries should use clear but wide dependency bounds to avoid overly constraining charms.
-    # Ops 3 is backwards compatible with Ops 2, but drops Python 3.8 support.
-    # Ops 3 has new features not present in Ops 2.23 (the last Ops 2 feature release).
-    # See the Ops 2.23 maintenance branch changelog and the Ops 3 changelog for current information:
-    # - https://github.com/canonical/operator/blob/2.23-maintenance/CHANGES.md
-    # - https://github.com/canonical/operator/blob/main/CHANGES.md
-    # Set the dependency bounds according to the features and fixes your library needs.
-    # "ops>=2.23.1,<4",
+    "ops>=2.23.1,<4",
+    "charmlibs-interfaces-tls-certificates>=1.8.1",
+    "charmlibs-pathops>=1.2.1",
+    "dpcharmlibs-interfaces==1.0.0",
+    "tenacity",
+    "pydantic>=2.12.5",
+    "shortuuid>=1.0.13",
 ]
 
 [dependency-groups]
-lint = [  # installed for `just lint example` (unit, functional, and integration are also installed)
+lint = [  # installed for `just lint rollingops` (unit, functional, and integration are also installed)
     # "typing_extensions",
 ]
-unit = [  # installed for `just unit example`
+unit = [  # installed for `just unit rollingops`
     "ops[testing]",
 ]
-functional = [  # installed for `just functional example`
+functional = [  # installed for `just functional rollingops`
 ]
-integration = [  # installed for `just integration example`
+integration = [  # installed for `just integration rollingops`
     "jubilant",
+    "tenacity",
+    "charmlibs-apt",
 ]
 
 [project.urls]
-"Documentation" = "https://documentation.ubuntu.com/charmlibs/reference/charmlibs/example"
-"Repository" = "https://github.com/canonical/charmlibs/tree/main/example"
+"Documentation" = "https://documentation.ubuntu.com/charmlibs/reference/charmlibs/rollingops"
+"Repository" = "https://github.com/canonical/charmlibs/tree/main/rollingops"
 "Issues" = "https://github.com/canonical/charmlibs/issues"
-"Changelog" = "https://github.com/canonical/charmlibs/blob/main/example/CHANGELOG.md"
+"Changelog" = "https://github.com/canonical/charmlibs/blob/main/rollingops/CHANGELOG.md"
 
 [build-system]
 requires = ["hatchling"]
@@ -52,11 +53,11 @@ build-backend = "hatchling.build"
 packages = ["src/charmlibs"]
 
 [tool.hatch.version]
-path = "src/charmlibs/example/_version.py"
+path = "src/charmlibs/rollingops/_version.py"
 
 [tool.ruff]
 extend = "../pyproject.toml"
-src = ["src", "tests/unit", "tests/functional", "tests/integration"]  # correctly sort local imports in tests
+src = ["src", "tests/unit", "tests/integration"]  # correctly sort local imports in tests
 
 [tool.ruff.lint.extend-per-file-ignores]
 # add additional per-file-ignores here to avoid overriding repo-level config
@@ -67,7 +68,8 @@ src = ["src", "tests/unit", "tests/functional", "tests/integration"]  # correctl
 [tool.pyright]
 extends = "../pyproject.toml"
 include = ["src", "tests"]
-pythonVersion = "3.10"  # check no python > 3.10 features are used
+exclude = ["tests/integration/.tmp/**"]
+pythonVersion = "3.12"  # check no python > 3.12 features are used
 
 [tool.charmlibs.functional]
 ubuntu = []  # ubuntu versions to run functional tests with, e.g. "24.04" (defaults to just "latest")
