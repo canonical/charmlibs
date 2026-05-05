@@ -42,7 +42,7 @@ Typical use cases:
 - Cluster-wide operations coordinated via etcd
 
 Known current limitations
-------------------------
+--------------------------
 
 - **Peer-only mode**
   Supported for both machine (VM) and Kubernetes charms.
