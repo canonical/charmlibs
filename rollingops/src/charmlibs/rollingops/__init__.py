@@ -347,6 +347,13 @@ In v0, coordination issues could lead to unexpected or unsafe behavior:
 - Multiple lock requests could overwrite each other, silently dropping operations
 - Exceptions during callbacks could leave the system in a stuck state.
 
+The new version introduces:
+
+- Safe handling of deferred callbacks, preserving lock guarantees
+- A per-unit operation queue, ensuring all requests are preserved and executed
+- Explicit retry semantics, allowing controlled and predictable failure handling
+- Support for rolling operations across multiple applications (via etcd)
+
 Key migration changes:
 
 - New ``RollingOpsManager`` constructor
@@ -388,6 +395,7 @@ Each callback is identified by a string key::
         },
     )
 
+
 ### Requesting an asynchronous lock
 
 Before, lock acquisition was triggered by emitting the library event::
@@ -400,8 +408,9 @@ Before, lock acquisition was triggered by emitting the library event::
             callback_override="_custom_restart"
     )
 
+
 Now, request the lock directly through ``request_async_lock`` and pass the
-callback identifier:
+callback identifier::
 
     def _on_restart_action(self, event):
         delay = event.params.get("delay")
@@ -417,6 +426,7 @@ callback identifier:
             callback_id="custom-restart",
             kwargs={"delay": delay},
         )
+
 
 Now, arguments can be passed directly through kwargs when requesting the lock.
 You can also use ``max_retry`` when requesting the lock to limit the number of
