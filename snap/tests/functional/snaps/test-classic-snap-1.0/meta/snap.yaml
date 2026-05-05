@@ -1,0 +1,4 @@
+name: test-classic-snap
+version: "1.0"
+summary: Minimal classic-confined snap for charmlibs.snap functional tests
+confinement: classic

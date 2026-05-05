@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from charmlibs.snap import _client
+from charmlibs.snap import _client, _errors
 from charmlibs.snap import _snapd_snaps as _snapd
 from conftest import ensure_removed
 
@@ -28,7 +28,7 @@ SNAPS_DIR = Path(__file__).parent / "snaps"
 # ---------------------------------------------------------------------------
 
 
-def install_local(path: Path, *, classic: bool = False) -> None:
+def install_local(path: Path, *, dangerous: bool = False, classic: bool = False) -> None:
     """Install a local snap file via the snapd sideload API (POST /v2/snaps)."""
     snap_data = path.read_bytes()
     boundary = uuid.uuid4().hex
@@ -50,12 +50,11 @@ def install_local(path: Path, *, classic: bool = False) -> None:
         + CRLF
         + snap_data
         + CRLF
-        + form_field("dangerous", "true")
     )
+    if dangerous:
+        body += form_field("dangerous", "true")
     if classic:
         body += form_field("classic", "true")
-    else:
-        body += form_field("devmode", "true")
     body += b'--' + boundary.encode() + b'--' + CRLF
 
     headers = {
@@ -84,20 +83,31 @@ def snap_v2() -> Path:
     return SNAPS_DIR / "test-snap_2.0.snap"
 
 
+@pytest.fixture
+def classic_snap_v1() -> Path:
+    return SNAPS_DIR / "test-classic-snap_1.0.snap"
+
+
 @pytest.fixture(autouse=True)
 def remove_test_snap():
     yield
     ensure_removed("test-snap")
 
 
+@pytest.fixture(autouse=True)
+def remove_test_classic_snap():
+    yield
+    ensure_removed("test-classic-snap")
+
+
 # ---------------------------------------------------------------------------
-# Tests
+# Tests — strict-confined snap
 # ---------------------------------------------------------------------------
 
 
 def test_install_local(snap_v1: Path):
     ensure_removed("test-snap")
-    install_local(snap_v1)
+    install_local(snap_v1, dangerous=True)
     info = _snapd.info("test-snap")
     assert info.name == "test-snap"
     assert info.version == "1.0"
@@ -106,14 +116,39 @@ def test_install_local(snap_v1: Path):
 def test_install_local_already_installed(snap_v1: Path):
     # Sideloading does not raise SnapAlreadyInstalledError when the snap is present.
     ensure_removed("test-snap")
-    install_local(snap_v1)
-    install_local(snap_v1)  # second call must succeed
+    install_local(snap_v1, dangerous=True)
+    install_local(snap_v1, dangerous=True)  # second call must succeed
     assert _snapd.info("test-snap").version == "1.0"
 
 
 def test_install_local_upgrades(snap_v1: Path, snap_v2: Path):
     ensure_removed("test-snap")
-    install_local(snap_v1)
+    install_local(snap_v1, dangerous=True)
     assert _snapd.info("test-snap").version == "1.0"
-    install_local(snap_v2)
+    install_local(snap_v2, dangerous=True)
     assert _snapd.info("test-snap").version == "2.0"
+
+
+def test_install_local_without_dangerous_raises(snap_v1: Path):
+    ensure_removed("test-snap")
+    with pytest.raises(_errors.SnapAPIError):
+        install_local(snap_v1)  # dangerous=False by default
+
+
+# ---------------------------------------------------------------------------
+# Tests — classic-confined snap
+# ---------------------------------------------------------------------------
+
+
+def test_install_local_classic_without_classic_flag_raises(classic_snap_v1: Path):
+    ensure_removed("test-classic-snap")
+    with pytest.raises(_errors.SnapNeedsClassicError):
+        install_local(classic_snap_v1, dangerous=True)
+
+
+def test_install_local_classic(classic_snap_v1: Path):
+    ensure_removed("test-classic-snap")
+    install_local(classic_snap_v1, dangerous=True, classic=True)
+    info = _snapd.info("test-classic-snap")
+    assert info.name == "test-classic-snap"
+    assert info.version == "1.0"
