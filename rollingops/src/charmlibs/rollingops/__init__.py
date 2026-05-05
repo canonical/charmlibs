@@ -34,7 +34,7 @@ relation for internal state management. If etcd becomes unavailable or encounter
 errors, the library automatically falls back to the peer-based backend to ensure
 operations can continue.
 
-Typical use cases::
+Typical use cases:
 
 - Rolling restarts of application units
 - Safe configuration changes requiring sequential execution
@@ -120,7 +120,8 @@ retried due to failures or hook replays. They must not interact directly with
 the locking mechanism (e.g. requesting locks, mutating the peer relation
 databag used by the library, emitting relation events, or deferring execution).
 
-### Operation result
+Operation result
+~~~~~~~~~~~~~~~~
 
 Callbacks must return an `OperationResult`:
 
@@ -136,7 +137,8 @@ Callbacks must return an `OperationResult`:
 - If the callback returns None or an invalid value, the lock is released.
 - If the callback raises an exception, it is considered as a `RETRY_RELEASE`.
 
-### Arguments
+Arguments:
+~~~~~~~~~~
 
 The callback arguments (``kwargs``) must be JSON-serializable, as they are
 stored in the peer relation databag.
@@ -369,7 +371,8 @@ Key migration changes:
   ``request_async_lock(callback_id=..., kwargs=..., max_retry=...)``.
 
 
-### Manager initialization
+Manager initialization
+^^^^^^^^^^^^^^^^^^^^^^
 
 Before, the manager accepted a single relation name and a single callback::
 
@@ -396,7 +399,8 @@ Each callback is identified by a string key::
     )
 
 
-### Requesting an asynchronous lock
+Requesting an asynchronous lock
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Before, lock acquisition was triggered by emitting the library event::
 
@@ -432,7 +436,8 @@ Now, arguments can be passed directly through kwargs when requesting the lock.
 You can also use ``max_retry`` when requesting the lock to limit the number of
 retry attempts in case of failure.
 
-### Retries and callback return value
+Retries and callback return value
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Callbacks must now return an ``OperationResult`` so the library knows whether
 to release the lock or retry the operation.
