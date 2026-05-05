@@ -35,6 +35,7 @@ errors, the library automatically falls back to the peer-based backend to ensure
 operations can continue.
 
 Typical use cases::
+
 - Rolling restarts of application units
 - Safe configuration changes requiring sequential execution
 - Maintenance tasks that must not run concurrently
