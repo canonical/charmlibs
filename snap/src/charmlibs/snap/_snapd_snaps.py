@@ -53,7 +53,7 @@ class Info:
     def _from_dict(cls, info_dict: dict[str, str]) -> Self:
         return cls(
             name=info_dict['name'],
-            channel=info_dict['channel'],
+            channel=info_dict.get('channel', ''),
             revision=info_dict['revision'],
             version=info_dict['version'],
             classic=info_dict['confinement'] == 'classic',

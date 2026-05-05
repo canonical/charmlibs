@@ -1,0 +1,4 @@
+name: test-snap
+version: "1.0"
+summary: Minimal snap for charmlibs.snap functional tests
+confinement: devmode

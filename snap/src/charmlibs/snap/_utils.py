@@ -27,6 +27,8 @@ def _normalize_channel(channel: str) -> str:  # pyright: ignore[reportUnusedFunc
     Snapd uses default values internally, but will record the *requested* value in the snap info.
     This function normalizes channels with no "/" to the form "track/risk" for easier comparison.
     """
+    if not channel:
+        return ''
     if '/' not in channel:
         if channel not in ('edge', 'beta', 'candidate', 'stable'):
             # track only, append default risk
