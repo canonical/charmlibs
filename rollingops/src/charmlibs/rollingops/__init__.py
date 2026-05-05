@@ -140,7 +140,8 @@ Callbacks must return an `OperationResult`:
 The callback arguments (``kwargs``) must be JSON-serializable, as they are
 stored in the peer relation databag.
 
-## Peer-based scheduling
+Peer-based scheduling
+^^^^^^^^^^^^^^^^^^^^^
 
 In peer-based mode, the leader unit acts as scheduler and grants the lock.
 
@@ -157,7 +158,8 @@ Rules:
 
 The selected unit executes the head of its queue.
 
-### Etcd-based coordination
+Etcd-based coordination
+^^^^^^^^^^^^^^^^^^^^^^^^
 
 When etcd is used:
 
@@ -172,7 +174,7 @@ To use etcd-backed operations:
 
 1. Deploy an ``charmed-etcd`` application
 2. Integrate it with a TLS certificates provider that implements the
-``tls-certificates`` interface
+   `tls-certificates`` interface
 3. Relate ``charmed-etcd`` to your charm
 
 The etcd-based functionality requires the etcdctl binary to be present
@@ -249,7 +251,8 @@ Nothe that the peer relation is mandatory even if we are integrating
 with etcd.
 
 
-## Usage
+Usage
+----------
 
 Provide an implementation of `SyncLockBackend`::
 
@@ -330,6 +333,126 @@ If you want to used it on peer-only mode, skip the `etcd_relation_name` and
 
 Beware that the `sync_lock_targets` is also optional, but if no provided, the
 sync lock cannot be used
+
+Migration from v0
+-----------------
+
+The charmlibs-rollingops library introduces a more robust and predictable execution model,
+addressing several limitations of the previous implementation.
+
+In v0, coordination issues could lead to unexpected or unsafe behavior:
+
+- Deferred callbacks could break mutual exclusion, causing operations to run without a lock
+- Multiple lock requests could overwrite each other, silently dropping operations
+- Exceptions during callbacks could leave the system in a stuck state.
+
+Key migration changes:
+
+- New ``RollingOpsManager`` constructor
+  Replace `relation` and `callback` with `peer_relation_name` and
+  `callback_targets` (mapping of callback IDs to methods).
+
+- New callback signature and contract
+  Callbacks no longer receive an event, must accept ``**kwargs``, and must
+  return an ``OperationResult``.
+
+- New async lock request API
+  Replace event emission (``acquire_lock.emit``) with
+  ``request_async_lock(callback_id=..., kwargs=..., max_retry=...)``.
+
+
+### Manager initialization
+
+Before, the manager accepted a single relation name and a single callback::
+
+    from charms.rolling_ops.v0.rollingops import RollingOpsManager
+
+    self.restart_manager = RollingOpsManager(
+        charm=self,
+        relation="restart",
+        callback=self._restart,
+    )
+
+Now, callbacks are registered explicitly using callback_targets.
+Each callback is identified by a string key::
+
+    from charmlibs.rollingops import RollingOpsManager
+
+    self.rollingops = RollingOpsManager(
+        charm=self,
+        peer_relation_name="restart",
+        callback_targets={
+            "restart": self._restart,
+            "custom-restart": self._custom_restart,
+        },
+    )
+
+### Requesting an asynchronous lock
+
+Before, lock acquisition was triggered by emitting the library event::
+
+    def _on_restart_action(self, event):
+        self.on[self.restart_manager.name].acquire_lock.emit()
+
+    def _on_custom_restart_action(self, event):
+        self.on[self.restart_manager.name].acquire_lock.emit(
+            callback_override="_custom_restart"
+    )
+
+Now, request the lock directly through ``request_async_lock`` and pass the
+callback identifier:
+
+    def _on_restart_action(self, event):
+        delay = event.params.get("delay")
+        self.rollingops.request_async_lock(
+            callback_id="restart",
+            kwargs={"delay": delay},
+            max-retry=1,
+        )
+
+    def _on_custom_restart_action(self, event):
+        delay = event.params.get("delay")
+        self.rollingops.request_async_lock(
+            callback_id="custom-restart",
+            kwargs={"delay": delay},
+        )
+
+Now, arguments can be passed directly through kwargs when requesting the lock.
+You can also use ``max_retry`` when requesting the lock to limit the number of
+retry attempts in case of failure.
+
+### Retries and callback return value
+
+Callbacks must now return an ``OperationResult`` so the library knows whether
+to release the lock or retry the operation.
+
+Before::
+
+    def _restart(self, event):
+        if self._stored.delay:
+            time.sleep(int(self._stored.delay))
+
+        self.model.get_relation(self.restart_manager.name).data[self.unit].update({
+            "restart-type": "restart"
+        })
+
+Now::
+
+    from charmlibs.rollingops import OperationResult
+
+    def _restart(self, delay=None) -> OperationResult:
+        if not self.is_ready():
+            return OperationResult.RETRY_RELEASE
+        if delay:
+            time.sleep(int(delay))
+
+        self._stored.restarted = True
+
+        self.model.get_relation("restart").data[self.unit].update({
+            "restart-type": "restart"
+        })
+
+        return OperationResult.RELEASE
 
 """
 

@@ -241,7 +241,7 @@ class RollingOpsManager(Object):
                 operation is granted the rolling lock.
             kwargs: Optional keyword arguments passed to the callback target.
             max_retry: Optional maximum number of retries allowed for the
-                operation. None means infinte retries.
+                operation. None means infinite retries.
 
         Raises:
             RollingOpsInvalidLockRequestError: If the callback identifier is
