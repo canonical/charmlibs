@@ -11,6 +11,7 @@ exercising POST /v2/snaps with a multipart body.
 from __future__ import annotations
 
 import json
+import subprocess
 import uuid
 from pathlib import Path
 
@@ -21,6 +22,19 @@ from charmlibs.snap import _snapd_snaps as _snapd
 from conftest import ensure_removed
 
 SNAPS_DIR = Path(__file__).parent / "snaps"
+
+
+# ---------------------------------------------------------------------------
+# Provisional ack implementation
+# ---------------------------------------------------------------------------
+
+
+def ack(assertions_data: bytes) -> None:
+    """Upload assertion(s) to snapd's local database (POST /v2/assertions)."""
+    response = _client._request_raw("POST", "/v2/assertions", data=assertions_data)
+    response_dict = json.loads(response.read())
+    if response_dict.get("type") == "error":
+        raise _client._make_error(response_dict)
 
 
 # ---------------------------------------------------------------------------
@@ -100,6 +114,26 @@ def remove_test_classic_snap():
     ensure_removed("test-classic-snap")
 
 
+@pytest.fixture(scope="session")
+def hello_world_download(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, Path]:
+    """Download hello-world snap and assertions once for the session."""
+    d = tmp_path_factory.mktemp("hello-world")
+    subprocess.run(
+        ["snap", "download", "hello-world", "--channel=stable", f"--target-directory={d}"],
+        check=True,
+        capture_output=True,
+    )
+    snap_file = next(d.glob("hello-world_*.snap"))
+    assert_file = next(d.glob("hello-world_*.assert"))
+    return snap_file, assert_file
+
+
+@pytest.fixture(autouse=True)
+def remove_hello_world():
+    yield
+    ensure_removed("hello-world")
+
+
 # ---------------------------------------------------------------------------
 # Tests — strict-confined snap
 # ---------------------------------------------------------------------------
@@ -154,3 +188,22 @@ def test_install_local_classic(classic_snap_v1: Path):
     info = _snapd.info("test-classic-snap")
     assert info.name == "test-classic-snap"
     assert info.version == "1.0"
+
+
+# ---------------------------------------------------------------------------
+# Tests — assertions (ack)
+# ---------------------------------------------------------------------------
+
+
+def test_ack_and_install(hello_world_download: tuple[Path, Path]):
+    snap_file, assert_file = hello_world_download
+    ensure_removed("hello-world")
+    ack(assert_file.read_bytes())
+    install_local(snap_file)  # dangerous=False — assertions are in the DB
+    assert _snapd.info("hello-world").name == "hello-world"
+
+
+def test_ack_is_idempotent(hello_world_download: tuple[Path, Path]):
+    _, assert_file = hello_world_download
+    ack(assert_file.read_bytes())
+    ack(assert_file.read_bytes())  # second call must not raise
