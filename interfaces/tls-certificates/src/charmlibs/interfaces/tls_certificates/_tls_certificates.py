@@ -2517,6 +2517,9 @@ class TLSCertificatesRequiresV4(Object):
         except DataValidationError:
             logger.warning("Invalid relation data")
             return []
+        except ModelError:
+            logger.warning("Relation data not available")
+            return []
         return [
             certificate.to_provider_certificate(relation_id=relation.id)
             for certificate in provider_relation_data.certificates
