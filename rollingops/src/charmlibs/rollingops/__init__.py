@@ -251,7 +251,7 @@ operate using the peer backend until the identifier becomes available.
 Once the ``cluster_id`` is set, etcd-backed coordination will be used
 automatically if the etcd relation is configured.
 
-Do not provide a ``cluster_id`` without a `etcd_relation_name`.
+Do not provide a ``cluster_id`` without a ``etcd_relation_name``.
 
 
 Integrations
@@ -276,7 +276,7 @@ with etcd.
 Usage
 ----------
 
-Provide an implementation of `SyncLockBackend`::
+Provide an implementation of ``SyncLockBackend``::
 
     from charmlibs.rollingops import SyncLockBackend
 
@@ -332,8 +332,8 @@ Use the rollingops library in your charm::
 
             # Lock is automatically released
 
-If you want to used it on peer-only mode, skip the `etcd_relation_name` and
-`cluster_id` parameters in the `RollingOpsManager` constructor::
+If you want to used it on peer-only mode, skip the ``etcd_relation_name`` and
+``cluster_id`` parameters in the ``RollingOpsManager`` constructor::
 
     from charmlibs.rollingops import RollingOpsManager
 
@@ -353,7 +353,7 @@ If you want to used it on peer-only mode, skip the `etcd_relation_name` and
                 },
             )
 
-Beware that the `sync_lock_targets` is also optional, but if no provided, the
+Beware that the ``sync_lock_targets`` is also optional, but if no provided, the
 sync lock cannot be used
 
 Migration from v0
@@ -378,8 +378,8 @@ The new version introduces:
 Key migration changes:
 
 - New ``RollingOpsManager`` constructor
-  Replace `relation` and `callback` with `peer_relation_name` and
-  `callback_targets` (mapping of callback IDs to methods).
+  Replace ``relation`` and ``callback`` with ``peer_relation_name`` and
+  ``callback_targets`` (mapping of callback IDs to methods).
 
 - New callback signature and contract
   Callbacks no longer receive an event, must accept ``**kwargs``, and must
