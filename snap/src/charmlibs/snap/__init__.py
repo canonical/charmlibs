@@ -12,87 +12,121 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Representations of the system's Snaps, and abstractions around managing them.
+"""Opinionated library for performing snap operations, targeted at use in charm code.
 
-The ``snap`` package provides convenience methods for listing, installing, refreshing, and removing
-Snap packages, in addition to setting and getting configuration options for them.
+Use :func:`ensure` or :func:`ensure_revision` to ensure that a snap is installed.
 
-In the ``snap`` package, ``SnapCache`` creates a ``dict``-like mapping of ``Snap`` objects when
-instantiated. Installed snaps are fully populated, and available snaps are lazily-loaded upon
-request. This module relies on an installed and running ``snapd`` daemon to perform operations over
-the ``snapd`` HTTP API.
+Manually manage snap installation with :func:`install`, :func:`refresh`, and :func:`remove`.
+Use :func:`info` to query the current state of an installed snap.
 
-``SnapCache`` objects can be used to install or modify nnap packages by name in a manner similar to
-using the ``snap`` command from the commandline.
+Also manage:
 
-An example of adding Juju to the system with ``SnapCache`` and setting a config value::
+- Automatic refreshes with :func:`hold` and :func:`unhold`.
+- Services with :func:`start`, :func:`stop`, and :func:`restart`.
+- Config with :func:`config_get`, :func:`config_set`, and :func:`config_unset`.
+- Connections between snaps with :func:`connect` and :func:`disconnect`.
+- Application aliases with :func:`alias` and :func:`unalias`.
 
-    try:
-        cache = snap.SnapCache()
-        juju = cache["juju"]
+Exceptions
+----------
 
-        if not juju.present:
-            juju.ensure(snap.SnapState.Latest, channel="beta")
-            juju.set({"some.key": "value", "some.key2": "value2"})
-    except snap.SnapError as e:
-        logger.error("An exception occurred when installing charmcraft. Reason: %s", e.message)
+All functions will raise a :class:`SnapError` subclass if the snapd API returns an error response.
 
-In addition, the ``snap`` module provides "bare" methods which can act on Snap packages as
-simple function calls. :meth:`add`, :meth:`remove`, and :meth:`ensure` are provided, as
-well as :meth:`add_local` for installing directly from a local ``.snap`` file. These return
-``Snap`` objects.
+Functions will raise specific subclasses where possible to allow callers to handle logical errors.
+Check the documentation for each function for details on which exceptions it may raise.
 
-As an example of installing several Snaps and checking details::
+The :class:`SnapAPIError` subclass will be raised if the snapd API returns a malformed response.
+Callers will not be able to resolve this error directly, but may want to catch it for logging,
+or to trigger retries if the error may be transient. If retries are not successful,
+user intervention may be required.
 
-    try:
-        nextcloud, charmcraft = snap.add(["nextcloud", "charmcraft"])
-        if nextcloud.get("mode") != "production":
-            nextcloud.set({"mode": "production"})
-    except snap.SnapError as e:
-        logger.error("An exception occurred when installing snaps. Reason: %s" % e.message)
+A :class:`ConnectionError` indicates a failure to connect to the snapd socket at all. In this case
+something is badly wrong with the system, and user intervention is almost certainly required.
 """
 
-from ._snap import (
-    Error,
-    JSONAble,
-    JSONType,
-    MetaCache,
-    Snap,
+from ._errors import (
+    SnapAlreadyInstalledError,
     SnapAPIError,
-    SnapCache,
-    SnapClient,
+    SnapAppNotFoundError,
+    SnapBadResponseError,
+    SnapChangeError,
+    SnapConnectionError,
     SnapError,
+    SnapNeedsClassicError,
     SnapNotFoundError,
-    SnapService,
-    SnapServiceDict,
-    SnapState,
-    add,
-    ansi_filter,
+    SnapNoUpdatesAvailableError,
+    SnapOptionNotFoundError,
+    SnapTimeoutError,
+)
+from ._functions import (
     ensure,
-    hold_refresh,
-    install_local,
+    ensure_revision,
+)
+from ._snapd_aliases import (
+    alias,
+    unalias,
+)
+from ._snapd_apps import (
+    restart,
+    start,
+    stop,
+)
+from ._snapd_conf import (
+    get,
+    set,  # noqa: A004 (shadowing a Python builtin)
+    unset,
+)
+from ._snapd_interfaces import (
+    connect,
+    disconnect,
+)
+from ._snapd_logs import (
+    LogEntry,
+    logs,
+)
+from ._snapd_snaps import (
+    Info,
+    hold,
+    info,
+    install,
+    refresh,
     remove,
+    unhold,
 )
 from ._version import __version__ as __version__
 
 __all__ = [
-    'Error',
-    'JSONAble',
-    'JSONType',
-    'MetaCache',
-    'Snap',
+    'Info',
+    'LogEntry',
     'SnapAPIError',
-    'SnapCache',
-    'SnapClient',
+    'SnapAlreadyInstalledError',
+    'SnapAppNotFoundError',
+    'SnapBadResponseError',
+    'SnapChangeError',
+    'SnapConnectionError',
     'SnapError',
+    'SnapNeedsClassicError',
+    'SnapNoUpdatesAvailableError',
     'SnapNotFoundError',
-    'SnapService',
-    'SnapServiceDict',
-    'SnapState',
-    'add',
-    'ansi_filter',
+    'SnapOptionNotFoundError',
+    'SnapTimeoutError',
+    'alias',
+    'connect',
+    'disconnect',
     'ensure',
-    'hold_refresh',
-    'install_local',
+    'ensure_revision',
+    'get',
+    'hold',
+    'info',
+    'install',
+    'logs',
+    'refresh',
     'remove',
+    'restart',
+    'set',
+    'start',
+    'stop',
+    'unalias',
+    'unhold',
+    'unset',
 ]
