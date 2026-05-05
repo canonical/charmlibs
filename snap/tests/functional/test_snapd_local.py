@@ -131,8 +131,10 @@ def test_install_local_upgrades(snap_v1: Path, snap_v2: Path):
 
 def test_install_local_without_dangerous_raises(snap_v1: Path):
     ensure_removed("test-snap")
-    with pytest.raises(_errors.SnapAPIError):
+    with pytest.raises(_errors.SnapAPIError) as ctx:
         install_local(snap_v1)  # dangerous=False by default
+    assert "cannot find signatures with metadata" in ctx.value.message
+    assert ctx.value.kind == ""
 
 
 # ---------------------------------------------------------------------------
