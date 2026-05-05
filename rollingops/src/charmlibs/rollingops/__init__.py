@@ -41,6 +41,23 @@ Typical use cases:
 - Maintenance tasks that must not run concurrently
 - Cluster-wide operations coordinated via etcd
 
+Limitations
+-----------
+
+- **Peer-only mode**
+  Supported for both machine (VM) and Kubernetes charms.
+
+- **Etcd-based mode**
+  Supported only for machine (VM) charms.
+
+This is due to current ecosystem constraints:
+
+- The etcd charm is only available for VM deployments
+- Cross-model relations between Kubernetes and VM charms have limitations,
+  particularly when sharing secrets over relations.
+
+As a result, Kubernetes charms should use the peer-based backend only.
+
 Execution model
 ---------------
 
