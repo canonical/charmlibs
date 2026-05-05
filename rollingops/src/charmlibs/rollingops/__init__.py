@@ -41,8 +41,8 @@ Typical use cases:
 - Maintenance tasks that must not run concurrently
 - Cluster-wide operations coordinated via etcd
 
-Limitations
------------
+Known current limitations
+------------------------
 
 - **Peer-only mode**
   Supported for both machine (VM) and Kubernetes charms.
@@ -57,6 +57,8 @@ This is due to current ecosystem constraints:
   particularly when sharing secrets over relations.
 
 As a result, Kubernetes charms should use the peer-based backend only.
+
+We are aware of these limitations and are actively working to address them.
 
 Execution model
 ---------------
