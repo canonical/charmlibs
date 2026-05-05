@@ -10,12 +10,7 @@ verifying response decoding, async change waiting, error mapping, and edge cases
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 import pytest
-
-if TYPE_CHECKING:
-    from pytest import MonkeyPatch
 
 from charmlibs.snap import _client, _errors
 from conftest import ensure_installed, ensure_removed
@@ -194,7 +189,7 @@ def test_change_timeout_raises_snap_timeout_error():
     assert ctx.value.kind == 'charmlibs-snap-change-timeout'
     assert isinstance(ctx.value, TimeoutError)
     # snapd is still processing the change; wait for it before cleaning up.
-    _client._wait_for_change(ctx.value.value)
+    _client._wait_for_change(str(ctx.value.value))
     _client.put('/v2/snaps/lxd/conf', body={'test-change-timeout-key': None})
 
 

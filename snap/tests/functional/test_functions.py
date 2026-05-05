@@ -19,7 +19,7 @@ def test_ensure_revision_installs_if_not_present():
     ensure_removed('hello-world')
     did_something = _functions.ensure_revision('hello-world', revision=28)
     assert did_something is True
-    assert _snapd.info('hello-world').revision == 28
+    assert _snapd.info('hello-world').revision == '28'
 
 
 def test_ensure_revision_installs_classic():
@@ -36,7 +36,7 @@ def test_ensure_revision_installs_classic():
 def test_ensure_revision_no_op_if_same_revision():
     ensure_installed('hello-world')
     current_revision = _snapd.info('hello-world').revision
-    result = _functions.ensure_revision('hello-world', revision=current_revision)
+    result = _functions.ensure_revision('hello-world', revision=int(current_revision))
     assert result is False
 
 
@@ -48,10 +48,10 @@ def test_ensure_revision_no_op_if_same_revision():
 def test_ensure_revision_refreshes_on_different_revision():
     ensure_installed('hello-world')
     original_revision = _snapd.info('hello-world').revision
-    older_revision = original_revision - 1
+    older_revision = int(original_revision) - 1
     did_something = _functions.ensure_revision('hello-world', revision=older_revision)
     assert did_something is True
-    assert _snapd.info('hello-world').revision == older_revision
+    assert _snapd.info('hello-world').revision == str(older_revision)
 
 
 # ---------------------------------------------------------------------------

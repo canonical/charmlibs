@@ -38,14 +38,14 @@ class Info:
         name: str,
         classic: bool,
         channel: str,
-        revision: int,
+        revision: int | str,
         version: str,
         hold: datetime.datetime | str | None,
     ):
         self._name = name
         self._classic = classic
         self._channel = _utils._normalize_channel(channel)
-        self._revision = revision
+        self._revision = str(revision)
         self._version = version
         self._hold = _utils._parse_timestamp(hold) if isinstance(hold, str) else hold
 
@@ -54,7 +54,7 @@ class Info:
         return cls(
             name=info_dict['name'],
             channel=info_dict['channel'],
-            revision=int(info_dict['revision']),
+            revision=info_dict['revision'],
             version=info_dict['version'],
             classic=info_dict['confinement'] == 'classic',
             hold=info_dict.get('hold'),
@@ -73,7 +73,7 @@ class Info:
         return self._channel
 
     @property
-    def revision(self) -> int:
+    def revision(self) -> str:
         return self._revision
 
     @property
@@ -122,7 +122,7 @@ def install(
     snap: str,
     *,
     channel: str | None = None,
-    revision: int | None = None,
+    revision: int | str | None = None,
     classic: bool = False,
     strict: bool = False,
 ) -> None:
@@ -171,7 +171,11 @@ def remove(snap: str, *, purge: bool = False, strict: bool = False) -> None:
 
 
 def refresh(
-    snap: str, channel: str | None = None, *, revision: int | None = None, strict: bool = False
+    snap: str,
+    channel: str | None = None,
+    *,
+    revision: int | str | None = None,
+    strict: bool = False,
 ) -> None:
     """Refresh a snap.
 

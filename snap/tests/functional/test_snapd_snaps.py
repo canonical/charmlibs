@@ -22,7 +22,7 @@ def test_info_installed():
     info = _snapd.info('hello-world')
     assert info.name == 'hello-world'
     assert info.channel
-    assert info.revision > 0
+    assert info.revision
     assert info.version
 
 
@@ -97,7 +97,7 @@ def test_install_revision():
     # hello-world revision 28 is one behind the current 29.
     _snapd.install('hello-world', revision=28)
     info = _snapd.info('hello-world')
-    assert info.revision == 28
+    assert info.revision == '28'
 
 
 def test_install_channel_and_revision_raises():

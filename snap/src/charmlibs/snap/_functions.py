@@ -17,7 +17,7 @@
 from . import _errors, _snapd_snaps, _utils
 
 
-def ensure_revision(snap: str, revision: int, *, classic: bool = False) -> bool:
+def ensure_revision(snap: str, revision: int | str, *, classic: bool = False) -> bool:
     """Ensure the snap is installed at the specified revision.
 
     Returns:
@@ -27,7 +27,7 @@ def ensure_revision(snap: str, revision: int, *, classic: bool = False) -> bool:
     if info is None:  # Not installed.
         _snapd_snaps.install(snap, revision=revision, classic=classic)
         return True
-    if info.revision != revision:  # Installed but at different revision.
+    if info.revision != str(revision):  # Installed but at different revision.
         _snapd_snaps.refresh(snap, revision=revision)
         return True
     return False  # Already installed at the requested revision.

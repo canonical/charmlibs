@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 def make_info(
     channel: str = 'latest/stable',
-    revision: int = 29,
+    revision: int | str = 29,
     classic: bool = False,
     hold: str | None = None,
 ) -> _snapd.Info:

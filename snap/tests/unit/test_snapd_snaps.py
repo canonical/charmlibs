@@ -53,14 +53,18 @@ class TestInfoFromDict:
         assert info.name == 'hello-world'
         assert info.version == '6.4'
         assert info.channel == 'latest/stable'
-        assert info.revision == 29
+        assert info.revision == '29'
         assert info.classic is False
         assert info.hold is None
 
-    def test_revision_is_int(self):
+    def test_revision_is_str(self):
         info = _snapd.Info._from_dict(_minimal_info_dict(revision='29'))
-        assert isinstance(info.revision, int)
-        assert info.revision == 29
+        assert isinstance(info.revision, str)
+        assert info.revision == '29'
+
+    def test_local_revision(self):
+        info = _snapd.Info._from_dict(_minimal_info_dict(revision='x1'))
+        assert info.revision == 'x1'
 
     def test_strict_not_classic(self):
         info = _snapd.Info._from_dict(_minimal_info_dict(confinement='strict'))
@@ -102,7 +106,7 @@ class TestInfo:
         mock_client.get.return_value = result_of('snap_info_hello_world.json')
         info = _snapd.info('hello-world')
         assert info.name == 'hello-world'
-        assert info.revision == 29
+        assert info.revision == '29'
         mock_client.get.assert_called_once_with('/v2/snaps/hello-world')
 
     def test_info_classic(self, mock_client: MockClient):
@@ -329,5 +333,5 @@ class TestListChannels:
         channels = _snapd._list_channels('hello-world')
         info = channels['latest/stable']
         assert info.name == 'hello-world'
-        assert info.revision == 29
+        assert info.revision == '29'
         assert info.classic is False
