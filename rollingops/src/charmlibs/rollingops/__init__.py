@@ -234,6 +234,8 @@ operate using the peer backend until the identifier becomes available.
 Once the ``cluster_id`` is set, etcd-backed coordination will be used
 automatically if the etcd relation is configured.
 
+Do not provide a ``cluster_id`` without a `etcd_relation_name`.
+
 
 Integrations
 --------------

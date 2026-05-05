@@ -96,8 +96,7 @@ class RollingOpsStatus(StrEnum):
 
     States:
 
-    - NOT_READY:
-        Rolling-ops cannot be used on this unit. This typically occurs when
+    - NOT_READY: Rolling-ops cannot be used on this unit. This typically occurs when
         required relations are missing or the selected backend is not reachable.
 
         - peer backend: peer relation does not exist
@@ -445,11 +444,11 @@ class RollingOpsState:
 
     This state is intended for decision-making in charm logic
 
-    The `processing_backend` reflects the backend currently selected
+    The ``processing_backend`` reflects the backend currently selected
         for execution. It may change dynamically (e.g. fallback from etcd
         to peer).
 
-    When `status` is NOT_READY, the unit cannot currently participate
+    When ``status`` is NOT_READY, the unit cannot currently participate
         in rolling operations due to missing relations or backend failures.
 
     status: High-level rolling-ops status for the unit.
