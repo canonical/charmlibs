@@ -15,20 +15,24 @@
 """RollingOps: coordinated rolling operations for Juju charms.
 
 This library provides a unified API to coordinate rolling operations across
-units of a Juju application. It supports two execution modes:
+units of a Juju application.
+
+It supports two execution modes:
 
 1. Peer-based (application level)
    Uses peer relations to coordinate operations within a single application.
-   Ensures that disruptive actions (e.g. restarts, reconfigurations) are
-   executed sequentially, with at most one unit operating at a time.
-   The leader schedules work and guarantees fairness and safe progression.
+   The leader unit schedules execution and ensures that operations are
+   performed sequentially (at most one unit at a time).
 
 2. Etcd-based (cluster level)
-   Uses etcd as a distributed coordination backend to provide asynchronous,
-   non-blocking mutual exclusion across units. Each unit runs a background
-   worker that manages lock acquisition, lease renewal, and execution of
-   operations without blocking Juju hooks. This is suitable for long-running
-   tasks across a cluster.
+   Uses etcd as a distributed coordination backend. Units independently
+   compete for the lock using etcd primitives, enabling coordination across
+   applications or clusters.
+
+When etcd is configured, it is the primary backend, but it depends on the peer
+relation for internal state management. If etcd becomes unavailable or encounters
+errors, the library automatically falls back to the peer-based backend to ensure
+operations can continue.
 
 Typical use cases::
 - Rolling restarts of application units
@@ -36,21 +40,50 @@ Typical use cases::
 - Maintenance tasks that must not run concurrently
 - Cluster-wide operations coordinated via etcd
 
+Execution model
+---------------
+
+RollingOps is based on a **lock-driven execution model**.
+
+Units do not execute operations immediately. Instead, they:
+
+- Request a lock
+- Provide a callback identifier and arguments
+- The operation is queued locally
+- When the lock is granted, the callback is executed asynchronously
+
+At any time, only one unit holds the lock and executes one operation.
+
+Operation queue
+---------------
+
+Each unit maintains a queue of pending operations. Only the head of the queue
+is executed when the lock is granted.
+
+New operations follow these deduplication rules:
+
+- Same operation + same arguments
+  → If the latest queued operation has the same `callback_id` and arguments,
+  the new request is ignored.
+
+- Same operation + different arguments
+  → The new operation is added to the queue.
+
+- Different operation
+  → The new operation is added to the queue.
+
 
 Core concepts
 -------------
 
-Asynchronous lock (primary mechanism)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Asynchronous lock (recommended)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The main functionality of this library is the asynchronous lock.
-Callers enqueue an operation by providing a callback target. The library
-ensures that the operation is executed later, in mutual exclusion,
-without blocking the current Juju hook. This is the recommended approach
-for most operations.
+The primary mechanism. Operations are enqueued and executed later when the
+lock is granted. This avoids blocking Juju hooks.
 
-Synchronous lock (special-case mechanism)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Synchronous lock (special-case)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 A synchronous lock is provided for scenarios where deferring is not
 possible (e.g. teardown or finalization paths). In this mode, the hook is
@@ -69,105 +102,87 @@ lock backends via the ``sync_lock_targets`` parameter when initializing
 ``RollingOpsManager``. Each backend must implement ``SyncLockBackend``.
 
 
-Basic usage::
+Callback contract
+^^^^^^^^^^^^^^^^^
 
-    from charmlibs.rollingops import RollingOpsManager, SyncLockBackend, OperationResult
+Asynchronous operations are defined as callbacks and registered via the
+``callback_targets`` parameter when initializing ``RollingOpsManager``.
+This parameter is a mapping of string identifiers to bound methods on the
+charm.
 
-    class MySyncLockBackend(SyncLockBackend):
-        def __init__(self, path: str = "/tmp/rollingops.lock"):
-            self._path = path
+Callbacks must follow this signature::
 
-        def acquire(self, timeout: int | None) -> None:
-            # Provide implementation
+    def <callback>(self, **kwargs) -> OperationResult
 
-        def release(self) -> None:
-            # Provide implementation
+Callbacks must be idempotent and safe to run multiple times, as they may be
+retried due to failures or hook replays. They must not interact directly with
+the locking mechanism (e.g. requesting locks, mutating the peer relation
+databag used by the library, emitting relation events, or deferring execution).
 
-    class MyCharm(CharmBase):
-        def __init__(self, *args):
-            super().__init__(*args)
+### Operation result
 
-            my_sync_backend = MySyncLockBackend()
-            self.rollingops = RollingOpsManager(
-                charm=self,
-                callback_targets={
-                    "restart": self._restart_unit,
-                },
-                peer_relation_name="my-peers",
-                etcd_relation_name="etcd",
-                cluster_id="my-cluster",
-                sync_lock_targets={
-                    "my-lock" : my_sync_backend,
-                },
-            )
+Callbacks must return an `OperationResult`:
 
-        def _restart_unit(self) -> OperationResult:
-            # logic executed under rolling coordination
-            return OperationResult.RELEASE
+- `RELEASE`
+  → Execution succeeded, release the lock
 
-        def _on_config_changed(self, event):
-            # asynchronous (recommended)
-            self.rollingops.request_async_lock("restart")
+- `RETRY_RELEASE`
+  → Execution failed, retry later after releasing the lock (other units may proceed)
 
-        def _on_stop(self, event):
-            # synchronous (only when deferring is not possible)
-            with self.rollingops.acquire_sync_lock(
-                backend_id="my-lock",
-                timeout=300,
-            ):
-                self._restart_unit()
+- `RETRY_HOLD`
+  → Execution failed, retry while keeping the lock
 
+- If the callback returns None or an invalid value, the lock is released.
+- If the callback raises an exception, it is considered as a `RETRY_RELEASE`.
+
+### Arguments
+
+The callback arguments (``kwargs``) must be JSON-serializable, as they are
+stored in the peer relation databag.
+
+## Peer-based scheduling
+
+In peer-based mode, the leader unit acts as scheduler and grants the lock.
+
+Scheduling is priority-based, from highest to lowest:
+
+1. Retry-hold operations
+2. First-time requests
+3. Retry-release operations
+
+Rules:
+
+- If a unit holds the lock → no new grant
+- Otherwise → select next unit based on priority
+
+The selected unit executes the head of its queue.
+
+### Etcd-based coordination
+
+When etcd is used:
+
+- Units independently attempt to acquire the lock via etcd
+- There is no central scheduler
+- Execution remains mutually exclusive (one lock holder)
 
 Etcd setup
 ----------
 
-To use etcd-backed rolling operations, deploy an etcd application and a
-certificates provider that implements the ``tls-certificates`` interface
-according to your deployment requirements.
+To use etcd-backed operations:
 
-The certificates provider must be integrated with etcd first. Then integrate
-etcd with the charm using this library.
+1. Deploy an ``charmed-etcd`` application
+2. Integrate it with a TLS certificates provider that implements the
+``tls-certificates`` interface
+3. Relate ``charmed-etcd`` to your charm
 
-At the moment, etcd is available as a VM operator only. There is no Kubernetes
-etcd operator. If your charm is a VM charm, etcd can be deployed in the same
-model and related directly to your charm. If your charm runs on Kubernetes,
-deploy etcd in another VM model/cloud/controller, offer the etcd relation,
-consume the offer from the Kubernetes model, and integrate your charm with
-that consumed offer.
-
-Integrations
---------------------------
-
-Integration with etcd is optional. If you only need application-level
-coordination, you can rely on the peer relation alone and omit both
-``etcd_relation_name`` and ``cluster_id`` when initializing
-``RollingOpsManager``.
-
-Note that the etcd-based functionality still depends on the peer relation
-for internal coordination and state management, so the peer relation must
-always be configured.
-
-When etcd is configured, the library will prefer etcd-backed coordination
-and fall back to the peer-based mechanism if etcd is unavailable.
-
-The relations can be added to the charm as follows::
-
-
-    peers:
-      rollingops-peers:
-        interface: rollingops-peers
-
-    requires:
-      etcd:
-        interface: etcd_client
-        limit: 1
-        optional: true
+The etcd-based functionality requires the etcdctl binary to be present
+in the charm.
 
 Including etcdctl in your charm
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The etcd-backed functionality relies on the ``etcdctl`` binary being available
-inside the charm container/machine. This binary is not provided automatically
+inside the charm machine. This binary is not provided automatically
 and must be included as part of your charm build.
 
 You can add it in your ``charmcraft.yaml`` using a build part::
@@ -187,17 +202,26 @@ You can add it in your ``charmcraft.yaml`` using a build part::
         prime:
           - usr/bin/etcdctl
 
-This will make ``etcdctl`` available at runtime under ``<charm-dir>/usr/bin/etcdctl``
-inside the charm.
+This makes ``etcdctl`` available at runtime under
+``<charm-dir>/usr/bin/etcdctl``.
+
+This path is expected by the library, so do not install the binary in a
+different location.
 
 Make sure the binary is present and executable, as it is required for
 communication with the etcd backend.
+
 
 Cluster identifier
 ^^^^^^^^^^^^^^^^^^
 
 The ``cluster_id`` parameter is used to scope etcd-backed coordination.
-It does not need to be hardcoded and may be provided dynamically at runtime.
+
+All applications using the same ``cluster_id`` will share the same lock,
+allowing rolling operations to be coordinated across multiple applications.
+
+The ``cluster_id`` does not need to be hardcoded and may be provided dynamically
+at runtime.
 
 The ``RollingOpsManager`` can be initialized without a ``cluster_id`` and will
 operate using the peer backend until the identifier becomes available.
@@ -205,33 +229,108 @@ operate using the peer backend until the identifier becomes available.
 Once the ``cluster_id`` is set, etcd-backed coordination will be used
 automatically if the etcd relation is configured.
 
-Callback definition and registration
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Asynchronous operations are defined as callbacks and registered through the
-``callback_targets`` parameter when initializing ``RollingOpsManager``.
-This parameter is a mapping of string identifiers to bound methods on the
-charm. Each identifier is used when requesting a lock and determines which
-callback will be executed once the lock is granted.
+Integrations
+--------------
 
-Callbacks are invoked on the unit holding the lock and must follow this
-signature::
+Example relations::
 
-    def <callback>(self, **kwargs) -> OperationResult
+    peers:
+      rollingops-peers:
+        interface: rollingops-peers
 
-The ``kwargs`` provided when requesting the lock are passed to the callback
-at execution time. These arguments must be JSON-serializable, as they are
-stored in the peer relation databag.
+    requires:
+      etcd:
+        interface: etcd_client
+        limit: 1
+        optional: true
 
-Callbacks must be idempotent and safe to run multiple times, as they may be
-retried due to failures or hook replays. They must not interact directly with
-the locking mechanism (e.g. requesting locks, mutating the peer relation
-databag used by the library, emitting relation events, or deferring execution).
+Nothe that the peer relation is mandatory even if we are integrating
+with etcd.
 
-The callback must return an ``OperationResult`` indicating how the library
-should proceed (e.g. release the lock or retry execution). If the callback
-raises an unexpected exception or returns an invalid value, the library will
-log the issue and release the lock.
+
+## Usage
+
+Provide an implementation of `SyncLockBackend`::
+
+    from charmlibs.rollingops import SyncLockBackend
+
+    class MySyncLockBackend(SyncLockBackend):
+        def __init__(self, path: str = "/tmp/rollingops.lock"):
+            self._path = path
+
+        def acquire(self, timeout: int | None) -> None:
+            # Provide implementation
+
+        def release(self) -> None:
+            # Provide implementation
+
+Use the rollingops library in your charm::
+
+    from charmlibs.rollingops import RollingOpsManager, OperationResult
+
+    class MyCharm(CharmBase):
+        def __init__(self, *args):
+            super().__init__(*args)
+
+            my_sync_backend = MySyncLockBackend()
+            self.rollingops = RollingOpsManager(
+                charm=self,
+                callback_targets={
+                    "restart": self._restart_unit,
+                },
+                peer_relation_name="my-peers",
+                etcd_relation_name="etcd",
+                cluster_id="my-cluster",
+                sync_lock_targets={
+                    "my-lock" : my_sync_backend,
+                },
+            )
+
+        # This is a callback
+        def _restart_unit(self) -> OperationResult:
+            # logic executed under rolling coordination
+            return OperationResult.RELEASE
+
+        # This is an async lock request
+        def _on_config_changed(self, event):
+            self.rollingops.request_async_lock("restart", kwargs={'delay': delay}, max_retry=2)
+
+        # This is a sync lock request (to be used only when deferring is not possible)
+        def _on_stop(self, event):
+            with self.rollingops.acquire_sync_lock(
+                backend_id="my-lock",
+                timeout=300,
+            ):
+                # Execute the critial section
+                self._restart_unit()
+
+            # Lock is automatically released
+
+If you want to used it on peer-only mode, skip the `etcd_relation_name` and
+`cluster_id` parameters in the `RollingOpsManager` constructor::
+
+    from charmlibs.rollingops import RollingOpsManager
+
+    class MyCharm(CharmBase):
+        def __init__(self, *args):
+            super().__init__(*args)
+
+            my_sync_backend = MySyncLockBackend()
+            self.rollingops = RollingOpsManager(
+                charm=self,
+                callback_targets={
+                    "restart": self._restart_unit,
+                },
+                peer_relation_name="my-peers",
+                sync_lock_targets={
+                    "my-lock" : my_sync_backend,
+                },
+            )
+
+Beware that the `sync_lock_targets` is also optional, but if no provided, the
+sync lock cannot be used
+
 """
 
 from ._common._exceptions import (
