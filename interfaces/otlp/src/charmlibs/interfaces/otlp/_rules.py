@@ -170,8 +170,7 @@ class _RulesModel(BaseModel):
         default_factory=OfficialRuleFileFormat,
     )
     sigma: SigmaRuleFileFormat = Field(
-        description='Sigma detection rules, following the '
-        'SigmaRuleFileFormat from cos-lib.',
+        description='Sigma detection rules, following the SigmaRuleFileFormat from cos-lib.',
         default_factory=SigmaRuleFileFormat,
     )
 
