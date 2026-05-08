@@ -21,8 +21,19 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from cosl.juju_topology import JujuTopology
-from cosl.rules import HOST_METRICS_MISSING_RULE_NAME, CosTool, Rules, SigmaRules, generic_alert_groups
-from cosl.types import OfficialRuleFileFormat, SigmaRuleFileFormat, SingleRuleFormat
+from cosl.rules import (
+    HOST_METRICS_MISSING_RULE_NAME,
+    CosTool,
+    Rules,
+    SigmaRules,
+    generic_alert_groups,
+)
+from cosl.types import (
+    OfficialRuleFileFormat,
+    SigmaRuleFileFormat,
+    SigmaRuleFormat,
+    SingleRuleFormat,
+)
 from ops import CharmBase
 from pydantic import BaseModel, Field
 
@@ -48,7 +59,7 @@ class RuleStore:
     def __post_init__(self):
         self.logql = Rules(query_type='logql', topology=self.topology)
         self.promql = Rules(query_type='promql', topology=self.topology)
-        self.sigma = SigmaRules(query_type='sigma', topology=self.topology)
+        self.sigma = SigmaRules(topology=self.topology)
 
     def add_logql(
         self,
@@ -112,11 +123,11 @@ class RuleStore:
         self.promql.add_path(dir_path, recursive=recursive)
         return self
 
-    def add_sigma(self, rule_dict: OfficialRuleFileFormat | SingleRuleFormat) -> 'RuleStore':
+    def add_sigma(self, rule_dict: SigmaRuleFileFormat | SigmaRuleFormat) -> 'RuleStore':
         """Add rules from dict to the existing Sigma ruleset.
 
         Args:
-            rule_dict: a single-rule or official-rule YAML dict
+            rule_dict: a single sigma rule dict or a ``{"rules": [...]}`` collection.
         """
         self.sigma.add(rule_dict)
         return self
@@ -124,8 +135,8 @@ class RuleStore:
     def add_sigma_path(self, dir_path: str | Path, *, recursive: bool = False) -> 'RuleStore':
         """Add Sigma rules from a dir path.
 
-        All rules from files are aggregated into a data structure representing a single rule file.
-        All group names are augmented with juju topology.
+        All rules from files are aggregated into a single collection.
+        Topology labels are injected into each rule.
 
         Args:
             dir_path: either a rules file or a dir of rules files.

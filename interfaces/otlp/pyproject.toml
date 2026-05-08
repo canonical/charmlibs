@@ -16,7 +16,7 @@ classifiers = [
 dynamic = ["version"]
 dependencies = [
     # "ops",
-    "cosl>=1.6.1",
+    "cosl @ git+https://github.com/canonical/cos-lib@feat/sigma-rules-3",
     "requests",
 ]
 
