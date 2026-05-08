@@ -26,10 +26,12 @@ from charmlibs.interfaces.otlp._otlp import _OtlpRequirerAppData
 from charmlibs.interfaces.otlp._rules import _RulesModel, duplicate_rules_per_unit
 from conftest import (
     PEERS_ENDPOINT,
+    SIGMA_COLLECTION,
     SINGLE_LOGQL_ALERT,
     SINGLE_LOGQL_RECORD,
     SINGLE_PROMQL_ALERT,
     SINGLE_PROMQL_RECORD,
+    SINGLE_SIGMA_RULE,
 )
 
 MODEL_NAME = 'foo-model'
@@ -423,3 +425,182 @@ def test_rulestore_combine_returns_self():
 
     # THEN combine returns the target (self) for chaining
     assert result is target
+
+
+# --- Sigma rules ---
+
+
+def test_rulestore_add_single_sigma_rule():
+    # GIVEN a RuleStore
+    store = _make_store()
+
+    # WHEN a single sigma rule is added
+    store.add_sigma(SINGLE_SIGMA_RULE)
+
+    # THEN the sigma collection contains 1 rule
+    sigma = store.sigma.as_dict()
+    assert len(sigma.get('rules', [])) == 1
+    # AND topology labels are injected
+    labels = sigma['rules'][0].get('labels', {})
+    assert labels['juju_model'] == MODEL_NAME
+    assert labels['juju_application'] == 'test-app'
+
+
+def test_rulestore_add_sigma_collection():
+    # GIVEN a RuleStore
+    store = _make_store()
+
+    # WHEN a sigma collection is added
+    store.add_sigma(SIGMA_COLLECTION)
+
+    # THEN the sigma collection contains 2 rules
+    sigma = store.sigma.as_dict()
+    assert len(sigma.get('rules', [])) == 2
+    titles = {r['title'] for r in sigma['rules']}
+    assert titles == {'Failed SSH Login Attempt', 'High CPU Usage'}
+
+
+def test_rulestore_add_sigma_returns_self():
+    # GIVEN a RuleStore
+    store = _make_store()
+
+    # WHEN add_sigma is called
+    result = store.add_sigma(SINGLE_SIGMA_RULE)
+
+    # THEN it returns self for chaining
+    assert result is store
+
+
+def test_rulestore_combine_sigma():
+    # GIVEN a source RuleStore with sigma rules
+    source = _make_store().add_sigma(SINGLE_SIGMA_RULE)
+    # AND an empty target RuleStore
+    target = _make_store()
+
+    # WHEN combined
+    target.combine(source)
+
+    # THEN the target now contains the sigma rules
+    sigma = target.sigma.as_dict()
+    assert len(sigma.get('rules', [])) == 1
+    assert sigma['rules'][0]['title'] == 'Failed SSH Login Attempt'
+
+
+def test_rulestore_combine_empty_sigma_does_not_clear_target():
+    # GIVEN a target RuleStore with sigma rules
+    target = _make_store().add_sigma(SINGLE_SIGMA_RULE)
+    # AND an empty source RuleStore
+    source = _make_store()
+
+    # WHEN combined
+    target.combine(source)
+
+    # THEN the target sigma rules are unchanged
+    assert len(target.sigma.as_dict().get('rules', [])) == 1
+
+
+def test_sigma_rules_in_databag(otlp_requirer_ctx: testing.Context[ops.CharmBase]):
+    # GIVEN a send-otlp relation
+    state = State(relations=[Relation(SEND)], leader=True, model=MODEL)
+
+    # WHEN the update_status event is fired
+    state_out = otlp_requirer_ctx.run(otlp_requirer_ctx.on.update_status(), state=state)
+    for relation in list(state_out.relations):
+        # THEN the sigma rules appear in the compressed databag
+        decompressed = _decompress(relation.local_app_data.get('rules'))
+        assert decompressed
+        sigma_rules = decompressed.get('sigma', {}).get('rules', [])
+        # 1 single rule + 2 from collection = 3
+        assert len(sigma_rules) == 3
+
+
+def test_sigma_topology_in_databag(otlp_requirer_ctx: testing.Context[ops.CharmBase]):
+    # GIVEN a send-otlp relation
+    state = State(relations=[Relation(SEND)], leader=True, model=MODEL)
+
+    # WHEN the update_status event is fired
+    state_out = otlp_requirer_ctx.run(otlp_requirer_ctx.on.update_status(), state=state)
+    for relation in list(state_out.relations):
+        decompressed = _decompress(relation.local_app_data.get('rules'))
+        sigma_rules = decompressed.get('sigma', {}).get('rules', [])
+        for rule in sigma_rules:
+            # THEN each sigma rule has topology labels
+            labels = rule.get('labels', {})
+            assert labels.get('juju_model') == MODEL_NAME
+            assert labels.get('juju_application') == 'otlp-requirer'
+
+
+def test_provider_sigma_rules(otlp_provider_ctx: testing.Context[ops.CharmBase]):
+    # GIVEN a requirer offers sigma rules in the databag
+    rules = {
+        'logql': {},
+        'promql': {},
+        'sigma': {
+            'rules': [SINGLE_SIGMA_RULE],
+        },
+    }
+    metadata = {
+        'model': MODEL_NAME,
+        'model_uuid': MODEL_UUID,
+        'application': 'otlp-requirer',
+        'charm_name': 'otlp-requirer',
+        'unit': 'otlp-requirer/0',
+    }
+    receiver = Relation(
+        RECEIVE, remote_app_data={'rules': json.dumps(rules), 'metadata': json.dumps(metadata)}
+    )
+    state = State(leader=True, relations=[receiver], model=MODEL)
+    with otlp_provider_ctx(otlp_provider_ctx.on.update_status(), state=state) as mgr:
+        # WHEN the provider aggregates the rules from the databag
+        rule_store = OtlpProvider(mgr.charm, RECEIVE).rules[receiver.id]
+        sigma = rule_store.sigma.as_dict()
+
+        # THEN the sigma rules exist in the RuleStore
+        assert len(sigma.get('rules', [])) == 1
+        rule = sigma['rules'][0]
+        assert rule['title'] == 'Failed SSH Login Attempt'
+
+        # AND the rule has topology labels from the provider
+        labels = rule.get('labels', {})
+        assert labels.get('juju_model') == MODEL_NAME
+        assert labels.get('juju_model_uuid') == MODEL_UUID
+        assert labels.get('juju_application') == 'otlp-provider'
+
+
+@pytest.mark.parametrize(
+    'otlp_requirer_ctx,expected_labels',
+    [
+        pytest.param(
+            {'aggregator': True, 'extra_alert_labels': {'env': 'prod'}},
+            {'env': 'prod'},
+            id='single-label',
+        ),
+        pytest.param(
+            {'aggregator': True, 'extra_alert_labels': {'env': 'prod', 'team': 'core'}},
+            {'env': 'prod', 'team': 'core'},
+            id='multiple-labels',
+        ),
+    ],
+    indirect=['otlp_requirer_ctx'],
+)
+def test_extra_alert_labels_injected_into_sigma(
+    otlp_requirer_ctx: testing.Context[ops.CharmBase], expected_labels: dict[str, str]
+):
+    # GIVEN a send-otlp relation with peers
+    peers = PeerRelation(endpoint=PEERS_ENDPOINT)
+    state = State(relations=[peers, Relation(SEND)], leader=True, model=MODEL)
+
+    # WHEN the update_status event is fired
+    state_out = otlp_requirer_ctx.run(otlp_requirer_ctx.on.update_status(), state=state)
+    for relation in list(state_out.relations):
+        if relation.endpoint != SEND:
+            continue
+        decompressed = _decompress(relation.local_app_data.get('rules'))
+        sigma_rules = decompressed.get('sigma', {}).get('rules', [])
+        assert sigma_rules
+
+        # THEN each sigma rule has the extra alert labels
+        for rule in sigma_rules:
+            labels = rule.get('labels', {})
+            for k, v in expected_labels.items():
+                assert labels.get(k) == v

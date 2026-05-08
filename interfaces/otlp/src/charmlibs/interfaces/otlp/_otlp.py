@@ -218,6 +218,7 @@ class OtlpRequirer:
             'rules': {
                 'logql': self._rules.logql.as_dict(),
                 'promql': self._rules.promql.as_dict(),
+                'sigma': self._rules.sigma.as_dict(),
             },
             'metadata': self._topology.as_dict(),
         })
@@ -337,6 +338,9 @@ class OtlpProvider:
                 rules.logql.add(logql_result.rules)
             if promql_result.rules and not promql_result.errmsg:
                 rules.promql.add(promql_result.rules)
+            # Sigma rules: inject topology labels (no expression rewriting needed)
+            if sigma_dict := requirer.rules.sigma:
+                rules.sigma.add(sigma_dict)
             for errmsg in [logql_result.errmsg, promql_result.errmsg]:
                 if errmsg and self._charm.unit.is_leader():
                     relation.data[self._charm.app]['event'] = json.dumps({'errors': errmsg})
