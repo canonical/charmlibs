@@ -187,6 +187,59 @@ def test_generic_rule_injection(
             assert agg_rule not in promql_group_names
 
 
+@pytest.mark.parametrize(
+    'otlp_requirer_ctx,expected_labels',
+    [
+        pytest.param(
+            {'aggregator': True, 'extra_alert_labels': {}},
+            {},
+            id='no-labels',
+        ),
+        pytest.param(
+            {'aggregator': True, 'extra_alert_labels': {'env': 'prod'}},
+            {'env': 'prod'},
+            id='single-label',
+        ),
+        pytest.param(
+            {'aggregator': True, 'extra_alert_labels': {'env': 'prod', 'team': 'core'}},
+            {'env': 'prod', 'team': 'core'},
+            id='multiple-labels',
+        ),
+    ],
+    indirect=['otlp_requirer_ctx'],
+)
+def test_extra_alert_labels_injection(
+    otlp_requirer_ctx: testing.Context[ops.CharmBase], expected_labels: dict[str, str]
+):
+    # GIVEN a send-otlp relation
+    # * a peers relation
+    peers = PeerRelation(endpoint=PEERS_ENDPOINT)
+    state = State(relations=[peers, Relation(SEND)], leader=True, model=MODEL)
+
+    # WHEN the update_status event is fired
+    state_out = otlp_requirer_ctx.run(otlp_requirer_ctx.on.update_status(), state=state)
+    for relation in list(state_out.relations):
+        if relation.endpoint != SEND:
+            continue
+
+        # THEN if the charm is an aggregator, generic rules are injected into the databag
+        # AND the rules in the databag are decompressed
+        decompressed = _decompress(relation.local_app_data.get('rules'))
+        assert decompressed
+        logql_groups = decompressed.get('logql', {}).get('groups', [])
+        promql_groups = decompressed.get('promql', {}).get('groups', [])
+        assert logql_groups
+        assert promql_groups
+
+        # THEN all rules have the extra alert labels injected
+        for groups in promql_groups, logql_groups:
+            for group in groups:
+                for rule in group.get('rules', []):
+                    labels = rule.get('labels', {})
+                    for k, v in expected_labels.items():
+                        assert labels.get(k) == v
+
+
 def test_metadata(otlp_requirer_ctx: testing.Context[ops.CharmBase]):
     # GIVEN a send-otlp relation
     state = State(relations=[Relation(SEND)], leader=True, model=MODEL)

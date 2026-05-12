@@ -61,6 +61,25 @@ class RollingOpsManager(Object):
     available, mirrors operation state into the peer relation, and falls
     back to peer-based processing when etcd becomes unavailable or
     inconsistent.
+
+    Args:
+        charm: The charm instance owning this manager.
+        callback_targets: Mapping of callback identifiers to callables
+            executed when the unit is granted the lock.
+        peer_relation_name: Name of the peer relation used for fallback
+            state and operation mirroring.
+        etcd_relation_name: Name of the relation providing etcd access.
+            If not provided, only peer backend is used.
+        cluster_id: Identifier used to scope etcd-backed state for this
+            rolling-ops instance. All applications using the same ``cluster_id``
+            will share the same lock, allowing rolling operations to be coordinated
+            across multiple applications.  Do not provide a ``cluster_id`` without
+            a `etcd_relation_name`.
+        sync_lock_targets: Optional mapping of sync lock backend
+            identifiers to backend implementations used when acquiring
+            synchronous locks through the peer backend.
+        base_dir: base directory where all files related to rollingops will be written.
+            Written to ``/var/lib/rollingops`` by default.
     """
 
     def __init__(
@@ -89,16 +108,19 @@ class RollingOpsManager(Object):
         Args:
             charm: The charm instance owning this manager.
             callback_targets: Mapping of callback identifiers to callables
-                executed when queued operations are granted the lock.
+                executed when the unit is granted the lock.
             peer_relation_name: Name of the peer relation used for fallback
                 state and operation mirroring.
             etcd_relation_name: Name of the relation providing etcd access.
                 If not provided, only peer backend is used.
             cluster_id: Identifier used to scope etcd-backed state for this
-                rolling-ops instance.
+                rolling-ops instance. All applications using the same ``cluster_id``
+                will share the same lock, allowing rolling operations to be coordinated
+                across multiple applications.  Do not provide a ``cluster_id`` without
+                a `etcd_relation_name`.
             sync_lock_targets: Optional mapping of sync lock backend
                 identifiers to backend implementations used when acquiring
-                synchronous locks through the peer fallback path.
+                synchronous locks through the peer backend.
             base_dir: base directory where all files related to rollingops will be written.
                 Written to ``/var/lib/rollingops`` by default.
         """
@@ -241,7 +263,7 @@ class RollingOpsManager(Object):
                 operation is granted the rolling lock.
             kwargs: Optional keyword arguments passed to the callback target.
             max_retry: Optional maximum number of retries allowed for the
-                operation. None means infinte retries.
+                operation. None means infinite retries.
 
         Raises:
             RollingOpsInvalidLockRequestError: If the callback identifier is

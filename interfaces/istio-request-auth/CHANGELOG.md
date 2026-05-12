@@ -9,3 +9,7 @@ The initial `istio-request-auth` interface library provides the following featur
 - Provides convienience data models for describing JWTRules
 - Models the top level data bag as datamodel
 
+## 0.0.2 - 29 April 2026
+
+- pins ops to >=2.23.1,<4
+- pins pydantic to >=2,<3
