@@ -78,8 +78,12 @@ class RollingOpsManager(Object):
         sync_lock_targets: Optional mapping of sync lock backend
             identifiers to backend implementations used when acquiring
             synchronous locks through the peer backend.
-        base_dir: base directory where all files related to rollingops will be written.
-            Written to ``/var/lib/rollingops`` by default.
+        base_dir: Base directory used by rollingops to store runtime files, including
+            etcd connection information and logs from background processes.
+            Defaults to ``/var/lib/rollingops``, which will be created if missing.
+            The process running rollingops must have permission to create and write to
+            this directory. For Kubernetes charms, this path must exist within the
+            charm container filesystem.
     """
 
     def __init__(
