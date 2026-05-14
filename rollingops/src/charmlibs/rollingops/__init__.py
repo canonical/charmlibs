@@ -276,7 +276,7 @@ with etcd.
 
 
 Runtime storage (``base_dir``)
-----------------------------
+-------------------------------
 
 RollingOps requires a writable base directory to store runtime files
 used during operation. This directory is configured through the ``base_dir``
@@ -289,7 +289,7 @@ If the directory does not exist, RollingOps will attempt to create it automatica
 The process running RollingOps must have permission to write to ``base_dir``.
 
 What is stored in ``base_dir``
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 RollingOps uses this directory for runtime artifacts, including:
 
