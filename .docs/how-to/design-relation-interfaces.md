@@ -334,8 +334,6 @@ def test_secret_content(secret_content: dict[str, Any], status):
     assert state_out.unit_status == status
 ```
 
-[Full test code](https://github.com/dimaqq/op083-samples/blob/main/test_secret_content.py)
-
 Or a unit test:
 
 ```py
