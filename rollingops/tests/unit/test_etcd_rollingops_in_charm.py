@@ -419,10 +419,7 @@ def test_is_waiting_returns_true_when_matching_operation_exists_in_unit(
         local_app_data={},
         local_unit_data={
             'state': 'request',
-            'operations': _OperationQueue([
-                _Operation.create('restart', {'delay': 1}),
-                _Operation.create('restart', {'delay': 2}),
-            ]).to_string(),
+            'operations': _OperationQueue([]).to_string(),
             'executed_at': '',
             'processing_backend': 'peer',
             'etcd_cleanup_needed': 'false',
@@ -456,9 +453,7 @@ def test_is_waiting_returns_false_when_callback_does_not_match_in_unit(
         local_app_data={},
         local_unit_data={
             'state': 'request',
-            'operations': _OperationQueue([
-                _Operation.create('restart', {'delay': 1}),
-            ]).to_string(),
+            'operations': _OperationQueue([]).to_string(),
             'executed_at': '',
             'processing_backend': 'peer',
             'etcd_cleanup_needed': 'false',
@@ -489,7 +484,9 @@ def test_is_waiting_returns_false_when_no_operations_in_unit(
         local_app_data={},
         local_unit_data={
             'state': 'request',
-            'operations': _OperationQueue([]).to_string(),
+            'operations': _OperationQueue([
+                _Operation.create('restart', {'delay': 1}),
+            ]).to_string(),
             'executed_at': '',
             'processing_backend': 'peer',
             'etcd_cleanup_needed': 'false',
