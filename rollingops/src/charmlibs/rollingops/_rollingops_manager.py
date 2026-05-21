@@ -423,13 +423,13 @@ class RollingOpsManager(Object):
             TimeoutError: If lock acquisition through etcd or the peer backend
                 times out.
             RollingOpsSyncLockError: if there is an error when acquiring the lock.
+            Any exception raised within the protected block is propagated, and the
+            lock is released before propagation.
         """
         if self._etcd_backend is not None and self._etcd_backend.is_available():
             logger.info('Acquiring sync lock on etcd.')
             try:
                 self._etcd_backend.acquire_sync_lock(timeout)
-                yield
-                return
             except TimeoutError:
                 raise
             except Exception as e:
@@ -438,12 +438,17 @@ class RollingOpsManager(Object):
                     'Failed to request etcd sync lock; falling back to peer: %s',
                     e,
                 )
-            finally:
+            else:
                 try:
-                    self._etcd_backend.release_sync_lock()
-                    logger.info('etcd lock released.')
-                except Exception as e:
-                    logger.exception('Failed to release sync lock: %s', e)
+                    # Separate lock acquisition errors from errors raised while holding the lock.
+                    yield
+                finally:
+                    try:
+                        self._etcd_backend.release_sync_lock()
+                        logger.info('etcd lock released.')
+                    except Exception as e:
+                        logger.exception('Failed to release sync lock: %s', e)
+                return
 
         backend = self._get_sync_lock_backend(backend_id)
         logger.info('Acquiring sync lock backend %s.', backend_id)
