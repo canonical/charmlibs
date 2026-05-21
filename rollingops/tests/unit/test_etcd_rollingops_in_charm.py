@@ -17,7 +17,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-from ops.testing import Context, PeerRelation, Secret, State
+from ops.testing import Context, PeerRelation, Relation, Secret, State
 from scenario import RawDataBagContents
 from scenario.errors import UncaughtCharmError
 from tests.unit.conftest import (
@@ -497,3 +497,152 @@ def test_is_waiting_returns_false_when_no_operations_in_unit(
     with ctx(ctx.on.update_status(), state) as mgr:
         assert mgr.charm.restart_manager.is_waiting_callback('restart', 'charm/1') is False
         assert mgr.charm.restart_manager.is_waiting('charm/1') is False
+
+
+def test_sync_lock_request_failed_critical_path_using_etcd_lock(
+    ctx: Context[RollingOpsCharm],
+):
+    peer = PeerRelation(endpoint='restart')
+    etcd_relation = Relation(
+        endpoint='etcd',
+        interface='rollingops',
+    )
+    state_in = State(leader=False, relations={peer, etcd_relation})
+
+    with (
+        patch(
+            'charmlibs.rollingops._etcd._backend._EtcdRollingOpsBackend.is_available',
+            return_value=True,
+        ) as mock_is_available,
+        patch(
+            'charmlibs.rollingops._etcd._backend._EtcdRollingOpsBackend.acquire_sync_lock',
+        ) as mock_acquire_sync_lock,
+        patch(
+            'charmlibs.rollingops._etcd._backend._EtcdRollingOpsBackend.release_sync_lock',
+        ) as mock_release_sync_lock,
+    ):
+        with pytest.raises(UncaughtCharmError) as exc_info:
+            ctx.run(
+                ctx.on.action('failed-sync-restart'),
+                state_in,
+            )
+
+    assert isinstance(exc_info.value.__cause__, ValueError)
+    mock_is_available.assert_called_once()
+    mock_acquire_sync_lock.assert_called_once_with(30)
+    mock_release_sync_lock.assert_called_once()
+
+
+def test_sync_lock_fallbacks_to_peer_backend_on_etcd_error(
+    ctx: Context[RollingOpsCharm],
+):
+    peer = PeerRelation(endpoint='restart')
+    etcd_relation = Relation(
+        endpoint='etcd',
+        interface='rollingops',
+    )
+    state_in = State(leader=False, relations={peer, etcd_relation})
+
+    mock_backend = MagicMock()
+    mock_backend.acquire = MagicMock()
+    mock_backend.release = MagicMock()
+
+    with (
+        patch(
+            'charmlibs.rollingops._etcd._backend._EtcdRollingOpsBackend.is_available',
+            return_value=True,
+        ) as mock_is_available,
+        patch(
+            'charmlibs.rollingops._etcd._backend._EtcdRollingOpsBackend.acquire_sync_lock',
+            side_effect=Exception('etcd failure'),
+        ) as mock_etcd_acquire,
+        patch(
+            'charmlibs.rollingops._rollingops_manager.RollingOpsManager._get_sync_lock_backend',
+            return_value=mock_backend,
+        ),
+    ):
+        ctx.run(
+            ctx.on.action('sync-restart'),
+            state_in,
+        )
+
+    mock_is_available.assert_called_once()
+    mock_etcd_acquire.assert_called_once()
+    mock_backend.acquire.assert_called_once_with(timeout=30)
+    mock_backend.release.assert_called_once()
+
+
+def test_sync_lock_peer_backend_and_failure_on_critical_path_is_propagated(
+    ctx: Context[RollingOpsCharm],
+):
+    peer = PeerRelation(endpoint='restart')
+    etcd_relation = Relation(
+        endpoint='etcd',
+        interface='rollingops',
+    )
+    state_in = State(leader=False, relations={peer, etcd_relation})
+
+    mock_backend = MagicMock()
+    mock_backend.acquire = MagicMock()
+    mock_backend.release = MagicMock()
+
+    with (
+        patch(
+            'charmlibs.rollingops._etcd._backend._EtcdRollingOpsBackend.is_available',
+            return_value=True,
+        ) as mock_is_available,
+        patch(
+            'charmlibs.rollingops._etcd._backend._EtcdRollingOpsBackend.acquire_sync_lock',
+            side_effect=Exception('etcd failure'),
+        ) as mock_etcd_acquire,
+        patch(
+            'charmlibs.rollingops._rollingops_manager.RollingOpsManager._get_sync_lock_backend',
+            return_value=mock_backend,
+        ),
+    ):
+        with pytest.raises(UncaughtCharmError) as exc_info:
+            ctx.run(
+                ctx.on.action('failed-sync-restart'),
+                state_in,
+            )
+
+    assert isinstance(exc_info.value.__cause__, ValueError)
+    mock_is_available.assert_called_once()
+    mock_etcd_acquire.assert_called_once()
+    mock_backend.acquire.assert_called_once_with(timeout=30)
+    mock_backend.release.assert_called_once()
+
+
+def test_sync_lock_request_timeout_raises(
+    ctx: Context[RollingOpsCharm],
+):
+    peer = PeerRelation(endpoint='restart')
+    etcd_relation = Relation(
+        endpoint='etcd',
+        interface='rollingops',
+    )
+    state_in = State(leader=False, relations={peer, etcd_relation})
+
+    with (
+        patch(
+            'charmlibs.rollingops._etcd._backend._EtcdRollingOpsBackend.is_available',
+            return_value=True,
+        ) as mock_is_available,
+        patch(
+            'charmlibs.rollingops._etcd._backend._EtcdRollingOpsBackend.acquire_sync_lock',
+            side_effect=TimeoutError,
+        ) as mock_acquire_sync_lock,
+        patch(
+            'charmlibs.rollingops._etcd._backend._EtcdRollingOpsBackend.release_sync_lock',
+        ) as mock_release_sync_lock,
+    ):
+        with pytest.raises(UncaughtCharmError) as exc_info:
+            ctx.run(
+                ctx.on.action('sync-restart', params={'timeout': 2}),
+                state_in,
+            )
+
+    assert isinstance(exc_info.value.__cause__, TimeoutError)
+    mock_is_available.assert_called_once()
+    mock_acquire_sync_lock.assert_called_once_with(2)
+    mock_release_sync_lock.assert_not_called()
