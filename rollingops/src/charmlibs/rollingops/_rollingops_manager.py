@@ -18,7 +18,7 @@ import logging
 from contextlib import contextmanager
 from typing import Any
 
-from ops import CharmBase, Object, Relation, RelationBrokenEvent
+from ops import CharmBase, Object, Relation, RelationBrokenEvent, Unit
 from ops.framework import EventBase
 
 from charmlibs import pathops
@@ -40,7 +40,7 @@ from charmlibs.rollingops._common._models import (
 from charmlibs.rollingops._common._utils import ETCD_FAILED_HOOK_NAME, LOCK_GRANTED_HOOK_NAME
 from charmlibs.rollingops._etcd._backend import _EtcdRollingOpsBackend
 from charmlibs.rollingops._peer._backend import _PeerRollingOpsBackend
-from charmlibs.rollingops._peer._models import PeerUnitOperations
+from charmlibs.rollingops._peer._models import PeerUnitOperations, iter_peer_units
 
 logger = logging.getLogger(__name__)
 
@@ -386,6 +386,14 @@ class RollingOpsManager(Object):
             self._peer_backend.ensure_processing()
             logger.info('Fell back to peer backend.')
 
+    def _get_peer_unit(self, unit_name: str) -> Unit:
+        """Return the peer unit having the provided name."""
+        for peer_unit in iter_peer_units(self.model, self.peer_relation_name):
+            if peer_unit.name == unit_name:
+                return peer_unit
+
+        raise ValueError('unit_name provided does not belong to the peer relation.')
+
     def _get_sync_lock_backend(self, backend_id: str) -> SyncLockBackend:
         """Instantiate the configured peer sync lock backend.
 
@@ -511,28 +519,51 @@ class RollingOpsManager(Object):
             processing_backend=self._backend_state.backend,
         )
 
-    def is_waiting_callback(self, callback_id: str) -> bool:
-        """Return whether the current unit has a pending operation matching callback."""
+    def is_waiting_callback(self, callback_id: str, unit_name: str | None = None) -> bool:
+        """Return whether the desired unit has a pending operation matching callback.
+
+        Args:
+            callback_id: callback ID to search for in the unit list of operations.
+            unit_name: name of the unit to search for specific callback ID operations.
+                If not specified, defaults to this unit.
+
+        Raises:
+            ValueError: If the unit name is not found within the peer relation units.
+        """
         if self._peer_relation is None:
             return False
+
+        if unit_name is None:
+            unit_name = self.model.unit.name
 
         operations = PeerUnitOperations(
             self.model,
             self.peer_relation_name,
-            self.model.unit,
+            self._get_peer_unit(unit_name),
         ).queue.operations
 
         return any(op.callback_id == callback_id for op in operations)
 
-    def is_waiting(self) -> bool:
-        """Return whether the current unit has a pending operations."""
+    def is_waiting(self, unit_name: str | None = None) -> bool:
+        """Return whether the desired unit has pending operations.
+
+        Args:
+            unit_name: name of the unit to search for operations.
+                If not specified, defaults to this unit.
+
+        Raises:
+            ValueError: If the unit name is not found within the peer relation units.
+        """
         if self._peer_relation is None:
             return False
+
+        if unit_name is None:
+            unit_name = self.model.unit.name
 
         operations = PeerUnitOperations(
             self.model,
             self.peer_relation_name,
-            self.model.unit,
+            self._get_peer_unit(unit_name),
         ).queue.operations
 
         return bool(operations)
