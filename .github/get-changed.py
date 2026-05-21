@@ -52,7 +52,7 @@ def _main() -> None:
     else:
         cmd.append(args.git_base_ref)
     if args.name_only:
-        cmd.append('--name-only')
+        cmd.extend(['--output-only', 'name'])
     result = subprocess.check_output(cmd, text=True).strip()
     output = f'result={result}'
     logger.info(output)
