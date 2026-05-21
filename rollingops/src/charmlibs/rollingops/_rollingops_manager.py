@@ -168,10 +168,7 @@ class RollingOpsManager(Object):
                 callback_targets=callback_targets,
                 base_dir=base_dir,
             )
-            self.framework.observe(
-                charm.on[etcd_relation_name].relation_broken,
-                self._on_etcd_relation_broken,
-            )
+            self._etcd_backend.shared_certificates.create_and_share_certificate()
 
         self.framework.observe(charm.on.rollingops_lock_granted, self._on_rollingops_lock_granted)
         self.framework.observe(charm.on.rollingops_etcd_failed, self._on_rollingops_etcd_failed)
