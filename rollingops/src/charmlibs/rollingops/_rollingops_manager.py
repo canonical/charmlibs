@@ -18,7 +18,7 @@ import logging
 from contextlib import contextmanager
 from typing import Any
 
-from ops import CharmBase, Object, Relation, RelationBrokenEvent
+from ops import CharmBase, Object, Relation
 from ops.framework import EventBase
 
 from charmlibs import pathops
@@ -188,14 +188,6 @@ class RollingOpsManager(Object):
         recovery decisions.
         """
         return _UnitBackendState(self.model, self.peer_relation_name, self.model.unit)
-
-    def _on_etcd_relation_broken(self, event: RelationBrokenEvent) -> None:
-        """Handle the etcd relation being fully removed.
-
-        This method stops the etcd worker process since the required
-        relation is no longer available.
-        """
-        self._fallback_current_unit_to_peer()
 
     def _select_processing_backend(self) -> ProcessingBackend:
         """Choose which backend should handle new operations for this unit.
