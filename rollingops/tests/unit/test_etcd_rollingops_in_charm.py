@@ -396,3 +396,104 @@ def test_is_waiting_returns_false_when_no_operations(ctx: Context[RollingOpsChar
     with ctx(ctx.on.update_status(), state) as mgr:
         assert mgr.charm.restart_manager.is_waiting_callback('restart') is False
         assert mgr.charm.restart_manager.is_waiting() is False
+
+
+def test_is_waiting_returns_true_when_matching_operation_exists_in_unit(
+    ctx: Context[RollingOpsCharm],
+):
+    peer_rel = PeerRelation(
+        peers_data={
+            1: {
+                'state': 'request',
+                'operations': _OperationQueue([
+                    _Operation.create('restart', {'delay': 1}),
+                    _Operation.create('restart', {'delay': 2}),
+                ]).to_string(),
+                'executed_at': '',
+                'processing_backend': 'peer',
+                'etcd_cleanup_needed': 'false',
+            },
+        },
+        endpoint='restart',
+        interface='rollingops',
+        local_app_data={},
+        local_unit_data={
+            'state': 'request',
+            'operations': _OperationQueue([]).to_string(),
+            'executed_at': '',
+            'processing_backend': 'peer',
+            'etcd_cleanup_needed': 'false',
+        },
+    )
+
+    state = State(leader=False, relations={peer_rel})
+
+    with ctx(ctx.on.update_status(), state) as mgr:
+        assert mgr.charm.restart_manager.is_waiting_callback('restart', 'charm/1') is True
+        assert mgr.charm.restart_manager.is_waiting('charm/1') is True
+
+
+def test_is_waiting_returns_false_when_callback_does_not_match_in_unit(
+    ctx: Context[RollingOpsCharm],
+):
+    peer_rel = PeerRelation(
+        peers_data={
+            1: {
+                'state': 'request',
+                'operations': _OperationQueue([
+                    _Operation.create('restart', {'delay': 1}),
+                ]).to_string(),
+                'executed_at': '',
+                'processing_backend': 'peer',
+                'etcd_cleanup_needed': 'false',
+            },
+        },
+        endpoint='restart',
+        interface='rollingops',
+        local_app_data={},
+        local_unit_data={
+            'state': 'request',
+            'operations': _OperationQueue([]).to_string(),
+            'executed_at': '',
+            'processing_backend': 'peer',
+            'etcd_cleanup_needed': 'false',
+        },
+    )
+    state = State(leader=False, relations={peer_rel})
+
+    with ctx(ctx.on.update_status(), state) as mgr:
+        assert mgr.charm.restart_manager.is_waiting_callback('other-callback', 'charm/1') is False
+        assert mgr.charm.restart_manager.is_waiting('charm/1') is True
+
+
+def test_is_waiting_returns_false_when_no_operations_in_unit(
+    ctx: Context[RollingOpsCharm],
+):
+    peer_rel = PeerRelation(
+        peers_data={
+            1: {
+                'state': 'request',
+                'operations': _OperationQueue([]).to_string(),
+                'executed_at': '',
+                'processing_backend': 'peer',
+                'etcd_cleanup_needed': 'false',
+            },
+        },
+        endpoint='restart',
+        interface='rollingops',
+        local_app_data={},
+        local_unit_data={
+            'state': 'request',
+            'operations': _OperationQueue([
+                _Operation.create('restart', {'delay': 1}),
+            ]).to_string(),
+            'executed_at': '',
+            'processing_backend': 'peer',
+            'etcd_cleanup_needed': 'false',
+        },
+    )
+    state = State(leader=False, relations={peer_rel})
+
+    with ctx(ctx.on.update_status(), state) as mgr:
+        assert mgr.charm.restart_manager.is_waiting_callback('restart', 'charm/1') is False
+        assert mgr.charm.restart_manager.is_waiting('charm/1') is False
