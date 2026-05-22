@@ -247,7 +247,7 @@ jobs:
 
       - name: Upload Charmcraft logs
         if: ${{ !cancelled() && (steps.pack.conclusion != 'skipped' || steps.integration.conclusion != 'skipped') }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ needs.init.outputs.package-name }}-charmcraft-logs-${{ matrix.substrate }}-${{ matrix.tag }}
           path: /home/runner/.local/state/charmcraft/log/charmcraft-*.log
