@@ -450,6 +450,9 @@ class RollingOpsManager(Object):
                 try:
                     # Separate lock acquisition errors from errors raised while holding the lock.
                     yield
+                except Exception as e:
+                    logger.exception('Error while holding etcd sync lock: %s', e)
+                    raise
                 finally:
                     try:
                         self._etcd_backend.release_sync_lock()
@@ -469,6 +472,9 @@ class RollingOpsManager(Object):
 
         try:
             yield
+        except Exception as e:
+            logger.exception('Error while holding sync lock backend %s: %s', backend_id, e)
+            raise
         finally:
             try:
                 backend.release()
