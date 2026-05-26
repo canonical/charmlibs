@@ -58,7 +58,7 @@ def _load_on_doctree_read(app: sphinx.application.Sphinx, doctree: docutils.node
         return
     if not (source := pathlib.Path('.save', f'{app.env.docname}.pickle')).exists():
         return
-    saved, objects, modules = pickle.loads(source.read_bytes())  # noqa: S301
+    saved, objects, modules, toc, toc_num_entries = pickle.loads(source.read_bytes())  # noqa: S301
     # restore saved doctree
     doctree.clear()
     for node in saved.children:
@@ -66,6 +66,10 @@ def _load_on_doctree_read(app: sphinx.application.Sphinx, doctree: docutils.node
     # restore domain inventory for cross-refs
     app.env.domains['py'].data['objects'].update(objects)
     app.env.domains['py'].data['modules'].update(modules)
+    # restore TOC so the RHS table of contents is populated
+    docname = app.env.docname
+    app.env.tocs[docname] = toc
+    app.env.toc_num_entries[docname] = toc_num_entries
 
 
 def _save_on_doctree_resolved(
@@ -79,9 +83,11 @@ def _save_on_doctree_resolved(
         return
     objects = app.env.domains['py'].data['objects']
     modules = app.env.domains['py'].data['modules']
+    toc = app.env.tocs[docname]
+    toc_num_entries = app.env.toc_num_entries[docname]
     target = pathlib.Path('.save', f'{docname}.pickle')
     target.parent.mkdir(exist_ok=True, parents=True)
-    target.write_bytes(pickle.dumps((doctree, objects, modules)))
+    target.write_bytes(pickle.dumps((doctree, objects, modules, toc, toc_num_entries)))
 
 
 ####################

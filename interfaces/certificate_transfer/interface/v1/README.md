@@ -31,9 +31,9 @@ Both the Requirer and the Provider need to adhere to criteria to be considered c
 
 ## Relation Data
 
-### Provider
+[\[Pydantic Schema\]](./schema.py)
 
-[\[JSON Schema\]](./schema.py)
+### Provider
 
 The provider writes any number of certficates to its relation data.
 
@@ -51,8 +51,6 @@ relation-info:
 ```
 
 ### Requirer
-
-[\[JSON Schema\]](./schema.py)
 
 The requirer writes the version number of the interface to its application databag as soon as feasible.
 
