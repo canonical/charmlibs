@@ -1,4 +1,4 @@
-# Copyright 2025 Canonical
+# Copyright 2026 Canonical
 # See LICENSE file for licensing details.
 
 """Regression tests for ResourceWarning leaks from container.pull().
