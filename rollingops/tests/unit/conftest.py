@@ -14,6 +14,7 @@
 
 """Fixtures for unit tests, typically mocking out parts of the external system."""
 
+import time
 from collections.abc import Generator
 from pathlib import Path
 from typing import Any
@@ -31,7 +32,7 @@ from charmlibs.interfaces.tls_certificates import (
     Certificate,
     PrivateKey,
 )
-from charmlibs.rollingops import RollingOpsManager
+from charmlibs.rollingops import RollingOpsManager, SyncLockBackend
 from charmlibs.rollingops._common._models import OperationResult
 from charmlibs.rollingops._etcd._models import SharedCertificate
 
@@ -144,6 +145,16 @@ def certificates_manager_patches() -> Generator[dict[str, MagicMock], None, None
         }
 
 
+class DummySyncLockBackend(SyncLockBackend):
+    STOP_REPLSET_MEMBER = 'stop-replset-member'
+
+    def acquire(self, timeout: int | None) -> None:
+        return None
+
+    def release(self) -> None:
+        return None
+
+
 class RollingOpsCharm(ops.CharmBase):
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
@@ -160,10 +171,15 @@ class RollingOpsCharm(ops.CharmBase):
             etcd_relation_name='etcd',
             cluster_id='cluster-12345',
             callback_targets=callback_targets,
+            sync_lock_targets={DummySyncLockBackend.STOP_REPLSET_MEMBER: DummySyncLockBackend()},
         )
         self.framework.observe(self.on.restart_action, self._on_restart_action)
         self.framework.observe(self.on.failed_restart_action, self._on_failed_restart_action)
         self.framework.observe(self.on.deferred_restart_action, self._on_deferred_restart_action)
+        self.framework.observe(
+            self.on.failed_sync_restart_action, self._on_failed_sync_restart_action
+        )
+        self.framework.observe(self.on.sync_restart_action, self.on_sync_restart_action)
 
     def _on_restart_action(self, event: ActionEvent) -> None:
         delay = event.params.get('delay')
@@ -186,6 +202,23 @@ class RollingOpsCharm(ops.CharmBase):
             kwargs={'delay': delay},
             max_retry=max_retry,
         )
+
+    def _on_failed_sync_restart_action(self, event: ActionEvent) -> None:
+        timeout = int(event.params.get('timeout', 30))
+        with self.restart_manager.acquire_sync_lock(
+            backend_id=DummySyncLockBackend.STOP_REPLSET_MEMBER,
+            timeout=timeout,
+        ):
+            raise ValueError('Simulated failure in sync lock callback')
+
+    def on_sync_restart_action(self, event: ActionEvent) -> None:
+        timeout = int(event.params.get('timeout', 30))
+        delay = int(event.params.get('delay', 0))
+        with self.restart_manager.acquire_sync_lock(
+            backend_id=DummySyncLockBackend.STOP_REPLSET_MEMBER,
+            timeout=timeout,
+        ):
+            time.sleep(delay)
 
     def _restart(self) -> None:
         pass
@@ -252,6 +285,24 @@ actions: dict[str, Any] = {
             'max-retry': {
                 'description': 'Number of times the operation should be retried.',
                 'type': 'integer',
+            },
+        },
+    },
+    'failed-sync-restart': {
+        'description': 'Example restart that simulates a failure in a sync lock callback.',
+    },
+    'sync-restart': {
+        'description': 'Example restart that acquires a sync lock. Used in testing',
+        'params': {
+            'delay': {
+                'description': 'Amount of time in seconds to sleep while holding the sync lock.',
+                'type': 'integer',
+                'default': 0,
+            },
+            'timeout': {
+                'description': 'Timeout in seconds for sync lock acquisition.',
+                'type': 'integer',
+                'default': 30,
             },
         },
     },

@@ -112,7 +112,7 @@ class SharedClientCertificateManager(Object):
         app_data = relation.data[self.model.app]
 
         if app_data.get(CERT_SECRET_FIELD):
-            logger.info(
+            logger.debug(
                 'Shared certificate already exists in the databag. No new certificate is created.'
             )
             return

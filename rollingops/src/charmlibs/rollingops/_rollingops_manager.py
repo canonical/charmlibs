@@ -18,7 +18,7 @@ import logging
 from contextlib import contextmanager
 from typing import Any
 
-from ops import CharmBase, Object, Relation, RelationBrokenEvent, Unit
+from ops import CharmBase, Object, Relation, Unit
 from ops.framework import EventBase
 
 from charmlibs import pathops
@@ -168,10 +168,7 @@ class RollingOpsManager(Object):
                 callback_targets=callback_targets,
                 base_dir=base_dir,
             )
-            self.framework.observe(
-                charm.on[etcd_relation_name].relation_broken,
-                self._on_etcd_relation_broken,
-            )
+            self._etcd_backend.shared_certificates.create_and_share_certificate()
 
         self.framework.observe(charm.on.rollingops_lock_granted, self._on_rollingops_lock_granted)
         self.framework.observe(charm.on.rollingops_etcd_failed, self._on_rollingops_etcd_failed)
@@ -191,14 +188,6 @@ class RollingOpsManager(Object):
         recovery decisions.
         """
         return _UnitBackendState(self.model, self.peer_relation_name, self.model.unit)
-
-    def _on_etcd_relation_broken(self, event: RelationBrokenEvent) -> None:
-        """Handle the etcd relation being fully removed.
-
-        This method stops the etcd worker process since the required
-        relation is no longer available.
-        """
-        self._fallback_current_unit_to_peer()
 
     def _select_processing_backend(self) -> ProcessingBackend:
         """Choose which backend should handle new operations for this unit.
@@ -442,13 +431,13 @@ class RollingOpsManager(Object):
             TimeoutError: If lock acquisition through etcd or the peer backend
                 times out.
             RollingOpsSyncLockError: if there is an error when acquiring the lock.
+            Any exception raised within the protected block is propagated, and the
+            lock is released before propagation.
         """
         if self._etcd_backend is not None and self._etcd_backend.is_available():
             logger.info('Acquiring sync lock on etcd.')
             try:
                 self._etcd_backend.acquire_sync_lock(timeout)
-                yield
-                return
             except TimeoutError:
                 raise
             except Exception as e:
@@ -457,12 +446,20 @@ class RollingOpsManager(Object):
                     'Failed to request etcd sync lock; falling back to peer: %s',
                     e,
                 )
-            finally:
+            else:
                 try:
-                    self._etcd_backend.release_sync_lock()
-                    logger.info('etcd lock released.')
+                    # Separate lock acquisition errors from errors raised while holding the lock.
+                    yield
                 except Exception as e:
-                    logger.exception('Failed to release sync lock: %s', e)
+                    logger.exception('Error while holding etcd sync lock: %s', e)
+                    raise
+                finally:
+                    try:
+                        self._etcd_backend.release_sync_lock()
+                        logger.info('etcd lock released.')
+                    except Exception as e:
+                        logger.exception('Failed to release sync lock: %s', e)
+                return
 
         backend = self._get_sync_lock_backend(backend_id)
         logger.info('Acquiring sync lock backend %s.', backend_id)
@@ -475,6 +472,9 @@ class RollingOpsManager(Object):
 
         try:
             yield
+        except Exception as e:
+            logger.exception('Error while holding sync lock backend %s: %s', backend_id, e)
+            raise
         finally:
             try:
                 backend.release()
