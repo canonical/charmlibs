@@ -91,7 +91,7 @@ The `<package>` argument is the path from the repo root, e.g. `pathops` or `inte
 | `just format [package]` | Auto-fix ruff and formatting errors |
 | `just static <package>` | pyright only |
 | `just unit <package>` | Run unit tests |
-| `just functional <package>` | Run functional tests (may need external software available, or to be run with sudo -- and note that this probably indicates a test that's destructive to the local environment (e.g. adding or removing packages)) |
+| `just functional <package>` | Run functional tests (may need external software available, or to be run with sudo -- and note that this probably indicates a test that's destructive to the local environment (e.g. adding or removing packages)). **Do not run functional tests directly on the host.** Use Workshop instead (see below). |
 | `just pack-k8s <package>` | Pack K8s test charm(s) for integration tests, running the libraries `tests/integration/pack.sh` script with environment variables set |
 | `just pack-machine <package>` | Pack machine test charm(s) for integration tests, as above |
 | `just integration-k8s <package>` | Run Juju integration tests, excluding `pytest.mark.machine_only` tests |
@@ -128,6 +128,22 @@ just add interfaces/tls-certificates --requirements my-requirements.txt
 A test type is only executed if the corresponding `tests/` subdirectory exists. Remove a directory to skip that test type entirely.
 
 Read more: [types of tests in the charmlibs monorepo](https://documentation.ubuntu.com/charmlibs/explanation/charmlibs-tests/).
+
+### Running functional tests with Workshop
+
+Functional tests often require `sudo` and may be destructive to the local environment (e.g. installing or removing system packages). **Never run functional tests directly on the host machine.** Always use [Workshop](https://snapcraft.io/workshop) to run them in an isolated container:
+
+```bash
+workshop run resolute -- functional <package>    # Ubuntu 26.04
+workshop run noble -- functional <package>       # Ubuntu 24.04
+workshop run jammy -- functional <package>       # Ubuntu 22.04
+```
+
+Workshop configs are defined in `.workshop/`. The `functional` action runs `sudo just functional "$@"` inside the VM. Extra pytest flags are passed through:
+
+```bash
+workshop run noble -- functional snap -x -k test_install
+```
 
 ## Commit and PR conventions
 

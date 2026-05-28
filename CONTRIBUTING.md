@@ -45,7 +45,16 @@ just add pathops 'pydantic>=2'
 
 `functional` and `integration` tests are also executed in CI, and can be run locally too. They're excluded from `just check` as they may require additional setup:
 
-- `just functional <package>` runs functional tests, which interact with real external processes (but not Juju itself). Some functional test suites may require additional software installed locally, like `pebble` or `sudo` access.
+- `just functional <package>` runs functional tests, which interact with real external processes (but not Juju itself). Some functional test suites may require `sudo` access and may be destructive to the local environment (e.g. installing or removing system packages). Use [Workshop](https://snapcraft.io/workshop) to run them in an isolated container instead of running them directly on your host:
+
+  ```bash
+  workshop run resolute -- functional <package>    # Ubuntu 26.04
+  workshop run noble -- functional <package>       # Ubuntu 24.04
+  workshop run jammy -- functional <package>       # Ubuntu 22.04
+  ```
+
+  Extra pytest flags are passed through, e.g. `workshop run noble -- functional snap -x -k test_install`. Workshop configs are in `.workshop/`.
+
 - Integration tests involve packing real test charms and deploying them on a Juju cloud. Pack first with `just pack-k8s <package>` or `just pack-machine <package>`, then run `just integration-k8s <package>` or `just integration-machine <package>`.
 
 Read more: [the different types of tests](https://documentation.ubuntu.com/charmlibs/explanation/charmlibs-tests/).
