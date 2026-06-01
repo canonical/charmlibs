@@ -53,6 +53,7 @@ jobs:
   build-n-publish:
     needs: [unify-inputs,test-package]
     if: ${{ needs.unify-inputs.outputs.include != '[]' }}
+    environment: publish-pypi
     strategy:
       fail-fast: false
       matrix:

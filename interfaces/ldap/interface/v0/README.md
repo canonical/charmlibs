@@ -53,6 +53,8 @@ through the relation databag(s).
 
 ## Relation Data
 
+[\[Pydantic Schema\]](./schema.py)
+
 ### Provider
 
 The `provider` provides LDAP URL, base DN, and bind DN, and LDAP

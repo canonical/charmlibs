@@ -242,6 +242,7 @@ autodoc_default_options = {
         '__pydantic_custom_init__,'
         '__pydantic_decorators__,'
         '__pydantic_extra__,'
+        '__pydantic_extra_info__,'
         '__pydantic_fields__,'
         '__pydantic_fields_set__,'
         '__pydantic_generic_metadata__,'

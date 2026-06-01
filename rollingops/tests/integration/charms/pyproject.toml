@@ -1,0 +1,19 @@
+# common pyproject.toml file symlinked by these charms
+
+[project]
+name = "integration-test-charm"
+version = "0.0.0.dev0"
+description = "Charm for integration tests."
+requires-python = ">=3.12"
+dependencies = [
+    "ops==3.*",
+    "charmlibs-rollingops",
+    "charmlibs-apt",
+    "charmlibs-interfaces-tls-certificates>=1.8.1",
+    "charmlibs-pathops>=1.2.1",
+    "dpcharmlibs-interfaces==1.0.0",
+    "tenacity"
+]
+
+[tool.uv.sources]
+"charmlibs-rollingops" = { path = "library", editable = true }

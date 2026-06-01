@@ -50,7 +50,7 @@ Example::
         CertificateTransferProvides,
     )
 
-    class DummyCertificateTransferProviderCharm(CharmBase):
+    class SampleCertificateTransferProviderCharm(CharmBase):
         def __init__(self, *args):
             super().__init__(*args)
             self.ct = CertificateTransferProvides(self, "certificates")
@@ -64,7 +64,7 @@ Example::
 
 
     if __name__ == "__main__":
-        main(DummyCertificateTransferProviderCharm)
+        main(SampleCertificateTransferProviderCharm)
 
 
 =================
@@ -86,7 +86,7 @@ Example::
     )
 
 
-    class DummyCertificateTransferRequirerCharm(CharmBase):
+    class SampleCertificateTransferRequirerCharm(CharmBase):
         def __init__(self, *args):
             super().__init__(*args)
             self.ct = CertificateTransferRequires(self, "certificates")
@@ -106,7 +106,7 @@ Example::
 
 
     if __name__ == "__main__":
-        main(DummyCertificateTransferRequirerCharm)
+        main(SampleCertificateTransferRequirerCharm)
 
 You can integrate both charms by running::
 

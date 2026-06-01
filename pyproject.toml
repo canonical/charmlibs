@@ -64,9 +64,11 @@ exclude = [
 
 # Ruff formatter configuration
 [tool.ruff.format]
+preview = true
 quote-style = "single"
 
 [tool.ruff.lint]
+preview = true
 select = [
     # flake8-builtins
     "A",
