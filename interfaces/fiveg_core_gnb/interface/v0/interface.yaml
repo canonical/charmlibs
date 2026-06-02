@@ -3,6 +3,7 @@ internal: true
 
 version: 0
 status: draft
+lib: charms.sdcore_nms_k8s.fiveg_core_gnb
 
 providers:
   - name: sdcore-nms-k8s-operator
