@@ -192,8 +192,8 @@
   {
     "name": "forward_auth",
     "version": "0",
-    "lib": "",
-    "lib_url": "",
+    "lib": "charms.oathkeeper.forward_auth",
+    "lib_url": "https://charmhub.io/oathkeeper/libraries/forward_auth",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/forward_auth/",
     "summary": "",
     "description": "",
@@ -232,8 +232,8 @@
   {
     "name": "hydra_endpoints",
     "version": "0",
-    "lib": "",
-    "lib_url": "",
+    "lib": "charms.hydra.hydra_endpoints",
+    "lib_url": "https://charmhub.io/hydra/libraries/hydra_endpoints",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/hydra_endpoints/",
     "summary": "",
     "description": "",
@@ -332,8 +332,8 @@
   {
     "name": "kratos_info",
     "version": "0",
-    "lib": "",
-    "lib_url": "",
+    "lib": "charms.kratos.kratos_info",
+    "lib_url": "https://charmhub.io/kratos/libraries/kratos_info",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/kratos_info/",
     "summary": "",
     "description": "",
@@ -372,8 +372,8 @@
   {
     "name": "login_ui_endpoints",
     "version": "0",
-    "lib": "",
-    "lib_url": "",
+    "lib": "charms.identity_platform_login_ui_operator.login_ui_endpoints",
+    "lib_url": "https://charmhub.io/identity-platform-login-ui-operator/libraries/login_ui_endpoints",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/login_ui_endpoints/",
     "summary": "",
     "description": "",
