@@ -1,0 +1,1537 @@
+general:
+- name: charms.operator_libs_linux.apt
+  status: legacy
+  url: https://charmhub.io/operator-libs-linux/libraries/apt
+  docs: ''
+  src: https://github.com/canonical/operator-libs-linux
+  kind: Charmhub
+  machine: true
+  K8s: false
+  description: Use ``apt`` to install and manage packages. Deprecated in favor of
+    ``charmlibs.apt``.
+- name: charms.mysql.architecture
+  status: team
+  url: https://charmhub.io/mysql/libraries/architecture
+  docs: ''
+  src: https://github.com/canonical/mysql-operator
+  kind: Charmhub
+  machine: true
+  K8s: true
+  description: Shared code between the ``mysql`` and ``mysql-k8s`` charms.
+- name: charms.mysql.async_replication
+  status: team
+  url: https://charmhub.io/mysql/libraries/async_replication
+  docs: ''
+  src: https://github.com/canonical/mysql-operator
+  kind: Charmhub
+  machine: true
+  K8s: true
+  description: Shared code between the ``mysql`` and ``mysql-k8s`` charms.
+- name: awsjuju
+  status: unlisted
+  url: https://pypi.org/project/awsjuju/
+  docs: ''
+  src: https://github.com/kapilt/awsjuju
+  kind: PyPI
+  machine: false
+  K8s: false
+  description: Legacy library for managing AWS resources.
+- name: charms.mysql.backups
+  status: team
+  url: https://charmhub.io/mysql/libraries/backups
+  docs: ''
+  src: https://github.com/canonical/mysql-operator
+  kind: Charmhub
+  machine: true
+  K8s: true
+  description: Shared code between the ``mysql`` and ``mysql-k8s`` charms.
+- name: charms.harness_extensions.capture_events
+  status: legacy
+  url: https://charmhub.io/harness-extensions/libraries/capture_events
+  docs: ''
+  src: https://github.com/PietroPasotti/harness-extensions
+  kind: Charmhub
+  machine: true
+  K8s: true
+  description: Helper for legacy harness tests. New charms should write state-transition
+    tests with ``ops[testing]`` instead.
+- name: charms.observability_libs.cert_handler
+  status: ''
+  url: https://charmhub.io/observability-libs/libraries/cert_handler
+  docs: ''
+  src: https://github.com/canonical/observability-libs
+  kind: Charmhub
+  machine: true
+  K8s: true
+  description: Wraps the requirer side of the ``tls-certificates-interface`` charm's
+    ``tls_certificates`` lib.
+- name: charms.loki_k8s.charm_logging
+  status: recommended
+  url: https://charmhub.io/loki-k8s/libraries/charm_logging
+  docs: ''
+  src: https://github.com/canonical/loki-k8s-operator
+  kind: Charmhub
+  machine: true
+  K8s: true
+  description: Add charm code logging to logs sent via ``loki_push_api``.
+- name: charms.tempo_coordinator_k8s.charm_tracing
+  status: legacy
+  url: https://charmhub.io/tempo-coordinator-k8s/libraries/charm_tracing
+  docs: ''
+  src: https://github.com/canonical/tempo-coordinator-k8s-operator
+  kind: Charmhub
+  machine: true
+  K8s: true
+  description: Provided by the ``tempo-coordinator-k8s`` charm. Consider using ``ops[tracing]``
+    instead.
+- name: charms.tempo_k8s.charm_tracing
+  status: legacy
+  url: https://charmhub.io/tempo-k8s/libraries/charm_tracing
+  docs: ''
+  src: https://github.com/canonical/tempo-k8s-operator
+  kind: Charmhub
+  machine: true
+  K8s: true
+  description: Deprecated in favor of the ``tempo-coordinator-k8s`` charm's libs.
+    New charms should use ``ops[tracing]`` for tracing charm code instead.
+- name: charm-api
+  status: experimental
+  url: https://pypi.org/project/charm-api/
+  docs: ''
+  src: https://github.com/canonical/charm-api
+  kind: PyPI
+  machine: true
+  K8s: true
+  description: Experimental API for writing charms.
+- name: charm-helpers
+  status: legacy
+  url: https://pypi.org/project/charmhelpers/
+  docs: https://charm-helpers.readthedocs.io/
+  src: https://github.com/juju/charm-helpers
+  kind: PyPI
+  machine: true
+  K8s: true
+  description: Pre-Ops library used by reactive charms.
+- name: charm-json
+  status: legacy
+  url: https://pypi.org/project/charm-json/
+  docs: ''
+  src: https://github.com/canonical/charm-json
+  kind: PyPI
+  machine: true
+  K8s: true
+  description: JSON typed relation data – unnecessary with Ops 2.23+ due to the addition
+    of typed relation data.
+- name: charm-refresh
+  status: recommended
+  url: https://pypi.org/project/charm-refresh/
+  docs: https://canonical-charm-refresh.readthedocs-hosted.com/latest/
+  src: https://github.com/canonical/charm-refresh
+  kind: PyPI
+  machine: true
+  K8s: true
+  description: In-place rolling refreshes of stateful charmed applications.
+- name: charm-refresh-build-version
+  status: unlisted
+  url: https://pypi.org/project/charm-refresh-build-version/
+  docs: ''
+  src: https://github.com/canonical/charm-refresh-build-version
+  kind: PyPI
+  machine: true
+  K8s: true
+  description: Workaround for a Charmcraft issue.
+- name: charm-upgrade
+  status: unlisted
+  url: https://pypi.org/project/charm-upgrade/
+  docs: ''
+  src: https://github.com/canonical/charm-upgrade
+  kind: PyPI
+  machine: true
+  K8s: true
+  description: Alias for charm-refresh? (Repo URL redirects.)
+- name: charmed-kubeflow-chisme
+  status: team
+  url: https://pypi.org/project/charmed-kubeflow-chisme/
+  docs: ''
+  src: https://github.com/canonical/charmed-kubeflow-chisme
+  kind: PyPI
+  machine: true
+  K8s: true
+  description: Used internally by the Charmed Kubeflow team.
+- name: charmed-service-mesh-helpers
+  status: team
+  url: https://pypi.org/project/charmed-service-mesh-helpers/
+  docs: ''
+  src: https://github.com/canonical/charmed-service-mesh-helpers/
+  kind: PyPI
+  machine: false
+  K8s: true
+  description: Used internally by the Service Mesh team.
+- name: charmlibs.apt
+  status: recommended
+  url: https://pypi.org/project/charmlibs-apt
+  docs: https://documentation.ubuntu.com/charmlibs/reference/charmlibs/apt
+  src: https://github.com/canonical/charmlibs/tree/main/apt
+  kind: PyPI
+  machine: true
+  K8s: false
+  description: Use ``apt`` to install and manage packages.
+- name: charmlibs.passwd
+  status: recommended
+  url: https://pypi.org/project/charmlibs-passwd
+  docs: https://documentation.ubuntu.com/charmlibs/reference/charmlibs/passwd
+  src: https://github.com/canonical/charmlibs/tree/main/passwd
+  kind: PyPI
+  machine: true
+  K8s: false
+  description: Manage Linux users and groups.
+- name: charmlibs.pathops
+  status: recommended
+  url: https://pypi.org/project/charmlibs-pathops
+  docs: https://documentation.ubuntu.com/charmlibs/reference/charmlibs/pathops
+  src: https://github.com/canonical/charmlibs/tree/main/pathops
+  kind: PyPI
+  machine: true
+  K8s: true
+  description: Substrate agnostic file operations.
+- name: charmlibs.rollingops
+  status: recommended
+  url: https://pypi.org/project/charmlibs-rollingops
+  docs: https://documentation.ubuntu.com/charmlibs/reference/charmlibs/rollingops
+  src: https://github.com/canonical/charmlibs/tree/main/rollingops
+  kind: PyPI
+  machine: true
+  K8s: true
+  description: Coordinate rolling operations for charms, including across applications
+    or clusters.
+- name: charmlibs.snap
+  status: recommended
+  url: https://pypi.org/project/charmlibs-snap
+  docs: https://documentation.ubuntu.com/charmlibs/reference/charmlibs/snap
+  src: https://github.com/canonical/charmlibs/tree/main/snap
+  kind: PyPI
+  machine: true
+  K8s: false
+  description: Use ``snapd`` to install and manage packages.
+- name: charmlibs.sysctl
+  status: recommended
+  url: https://pypi.org/project/charmlibs-sysctl
+  docs: https://documentation.ubuntu.com/charmlibs/reference/charmlibs/sysctl
+  src: https://github.com/canonical/charmlibs/tree/main/sysctl
+  kind: PyPI
+  machine: true
+  K8s: false
+  description: Create and configure ``sysctl`` options.
+- name: charmlibs.systemd
+  status: recommended
+  url: https://pypi.org/project/charmlibs-systemd
+  docs: https://documentation.ubuntu.com/charmlibs/reference/charmlibs/systemd
+  src: https://github.com/canonical/charmlibs/tree/main/systemd
+  kind: PyPI
+  machine: true
+  K8s: false
+  description: Use ``systemd`` to start, stop, and manage system services.
+- name: charms.contextual_status
+  status: experimental
+  url: https://pypi.org/project/charms.contextual-status/
+  docs: ''
+  src: https://github.com/charmed-kubernetes/charm-lib-contextual-status
+  kind: PyPI
+  machine: true
+  K8s: true
+  description: Context manager based library for setting charm statuses.
+- name: charms.docker
+  status: legacy
+  url: https://pypi.org/project/charms.docker/
+  docs: ''
+  src: https://github.com/juju-solutions/charms.docker
+  kind: PyPI
+  machine: false
+  K8s: false
+  description: Legacy library used by the ``docker-layer`` reactive charm.
+- name: charms.proxylib
+  status: ''
+  url: https://github.com/canonical/charms.proxylib
+  docs: ''
+  src: https://github.com/canonical/charms.proxylib
+  kind: PyPI
+  machine: true
+  K8s: true
+  description: A library that helps charms direct HTTP requests and subprocess calls
+    through the model-configured proxy environment.
+- name: charms.reactive
+  status: legacy
+  url: https://pypi.org/project/charms.reactive/
+  docs: https://charmsreactive.readthedocs.io/en/latest/
+  src: https://github.com/canonical/charms.reactive
+  kind: PyPI
+  machine: true
+  K8s: true
+  description: Legacy library used to implement reactive charms.
+- name: charms.reconciler
+  status: experimental
+  url: https://pypi.org/project/charms.reconciler/
+  docs: ''
+  src: https://github.com/charmed-kubernetes/charm-lib-reconciler
+  kind: PyPI
+  machine: true
+  K8s: true
+  description: Handle all Juju events in an Ops-based charm with a single method.
+- name: charms.templating.jinja2
+  status: legacy
+  url: https://pypi.org/project/charms.templating.jinja2/
+  docs: https://pythonhosted.org/charms.templating.jinja2/
+  src: https://github.com/juju-solutions/charms.templating.jinja2
+  kind: PyPI
+  machine: false
+  K8s: false
+  description: Legacy library for Jinja templating in reactive charms.
+- name: charms.zookeeper.client
+  status: ''
+  url: https://charmhub.io/zookeeper/libraries/client
+  docs: ''
+  src: https://github.com/canonical/zookeeper-operator
+  kind: Charmhub
+  machine: true
+  K8s: true
+  description: Perform ``zookeeper`` operations.
+- name: coordinated-workers
+  status: team
+  url: https://pypi.org/project/coordinated-workers/
+  docs: ''
+  src: https://github.com/canonical/cos-coordinated-workers
+  kind: PyPI
+  machine: true
+  K8s: true
+  description: Abstractions for charms following the coordinator-worker pattern, used
+    by Observability Team.
+- name: cosl
+  status: team
+  url: https://pypi.org/project/cosl/
+  docs: ''
+  src: https://github.com/canonical/cos-lib
+  kind: PyPI
+  machine: true
+  K8s: true
+  description: Used internally by the Observability Charm Engineering Team. A dependency
+    (via ``PYDEPS``) of popular charm libs such as ``loki_push_api``.
+- name: charms.data_platform_libs.data_models
+  status: legacy
+  url: https://charmhub.io/data-platform-libs/libraries/data_models
+  docs: ''
+  src: https://github.com/canonical/data-platform-libs
+  kind: Charmhub
+  machine: true
+  K8s: true
+  description: '``pydantic``-based typed relation data – unnecessary with Ops 2.23+
+    due to the addition of typed relation data.'
+- name: charms.data_platform_libs.data_secrets
+  status: legacy
+  url: https://charmhub.io/data-platform-libs/libraries/data_secrets
+  docs: ''
+  src: https://github.com/canonical/data-platform-libs
+  kind: Charmhub
+  machine: true
+  K8s: true
+  description: Secrets-related helpers for interfaces. Deprecated in favor of the
+    ``data-platform-libs.data_inferfaces`` interface lib.
+- name: data-platform-helpers
+  status: team
+  url: https://pypi.org/project/data-platform-helpers/
+  docs: ''
+  src: https://github.com/canonical/data-platform-helpers
+  kind: PyPI
+  machine: true
+  K8s: true
+  description: Used internally by the Data Charm Engineering team.
+- name: charms.operator_libs_linux.dnf
+  status: legacy
+  url: https://charmhub.io/operator-libs-linux/libraries/dnf
+  docs: ''
+  src: https://github.com/canonical/operator-libs-linux
+  kind: Charmhub
+  machine: true
+  K8s: false
+  description: Use ``dnf`` to install and manage packages – modern charms all run
+    on Ubuntu, so this shouldn't be needed.
+- name: charms.harness_extensions.evt_sequences
+  status: legacy
+  url: https://charmhub.io/harness-extensions/libraries/evt_sequences
+  docs: ''
+  src: https://github.com/PietroPasotti/harness-extensions
+  kind: Charmhub
+  machine: true
+  K8s: true
+  description: Helper for legacy harness tests. New charms should write state-transition
+    tests with ``ops[testing]`` instead.
+- name: charms.operator_libs_linux.grub
+  status: legacy
+  url: https://charmhub.io/operator-libs-linux/libraries/grub
+  docs: ''
+  src: https://github.com/canonical/operator-libs-linux
+  kind: Charmhub
+  machine: true
+  K8s: false
+  description: Use GRUB to manage kernel configuration. This library has fallen out
+    of use and is no longer actively maintained. Contact Charm Tech if you have a
+    need for this functionality in your charm.
+- name: charms.opensearch.helper_cos
+  status: team
+  url: https://charmhub.io/opensearch/libraries/helper_cos
+  docs: ''
+  src: https://github.com/canonical/opensearch-operator
+  kind: Charmhub
+  machine: false
+  K8s: false
+  description: Relies on ``data_platform_helpers``.
+- name: hpc-libs
+  status: team
+  url: https://github.com/charmed-hpc/hpc-libs
+  docs: ''
+  src: ''
+  kind: git
+  machine: true
+  K8s: true
+  description: Used internally by HPC charms.
+- name: charms.operator_libs_linux.juju_systemd_notices
+  status: legacy
+  url: https://charmhub.io/operator-libs-linux/libraries/juju_systemd_notices
+  docs: ''
+  src: https://github.com/canonical/operator-libs-linux
+  kind: Charmhub
+  machine: true
+  K8s: false
+  description: Use ``systemd`` to observe and emit notices when services change state.
+    This library has fallen out of use and is no longer actively maintained. Contact
+    Charm Tech if you have a need for this functionality in your charm.
+- name: charms.observability_libs.juju_topology
+  status: legacy
+  url: https://charmhub.io/observability-libs/libraries/juju_topology
+  docs: ''
+  src: https://github.com/canonical/observability-libs
+  kind: Charmhub
+  machine: true
+  K8s: true
+  description: Deprecated in favor of ``cosl.juju_topology.JujuTopology``.
+- name: jujubigdata
+  status: legacy
+  url: https://pypi.org/project/jujubigdata/
+  docs: http://pythonhosted.org/jujubigdata/
+  src: https://github.com/juju-solutions/jujubigdata
+  kind: PyPI
+  machine: false
+  K8s: false
+  description: Legacy library for developing Big Data charms.
+- name: jujuresources
+  status: legacy
+  url: https://pypi.org/project/jujuresources/
+  docs: http://pythonhosted.org/jujuresources/
+  src: https://github.com/juju-solutions/jujuresources
+  kind: PyPI
+  machine: true
+  K8s: true
+  description: Legacy library for loading binary resources. New charms should use
+    ``ops.Model.resources``.
+- name: charms.observability_libs.kubernetes_compute_resources_patch
+  status: ''
+  url: https://charmhub.io/observability-libs/libraries/kubernetes_compute_resources_patch
+  docs: ''
+  src: https://github.com/canonical/observability-libs
+  kind: Charmhub
+  machine: false
+  K8s: true
+  description: Patch Kubernetes compute resource limits.
+- name: charms.observability_libs.kubernetes_service_patch
+  status: legacy
+  url: https://charmhub.io/observability-libs/libraries/kubernetes_service_patch
+  docs: ''
+  src: https://github.com/canonical/observability-libs
+  kind: Charmhub
+  machine: false
+  K8s: true
+  description: Deprecated in favor of ``ops.Unit.set_ports``.
+- name: charms.observability_libs.metrics_endpoint_discovery
+  status: ''
+  url: https://charmhub.io/observability-libs/libraries/metrics_endpoint_discovery
+  docs: ''
+  src: https://github.com/canonical/observability-libs
+  kind: Charmhub
+  machine: false
+  K8s: true
+  description: Discover metric endpoints exposed by applications deployed to a K8s
+    cluster.
+- name: mongo-charms-single-kernel
+  status: team
+  url: https://pypi.org/project/mongo-charms-single-kernel/
+  docs: ''
+  src: https://github.com/canonical/mongo-single-kernel-library
+  kind: PyPI
+  machine: true
+  K8s: true
+  description: Used internally by the Data Charm Engineering team.
+- name: charms.kubernetes_charm_libraries.multus
+  status: ''
+  url: https://charmhub.io/kubernetes-charm-libraries/libraries/multus
+  docs: ''
+  src: https://github.com/canonical/kubernetes-charm-libraries
+  kind: Charmhub
+  machine: false
+  K8s: true
+  description: Use the Multus Kubernetes Container Network Interface.
+- name: charms.mysql.mysql
+  status: team
+  url: https://charmhub.io/mysql/libraries/mysql
+  docs: ''
+  src: https://github.com/canonical/mysql-operator
+  kind: Charmhub
+  machine: true
+  K8s: true
+  description: Shared code between the ``mysql`` and ``mysql-k8s`` charms.
+- name: oci-image
+  status: legacy
+  url: https://pypi.org/project/oci-image/
+  docs: ''
+  src: https://github.com/juju-solutions/resource-oci-image
+  kind: PyPI
+  machine: false
+  K8s: true
+  description: Work with OCI images in podspec charms. New Kubernetes charms should
+    use the sidecar pattern. Repo archived in March 2024.
+- name: ops_reactive_interface
+  status: legacy
+  url: https://pypi.org/project/ops-reactive-interface/
+  docs: https://github.com/canonical/ops-reactive-interface/tree/main/docs
+  src: https://github.com/juju-solutions/ops-reactive-interface
+  kind: PyPI
+  machine: true
+  K8s: true
+  description: Helper for interface library developers, to allow an Ops-based interface
+    library to interact with legacy, reactive charms.
+- name: ops.manifest
+  status: ''
+  url: https://pypi.org/project/ops.manifest/
+  docs: ''
+  src: https://github.com/canonical/ops-lib-manifest
+  kind: PyPI
+  machine: false
+  K8s: true
+  description: Work with Kubernetes manifests.
+- name: charms.operator_libs_linux.passwd
+  status: legacy
+  url: https://charmhub.io/operator-libs-linux/libraries/passwd
+  docs: ''
+  src: https://github.com/canonical/operator-libs-linux
+  kind: Charmhub
+  machine: true
+  K8s: false
+  description: Manage Linux users and groups. Deprecated in favor of ``charmlibs.passwd``.
+- name: charms.pgbouncer_k8s.pgb
+  status: team
+  url: https://charmhub.io/pgbouncer-k8s/libraries/pgb
+  docs: ''
+  src: https://github.com/canonical/pgbouncer-k8s-operator
+  kind: Charmhub
+  machine: true
+  K8s: true
+  description: Shared code between ``pgbouncer`` and ``pgbouncer-k8s`` charms.
+- name: charms.postgresql_k8s.postgresql
+  status: team
+  url: https://charmhub.io/postgresql-k8s/libraries/postgresql
+  docs: ''
+  src: https://github.com/canonical/postgresql-k8s-operator
+  kind: Charmhub
+  machine: true
+  K8s: true
+  description: Shared code between the ``postgresql`` and ``postgresql-k8s`` charms.
+- name: charms.rolling_ops.rollingops
+  status: legacy
+  url: https://charmhub.io/rolling-ops/libraries/rollingops
+  docs: ''
+  src: https://github.com/canonical/charm-rolling-ops
+  kind: Charmhub
+  machine: true
+  K8s: true
+  description: Legacy library for performing "rolling" operations across units, for
+    example rolling restarts. New charms should use ``charmlibs.rollingops``.
+- name: charms.mysql.s3_helpers
+  status: team
+  url: https://charmhub.io/mysql/libraries/s3_helpers
+  docs: ''
+  src: https://github.com/canonical/mysql-operator
+  kind: Charmhub
+  machine: true
+  K8s: true
+  description: Shared code between the ``mysql`` and ``mysql-k8s`` charms.
+- name: sborl
+  status: legacy
+  url: https://pypi.org/project/sborl/
+  docs: ''
+  src: https://github.com/canonical/sborl
+  kind: PyPI
+  machine: true
+  K8s: true
+  description: Legacy library for implementing interface libraries. New interface
+    libraries can use the typed relation data feature available in Ops 2.23+.
+- name: serialized-data-interface
+  status: legacy
+  url: https://pypi.org/project/serialized-data-interface/
+  docs: ''
+  src: https://github.com/canonical/serialized-data-interface
+  kind: PyPI
+  machine: true
+  K8s: true
+  description: Relation data validation – use the features available in Ops instead.
+- name: charms.operator_libs_linux.snap
+  status: legacy
+  url: https://charmhub.io/operator-libs-linux/libraries/snap
+  docs: ''
+  src: https://github.com/canonical/operator-libs-linux
+  kind: Charmhub
+  machine: true
+  K8s: false
+  description: Use ``snapd`` to install and manage packages. Deprecated in favor of
+    ``charmlibs.snap``.
+- name: charms.operator_libs_linux.sysctl
+  status: legacy
+  url: https://charmhub.io/operator-libs-linux/libraries/sysctl
+  docs: ''
+  src: https://github.com/canonical/operator-libs-linux
+  kind: Charmhub
+  machine: true
+  K8s: false
+  description: Create and configure ``sysctl`` options. Deprecated in favor of ``charmlibs.sysctl``.
+- name: charms.operator_libs_linux.systemd
+  status: legacy
+  url: https://charmhub.io/operator-libs-linux/libraries/systemd
+  docs: ''
+  src: https://github.com/canonical/operator-libs-linux
+  kind: Charmhub
+  machine: true
+  K8s: false
+  description: Use ``systemd`` to start, stop, and manage system services. Deprecated
+    in favor of ``charmlibs.systemd``.
+- name: charms.mysql.tls
+  status: team
+  url: https://charmhub.io/mysql/libraries/tls
+  docs: ''
+  src: https://github.com/canonical/mysql-operator
+  kind: Charmhub
+  machine: true
+  K8s: true
+  description: Shared code between the ``mysql`` and ``mysql-k8s`` charms.
+- name: charms.data_platform_libs.upgrade
+  status: legacy
+  url: https://charmhub.io/data-platform-libs/libraries/upgrade
+  docs: ''
+  src: https://github.com/canonical/data-platform-libs
+  kind: Charmhub
+  machine: true
+  K8s: true
+  description: Manage in-place upgrades. Deprecated in favor of ``charm-refresh``.
+interfaces:
+- name: charms.opencti.opencti_connector
+  status: ''
+  url: https://charmhub.io/opencti/libraries/opencti_connector
+  docs: ''
+  src: https://github.com/canonical/opencti-operator/
+  kind: Charmhub
+  rel_name: opencti-connector
+  rel_url_charmhub: https://charmhub.io/integrations/opencti_connector
+  rel_url_schema: https://documentation.ubuntu.com/charmlibs/reference/interfaces/opencti_connector/v0/
+  description: ''
+- name: charms.filesystem_client.filesystem_info
+  status: ''
+  url: https://charmhub.io/filesystem-client/libraries/filesystem_info
+  docs: ''
+  src: https://github.com/charmed-hpc/filesystem-charms
+  kind: Charmhub
+  rel_name: filesystem_info
+  rel_url_charmhub: https://charmhub.io/integrations/filesystem_info
+  rel_url_schema: ''
+  description: ''
+- name: charms.storage_libs.nfs_interfaces
+  status: legacy
+  url: https://charmhub.io/storage-libs/libraries/nfs_interfaces
+  docs: ''
+  src: ''
+  kind: Charmhub
+  rel_name: nfs_share
+  rel_url_charmhub: https://charmhub.io/integrations/nfs_share
+  rel_url_schema: ''
+  description: This interface is deprecated in favour of ``filesystem_info``.
+- name: charms.alertmanager_k8s.alertmanager_dispatch
+  status: ''
+  url: https://charmhub.io/alertmanager-k8s/libraries/alertmanager_dispatch
+  docs: ''
+  src: https://github.com/canonical/alertmanager-k8s-operator
+  kind: Charmhub
+  rel_name: alertmanager_dispatch
+  rel_url_charmhub: https://charmhub.io/integrations/alertmanager_dispatch
+  rel_url_schema: ''
+  description: ''
+- name: charms.alertmanager_k8s.alertmanager_remote_configuration
+  status: ''
+  url: https://charmhub.io/alertmanager-k8s/libraries/alertmanager_remote_configuration
+  docs: ''
+  src: https://github.com/canonical/alertmanager-k8s-operator
+  kind: Charmhub
+  rel_name: alertmanager_remote_configuration
+  rel_url_charmhub: https://charmhub.io/integrations/alertmanager_remote_configuration
+  rel_url_schema: ''
+  description: ''
+- name: charms.oathkeeper.auth_proxy
+  status: ''
+  url: https://charmhub.io/oathkeeper/libraries/auth_proxy
+  docs: ''
+  src: https://github.com/canonical/oathkeeper-operator
+  kind: Charmhub
+  rel_name: auth_proxy
+  rel_url_charmhub: https://charmhub.io/integrations/auth_proxy
+  rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/auth_proxy/v0
+  description: ''
+- name: charms.oauth2_proxy_k8s.auth_proxy
+  status: ''
+  url: https://charmhub.io/oauth2-proxy-k8s/libraries/auth_proxy
+  docs: ''
+  src: https://github.com/canonical/oauth2-proxy-k8s-operator
+  kind: Charmhub
+  rel_name: auth_proxy
+  rel_url_charmhub: https://charmhub.io/integrations/auth_proxy
+  rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/auth_proxy/v0
+  description: ''
+- name: charms.blackbox_exporter_k8s.blackbox_probes
+  status: ''
+  url: https://charmhub.io/blackbox-exporter-k8s/libraries/blackbox_probes
+  docs: ''
+  src: https://github.com/canonical/blackbox-exporter-k8s-operator
+  kind: Charmhub
+  rel_name: blackbox_exporter_probes
+  rel_url_charmhub: https://charmhub.io/blackbox-exporter-k8s/integrations#probes
+  rel_url_schema: ''
+  description: (The Charmhub interfaces page doesn't load, this link is to a charm
+    that uses the interface.)
+- name: charms.catalogue_k8s.catalogue
+  status: ''
+  url: https://charmhub.io/catalogue-k8s/libraries/catalogue
+  docs: ''
+  src: https://github.com/canonical/catalogue-k8s-operator
+  kind: Charmhub
+  rel_name: catalogue
+  rel_url_charmhub: https://charmhub.io/integrations/catalogue
+  rel_url_schema: ''
+  description: Transfer catalogue data for display by the provider.
+- name: charms.certificate_transfer_interface.certificate_transfer
+  status: ''
+  url: https://charmhub.io/certificate-transfer-interface/libraries/certificate_transfer
+  docs: ''
+  src: https://github.com/canonical/certificate-transfer-interface
+  kind: Charmhub
+  rel_name: certificate_transfer
+  rel_url_charmhub: https://charmhub.io/integrations/certificate_transfer
+  rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/certificate_transfer/v1
+  description: Transfer certificates between charms.
+- name: charms.grafana_cloud_integrator.cloud_config_provider
+  status: ''
+  url: https://charmhub.io/grafana-cloud-integrator/libraries/cloud_config_provider
+  docs: ''
+  src: https://github.com/canonical/grafana-cloud-integrator
+  kind: Charmhub
+  rel_name: grafana_cloud_config
+  rel_url_charmhub: https://charmhub.io/integrations/grafana_cloud_config
+  rel_url_schema: ''
+  description: ''
+- name: charms.grafana_cloud_integrator.cloud_config_requirer
+  status: ''
+  url: https://charmhub.io/grafana-cloud-integrator/libraries/cloud_config_requirer
+  docs: ''
+  src: https://github.com/canonical/grafana-cloud-integrator
+  kind: Charmhub
+  rel_name: grafana_cloud_config
+  rel_url_charmhub: https://charmhub.io/integrations/grafana_cloud_config
+  rel_url_schema: ''
+  description: ''
+- name: charms.cloudflare_configurator.cloudflared_route
+  status: ''
+  url: https://charmhub.io/cloudflare-configurator/libraries/cloudflared_route
+  docs: ''
+  src: https://github.com/canonical/cloudflare-configurator-operator
+  kind: Charmhub
+  rel_name: cloudflared_route
+  rel_url_charmhub: https://charmhub.io/integrations/cloudflared_route
+  rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/cloudflared_route/v0
+  description: ''
+- name: charms.grafana_agent.cos_agent
+  status: ''
+  url: https://charmhub.io/grafana-agent/libraries/cos_agent
+  docs: ''
+  src: https://github.com/canonical/grafana-agent-operator
+  kind: Charmhub
+  rel_name: cos_agent
+  rel_url_charmhub: https://charmhub.io/integrations/cos_agent
+  rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/cos_agent/v0
+  description: Machine charm specific interface for exchanging observability related
+    data.
+- name: charms.data_platform_libs.data_interfaces
+  status: ''
+  url: https://charmhub.io/data-platform-libs/libraries/data_interfaces
+  docs: ''
+  src: https://github.com/canonical/data-platform-libs
+  kind: Charmhub
+  rel_name: etcd_client
+  rel_url_charmhub: https://charmhub.io/integrations/etcd_client
+  rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/etcd_client
+  description: Database charms from the Data Platform Team recommend using the generic
+    ``data_platform_libs.data_interfaces`` library to implement the interface.
+- name: charms.data_platform_libs.data_interfaces
+  status: ''
+  url: https://charmhub.io/data-platform-libs/libraries/data_interfaces
+  docs: ''
+  src: https://github.com/canonical/data-platform-libs
+  kind: Charmhub
+  rel_name: mysql_client
+  rel_url_charmhub: https://charmhub.io/integrations/mysql_client
+  rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/mysql_client
+  description: Database charms from the Data Platform Team recommend using the generic
+    ``data_platform_libs.data_interfaces`` library to implement the interface.
+- name: charms.data_platform_libs.data_interfaces
+  status: ''
+  url: https://charmhub.io/data-platform-libs/libraries/data_interfaces
+  docs: ''
+  src: https://github.com/canonical/data-platform-libs
+  kind: Charmhub
+  rel_name: mongodb_client
+  rel_url_charmhub: https://charmhub.io/integrations/mongodb_client
+  rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/mongodb_client
+  description: Database charms from the Data Platform Team recommend using the generic
+    ``data_platform_libs.data_interfaces`` library to implement the interface.
+- name: charms.data_platform_libs.data_interfaces
+  status: ''
+  url: https://charmhub.io/data-platform-libs/libraries/data_interfaces
+  docs: ''
+  src: https://github.com/canonical/data-platform-libs
+  kind: Charmhub
+  rel_name: opensearch_client
+  rel_url_charmhub: https://charmhub.io/integrations/opensearch_client
+  rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/opensearch_client
+  description: Database charms from the Data Platform Team recommend using the generic
+    ``data_platform_libs.data_interfaces`` library to implement the interface.
+- name: charms.data_platform_libs.data_interfaces
+  status: ''
+  url: https://charmhub.io/data-platform-libs/libraries/data_interfaces
+  docs: ''
+  src: https://github.com/canonical/data-platform-libs
+  kind: Charmhub
+  rel_name: postgresql_client
+  rel_url_charmhub: https://charmhub.io/integrations/postgresql_client
+  rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/postgresql_client
+  description: Database charms from the Data Platform Team recommend using the generic
+    ``data_platform_libs.data_interfaces`` library to implement the interface.
+- name: charms.data_platform_libs.database_provides
+  status: legacy
+  url: https://charmhub.io/data-platform-libs/libraries/database_provides
+  docs: ''
+  src: https://github.com/canonical/data-platform-libs
+  kind: Charmhub
+  rel_name: ''
+  rel_url_charmhub: ''
+  rel_url_schema: ''
+  description: Deprecated in favour of ``data_platform_helpers.data_interfaces``.
+- name: charms.data_platform_libs.database_requires
+  status: legacy
+  url: https://charmhub.io/data-platform-libs/libraries/database_requires
+  docs: ''
+  src: https://github.com/canonical/data-platform-libs
+  kind: Charmhub
+  rel_name: ''
+  rel_url_charmhub: ''
+  rel_url_schema: ''
+  description: Deprecated in favour of ``data_platform_helpers.data_interfaces``.
+- name: charms.dex_auth.dex_oidc_config
+  status: ''
+  url: https://charmhub.io/dex-auth/libraries/dex_oidc_config
+  docs: ''
+  src: https://github.com/canonical/dex-auth-operator
+  kind: Charmhub
+  rel_name: dex-oidc-config
+  rel_url_charmhub: https://charmhub.io/integrations/dex-oidc-config
+  rel_url_schema: ''
+  description: ''
+- name: charms.sdcore_nms_k8s.fiveg_core_gnb
+  status: ''
+  url: https://charmhub.io/sdcore-nms-k8s/libraries/fiveg_core_gnb
+  docs: ''
+  src: https://github.com/canonical/sdcore-nms-k8s-operator
+  kind: Charmhub
+  rel_name: fiveg_core_gnb
+  rel_url_charmhub: https://charmhub.io/integrations/fiveg_core_gnb
+  rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/fiveg_core_gnb/v0
+  description: ''
+- name: charms.sdcore_amf_k8s.fiveg_n2
+  status: ''
+  url: https://charmhub.io/sdcore-amf-k8s/libraries/fiveg_n2
+  docs: ''
+  src: https://github.com/canonical/sdcore-amf-k8s-operator
+  kind: Charmhub
+  rel_name: fiveg_n2
+  rel_url_charmhub: https://charmhub.io/integrations/fiveg_n2
+  rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/fiveg_n2/v0
+  description: ''
+- name: charms.sdcore_upf_k8s.fiveg_n4
+  status: ''
+  url: https://charmhub.io/sdcore-upf-k8s/libraries/fiveg_n4
+  docs: ''
+  src: https://github.com/canonical/sdcore-upf-k8s-operator
+  kind: Charmhub
+  rel_name: fiveg_n4
+  rel_url_charmhub: https://charmhub.io/integrations/fiveg_n4
+  rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/fiveg_n4/v0
+  description: ''
+- name: charms.sdcore_nrf_k8s.fiveg_nrf
+  status: ''
+  url: https://charmhub.io/sdcore-nrf-k8s/libraries/fiveg_nrf
+  docs: ''
+  src: https://github.com/canonical/sdcore-nrf-k8s-operator
+  kind: Charmhub
+  rel_name: fiveg_nrf
+  rel_url_charmhub: https://charmhub.io/integrations/fiveg_nrf
+  rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/fiveg_nrf/v0
+  description: Transfer Network Repository Function information from one charm to
+    another.
+- name: charms.oathkeeper.forward_auth
+  status: ''
+  url: https://charmhub.io/oathkeeper/libraries/forward_auth
+  docs: ''
+  src: https://github.com/canonical/oathkeeper-operator
+  kind: Charmhub
+  rel_name: forward_auth
+  rel_url_charmhub: https://charmhub.io/integrations/forward_auth
+  rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/forward_auth/v0
+  description: ''
+- name: charms.oauth2_proxy_k8s.forward_auth
+  status: ''
+  url: https://charmhub.io/oauth2-proxy-k8s/libraries/forward_auth
+  docs: ''
+  src: https://github.com/canonical/oauth2-proxy-k8s-operator
+  kind: Charmhub
+  rel_name: forward_auth
+  rel_url_charmhub: https://charmhub.io/integrations/forward_auth
+  rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/forward_auth/v0
+  description: ''
+- name: charms.glauth_utils.glauth_auxiliary
+  status: ''
+  url: https://charmhub.io/glauth-utils/libraries/glauth_auxiliary
+  docs: ''
+  src: https://github.com/canonical/glauth-utils
+  kind: Charmhub
+  rel_name: glauth_auxiliary
+  rel_url_charmhub: https://charmhub.io/integrations/glauth_auxiliary
+  rel_url_schema: ''
+  description: ''
+- name: charms.grafana_k8s.grafana_auth
+  status: ''
+  url: https://charmhub.io/grafana-k8s/libraries/grafana_auth
+  docs: ''
+  src: https://github.com/canonical/grafana-k8s-operator
+  kind: Charmhub
+  rel_name: grafana_auth
+  rel_url_charmhub: https://charmhub.io/integrations/grafana_auth
+  rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/grafana_auth/v0
+  description: ''
+- name: charms.grafana_k8s.grafana_dashboard
+  status: ''
+  url: https://charmhub.io/grafana-k8s/libraries/grafana_dashboard
+  docs: ''
+  src: https://github.com/canonical/grafana-k8s-operator
+  kind: Charmhub
+  rel_name: grafana_dashboard
+  rel_url_charmhub: https://charmhub.io/integrations/grafana_dashboard
+  rel_url_schema: ''
+  description: Manage dashboards for Grafana.
+- name: charms.grafana_k8s.grafana_metadata
+  status: ''
+  url: https://charmhub.io/grafana-k8s/libraries/grafana_metadata
+  docs: ''
+  src: https://github.com/canonical/grafana-k8s-operator
+  kind: Charmhub
+  rel_name: grafana_metadata
+  rel_url_charmhub: https://charmhub.io/integrations/grafana_metadata
+  rel_url_schema: ''
+  description: ''
+- name: charms.grafana_k8s.grafana_source
+  status: ''
+  url: https://charmhub.io/grafana-k8s/libraries/grafana_source
+  docs: ''
+  src: https://github.com/canonical/grafana-k8s-operator
+  kind: Charmhub
+  rel_name: grafana-source
+  rel_url_charmhub: https://charmhub.io/integrations/grafana-source
+  rel_url_schema: ''
+  description: Provide a data source for Grafana dashboards.
+- name: charms.hydra.hydra_endpoints
+  status: ''
+  url: https://charmhub.io/hydra/libraries/hydra_endpoints
+  docs: ''
+  src: https://github.com/canonical/hydra-operator
+  kind: Charmhub
+  rel_name: hydra_endpoints
+  rel_url_charmhub: https://charmhub.io/integrations/hydra_endpoints
+  rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/hydra_endpoints/v0
+  description: ''
+- name: charms.traefik_k8s.ingress
+  status: ''
+  url: https://charmhub.io/traefik-k8s/libraries/ingress
+  docs: ''
+  src: https://github.com/canonical/traefik-k8s-operator
+  kind: Charmhub
+  rel_name: ingress
+  rel_url_charmhub: https://charmhub.io/integrations/ingress
+  rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/ingress/v2
+  description: Manage per-application ingress and and load-balancing.
+- name: charms.nginx_ingress_integrator.ingress
+  status: ''
+  url: https://charmhub.io/nginx-ingress-integrator/libraries/ingress
+  docs: ''
+  src: https://github.com/canonical/nginx-ingress-integrator-operator
+  kind: Charmhub
+  rel_name: ingress
+  rel_url_charmhub: https://charmhub.io/integrations/ingress
+  rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/ingress/v2
+  description: Manage ingress.
+- name: charms.traefik_k8s.ingress_per_unit
+  status: ''
+  url: https://charmhub.io/traefik-k8s/libraries/ingress_per_unit
+  docs: ''
+  src: https://github.com/canonical/traefik-k8s-operator
+  kind: Charmhub
+  rel_name: ingress_per_unit
+  rel_url_charmhub: https://charmhub.io/integrations/ingress_per_unit
+  rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/ingress_per_unit/v0
+  description: ''
+- name: charms.istio_pilot.istio_gateway_info
+  status: ''
+  url: https://charmhub.io/istio-pilot/libraries/istio_gateway_info
+  docs: ''
+  src: https://github.com/canonical/istio-operators
+  kind: Charmhub
+  rel_name: istio-gateway-info
+  rel_url_charmhub: https://charmhub.io/integrations/istio-gateway-info
+  rel_url_schema: ''
+  description: ''
+- name: charms.mlops_libs.k8s_service_info
+  status: ''
+  url: https://charmhub.io/mlops-libs/libraries/k8s_service_info
+  docs: ''
+  src: https://github.com/canonical/mlops-libs
+  kind: Charmhub
+  rel_name: k8s-service
+  rel_url_charmhub: https://charmhub.io/integrations/k8s-service
+  rel_url_schema: ''
+  description: ''
+- name: charms.karma_k8s.karma_dashboard
+  status: ''
+  url: https://charmhub.io/karma-k8s/libraries/karma_dashboard
+  docs: ''
+  src: https://github.com/canonical/karma-k8s-operator
+  kind: Charmhub
+  rel_name: karma_dashboard
+  rel_url_charmhub: https://charmhub.io/integrations/karma_dashboard
+  rel_url_schema: ''
+  description: ''
+- name: charms.kratos_external_idp_integrator.kratos_external_provider
+  status: ''
+  url: https://charmhub.io/kratos-external-idp-integrator/libraries/kratos_external_provider
+  docs: ''
+  src: https://github.com/canonical/kratos-external-idp-integrator
+  kind: Charmhub
+  rel_name: external_provider
+  rel_url_charmhub: https://charmhub.io/integrations/external_provider
+  rel_url_schema: ''
+  description: ''
+- name: charms.kratos.kratos_info
+  status: ''
+  url: https://charmhub.io/kratos/libraries/kratos_info
+  docs: ''
+  src: https://github.com/canonical/kratos-operator
+  kind: Charmhub
+  rel_name: kratos_info
+  rel_url_charmhub: https://charmhub.io/integrations/kratos_info
+  rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/kratos_info/v0
+  description: ''
+- name: charms.kratos.kratos_registration_webhook
+  status: unlisted
+  url: https://charmhub.io/kratos/libraries/kratos_registration_webhook
+  docs: ''
+  src: https://github.com/canonical/kratos-operator
+  kind: Charmhub
+  rel_name: ''
+  rel_url_charmhub: ''
+  rel_url_schema: ''
+  description: ''
+- name: charms.kubeflow_dashboard.kubeflow_dashboard_links
+  status: ''
+  url: https://charmhub.io/kubeflow-dashboard/libraries/kubeflow_dashboard_links
+  docs: ''
+  src: https://github.com/canonical/kubeflow-dashboard-operator
+  kind: Charmhub
+  rel_name: kubeflow_dashboard_links
+  rel_url_charmhub: https://charmhub.io/integrations/kubeflow_dashboard_links
+  rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/kubeflow_dashboard_links/v0
+  description: ''
+- name: charms.resource_dispatcher.kubernetes_manifests
+  status: ''
+  url: https://charmhub.io/resource-dispatcher/libraries/kubernetes_manifests
+  docs: ''
+  src: https://github.com/canonical/resource-dispatcher
+  kind: Charmhub
+  rel_name: kubernetes_manifest
+  rel_url_charmhub: https://charmhub.io/integrations/kubernetes_manifest
+  rel_url_schema: ''
+  description: ''
+- name: charms.glauth_k8s.ldap
+  status: ''
+  url: https://charmhub.io/glauth-k8s/libraries/ldap
+  docs: ''
+  src: https://github.com/canonical/glauth-k8s-operator
+  kind: Charmhub
+  rel_name: ldap
+  rel_url_charmhub: https://charmhub.io/integrations/ldap
+  rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/ldap/v0
+  description: ''
+- name: charms.lego_base_k8s.lego_client
+  status: legacy
+  url: https://charmhub.io/lego-base-k8s/libraries/lego_client
+  docs: ''
+  src: https://github.com/canonical/lego-base-k8s-operator
+  kind: Charmhub
+  rel_name: tls_certificates
+  rel_url_charmhub: https://charmhub.io/integrations/tls_certificates
+  rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/tls_certificates/v1
+  description: Legacy charm library used to implement the provider side of this interface.
+- name: loadbalancer_interface
+  status: ''
+  url: https://pypi.org/project/loadbalancer-interface/
+  docs: https://github.com/juju-solutions/loadbalancer-interface/blob/main/docs/api.md
+  src: https://github.com/juju-solutions/loadbalancer-interface
+  kind: PyPI
+  rel_name: loadbalancer
+  rel_url_charmhub: https://charmhub.io/integrations/loadbalancer
+  rel_url_schema: ''
+  description: ''
+- name: charms.identity_platform_login_ui_operator.login_ui_endpoints
+  status: ''
+  url: https://charmhub.io/identity-platform-login-ui-operator/libraries/login_ui_endpoints
+  docs: ''
+  src: https://github.com/canonical/identity-platform-login-ui-operator
+  kind: Charmhub
+  rel_name: login_ui_endpoints
+  rel_url_charmhub: https://charmhub.io/integrations/login_ui_endpoints
+  rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/login_ui_endpoints/v0
+  description: ''
+- name: charms.loki_k8s.loki_push_api
+  status: ''
+  url: https://charmhub.io/loki-k8s/libraries/loki_push_api
+  docs: ''
+  src: https://github.com/canonical/loki-k8s-operator
+  kind: Charmhub
+  rel_name: loki_push_api
+  rel_url_charmhub: https://charmhub.io/integrations/loki_push_api
+  rel_url_schema: ''
+  description: Manage logs for Loki.
+- name: charms.synapse.matrix_auth
+  status: ''
+  url: https://charmhub.io/synapse/libraries/matrix_auth
+  docs: ''
+  src: https://github.com/canonical/synapse-operator
+  kind: Charmhub
+  rel_name: matrix_auth
+  rel_url_charmhub: https://charmhub.io/maubot/integrations#matrix-auth
+  rel_url_schema: ''
+  description: (The Charmhub interfaces page doesn't load, this link is to a charm
+    that uses the interface.)
+- name: charms.nginx_ingress_integrator.nginx_route
+  status: ''
+  url: https://charmhub.io/nginx-ingress-integrator/libraries/nginx_route
+  docs: ''
+  src: https://github.com/canonical/nginx-ingress-integrator-operator
+  kind: Charmhub
+  rel_name: nginx_route
+  rel_url_charmhub: https://charmhub.io/integrations/nginx_route
+  rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/nginx_route/v0
+  description: Manage external HTTP access to Kubernetes workloads using Nginx.
+- name: charms.oathkeeper.oathkeeper_info
+  status: ''
+  url: https://charmhub.io/oathkeeper/libraries/oathkeeper_info
+  docs: ''
+  src: https://github.com/canonical/oathkeeper-operator
+  kind: Charmhub
+  rel_name: oathkeeper_info
+  rel_url_charmhub: https://charmhub.io/integrations/oathkeeper_info
+  rel_url_schema: ''
+  description: ''
+- name: charms.hydra.oauth
+  status: ''
+  url: https://charmhub.io/hydra/libraries/oauth
+  docs: ''
+  src: https://github.com/canonical/hydra-operator
+  kind: Charmhub
+  rel_name: oauth
+  rel_url_charmhub: https://charmhub.io/integrations/oauth
+  rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/oauth/v0
+  description: ''
+- name: charms.s3proxy_k8s.object_storage
+  status: ''
+  url: https://charmhub.io/s3proxy-k8s/libraries/object_storage
+  docs: ''
+  src: https://github.com/canonical/s3proxy-k8s-operator
+  kind: Charmhub
+  rel_name: s3
+  rel_url_charmhub: https://charmhub.io/integrations/s3
+  rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/s3/v0
+  description: ''
+- name: charms.openfga_k8s.openfga
+  status: ''
+  url: https://charmhub.io/openfga-k8s/libraries/openfga
+  docs: ''
+  src: https://github.com/canonical/openfga-operator
+  kind: Charmhub
+  rel_name: openfga
+  rel_url_charmhub: https://charmhub.io/integrations/openfga
+  rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/openfga/v1
+  description: ''
+- name: ops-lib-mysql
+  status: legacy
+  url: https://pypi.org/project/ops-lib-mysql/
+  docs: ''
+  src: https://github.com/canonical/ops-lib-mysql
+  kind: PyPI
+  rel_name: mysql
+  rel_url_charmhub: ''
+  rel_url_schema: ''
+  description: Modern charms should use the ``mysql_client`` interface, using the
+    ``data_interfaces`` lib from ``data-platform-helpers``.
+- name: ops-lib-pgsql
+  status: legacy
+  url: https://pypi.org/project/ops-lib-pgsql/
+  docs: ''
+  src: https://github.com/canonical/ops-lib-pgsql
+  kind: PyPI
+  rel_name: pgsql
+  rel_url_charmhub: ''
+  rel_url_schema: ''
+  description: Modern charms should use the ``postgresql_client`` interface, using the
+    ``data_interfaces`` lib from ``data-platform-helpers``.
+- name: ops.interface_kube_control
+  status: ''
+  url: https://pypi.org/project/ops.interface-kube-control/
+  docs: ''
+  src: https://github.com/charmed-kubernetes/interface-kube-control
+  kind: PyPI
+  rel_name: kube-control
+  rel_url_charmhub: https://charmhub.io/integrations/kube-control
+  rel_url_schema: ''
+  description: ''
+- name: charms.parca.parca_scrape
+  status: legacy
+  url: https://charmhub.io/parca/libraries/parca_scrape
+  docs: ''
+  src: https://github.com/canonical/parca-operator
+  kind: Charmhub
+  rel_name: parca_scrape
+  rel_url_charmhub: https://charmhub.io/integrations/parca_scrape
+  rel_url_schema: ''
+  description: Deprecated in favour of the ``parca-k8s`` charm's ``parca_scrape``
+    lib.
+- name: charms.parca_k8s.parca_scrape
+  status: ''
+  url: https://charmhub.io/parca-k8s/libraries/parca_scrape
+  docs: ''
+  src: https://github.com/canonical/parca-k8s-operator
+  kind: Charmhub
+  rel_name: parca_scrape
+  rel_url_charmhub: https://charmhub.io/integrations/parca_scrape
+  rel_url_schema: ''
+  description: ''
+- name: charms.mimir_coordinator_k8s.prometheus_api
+  status: ''
+  url: https://charmhub.io/mimir-coordinator-k8s/libraries/prometheus_api
+  docs: ''
+  src: https://github.com/canonical/mimir-coordinator-k8s-operator
+  kind: Charmhub
+  rel_name: prometheus_api
+  rel_url_charmhub: https://charmhub.io/integrations/prometheus_api
+  rel_url_schema: ''
+  description: ''
+- name: charms.prometheus_k8s.prometheus_remote_write
+  status: ''
+  url: https://charmhub.io/prometheus-k8s/libraries/prometheus_remote_write
+  docs: ''
+  src: https://github.com/canonical/prometheus-k8s-operator
+  kind: Charmhub
+  rel_name: prometheus_remote_write
+  rel_url_charmhub: https://charmhub.io/integrations/prometheus_remote_write
+  rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/prometheus_remote_write/v0
+  description: Transfer Prometheus metrics data between charms.
+- name: charms.prometheus_k8s.prometheus_scrape
+  status: ''
+  url: https://charmhub.io/prometheus-k8s/libraries/prometheus_scrape
+  docs: ''
+  src: https://github.com/canonical/prometheus-k8s-operator
+  kind: Charmhub
+  rel_name: prometheus_scrape
+  rel_url_charmhub: https://charmhub.io/integrations/prometheus_scrape
+  rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/prometheus_scrape/v0
+  description: Manage metrics for Prometheus.
+- name: charms.prometheus_pushgateway_k8s.pushgateway
+  status: ''
+  url: https://charmhub.io/prometheus-pushgateway-k8s/libraries/pushgateway
+  docs: ''
+  src: https://github.com/canonical/prometheus-pushgateway-k8s-operator
+  kind: Charmhub
+  rel_name: pushgateway
+  rel_url_charmhub: https://charmhub.io/prometheus-pushgateway-k8s/integrations#push-endpoint
+  rel_url_schema: ''
+  description: (The Charmhub interfaces page doesn't load, this link is to a charm
+    that uses the interface.)
+- name: charms.redis_k8s.redis
+  status: ''
+  url: https://charmhub.io/redis-k8s/libraries/redis
+  docs: ''
+  src: https://github.com/canonical/redis-k8s-operator
+  kind: Charmhub
+  rel_name: redis
+  rel_url_charmhub: https://charmhub.io/integrations/redis
+  rel_url_schema: ''
+  description: ''
+- name: charms.data_platform_libs.s3
+  status: ''
+  url: https://charmhub.io/data-platform-libs/libraries/s3
+  docs: ''
+  src: https://github.com/canonical/data-platform-libs
+  kind: Charmhub
+  rel_name: s3
+  rel_url_charmhub: https://charmhub.io/integrations/s3
+  rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/s3/v0
+  description: Manage s3 credentials and metadata.
+- name: charms.saml_integrator.saml
+  status: ''
+  url: https://charmhub.io/saml-integrator/libraries/saml
+  docs: ''
+  src: https://github.com/canonical/saml-integrator-operator
+  kind: Charmhub
+  rel_name: saml
+  rel_url_charmhub: https://charmhub.io/integrations/saml
+  rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/saml/v0
+  description: ''
+- name: charms.sdcore_nms_k8s.sdcore_config
+  status: ''
+  url: https://charmhub.io/sdcore-nms-k8s/libraries/sdcore_config
+  docs: ''
+  src: https://github.com/canonical/sdcore-nms-k8s-operator
+  kind: Charmhub
+  rel_name: sdcore_config
+  rel_url_charmhub: https://charmhub.io/integrations/sdcore_config
+  rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/sdcore_config/v0
+  description: Provide or require the web UI gRPC address for SD-Core configuration.
+- name: charms.sdcore_webui_k8s.sdcore_management
+  status: ''
+  url: https://charmhub.io/sdcore-webui-k8s/libraries/sdcore_management
+  docs: ''
+  src: https://github.com/canonical/sdcore-webui-k8s-operator
+  kind: Charmhub
+  rel_name: sdcore_management
+  rel_url_charmhub: https://charmhub.io/integrations/sdcore_management
+  rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/sdcore_management/v0
+  description: ''
+- name: charmlibs.interfaces.service_mesh
+  status: recommended
+  url: https://pypi.org/project/charmlibs-interfaces-service-mesh
+  docs: https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/service-mesh
+  src: https://github.com/canonical/charmlibs/tree/main/interfaces/service-mesh
+  kind: PyPI
+  rel_name: service_mesh
+  rel_url_charmhub: https://charmhub.io/integrations/service_mesh
+  rel_url_schema: ''
+  description: Enroll charms onto a service mesh and provision network policies.
+- name: charms.istio_beacon_k8s.service_mesh
+  status: legacy
+  url: https://charmhub.io/istio-beacon-k8s/libraries/service_mesh
+  docs: ''
+  src: https://github.com/canonical/istio-beacon-k8s-operator
+  kind: Charmhub
+  rel_name: service_mesh
+  rel_url_charmhub: https://charmhub.io/integrations/service_mesh
+  rel_url_schema: ''
+  description: Deprecated in favour of ``charmlibs.interfaces.service_mesh``.
+- name: charms.smtp_integrator.smtp
+  status: ''
+  url: https://charmhub.io/smtp-integrator/libraries/smtp
+  docs: ''
+  src: https://github.com/canonical/smtp-integrator-operator
+  kind: Charmhub
+  rel_name: smtp
+  rel_url_charmhub: https://charmhub.io/integrations/smtp
+  rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/smtp/v0
+  description: ''
+- name: charms.tempo_coordinator_k8s.tempo_api
+  status: ''
+  url: https://charmhub.io/tempo-coordinator-k8s/libraries/tempo_api
+  docs: ''
+  src: https://github.com/canonical/tempo-coordinator-k8s-operator
+  kind: Charmhub
+  rel_name: tempo_api
+  rel_url_charmhub: https://charmhub.io/integrations/tempo_api
+  rel_url_schema: ''
+  description: ''
+- name: charmlibs.interfaces.tls_certificates
+  status: recommended
+  url: https://pypi.org/project/charmlibs-interfaces-tls-certificates
+  docs: https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/tls_certificates
+  src: https://github.com/canonical/charmlibs/tree/main/interfaces/tls_certificates
+  kind: PyPI
+  rel_name: tls_certificates
+  rel_url_charmhub: https://charmhub.io/integrations/tls_certificates
+  rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/tls_certificates/v1
+  description: Manage TLS certificates.
+- name: charms.tls_certificates_interface.tls_certificates
+  status: legacy
+  url: https://charmhub.io/tls-certificates-interface/libraries/tls_certificates
+  docs: https://charmhub.io/tls-certificates-interface/
+  src: https://github.com/canonical/tls-certificates-interface
+  kind: Charmhub
+  rel_name: tls_certificates
+  rel_url_charmhub: https://charmhub.io/integrations/tls_certificates
+  rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/tls_certificates/v1
+  description: Manage TLS certificates. Deprecated in favor of ``charmlibs.interfaces.tls_certificates``.
+- name: charms.tempo_k8s.tracing
+  status: legacy
+  url: https://charmhub.io/tempo-k8s/libraries/tracing
+  docs: ''
+  src: https://github.com/canonical/tempo-coordinator-k8s-operator
+  kind: Charmhub
+  rel_name: tracing
+  rel_url_charmhub: https://charmhub.io/integrations/tracing
+  rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/tracing/v2
+  description: Deprecated in favour of ``tempo_coordinator_k8s .tracing``.
+- name: charms.tempo_coordinator_k8s.tracing
+  status: ''
+  url: https://charmhub.io/tempo-coordinator-k8s/libraries/tracing
+  docs: ''
+  src: https://github.com/canonical/tempo-coordinator-k8s-operator
+  kind: Charmhub
+  rel_name: tracing
+  rel_url_charmhub: https://charmhub.io/integrations/tracing
+  rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/tracing/v2
+  description: Provide and consume tracing data.
+- name: charms.traefik_route_k8s.traefik_route
+  status: legacy
+  url: https://charmhub.io/traefik-route-k8s/libraries/traefik_route
+  docs: ''
+  src: https://github.com/canonical/traefik-k8s-operator
+  kind: Charmhub
+  rel_name: traefik_route
+  rel_url_charmhub: https://charmhub.io/integrations/traefik_route
+  rel_url_schema: ''
+  description: Deprecated in favour of the ``traefik-k8s`` charm's ``traefik_route``
+    lib.
+- name: charms.traefik_k8s.traefik_route
+  status: ''
+  url: https://charmhub.io/traefik-k8s/libraries/traefik_route
+  docs: ''
+  src: https://github.com/canonical/traefik-k8s-operator
+  kind: Charmhub
+  rel_name: traefik_route
+  rel_url_charmhub: https://charmhub.io/integrations/traefik_route
+  rel_url_schema: ''
+  description: ''
+- name: charms.vault_k8s.vault_kv
+  status: ''
+  url: https://charmhub.io/vault-k8s/libraries/vault_kv
+  docs: ''
+  src: https://github.com/canonical/vault-k8s-operator
+  kind: Charmhub
+  rel_name: vault_kv
+  rel_url_charmhub: https://charmhub.io/integrations/vault_kv
+  rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/vault_kv/v0
+  description: ''
+- name: litmus-libs
+  status: ''
+  url: https://pypi.org/project/litmus-libs/
+  docs: ''
+  src: https://github.com/canonical/litmus-operators
+  kind: PyPI
+  rel_name: litmus_auth
+  rel_url_charmhub: https://charmhub.io/integrations/litmus_auth
+  rel_url_schema: https://documentation.ubuntu.com/charmlibs/reference/interfaces/litmus_auth/v0/
+  description: ''
+- name: charmlibs.interfaces.istio_request_auth
+  status: recommended
+  url: https://pypi.org/project/charmlibs-interfaces-istio-request-auth
+  docs: https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/istio-request-auth
+  src: https://github.com/canonical/charmlibs/tree/main/interfaces/istio-request-auth
+  kind: PyPI
+  rel_name: istio-request-auth
+  rel_url_charmhub: ''
+  rel_url_schema: ''
+  description: Configure Istio RequestAuthentication resources via relation data.
+- name: charmed_service_mesh_helpers.interfaces.request_auth
+  status: legacy
+  url: https://pypi.org/project/charmed-service-mesh-helpers/
+  docs: ''
+  src: https://github.com/canonical/charmed-service-mesh-helpers
+  kind: PyPI
+  rel_name: istio-request-auth
+  rel_url_charmhub: ''
+  rel_url_schema: ''
+  description: Deprecated in favour of charmlibs.interfaces.istio_request_auth.
+- name: charmlibs.interfaces.gateway_metadata
+  status: recommended
+  url: https://pypi.org/project/charmlibs-interfaces-gateway-metadata
+  docs: https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/gateway-metadata
+  src: https://github.com/canonical/charmlibs/tree/main/interfaces/gateway-metadata
+  kind: PyPI
+  rel_name: gateway-metadata
+  rel_url_charmhub: ''
+  rel_url_schema: ''
+  description: Share Kubernetes Gateway API workload metadata between charms.
+- name: charmed_service_mesh_helpers.interfaces.gateway_metadata
+  status: legacy
+  url: https://pypi.org/project/charmed-service-mesh-helpers/
+  docs: ''
+  src: https://github.com/canonical/charmed-service-mesh-helpers
+  kind: PyPI
+  rel_name: gateway-metadata
+  rel_url_charmhub: ''
+  rel_url_schema: ''
+  description: Deprecated in favour of ``charmlibs.interfaces.gateway_metadata``.
+- name: dpcharmlibs.interfaces
+  status: ''
+  url: https://pypi.org/project/dpcharmlibs-interfaces
+  docs: ''
+  src: https://github.com/canonical/data-platform-charmlibs
+  kind: PyPI
+  rel_name: valkey_client
+  rel_url_charmhub: https://charmhub.io/integrations/valkey_client
+  rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/valkey_client
+  description: Database charms from the Data Platform Team recommend using the generic
+    ``data_platform_libs.data_interfaces`` library to implement the interface.
+- name: charmlibs.interfaces.istio_ingress_route
+  status: recommended
+  url: https://pypi.org/project/charmlibs-interfaces-istio-ingress-route
+  docs: https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/istio-ingress-route
+  src: https://github.com/canonical/charmlibs/tree/main/interfaces/istio-ingress-route
+  kind: PyPI
+  rel_name: istio-ingress-route
+  rel_url_charmhub: ''
+  rel_url_schema: ''
+  description: Advanced ingress routing through the istio-ingress-k8s charm with multi-port
+    listeners and gRPC support.
+- name: charms.istio_ingress_k8s.istio_ingress_route
+  status: legacy
+  url: https://charmhub.io/istio-ingress-k8s/libraries/istio_ingress_route
+  docs: ''
+  src: https://github.com/canonical/istio-ingress-k8s-operator
+  kind: Charmhub
+  rel_name: istio-ingress-route
+  rel_url_charmhub: ''
+  rel_url_schema: ''
+  description: Deprecated in favour of ``charmlibs.interfaces.istio_ingress_route``.
