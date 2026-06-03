@@ -1,3 +1,7 @@
+# 1.8.2 - 3 June 2026
+
+Update the library to cache the `private_key`.
+
 # 1.8.1 - 27 February 2025
 
 Cleanup secrets when relation is removed.
