@@ -60,6 +60,10 @@ _EMOJIS = {
     'machine': '🖥️',
     'K8s': '☸️',
 }
+_SUBSTRATE_TOOLTIPS = {
+    'machine': 'Compatible with machine charms.',
+    'K8s': 'Compatible with Kubernetes charms.',
+}
 _STATUS_TOOLTIPS = {
     'recommended': 'Recommended for use in new charms today!',
     'dep': 'Dependency of other libs, unlikely to be required directly.',
@@ -116,6 +120,21 @@ _KEY_MSG = 'Library status is shown in the left column. See tooltips, or click h
 _KEY_DROPDOWN_HEADER = f""".. dropdown:: {_KEY_MSG}
 
 """
+_TAGS_KEY_TABLE_HEADER = """.. list-table::
+   :widths: 1, 100
+   :header-rows: 1
+
+   * - Tag
+     - Description
+"""
+
+
+class _TagInfo(typing.TypedDict):
+    description: str
+    criteria: str
+
+
+_TagsYaml = dict[str, dict[str, _TagInfo]]
 
 
 class _LibEntry(typing.TypedDict, total=True):
@@ -126,6 +145,7 @@ class _LibEntry(typing.TypedDict, total=True):
     src: str
     kind: str
     description: str
+    tags: list[str]
 
 
 class _InterfaceLibEntry(_LibEntry, total=True):
@@ -156,11 +176,12 @@ def _generate_libs_tables(docs_dir: str | pathlib.Path) -> None:
     generated_dir = reference_dir / 'generated'
     generated_dir.mkdir(exist_ok=True)
     data: _LibsYaml = yaml.safe_load((reference_dir / 'libs.yaml').read_text())
+    tag_descriptions = _load_tag_descriptions(reference_dir)
     interface_entries = data['interfaces']
     general_entries = data['general']
     _write_if_needed(
         path=(generated_dir / 'interface-libs-table.rst'),
-        content=_get_interface_libs_table(interface_entries),
+        content=_get_interface_libs_table(interface_entries, tag_descriptions),
     )
     _write_if_needed(
         path=(generated_dir / 'interface-libs-status-key-table.rst'),
@@ -168,11 +189,23 @@ def _generate_libs_tables(docs_dir: str | pathlib.Path) -> None:
     )
     _write_if_needed(
         path=(generated_dir / 'general-libs-table.rst'),
-        content=_get_general_libs_table(general_entries),
+        content=_get_general_libs_table(general_entries, tag_descriptions),
     )
     _write_if_needed(
         path=(generated_dir / 'general-libs-status-key-table.rst'),
         content=_get_status_key_table_dropdown(general_entries),
+    )
+    _write_if_needed(
+        path=(generated_dir / 'interface-libs-tags-key-table.rst'),
+        content=_get_tags_key_table_dropdown(
+            interface_entries, tag_descriptions, column='interface'
+        ),
+    )
+    _write_if_needed(
+        path=(generated_dir / 'general-libs-tags-key-table.rst'),
+        content=_get_tags_key_table_dropdown(
+            general_entries, tag_descriptions, column='description'
+        ),
     )
 
 
@@ -187,30 +220,56 @@ def _write_if_needed(path: pathlib.Path, content: str) -> None:
         path.write_text(to_write)
 
 
+def _load_tag_descriptions(reference_dir: pathlib.Path) -> dict[str, str]:
+    """Load tags.yaml and return a flat mapping of tag name to description."""
+    tags_data: _TagsYaml = yaml.safe_load((reference_dir / 'tags.yaml').read_text())
+    tag_descriptions: dict[str, str] = {}
+    for _category_key in ('domain-tags', 'audience-tags'):
+        for tag_name, tag_info in tags_data.get(_category_key, {}).items():
+            tag_descriptions[tag_name] = tag_info['description']
+    return tag_descriptions
+
+
 ##########
 # tables #
 ##########
 
 
-def _get_interface_libs_table(entries: Iterable[_InterfaceLibEntry]) -> str:
+def _get_interface_libs_table(
+    entries: Iterable[_InterfaceLibEntry],
+    tag_descriptions: dict[str, str],
+) -> str:
     def key(row: tuple[str, ...]) -> tuple[str, ...]:
         status, _name, _kind, desc = row
         return status, desc
 
     rows = [
-        (_status(entry), _name(entry), _kind(entry), _interface_description(entry))
+        (
+            _status(entry),
+            _name(entry),
+            _kind(entry),
+            _interface_description(entry, tag_descriptions),
+        )
         for entry in entries
         if _is_listed(entry)
     ]
     return _INTERFACE_LIBS_TABLE_HEADER + _rst_rows(sorted(rows, key=key))
 
 
-def _get_general_libs_table(entries: Iterable[_GeneralLibEntry]) -> str:
+def _get_general_libs_table(
+    entries: Iterable[_GeneralLibEntry],
+    tag_descriptions: dict[str, str],
+) -> str:
     def key(row: _TableRow) -> tuple[str, ...]:
         return row.status, row.kind, row.name, row.description
 
     rows = [
-        _TableRow(_status(entry), _name(entry), _kind(entry), _general_description(entry))
+        _TableRow(
+            _status(entry),
+            _name(entry),
+            _kind(entry),
+            _general_description(entry, tag_descriptions),
+        )
         for entry in entries
         if _is_listed(entry)
     ]
@@ -227,6 +286,34 @@ def _get_status_key_table_dropdown(entries: Iterable[_LibEntry]) -> str:
     rows.append(('', 'None of the above.'))
     table = _KEY_TABLE_HEADER + _rst_rows(rows)
     return _KEY_DROPDOWN_HEADER + _indent_lines(table, level=3)
+
+
+def _get_tags_key_table_dropdown(
+    entries: Iterable[_LibEntry],
+    tag_descriptions: dict[str, str],
+    *,
+    column: str,
+) -> str:
+    used_tags: set[str] = set()
+    for entry in entries:
+        if _is_listed(entry):
+            used_tags.update(entry['tags'])
+    if not used_tags:
+        return ''
+    rows = [
+        (
+            _rst_table_indent(_rst_raw_html(_html_tag_tooltip(f'#{tag}', None))),
+            tag_descriptions.get(tag, ''),
+        )
+        for tag in sorted(used_tags)
+    ]
+    table = _TAGS_KEY_TABLE_HEADER + _rst_rows(rows)
+    return _tags_key_dropdown_header(column) + _indent_lines(table, level=3)
+
+
+def _tags_key_dropdown_header(column: str) -> str:
+    msg = f'Tags are shown in the {column} column. See tooltips, or click here for a key.'
+    return f'.. dropdown:: {msg}\n\n'
 
 
 def _is_listed(entry: _LibEntry) -> bool:
@@ -263,19 +350,23 @@ def _kind(entry: _LibEntry) -> str:
     return _rst_table_indent('\n'.join(content))
 
 
-def _interface_description(entry: _InterfaceLibEntry) -> str:
+def _interface_description(
+    entry: _InterfaceLibEntry,
+    tag_descriptions: dict[str, str],
+) -> str:
     sortkeys = [
         entry['rel_name'].ljust(64, 'z'),
         str(_STATUS_SORTKEYS[entry['status']]),
         entry['name'],
         str(_KIND_SORTKEYS[entry['kind']]),
     ]
-    html_lines = [_html_hidden_span(''.join(sortkeys))]
+    content = [_rst_raw_html(_html_hidden_span(''.join(sortkeys)))]
     if rel_links := _rel_links(entry):
-        html_lines.append(rel_links)
-    content = [_rst_raw_html('\n'.join(html_lines))]
+        content.append(_rst_raw_html(f'<p>{rel_links}</p>'))
     if desc := entry['description']:
         content.append(_rst_lines(desc))
+    if tags := entry['tags']:
+        content.append(_tags_rst(tags, tag_descriptions))
     return _rst_table_indent('\n'.join(content))
 
 
@@ -283,15 +374,18 @@ def _rel_links(entry: _InterfaceLibEntry) -> str:
     if not (name := entry['rel_name']):
         return ''
     if not (main_url := entry['rel_url_charmhub']):
-        return _html_no_spellcheck_span(name)
+        return f'<span class="chip no-spellcheck">{name}</span>'
     main_link = _html_link(name, main_url)
     if not (schema_url := entry['rel_url_schema']):
-        return main_link
+        return f'<span class="chip">{main_link}</span>'
     schema_link = _html_link('schema', schema_url)
-    return f'{main_link} ({schema_link})'
+    return f'<span class="chip">{main_link}</span> ({schema_link})'
 
 
-def _general_description(entry: _GeneralLibEntry) -> str:
+def _general_description(
+    entry: _GeneralLibEntry,
+    tag_descriptions: dict[str, str],
+) -> str:
     substrates = ('machine', 'K8s')
     sortkeys = [
         *('0' if entry[s] else '1' for s in substrates),
@@ -300,11 +394,26 @@ def _general_description(entry: _GeneralLibEntry) -> str:
         str(_KIND_SORTKEYS[entry['kind']]),
     ]
     content = [_rst_raw_html(_html_hidden_span(''.join(sortkeys)))]
-    if firstline := ' '.join(_EMOJIS.get(s, '') + s for s in substrates if entry[s]):
-        content.append(_rst_lines(firstline))
     if desc := entry['description']:
         content.append(_rst_lines(desc))
+    substrate_parts = [
+        _html_tag_tooltip(f'{_EMOJIS.get(s, "")}{s}', _SUBSTRATE_TOOLTIPS.get(s))
+        for s in substrates
+        if entry[s]
+    ]
+    tag_parts = [_html_tag_tooltip(f'#{t}', tag_descriptions.get(t)) for t in entry['tags']]
+    if substrate_parts or tag_parts:
+        joined = ' '.join(substrate_parts + tag_parts)
+        content.append(_rst_raw_html(f'<span class="tag-group">{joined}</span>'))
     return _rst_table_indent('\n'.join(content))
+
+
+def _tags_rst(tags: list[str], tag_descriptions: dict[str, str]) -> str:
+    """Return RST raw HTML for a tags line, or empty string if no tags."""
+    assert tags
+    tag_htmls = [_html_tag_tooltip(f'#{t}', tag_descriptions.get(t)) for t in tags]
+    joined = ' '.join(tag_htmls)
+    return _rst_raw_html(f'<span class="tag-group">{joined}</span>')
 
 
 #######
@@ -369,7 +478,11 @@ def _html_link(text: str, url: str) -> str:
     return f'<a href="{url}" class="no-spellcheck">{text}</a>'
 
 
-def _html_no_spellcheck_span(text: object) -> str:
-    e = ElementTree.Element('span', attrib={'class': 'no-spellcheck'})
-    e.text = str(text)
+def _html_tag_tooltip(tag_text: str, tooltip: str | None) -> str:
+    e = ElementTree.Element('a', attrib={'class': 'tag-div no-spellcheck', 'href': '#'})
+    e.text = tag_text
+    if tooltip is not None:
+        child = ElementTree.Element('span', attrib={'class': 'tag-tooltip'})
+        child.text = tooltip
+        e.append(child)
     return ElementTree.tostring(e, encoding='unicode')

@@ -184,6 +184,7 @@ interfaces-json:
         --output docs_url \
         --output summary \
         --output description \
+        --output tags \
         --output status \
         --indent-json \
         > interfaces/index.json
