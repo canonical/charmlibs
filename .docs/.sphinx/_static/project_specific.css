@@ -31,3 +31,48 @@
   display: block;
   z-index: 9999;
 }
+
+/**
+ * Show tag-tooltip as floating text when hovering over tag-div.
+ */
+.tag-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.5em;
+}
+.tag-div {
+  position: relative;
+  display: inline-block;
+  cursor: pointer;
+}
+.tag-div:visited,
+.tag-div:visited:hover {
+  color: var(--color-link);
+}
+.tag-tooltip {
+  display: none;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background-color: #EBEBEB;
+  color: #000000;
+  padding: 5px;
+  border-radius: 5px;
+  width: max-content;
+  max-width: 20em;
+}
+.tag-div:hover .tag-tooltip {
+  display: block;
+  z-index: 9999;
+}
+
+/**
+ * Style interface names as subtle chips.
+ */
+td .chip {
+  background-color: #F2F1F0;
+  border: 1px solid #C6C1BB;
+  border-radius: 2px;
+  padding: 0.3em 0.6em;
+  white-space: nowrap;
+}

@@ -40,6 +40,65 @@ def test_status_key_table():
     assert table is not None
 
 
+def test_tags_key_table_with_tags():
+    entries: list[generate_tables._LibEntry] = [
+        {
+            'name': 'lib1',
+            'status': '',
+            'url': '',
+            'docs': '',
+            'src': '',
+            'kind': '',
+            'description': '',
+            'tags': ['security', 'data'],
+        },
+        {
+            'name': 'lib2',
+            'status': '',
+            'url': '',
+            'docs': '',
+            'src': '',
+            'kind': '',
+            'description': '',
+            'tags': ['security'],
+        },
+    ]
+    tag_descriptions = {'security': 'Security stuff', 'data': 'Data stuff'}
+    rst = generate_tables._get_tags_key_table_dropdown(
+        entries, tag_descriptions, column='description'
+    )
+    assert rst  # non-empty
+    dropdown_contents = '\n'.join(rst.split('\n')[1:])
+    html_content = rst_to_html(dropdown_contents)
+    table = ElementTree.fromstring(html.unescape(html_content)).find('.//table')
+    assert table is not None
+    rows = table.findall('.//tr')
+    # header + 2 unique tags (data, security)
+    assert len(rows) == 3
+    # Tags in the key should be clickable <a> elements
+    tag_links = table.findall('.//a[@class="tag-div no-spellcheck"]')
+    assert len(tag_links) == 2
+    tag_texts = sorted(link.text or '' for link in tag_links)
+    assert tag_texts == ['#data', '#security']
+
+
+def test_tags_key_table_no_tags():
+    entries: list[generate_tables._LibEntry] = [
+        {
+            'name': 'lib1',
+            'status': '',
+            'url': '',
+            'docs': '',
+            'src': '',
+            'kind': '',
+            'description': '',
+            'tags': [],
+        },
+    ]
+    rst = generate_tables._get_tags_key_table_dropdown(entries, {}, column='description')
+    assert rst == ''
+
+
 @pytest.mark.parametrize('rows', ([('r1c1', 'r1c2'), ('r2c1', 'r2c2')],))
 def test_rst_rows(rows: list[tuple[str, ...]]):
     rst = generate_tables._rst_rows(rows)
@@ -80,3 +139,24 @@ def test_html_link(text: str, url: str):
     a = ElementTree.fromstring(html_content)
     assert a.attrib['href'] == url
     assert a.text == text
+
+
+@pytest.mark.parametrize(
+    ('tag_text', 'tooltip'),
+    [('#security', 'TLS certificate management'), ('#data', None)],
+)
+def test_html_tag_tooltip(tag_text: str, tooltip: str | None):
+    html_content = generate_tables._html_tag_tooltip(tag_text, tooltip)
+    a = ElementTree.fromstring(html_content)
+    assert a.tag == 'a'
+    assert a.attrib['href'] == '#'
+    assert 'tag-div' in a.attrib['class']
+    assert 'no-spellcheck' in a.attrib['class']
+    assert a.text == tag_text
+    children = list(a)
+    if tooltip is not None:
+        assert len(children) == 1
+        assert 'tag-tooltip' in children[0].attrib['class']
+        assert children[0].text == tooltip
+    else:
+        assert len(children) == 0

@@ -7,6 +7,9 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/auth_proxy/",
     "summary": "Configure an Identity and Access Proxy.",
     "description": "The `auth_proxy` interface allows charms to configure an Identity and Access Proxy.\nThe requirer supplies the configuration, such as protected URLs, allowed endpoints, and headers.\nThe provider is responsible for transforming the configuration into access rules and forwarding relevant configuration to the proxy.",
+    "tags": [
+      "identity-auth"
+    ],
     "status": "draft"
   },
   {
@@ -17,6 +20,10 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/azure_service_principal/",
     "summary": "Interact with Microsoft Entra ID using service principal credentials.",
     "description": "The `azure_service_principal` interface allows charms to receive the service principal credential needed to access Entra ID objects such as Azure storage.\nRequirer charms can specify which fields should be transferred as Juju secrets, and the provider charm will deliver the credentials as requested.",
+    "tags": [
+      "data",
+      "identity-auth"
+    ],
     "status": "draft"
   },
   {
@@ -27,6 +34,7 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/azure_storage/",
     "summary": "Access Azure Blob Storage and Data Lake Storage (Gen 2).",
     "description": "The `azure_storage` interface allows charms to access Azure Blob Storage and Data Lake Storage (Gen 2) with appropriate credentials and connection details.\nThe provider charm supplies storage account credentials and configuration, while the requirer charm specifies the container to access.",
+    "tags": [],
     "status": "draft"
   },
   {
@@ -37,6 +45,9 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/certificate_transfer/",
     "summary": "Receive public or CA certificates.",
     "description": "The `certificate_transfer` interface allows charms to receive public and/or CA certificates.\nThe provider charm shares its certificates with the requirer.",
+    "tags": [
+      "security"
+    ],
     "status": "draft"
   },
   {
@@ -47,6 +58,10 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/cloudflared_route/",
     "summary": "Configure a cloudflared tunnel.",
     "description": "The `cloudflared_route` interface allows information to be exchanged between the cloudflared tunnel configurator charm and the cloudflared tunnel charm.",
+    "tags": [
+      "ingress",
+      "networking"
+    ],
     "status": "draft"
   },
   {
@@ -57,6 +72,10 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/connect_client/",
     "summary": "Interact with Kafka Connect clusters.",
     "description": "The `connect_client` interface allows charms to interact with Kafka Connect clusters for connector plugin and task management.\nThe provider charm manages the Kafka Connect cluster and deploys connector plugins from URLs supplied by the requirer, while the requirer charm manages its connectors and tasks using the provider's REST endpoints.",
+    "tags": [
+      "data",
+      "identity-auth"
+    ],
     "status": "draft"
   },
   {
@@ -67,6 +86,9 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/cos_agent/",
     "summary": "Machine-charm-specific interface for managing multiple observability-related data streams.",
     "description": "The `cos_agent` interface allows machine charms to send telemetry \u2014 such as metrics, logs, dashboards, and alert rules \u2014 to Opentelemetry Colector or Grafana Agent charms.\n\nThis interface is designed specifically for machine charms, where the requirer is typically the [grafana-agent](https://charmhub.io/grafana-agent) and the [opentelemetry-collector](https://github.com/canonical/opentelemetry-collector-operator/) subordinate charms.",
+    "tags": [
+      "observability"
+    ],
     "status": "published"
   },
   {
@@ -77,6 +99,7 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/database_backup/",
     "summary": "Manage database backup and restore operations.",
     "description": "The `database_backup` interface allows a database backup manager charm to coordinate backup and restore operations with database charms.\nThe provider charm (database) executes backup and restore jobs based on requirer requests and reports their status, while the requirer charm (backup manager) requests jobs, manages storage configuration, and stores backup artifacts.",
+    "tags": [],
     "status": "draft"
   },
   {
@@ -87,6 +110,7 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/dns_record/",
     "summary": "Create and manage DNS records.",
     "description": "",
+    "tags": [],
     "status": "draft"
   },
   {
@@ -97,6 +121,10 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/etcd_client/",
     "summary": "Access etcd clusters with credentials and TLS configuration.",
     "description": "The `etcd_client` interface allows charms to access etcd clusters with user-specific credentials and TLS configuration.\nThe provider charm creates etcd users and roles based on requirer requests, while the requirer charm shares certificate information and key access prefixes.",
+    "tags": [
+      "data",
+      "identity-auth"
+    ],
     "status": "draft"
   },
   {
@@ -107,6 +135,9 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/filesystem_info/",
     "summary": "Export mount information about shared filesystems.",
     "description": "The `filesystem_info` interface allows charms that export shared filesystems to expose the required mount information.\nThe provider charm exports mount information for the requirer charm.",
+    "tags": [
+      "data"
+    ],
     "status": "draft"
   },
   {
@@ -117,6 +148,9 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/fiveg_core_gnb/",
     "summary": "",
     "description": "",
+    "tags": [
+      "telco"
+    ],
     "status": "draft"
   },
   {
@@ -127,6 +161,7 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/fiveg_f1/",
     "summary": "",
     "description": "",
+    "tags": [],
     "status": "draft"
   },
   {
@@ -137,6 +172,7 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/fiveg_gnb_identity/",
     "summary": "",
     "description": "",
+    "tags": [],
     "status": "draft"
   },
   {
@@ -147,6 +183,9 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/fiveg_n2/",
     "summary": "",
     "description": "",
+    "tags": [
+      "telco"
+    ],
     "status": "draft"
   },
   {
@@ -157,6 +196,7 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/fiveg_n3/",
     "summary": "",
     "description": "",
+    "tags": [],
     "status": "draft"
   },
   {
@@ -167,6 +207,9 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/fiveg_n4/",
     "summary": "",
     "description": "",
+    "tags": [
+      "telco"
+    ],
     "status": "draft"
   },
   {
@@ -177,6 +220,9 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/fiveg_nrf/",
     "summary": "",
     "description": "",
+    "tags": [
+      "telco"
+    ],
     "status": "draft"
   },
   {
@@ -187,6 +233,7 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/fiveg_rfsim/",
     "summary": "",
     "description": "",
+    "tags": [],
     "status": "draft"
   },
   {
@@ -197,6 +244,9 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/forward_auth/",
     "summary": "",
     "description": "",
+    "tags": [
+      "identity-auth"
+    ],
     "status": "draft"
   },
   {
@@ -207,6 +257,10 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/grafana_auth/",
     "summary": "Provide authentication configuration for Grafana.",
     "description": "The `grafana_auth` interface supports configuring Grafana authentication.\nThe provider sends the authentication mode and its configuration.\nThe requirer configures authentication with Grafana and replies with its publicly reachable URL.",
+    "tags": [
+      "identity-auth",
+      "observability"
+    ],
     "status": "draft"
   },
   {
@@ -217,6 +271,9 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/grafana_datasource/",
     "summary": "Provide Grafana data source servers.",
     "description": "The `grafana_source` interface supports exposing servers implementing the Grafana source HTTP API.\nThe provider publishes the endpoint URL for the servers, one per unit.\nThe requirer replies with unique IDs for the Grafana application and a mapping of unique IDs for the units.",
+    "tags": [
+      "observability"
+    ],
     "status": "published"
   },
   {
@@ -227,6 +284,10 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/grafana_datasource_exchange/",
     "summary": "Share UIDs for Grafana datasources between charms.",
     "description": "The `grafana_datasource_exchange` interface allows charms that generate telemetry and have a reference to the datasources where said telemetry is queriable, to share those references to other charms for correlation and cross-referencing purposes.\n\nThis is a symmetrical relation, where implementers broadcast the same information regardless of whether they are the provider or requirer.\nTo avoid constraints on integration topology, charms should implement both a requirer and provider endpoint for this interface.",
+    "tags": [
+      "internal",
+      "observability"
+    ],
     "status": "draft"
   },
   {
@@ -237,6 +298,9 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/hydra_endpoints/",
     "summary": "",
     "description": "",
+    "tags": [
+      "identity-auth"
+    ],
     "status": "draft"
   },
   {
@@ -247,6 +311,10 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/ingress/",
     "summary": "",
     "description": "",
+    "tags": [
+      "ingress",
+      "networking"
+    ],
     "status": "published"
   },
   {
@@ -257,6 +325,10 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/ingress_per_unit/",
     "summary": "",
     "description": "",
+    "tags": [
+      "ingress",
+      "networking"
+    ],
     "status": "published"
   },
   {
@@ -267,6 +339,7 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/ip_router/",
     "summary": "",
     "description": "",
+    "tags": [],
     "status": "draft"
   },
   {
@@ -277,6 +350,7 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/jwt/",
     "summary": "Provide and consume JSON Web Token configuration.",
     "description": "The `jwt` interface allows charms to provide or require JSON Web Token configuration for secure token validation.\nThe provider charm supplies signing keys and optional validation parameters, while the requirer charm applies these settings to validate incoming JWTs in its workload.",
+    "tags": [],
     "status": "draft"
   },
   {
@@ -287,6 +361,7 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/k8s-service/",
     "summary": "",
     "description": "",
+    "tags": [],
     "status": "published"
   },
   {
@@ -297,6 +372,7 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/k8s_backup_target/",
     "summary": "Configure Kubernetes backup target specifications.",
     "description": "The `k8s_backup_target` interface allows client charms to specify Kubernetes backup requirements to a backup integrator charm.\nThe provider charm (client) provides backup specifications including namespaces, resource types, and retention policies, while the requirer charm (backup integrator) receives these specifications and forwards them to a backup operator.",
+    "tags": [],
     "status": "draft"
   },
   {
@@ -307,6 +383,10 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/kafka_client/",
     "summary": "Interact with Kafka clusters as a client.",
     "description": "The `kafka_client` interface allows charms to interact with Kafka clusters as producers, consumers, or admin clients.\nThe provider charm creates Kafka users with appropriate ACLs and permissions based on requested roles, while the requirer charm specifies its desired topic and role.",
+    "tags": [
+      "data",
+      "identity-auth"
+    ],
     "status": "draft"
   },
   {
@@ -317,6 +397,7 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/karapace_client/",
     "summary": "Access Karapace schema registry services.",
     "description": "The `karapace_client` interface allows charms to access Karapace schema registry services with user-specific credentials.\nThe provider charm manages Karapace users and subject access controls, while the requirer charm requests access to specific subjects with desired role permissions.",
+    "tags": [],
     "status": "draft"
   },
   {
@@ -327,6 +408,7 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/kratos_external_idp/",
     "summary": "",
     "description": "",
+    "tags": [],
     "status": "draft"
   },
   {
@@ -337,6 +419,9 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/kratos_info/",
     "summary": "",
     "description": "",
+    "tags": [
+      "identity-auth"
+    ],
     "status": "published"
   },
   {
@@ -347,6 +432,7 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/kubeflow_dashboard_links/",
     "summary": "",
     "description": "",
+    "tags": [],
     "status": "draft"
   },
   {
@@ -357,6 +443,9 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/ldap/",
     "summary": "Configure and connect to a Lightweight Directory Access Protocol (LDAP) server.",
     "description": "The `ldap` interface supports sharing configuration and connection information for a Lightweight Directory Access Protocol (LDAP) server.\nThe provider is responsible for sharing the LDAP URL and other information needed for the requirer to connect and perform LDAP operations.",
+    "tags": [
+      "identity-auth"
+    ],
     "status": "draft"
   },
   {
@@ -367,6 +456,10 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/litmus_auth/",
     "summary": "Exchange gRPC server endpoints for communication between Litmus auth and backend charms.",
     "description": "The `litmus_auth` interface enables communication between Litmus auth and Litmus backend charms.\nBoth the provider and requirer publish their respective gPRC server's endpoint.",
+    "tags": [
+      "internal",
+      "operations"
+    ],
     "status": "draft"
   },
   {
@@ -377,6 +470,9 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/login_ui_endpoints/",
     "summary": "",
     "description": "",
+    "tags": [
+      "identity-auth"
+    ],
     "status": "draft"
   },
   {
@@ -387,6 +483,7 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/milter/",
     "summary": "Provide or consume a mail filter.",
     "description": "The `milter` interface allows charms to connect to a charm serving as a mail filter (milter).\nThe provider charm shares the information needed to connect.",
+    "tags": [],
     "status": "published"
   },
   {
@@ -397,6 +494,7 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/mimir_cluster/",
     "summary": "Mimir coordinator and worker charm communication.",
     "description": "The `mimir_cluster` interface supports communication between the [mimir-coordinator-k8s](https://charmhub.io/mimir-coordinator-k8s) and [mimir-worker-k8s](https://charmhub.io/mimir-worker-k8s) charms.",
+    "tags": [],
     "status": "draft"
   },
   {
@@ -407,6 +505,10 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/mongodb_client/",
     "summary": "Access MongoDB databases with unique credentials.",
     "description": "The `mongodb_client` interface allows charms to access MongoDB databases with unique, relation-specific credentials transmitted via Juju Secrets.\nThe provider charm creates database users and provides connection details, while the requirer charm requests a database name and optional custom entities with specific role permissions.",
+    "tags": [
+      "data",
+      "identity-auth"
+    ],
     "status": "draft"
   },
   {
@@ -417,6 +519,10 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/mysql_client/",
     "summary": "Access MySQL databases with unique credentials.",
     "description": "The `mysql_client` interface allows charms to access MySQL databases with unique, relation-specific credentials transmitted via Juju Secrets.\nThe provider charm creates database users and provides connection details, while the requirer charm requests a database name and optional custom entities with specific role permissions.",
+    "tags": [
+      "data",
+      "identity-auth"
+    ],
     "status": "published"
   },
   {
@@ -427,6 +533,10 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/nginx-route/",
     "summary": "Create an Nginx ingress resource in a Kubernetes cluster.",
     "description": "The `nginx_route` interface allows charms to request the creation of an Nginx ingress resource in the Kubernetes cluster.\nThe requirer charm supplies the configuration for the ingress resources.\nThe provider charm creates the resource as requested.",
+    "tags": [
+      "ingress",
+      "networking"
+    ],
     "status": "draft"
   },
   {
@@ -437,6 +547,9 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/oauth/",
     "summary": "Connect to an OAuth2/OIDC Provider.",
     "description": "The `oauth` interface allows charms to interface with an OAuth2/OIDC Provider.\nThe requirer acts as an OAuth2 client.\nThe provider exposes an OAuth2/OIDC Provider.",
+    "tags": [
+      "identity-auth"
+    ],
     "status": "draft"
   },
   {
@@ -447,6 +560,9 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/opencti_connector/",
     "summary": "Connect a single OpenCTI provider to one or more OpenCTI connectors.",
     "description": "The `opencti_connector` interface supports connecting an OpenCTI provider charm to one or more OpenCTI connectors.\nThe provider charm specifies the expected connector type for each connector relation.\nEach requirer charm shares its OpenCTI URL (and token) for the provider to connect to.",
+    "tags": [
+      "security"
+    ],
     "status": "published"
   },
   {
@@ -457,6 +573,9 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/openfga/",
     "summary": "Set up and connect to an OpenFGA store.",
     "description": "The `openfga` interface supports setting up an OpenFGA store and connecting to it.\nThe requirer specifies the store name, while the provider creates the store and shares the data needed to connect.",
+    "tags": [
+      "identity-auth"
+    ],
     "status": "published"
   },
   {
@@ -467,6 +586,10 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/opensearch_client/",
     "summary": "Access OpenSearch and ElasticSearch clusters.",
     "description": "The `opensearch_client` interface allows charms to access OpenSearch and ElasticSearch clusters with user-specific credentials and index permissions transmitted via Juju Secrets.\nThe provider charm creates users and manages index access controls, while the requirer charm requests access to specific indices with optional role permissions.",
+    "tags": [
+      "data",
+      "identity-auth"
+    ],
     "status": "draft"
   },
   {
@@ -477,6 +600,10 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/postgresql_client/",
     "summary": "Access PostgreSQL databases with unique credentials.",
     "description": "The `postgresql_client` interface allows charms to access PostgreSQL databases with unique, relation-specific credentials.\nThe provider charm creates database users and provides connection details, while the requirer charm requests a database name and optional custom entities with specific role permissions. Supports subordinate charms that provide external connectivity.",
+    "tags": [
+      "data",
+      "identity-auth"
+    ],
     "status": "draft"
   },
   {
@@ -487,6 +614,7 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/profiling/",
     "summary": "",
     "description": "",
+    "tags": [],
     "status": "draft"
   },
   {
@@ -497,6 +625,9 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/prometheus_remote_write/",
     "summary": "Write Prometheus metrics to remote endpoint.",
     "description": "The `prometheus_remote_write` endpoint supports writing Prometheus metrics to a remote endpoint.\nThe provider publishes one or more endpoints, and emits alerts per rule files.\nThe requirer pushes metrics to the provided endpoints, and sends rule files to the provider.",
+    "tags": [
+      "observability"
+    ],
     "status": "published"
   },
   {
@@ -507,6 +638,9 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/prometheus_scrape/",
     "summary": "Configure Prometheus scraping jobs.",
     "description": "The `prometheus_scrape` interface supports configuring Prometheus scrape jobs and recording and alerting rules.\nThe provider specifies one or more scrape compatible metrics endpoints, and rule files.\nThe requirer then scrapes the provider's metrics and emits alerts per rule files.",
+    "tags": [
+      "observability"
+    ],
     "status": "published"
   },
   {
@@ -517,6 +651,7 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/pyroscope_cluster/",
     "summary": "Pyroscope coordinator and worker charm communication.",
     "description": "The `pyroscope_cluster` interface supports communication between the [pyroscope-coordinator-k8s](https://charmhub.io/pyroscope-coordinator-k8s) and [pyroscope-worker-k8s](https://charmhub.io/pyroscope-worker-k8s) charms.",
+    "tags": [],
     "status": "draft"
   },
   {
@@ -527,6 +662,7 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/s3/",
     "summary": "",
     "description": "",
+    "tags": [],
     "status": "draft"
   },
   {
@@ -537,6 +673,9 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/saml/",
     "summary": "Authenticate users with SAML.",
     "description": "The `saml` interface allows charms to connect to a SAML Identity Provider for authenticating users.\nThe provider charm is the SAML Identity Provider, and shares the necessary data with requirer charms (SAML Service Providers).",
+    "tags": [
+      "identity-auth"
+    ],
     "status": "published"
   },
   {
@@ -547,6 +686,9 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/sdcore_config/",
     "summary": "",
     "description": "",
+    "tags": [
+      "telco"
+    ],
     "status": "draft"
   },
   {
@@ -557,6 +699,9 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/sdcore_management/",
     "summary": "",
     "description": "",
+    "tags": [
+      "telco"
+    ],
     "status": "draft"
   },
   {
@@ -567,6 +712,9 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/smtp/",
     "summary": "Connect to a SMTP server.",
     "description": "The `smtp` interface allows charms to connect to a SMTP server.\nThe provider charm provides the SMTP details so that the requirer can connect.",
+    "tags": [
+      "operations"
+    ],
     "status": "published"
   },
   {
@@ -577,6 +725,7 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/spark_service_account/",
     "summary": "",
     "description": "",
+    "tags": [],
     "status": "draft"
   },
   {
@@ -587,6 +736,7 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/tempo_cluster/",
     "summary": "Tempo coordinator and worker charm communication.",
     "description": "The `tempo_cluster` interface supports communication between the [tempo-coordinator-k8s](https://charmhub.io/tempo-coordinator-k8s) and [tempo-worker-k8s](https://charmhub.io/tempo-worker-k8s) charms.",
+    "tags": [],
     "status": "published"
   },
   {
@@ -597,6 +747,9 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/tls-certificates/",
     "summary": "Securely request TLS certificates.",
     "description": "The `tls-certificates` interface allows charms to securely request and receive TLS certificates. The requirer charm is responsible for its private key and defining its certificate signing requests (CSRs). The provider charm delivers the certificate for each request, including the CA chain and CA certificate.",
+    "tags": [
+      "security"
+    ],
     "status": "published"
   },
   {
@@ -607,6 +760,9 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/tracing/",
     "summary": "Request endpoints for pushing trace data.",
     "description": "The `tracing` interface supports push-based tracing.\nThe requirer publishes the list of protocols it wants to use to send traces.\nThe provider replies with an API URL and an endpoint for each protocol, omitting those it does not support.",
+    "tags": [
+      "observability"
+    ],
     "status": "published"
   },
   {
@@ -617,6 +773,9 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/valkey_client/",
     "summary": "Access Valkey databases with credentials and TLS configuration.",
     "description": "The `valkey_client` interface allows charms to access Valkey databases with user-specific credentials and TLS configuration.\nThe provider charm creates Valkey users and permissions based on requirer requests, while the requirer charm shares the desired key access prefix.",
+    "tags": [
+      "data"
+    ],
     "status": "published"
   },
   {
@@ -627,6 +786,7 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/vault-autounseal/",
     "summary": "",
     "description": "",
+    "tags": [],
     "status": "draft"
   },
   {
@@ -637,6 +797,9 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/vault-kv/",
     "summary": "Securely share Vault credentials to interact with the Vault Key-Value (KV) backend.",
     "description": "The `vault-kv` interface allows the charms to securely request and receive the credentials needed to interact with the Key-Value (KV) backend of Vault.\nThe requirer charm requests credentials, and the provider charm supplies them.",
+    "tags": [
+      "security"
+    ],
     "status": "draft"
   },
   {
@@ -647,6 +810,7 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/velero_backup_config/",
     "summary": "Configure Kubernetes backup requirements for Velero.",
     "description": "The `velero_backup_config` interface allows client charms to specify Kubernetes backup requirements to a Velero Operator charm.\nThe requirer charm (client) provides backup specifications including namespaces, resource types, and retention policies, while the provider charm (Velero Operator) receives these specifications and uses them to execute backup operations.",
+    "tags": [],
     "status": "draft"
   },
   {
@@ -657,6 +821,7 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/wazuh_api_client/",
     "summary": "The `wazuh_api_client` interface allows charms to connect to a Wazuh server.\nThe provider charm manages access to the server, securely providing credentials and endpoints to the requirer charms.",
     "description": "Connect to a Wazuh server.",
+    "tags": [],
     "status": "draft"
   },
   {
@@ -667,6 +832,7 @@
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/zookeeper/",
     "summary": "",
     "description": "",
+    "tags": [],
     "status": "draft"
   }
 ]

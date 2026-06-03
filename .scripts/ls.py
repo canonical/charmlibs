@@ -66,8 +66,9 @@ class Info:
     description: str = ''
     status: str = ''
     schema_path: str = ''
+    tags: list[str] = dataclasses.field(default_factory=list[str])
 
-    def to_dict(self, *fields: str) -> dict[str, str]:
+    def to_dict(self, *fields: str) -> dict[str, object]:
         """Return dictionary containing only specified fields."""
         return {field: getattr(self, field) for field in fields}
 
@@ -105,7 +106,7 @@ def _main() -> None:
     if args.output:
         result = sorted(
             (info.to_dict(*args.output) for info in infos),
-            key=lambda di: tuple(di.items()),
+            key=lambda di: json.dumps(di, default=str),
         )
     else:
         result = sorted(getattr(info, args.output_only) for info in infos)
@@ -190,6 +191,8 @@ def _ls(
                 info.status = _get_status(category, root, path)
             if 'schema_path' in output:
                 info.schema_path = _get_schema_path_str(category, root, path)
+            if 'tags' in output:
+                info.tags = _lib_tags().get(_get_lib_name(category, root, path), [])
             infos.append(info)
         return infos
 
@@ -398,10 +401,21 @@ def _get_interface_version(path: pathlib.Path, root: pathlib.Path = _REPO_ROOT) 
 
 
 @functools.cache
+def _pyproject_toml(package: pathlib.Path, root: pathlib.Path = _REPO_ROOT):
+    with (root / package / 'pyproject.toml').open('rb') as f:
+        return tomllib.load(f)
+
+
+@functools.cache
+def _interface_yaml(path: pathlib.Path, root: pathlib.Path = _REPO_ROOT):
+    version = _get_interface_version(path, root=root)
+    with (root / path / 'interface' / f'v{version}' / 'interface.yaml').open() as f:
+        return yaml.safe_load(f)
+
+
 def _lib_urls() -> dict[str, str]:
     result: dict[str, str] = {}
-    data = yaml.safe_load((_REPO_ROOT / '.docs' / 'reference' / 'libs.yaml').read_text())
-    for entry in (*data['general'], *data['interfaces']):
+    for entry in (*_libs_yaml()['general'], *_libs_yaml()['interfaces']):
         # Library names should be unique, but we currently have an entry for
         # charms.data_platform_libs.data_interfaces for each interface it supports
         # This doesn't break our lookups though, since they all have the same metadata
@@ -414,17 +428,16 @@ def _lib_urls() -> dict[str, str]:
     return result
 
 
-@functools.cache
-def _pyproject_toml(package: pathlib.Path, root: pathlib.Path = _REPO_ROOT):
-    with (root / package / 'pyproject.toml').open('rb') as f:
-        return tomllib.load(f)
+def _lib_tags() -> dict[str, list[str]]:
+    return {
+        entry['name']: sorted(entry.get('tags') or [])
+        for entry in (*_libs_yaml()['general'], *_libs_yaml()['interfaces'])
+    }
 
 
 @functools.cache
-def _interface_yaml(path: pathlib.Path, root: pathlib.Path = _REPO_ROOT):
-    version = _get_interface_version(path, root=root)
-    with (root / path / 'interface' / f'v{version}' / 'interface.yaml').open() as f:
-        return yaml.safe_load(f)
+def _libs_yaml():
+    return yaml.safe_load((_REPO_ROOT / '.docs' / 'reference' / 'libs.yaml').read_text())
 
 
 def _normalize(name: str) -> str:
