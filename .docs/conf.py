@@ -41,7 +41,7 @@ html_title = f"{project} documentation"  # sidebar documentation title
 copyright = f"{datetime.date.today().year} CC-BY-SA, {author}"  # shown at the bottom of the page
 
 # Documentation website URL
-ogp_site_url = "https://canonical.com/juju/docs/charmlibs"
+ogp_site_url = "https://canonical.com/juju/docs/charmlibs/"
 # Preview name of the documentation website
 ogp_site_name = project
 # Preview image URL
