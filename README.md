@@ -5,7 +5,7 @@
 Charms are Python programs that use the [Ops](https://documentation.ubuntu.com/ops/) framework to manage workloads on Kubernetes or machine clouds. Charm libraries package up common functionality so that teams don't have to reinvent the wheel.
 
 > [!IMPORTANT]
-> Each library in this monorepo is distributed as a separate Python package on PyPI, so you charms only include what they actually need.
+> Each library in this monorepo is distributed as a separate Python package on PyPI, so charms only include what they actually need.
 
 There are two kinds of charm libraries:
 

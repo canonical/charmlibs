@@ -279,6 +279,17 @@ docs
 └── tutorial.{md,rst}
 ```
 
+## Update the library metadata
+
+The {ref}`interface library listing <interface-libs-listing>` and {ref}`general library listing <general-libs-listing>` are generated from `.docs/reference/libs.yaml`.
+
+There should already be an entry for the old Charmhub-hosted library.
+If there isn't, add one with a `deprecated` status and a description noting it has been superseded by the new `charmlibs` package.
+
+Add a new entry for the `charmlibs` package with the new package name, source URL, status, description, and any relevant tags.
+See `.docs/reference/tags.yaml` for the full list of available tags and their assignment criteria.
+Don't invent new tags, only use tags defined in `tags.yaml`.
+
 ## Deprecate the old library
 
 When migrating an existing Charmhub-hosted library, our recommendation is to do a bug-for-bug migration of the latest release.

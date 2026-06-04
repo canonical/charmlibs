@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import grp
+import os
 import pathlib
 import pwd
 import shutil
@@ -25,7 +26,9 @@ import typing
 from . import _constants
 
 if typing.TYPE_CHECKING:
-    from typing_extensions import Buffer
+    from collections.abc import Iterator
+
+    from typing_extensions import Buffer, Self
 
 
 class LocalPath(pathlib.PosixPath):
@@ -160,6 +163,13 @@ class LocalPath(pathlib.PosixPath):
             # explicitly set the mode if the user requested it
             self.chmod(mode)
         return bytes_written
+
+    def glob(  # pyright: ignore[reportIncompatibleMethodOverride]
+        self, pattern: str | os.PathLike[str]
+    ) -> Iterator[Self]:
+        # On Python 3.12 and earlier, pathlib.Path.glob only accepts a str pattern.
+        # ContainerPath.glob accepts str | os.PathLike[str], so we normalise here to match.
+        return super().glob(os.fspath(pattern))
 
     def mkdir(
         self,

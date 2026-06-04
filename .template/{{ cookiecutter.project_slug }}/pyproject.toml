@@ -6,9 +6,9 @@ requires-python = ">={{ cookiecutter.min_python_version }}"
 authors = [
     {name="{{ cookiecutter.author }}"},
 ]
+license = "Apache-2.0"
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: Apache Software License",
     "Intended Audience :: Developers",
     "Operating System :: POSIX :: Linux",
     "Development Status :: 5 - Production/Stable",
