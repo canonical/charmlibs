@@ -36,12 +36,12 @@ sys.path[0:0] = [
 # Project name
 project = "Charmlibs"
 author = "Canonical Ltd."
-slug = 'charmlibs'  # https://meta.discourse.org/t/what-is-category-slug/87897
+slug = 'juju/docs/charmlibs'  # https://meta.discourse.org/t/what-is-category-slug/87897
 html_title = f"{project} documentation"  # sidebar documentation title
 copyright = f"{datetime.date.today().year} CC-BY-SA, {author}"  # shown at the bottom of the page
 
 # Documentation website URL
-ogp_site_url = "https://documentation.ubuntu.com/charmlibs/"
+ogp_site_url = "https://canonical.com/juju/docs/charmlibs"
 # Preview name of the documentation website
 ogp_site_name = project
 # Preview image URL
@@ -66,8 +66,9 @@ html_static_path = [".sphinx/_static"]
 templates_path = [".sphinx/_templates"]
 
 # Sitemap configuration: https://sphinx-sitemap.readthedocs.io/
-html_baseurl = 'https://documentation.ubuntu.com/charmlibs/'
+html_baseurl = 'https://canonical.com/juju/docs/charmlibs/'
 sitemap_url_scheme = '{link}'  # URL scheme. Add language and version scheme elements.
+sitemap_filename = 'doc-sitemap.xml'
 sitemap_show_lastmod = True  # Include `lastmod` dates in the sitemap:
 sitemap_excludes = [  # Exclude generated pages from the sitemap:
     '404/',
@@ -173,6 +174,7 @@ html_css_files = [
 # Adds custom JavaScript files, located under 'html_static_path'
 html_js_files = [
     "tag_click_search.js",
+    "overwrite_links.js",
 ]
 
 # Specifies a reST snippet to be prepended to each .rst file
