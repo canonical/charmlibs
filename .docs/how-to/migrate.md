@@ -258,26 +258,56 @@ The `charmlibs` CI is aware of two special `pytest` marks: `k8s_only` and `machi
 If there are no tests compatible with a substrate, then it's skipped completely.
 By default each test is treated as compatible with both substrates.
 
+(how-to-migrate-docs)=
 ## Migrate your library's docs
 
-Your library's reference documentation is automatically built from its docstrings and source code.
+Your library's reference documentation is automatically built from its docstrings and source code. On top of that, you can add tutorials, how-to guides, and explanations under `<library path>/docs`, and they'll be included in this documentation site under the respective categories.
 
-```{warning}
-🚧 Actually including the docs described below in this documentation site is coming soon™ 🚧
+Read more: {ref}`how-to-add-library-docs`
+
+```{note}
+There is no `reference` docs category -- reference documentation is generated from your library's docstrings. If your existing docs include hand-written reference material, fold the relevant content into your docstrings, or rework it into an explanation or how-to guide.
 ```
 
-Additional documentation may be placed under `<library path>/docs`, and will be included in this documentation site under the respective categories.
-The following files are consumed.
+If your library already has documentation hosted on Charmhub, here's how to bring it across.
+
+### Find the source topics
+
+Charmhub renders a charm's documentation from a set of topics on [Discourse](https://discourse.charmhub.io). To find them:
+
+1. Start from the charm's Charmhub page -- `https://charmhub.io/<charm>`.
+2. Follow the **Help improve this document in the forum** link at the bottom of the page. This link points to the Discourse *root topic* for the charm's docs.
+
+The root topic contains a table of contents linking each child topic. This usually already encodes a Diátaxis-like layout (tutorial / how-to / explanation / reference) that you can carry over.
+
+```{tip}
+Some charms host their docs on a Read the Docs / Sphinx site instead of Discourse. That content isn't available through the Discourse API, but it's straightforward to migrate by hand: copy the doc site's source files into your library's `docs/` directory and adapt them.
 ```
-docs
-├── explanation
-│   └── *.{md,rst}
-├── how-to
-│   └── *.{md,rst}
-├── reference
-│   └── *.{md,rst}
-└── tutorial.{md,rst}
+
+### Download the topics
+
+Download each Discourse topic into your library's `docs/` directory:
+
+```bash
+.scripts/import_discourse_docs.py <discourse-url> <library path>/docs/<category>/<page>.md
 ```
+
+For example:
+
+```bash
+.scripts/import_discourse_docs.py \
+    https://discourse.charmhub.io/t/tls-certificates-interface/15539 \
+    interfaces/tls-certificates/docs/explanation/tls-certificates-interface.md
+```
+
+
+The script downloads the topic, extracts its Markdown source, and resolves any embedded images.
+
+Repeat for each topic, choosing a Diátaxis category for each.
+
+### Finish up
+
+Edit the imported pages to follow the conventions described in {ref}`how-to-add-library-docs`: give each page a title and meta description, fix up cross-references, and confirm the categorisation.
 
 ## Update the library metadata
 

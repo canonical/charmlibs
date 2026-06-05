@@ -1,4 +1,4 @@
-# Tutorial
+# charmlibs: Write your first charm library
 
 In this tutorial you'll add a new library to the `charmlibs` monorepo.
 
@@ -354,7 +354,7 @@ Note that this will require `charmcraft` installed locally for packing, and a Ju
 However, you may find it easier to run the integration tests in CI instead, which is most easily done by opening a pull request.
 If you're following along with your own library, then see the next section for how to do this for real.
 Otherwise, if you're using the `uptime` example, open a PR against the `main` branch of your fork -- just make sure you enable the workflows first!
-You'll be prompted to do this if you visit `https://github.com/<USERNAME>/charmlibs/actions`. 
+You'll be prompted to do this if you visit `https://github.com/<USERNAME>/charmlibs/actions`.
 
 ## Add library metadata
 

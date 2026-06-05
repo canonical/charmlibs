@@ -230,6 +230,15 @@ Read more: {ref}`how-to-customize-integration-tests`
 Read more: {ref}`charm-libs-charmhub-hosted`, {ref}`Charmcraft | Manage libraries <charmcraft:manage-libraries>`
 ```
 
+### Migrating a library's docs
+
+To bring an existing library's tutorials, how-to guides, and explanations into the monorepo, follow the **Migrate your library's docs** section of [How to migrate to the charmlibs monorepo](https://documentation.ubuntu.com/charmlibs/how-to/migrate/). In short:
+
+- For Charmhub-hosted docs, download each Discourse topic with `uv run .scripts/import-discourse-docs.py <discourse-url> <output-file>`, choosing a diataxis category (and so an output path) for each.
+- Then edit the imported pages to fit charmlibs conventions, following [How to add docs to a library](https://documentation.ubuntu.com/charmlibs/how-to/add-library-docs/).
+
+There is no `reference` docs category — reference docs are generated from docstrings.
+
 ## Common pitfalls
 
 - **Don't call `uv add` directly** — use `just add <package> <dep>` to respect repo-level constraints.

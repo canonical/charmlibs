@@ -188,3 +188,8 @@ interfaces-json:
         --output status \
         --indent-json \
         > interfaces/index.json
+
+[doc('Run unit tests for the repository tooling scripts in `.scripts/`.')]
+scripts-unit +flags='-rA':
+    {{_uv_run_with_test_requirements}} \
+        pytest --tb=native -vv {{flags}} .scripts/tests

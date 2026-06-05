@@ -125,6 +125,16 @@ jobs:
           uvx --from rust-just just interfaces-json
           git diff --exit-code
 
+  meta:  # tests for the repository's own CI tooling and helper scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v7
+      - name: Run unit tests for the repository tooling scripts
+        run: uvx --from rust-just just scripts-unit
+
   template-and-example-in-sync:
     runs-on: ubuntu-latest
     steps:

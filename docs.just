@@ -9,9 +9,13 @@ Build the docs, (re)generating reference docs for all packages, or just those sp
 `just docs` is an alias for `just docs html`. To specify packages, you must use the full recipe, e.g.
 `just docs html interfaces/foo`.
 """)]
-html *packages: (_packages packages)
+html *packages: _diataxis_docs (_packages packages)
     uvx --with-requirements=.sphinx/requirements.txt --from=sphinx \
         sphinx-build -b dirhtml -T -W --keep-going -d .sphinx/.doctrees -D language=en . '{{build_dir}}/html'
+
+[doc('Copy per-library diataxis docs into the Sphinx source tree and generate toctree include files.')]
+_diataxis_docs:
+    ./scripts/diataxis_preprocessor.py
 
 [doc("""
 Run html builder once per package, with its deps installed, setting the package argument and suppressing reference warnings.
@@ -78,14 +82,21 @@ clean:
     rm -rf reference/charmlibs
     rm -rf reference/interfaces
     rm -rf .save
+    # per-library diataxis docs
+    rm -rf tutorials/charmlibs
+    rm -rf how-to/charmlibs
+    rm -rf explanation/charmlibs
+    rm -f tutorials/_lib-tutorials.md
+    rm -f how-to/_lib-how-to.md
+    rm -f explanation/_lib-explanation.md
 
 [doc('Run `pyright` for local sphinx extensions.')]
 ext-static *pyrightargs:
-    cd extensions && uvx --with-requirements=../.sphinx/requirements.txt --with=pytest \
+    cd tests && uvx --with-requirements=../.sphinx/requirements.txt --with=pytest \
         pyright {{pyrightargs}}
 
 [doc('Run unit tests with `coverage` for local sphinx extensions.')]
 ext-unit +flags='-rA':
     uvx --with-requirements=.sphinx/requirements.txt --with=pytest \
-        coverage run --omit='test_*.py' -m pytest --tb=native -vv {{flags}} extensions
+        coverage run --omit='test_*.py' --source=extensions,scripts -m pytest --tb=native -vv {{flags}} tests
     uvx coverage report
