@@ -234,13 +234,13 @@ They're intended for tests that interact with the real world, but don't require 
 
 The process for migrating them is exactly the same as for unit tests.
 
-> Read more: {ref}`tutorial-add-functional-tests`, {ref}`charmlibs-functional-tests`
+Read more: {ref}`tutorial-add-functional-tests`, {ref}`charmlibs-functional-tests`
 
 ### Integration tests
 
 Integration tests involve packing your library into a charm and deploying it on a real Juju model.
 
-> Read more: {ref}`tutorial-add-integration-tests`, {ref}`charmlibs-integration-tests`
+Read more: {ref}`tutorial-add-integration-tests`, {ref}`charmlibs-integration-tests`
 
 If you take a look at your `<library path>/tests/integration` directory, you'll see a `pack.sh` script.
 Currently it packs a simple `k8s` or `machine` charm, depending on the `CHARMLIBS_SUBSTRATE` variable that is set in CI.

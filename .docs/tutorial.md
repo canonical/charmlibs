@@ -40,10 +40,11 @@ If you want to run the Juju integration tests locally, you'll also need `charmcr
 In CI, these are installed and set up for you using [concierge](https://github.com/canonical/concierge?tab=readme-ov-file#presets), with the `microk8s` and `machine` presets.
 The `dev` preset is suitable for local development and testing of both K8s and machine charms, but you may find it easier to run the Juju integration tests in CI when following this tutorial.
 
-> See more:
-> - {ref}`Charmcraft | Install charmcraft <charmcraft:manage-charmcraft>`
-> - {ref}`Juju | Set up your Juju deployment <juju:set-up-your-deployment>`
-> - {ref}`Juju | Set up an isolated environment <juju:set-things-up>`
+Read more:
+
+- {ref}`Charmcraft | Install charmcraft <charmcraft:manage-charmcraft>`
+- {ref}`Juju | Set up your Juju deployment <juju:set-up-your-deployment>`
+- {ref}`Juju | Set up an isolated environment <juju:set-things-up>`
 
 If you're not already using some alternative authentication for `git push`, you'll also want to [make sure you've set up your Github account with your SSH key](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/adding-a-new-ssh-key-to-your-github-account).
 
@@ -176,7 +177,7 @@ The `charmlibs` monorepo supports three distinct types of tests: unit, functiona
 The template starts you off with a simple passing test for each.
 We'll add a test of each kind for our `uptime` library in the following sections.
 
-> Read more: {ref}`charmlibs-tests`
+Read more: {ref}`charmlibs-tests`
 
 ### Add unit tests
 
@@ -251,7 +252,7 @@ In this repository, functional tests are essentially integration or end-to-end t
 In contrast to unit tests, which typically mock out external concerns, functional tests interact with real systems, external processes, and networks.
 However, they do not interact with a real Juju environment, which is reserved for tests under the `integration/` directory.
 
-> Read more: {ref}`how-to-customize-functional-tests`
+Read more: {ref}`how-to-customize-functional-tests`
 
 ````{tip}
 If you're working on an interface library, functional tests probably aren't a good fit, since the main thing the library interacts with is Juju.
@@ -288,7 +289,7 @@ Integration tests are the most complicated and most heavyweight part of the libr
 They involve packing a real charm that includes your library, and deploying it on a real Juju model.
 They can be customized in several ways depending on your library's needs.
 
-> Read more: {ref}`how-to-customize-integration-tests`
+Read more: {ref}`how-to-customize-integration-tests`
 
 For now, we'll just add an integration test for our `uptime` function.
 
@@ -384,4 +385,4 @@ Their review will cover whether the name and purpose of the library is appropria
 This type of review will be repeated for major version bumps of your library.
 All other releases will only require `CODEOWNERS` approval.
 
-> Read more: {ref}`charmlibs-publishing`
+Read more: {ref}`charmlibs-publishing`
