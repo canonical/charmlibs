@@ -1,5 +1,6 @@
-Directory for local sphinx extensions.
+Directory for local Sphinx extensions.
 
-This directory is referenced in the docs `conf.py`, and in the `docs.just` file (for running unit tests).
+This directory is referenced in the docs `conf.py`. Modules must be manually
+added to `local_extensions` in `conf.py` for Sphinx to detect them.
 
-Modules must be manually added to `local_extensions` in `conf.py` for Sphinx to detect them.
+Tests live in `../tests/`. Run them with `just docs ext-unit`.

@@ -4,7 +4,7 @@ import sys
 
 # local extensions
 sys.path.insert(0, str(pathlib.Path(__file__).parent / 'extensions'))
-local_extensions = ['generate_tables', 'interface_docs', 'package_docs']
+local_extensions = ['generate_tables', 'interface_docs', 'package_docs', 'diataxis_docs_fallback']
 
 # So that sphinx.ext.autodoc can find charmlibs code
 root = pathlib.Path(__file__).parent.parent
@@ -162,6 +162,7 @@ add_function_parentheses = False  # don't automatically add parentheses after fu
 # Excludes files or directories from processing
 exclude_patterns = [
     "doc-cheat-sheet*",
+    "**/_lib-*.md",
 ]
 
 # Adds custom CSS files, located under 'html_static_path'
