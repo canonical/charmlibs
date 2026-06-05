@@ -1,3 +1,7 @@
+# 1.8.3 - 5 June 2026
+
+Add a safety net to ensure expiring certificates are renewed even if the charm fails to trigger the renewal process.
+
 # 1.8.2 - 3 June 2026
 
 Update the library to cache the `private_key`.
