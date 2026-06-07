@@ -2,7 +2,7 @@
 
 `charmlibs` is the home of Canonical's charm libraries -- Python packages used by [Juju](https://canonical.com/juju) charms.
 
-Charms are Python programs that use the [Ops](https://documentation.ubuntu.com/ops/) framework to manage workloads on Kubernetes or machine clouds. Charm libraries package up common functionality so that teams don't have to reinvent the wheel.
+Charms are Python programs that use the [Ops](https://canonical.com/juju/docs/ops/) framework to manage workloads on Kubernetes or machine clouds. Charm libraries package up common functionality so that teams don't have to reinvent the wheel.
 
 > [!IMPORTANT]
 > Each library in this monorepo is distributed as a separate Python package on PyPI, so charms only include what they actually need.
@@ -61,4 +61,4 @@ Read more in the docs: [Charm libraries explained](https://canonical.com/juju/do
 
 ---
 
-New to charming? The [ops documentation](https://documentation.ubuntu.com/ops/) is the best place to start.
+New to charming? The [ops documentation](https://canonical.com/juju/docs/ops/) is the best place to start.

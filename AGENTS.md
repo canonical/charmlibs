@@ -7,7 +7,7 @@
 **Key concepts:**
 
 - **Juju** — Canonical's open-source orchestration engine. Deploys and manages applications on Kubernetes and bare-metal/VM clouds.
-- **Charm** — a Python program that uses the [ops](https://documentation.ubuntu.com/ops/) framework to respond to Juju lifecycle events and manage a workload. Charms can be Kubernetes-based (using [Pebble](https://documentation.ubuntu.com/pebble/) to manage container processes) or machine-based.
+- **Charm** — a Python program that uses the [ops](https://canonical.com/juju/docs/ops/) framework to respond to Juju lifecycle events and manage a workload. Charms can be Kubernetes-based (using [Pebble](https://ubuntu.com/docs/pebble/) to manage container processes) or machine-based.
 - **Juju relation** — a named connection between two charms, backed by shared key-value stores called *databags*. Relations are how charms communicate and exchange structured configuration.
 - **Charm library** — a reusable Python package that charm authors import. All libraries in this repo are distributed as Python packages on PyPI (not Charmhub-hosted single-file modules, which are a legacy distribution method).
 
@@ -251,10 +251,10 @@ There is no `reference` docs category — reference docs are generated from docs
 | Resource | URL |
 |----------|-----|
 | charmlibs docs | .docs/index.md |
-| ops (charm framework) | https://documentation.ubuntu.com/ops/ |
-| ops.testing reference | https://documentation.ubuntu.com/ops/latest/reference/ops-testing/ |
+| ops (charm framework) | https://canonical.com/juju/docs/ops/ |
+| ops.testing reference | https://canonical.com/juju/docs/ops/latest/reference/ops-testing/ |
 | Juju docs | https://documentation.ubuntu.com/juju/latest/llms.txt |
 | Charmcraft docs | https://documentation.ubuntu.com/charmcraft/stable/ |
-| Jubilant (integration test client) | https://documentation.ubuntu.com/jubilant/ |
-| Pebble | https://documentation.ubuntu.com/pebble/ |
+| Jubilant (integration test client) | https://canonical.com/juju/docs/jubilant/ |
+| Pebble | https://ubuntu.com/docs/pebble/ |
 | Concierge (CI Juju setup) | https://raw.githubusercontent.com/canonical/concierge/refs/heads/main/README.md |

@@ -150,7 +150,7 @@ extensions = [
 # myst_enable_extensions = set()
 
 intersphinx_mapping = {
-    'ops': ('https://documentation.ubuntu.com/ops/latest', None),
+    'ops': ('https://canonical.com/juju/docs/ops/latest', None),
     'python': ('https://docs.python.org/3', None),
     'juju': ('https://documentation.ubuntu.com/juju/3.6', None),
     'charmcraft': ('https://documentation.ubuntu.com/charmcraft/latest', None),
