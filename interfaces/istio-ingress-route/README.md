@@ -8,4 +8,4 @@ To install, add `charmlibs-interfaces-istio-ingress-route` to your Python depend
 from charmlibs.interfaces import istio_ingress_route
 ```
 
-See the [reference documentation](https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/istio-ingress-route) for more.
+See the [reference documentation](https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/istio-ingress-route) for more.

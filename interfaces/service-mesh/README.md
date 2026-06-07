@@ -8,4 +8,4 @@ To install, add `charmlibs-interfaces-service-mesh` to your Python dependencies.
 from charmlibs.interfaces import service_mesh
 ```
 
-See the [reference documentation](https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/service-mesh) for more.
+See the [reference documentation](https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/service-mesh) for more.

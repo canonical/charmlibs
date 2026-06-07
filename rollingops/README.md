@@ -22,7 +22,7 @@ To install, add `charmlibs-rollingops` to your Python dependencies. Then in your
 from charmlibs import rollingops
 ```
 
-See the [reference documentation](https://documentation.ubuntu.com/charmlibs/reference/charmlibs/rollingops) for more.
+See the [reference documentation](https://canonical.com/juju/docs/charmlibs/reference/charmlibs/rollingops) for more.
 
 # Developing
 

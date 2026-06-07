@@ -27,7 +27,7 @@ integration = []
 [project.urls]
 "Repository" = "https://github.com/canonical/charmlibs"
 "Issues" = "https://github.com/canonical/charmlibs/issues"
-"Documentation" = "https://documentation.ubuntu.com/charmlibs/reference/charmlibs/systemd/"
+"Documentation" = "https://canonical.com/juju/docs/charmlibs/reference/charmlibs/systemd/"
 "Changelog" = "https://github.com/canonical/charmlibs/blob/main/systemd/CHANGELOG.md"
 
 [build-system]
