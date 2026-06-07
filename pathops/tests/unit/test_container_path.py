@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import operator
 import pathlib
-import sys
 import typing
 
 import ops
@@ -205,12 +204,32 @@ class TestMatch:
         assert not container_path.match(pattern.upper())
 
     def test_pattern_cant_be_container_path(self, container: ops.Container):
+        # ContainerPath isn't os.PathLike, so it must be rejected as a pattern on every
+        # supported Python. Without this guard, pathlib.PurePath.match on 3.14+ would
+        # accept it (via the with_segments duck-type), silently dropping the container.
         container_path = ContainerPath('/', container=container)
-        if sys.version_info < (3, 14):
-            with pytest.raises(TypeError):
-                container_path.match(container_path)  # type: ignore
-        else:
+        with pytest.raises(TypeError):
             container_path.match(container_path)  # type: ignore
+
+    def test_pattern_can_be_pathlib(self, container: ops.Container):
+        path = '/foo/bar.txt'
+        container_path = ContainerPath(path, container=container)
+        assert container_path.match(pathlib.PurePosixPath('*.txt'))
+        assert not container_path.match(pathlib.PurePosixPath('*.md'))
+
+    def test_pattern_can_be_pathlike(self, container: ops.Container):
+        class _Pattern:
+            def __fspath__(self) -> str:
+                return '*.txt'
+
+        container_path = ContainerPath('/foo/bar.txt', container=container)
+        assert container_path.match(_Pattern())
+
+    def test_pattern_can_be_local_path(self, container: ops.Container):
+        # LocalPath is os.PathLike, so it's accepted by os.fspath and treated as a path
+        # string pattern, the same as a pathlib.PurePosixPath would be.
+        container_path = ContainerPath('/foo/bar.txt', container=container)
+        assert container_path.match(LocalPath('*.txt'))
 
 
 def test_with_name(container: ops.Container):
