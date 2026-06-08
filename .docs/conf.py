@@ -36,7 +36,7 @@ sys.path[0:0] = [
 # Project name
 project = "Charmlibs"
 author = "Canonical Ltd."
-slug = 'juju/docs/charmlibs'  # https://meta.discourse.org/t/what-is-category-slug/87897
+slug = 'juju/docs/charmlibs'  # Set to the path after https://canonical.com/
 html_title = f"{project} documentation"  # sidebar documentation title
 copyright = f"{datetime.date.today().year} CC-BY-SA, {author}"  # shown at the bottom of the page
 
