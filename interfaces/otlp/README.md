@@ -76,7 +76,7 @@ class MyOtlpSender(CharmBase):
 
 ## Documentation
 
-For complete documentation, see the [charmlibs documentation](https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/otlp).
+For complete documentation, see the [charmlibs documentation](https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/otlp).
 
 ## Contributing
 
