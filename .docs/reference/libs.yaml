@@ -1838,7 +1838,7 @@ interfaces:
   kind: PyPI
   rel_name: istio-metadata
   rel_url_charmhub: ''
-  rel_url_schema: ''
+  rel_url_schema: https://documentation.ubuntu.com/charmlibs/reference/interfaces/istio_metadata/v0/
   description: Share Istio installation metadata (e.g. root namespace) between charms.
   tags:
   - networking

@@ -77,7 +77,6 @@ The requirer's ``charmcraft.yaml`` should declare (with ``limit: 1``, since
 """
 
 from ._istio_metadata import (
-    DEFAULT_RELATION_NAME,
     IstioMetadataAppData,
     IstioMetadataProvider,
     IstioMetadataRequirer,
@@ -85,7 +84,6 @@ from ._istio_metadata import (
 from ._version import __version__ as __version__
 
 __all__ = [
-    'DEFAULT_RELATION_NAME',
     'IstioMetadataAppData',
     'IstioMetadataProvider',
     'IstioMetadataRequirer',

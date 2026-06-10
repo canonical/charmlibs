@@ -23,7 +23,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from pydantic import BaseModel, Field
+from ._schema import IstioMetadataAppData
 
 if TYPE_CHECKING:
     from ops import Application, CharmBase, RelationMapping
@@ -31,15 +31,6 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 DEFAULT_RELATION_NAME = 'istio-metadata'
-
-
-class IstioMetadataAppData(BaseModel):
-    """Data model for the istio-metadata interface."""
-
-    root_namespace: str = Field(
-        description='The root namespace for the Istio installation.',
-        examples=['istio-system'],
-    )
 
 
 class IstioMetadataRequirer:
