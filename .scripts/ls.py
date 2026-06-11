@@ -66,6 +66,7 @@ class Info:
     description: str = ''
     status: str = ''
     schema_path: str = ''
+    docs: dict[str, list[str]] = dataclasses.field(default_factory=dict)
     tags: list[str] = dataclasses.field(default_factory=list[str])
 
     def to_dict(self, *fields: str) -> dict[str, object]:
@@ -191,6 +192,8 @@ def _ls(
                 info.status = _get_status(category, root, path)
             if 'schema_path' in output:
                 info.schema_path = _get_schema_path_str(category, root, path)
+            if 'docs' in output:
+                info.docs = _get_docs(root, path)
             if 'tags' in output:
                 info.tags = _lib_tags().get(_get_lib_name(category, root, path), [])
             infos.append(info)
@@ -347,8 +350,8 @@ def _get_lib_name(category: str, root: pathlib.Path, path: pathlib.Path) -> str:
     if category == 'packages':
         if path.name == '.package':
             # .package -> () -> 'charmlibs'
-            # interfaces/.package -> ('interfaces') -> 'charmlibs.interface'
-            parts, _ = path.parts
+            # interfaces/.package -> ('interfaces',) -> 'charmlibs.interface'
+            parts = path.parts[:-1]
         else:
             # For special cases like '.tutorial' -> ('tutorial') -> 'charmlibs.tutorial'
             parts = tuple(p.removeprefix('.') for p in path.parts)
@@ -370,6 +373,31 @@ def _get_status(category: str, root: pathlib.Path, path: pathlib.Path) -> str:
         return ''
     assert category == 'interfaces'
     return _interface_yaml(path, root=root).get('status', '').strip()
+
+
+def _get_docs(root: pathlib.Path, path: pathlib.Path) -> dict[str, list[str]]:
+    """Return diataxis doc files for a package, relative to the package directory."""
+    docs_dir = root / path / 'docs'
+    result: dict[str, list[str]] = {}
+    if not docs_dir.is_dir():
+        return result
+    for ext in ('.md', '.rst'):
+        tutorial = docs_dir / f'tutorial{ext}'
+        if tutorial.exists():
+            result['tutorials'] = [str(tutorial.relative_to(root / path))]
+            break
+    for cat in ('how-to', 'explanation'):
+        cat_dir = docs_dir / cat
+        if not cat_dir.is_dir():
+            continue
+        files = sorted(
+            str(f.relative_to(root / path))
+            for f in cat_dir.iterdir()
+            if f.suffix in ('.md', '.rst')
+        )
+        if files:
+            result[cat] = files
+    return result
 
 
 def _get_schema_path_str(category: str, root: pathlib.Path, path: pathlib.Path) -> str:

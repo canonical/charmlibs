@@ -12,4 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-__version__ = "1.8.3"
+"""Pytest configuration for the .scripts tests.
+
+Add the .scripts directory to sys.path so the tooling scripts can be imported
+from test files.
+"""
+
+import pathlib
+import sys
+
+_SCRIPTS_DIR = pathlib.Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(_SCRIPTS_DIR))
