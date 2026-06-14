@@ -1,3 +1,7 @@
+# Unreleased
+
+`PathProtocol.full_match`, `LocalPath.full_match`, and `ContainerPath.full_match` are now available, matching `pathlib.Path.full_match` added in Python 3.13. Unlike `match`, `full_match` anchors the pattern against the entire path. Relative patterns are anchored from the filesystem root. Supports the `**` wildcard. On Python 3.10-3.12, the behaviour is polyfilled for both `LocalPath` and `ContainerPath`.
+
 # 1.3.0.post0 - 16 June 2026
 
 Update project URLs.

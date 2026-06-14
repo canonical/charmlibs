@@ -17,17 +17,18 @@
 from __future__ import annotations
 
 import errno
+import os
 import pathlib
 import re
+import sys
 import typing
 
 import ops
 from ops import pebble
 
-from . import _constants, _errors, _fileinfo
+from . import _compat, _constants, _errors, _fileinfo
 
 if typing.TYPE_CHECKING:
-    import os
     from collections.abc import Generator
     from typing import Literal, TypeGuard
 
@@ -159,6 +160,28 @@ class ContainerPath:
         always case-sensitive. Only the path is matched against, the container is not considered.
         """
         return self._path.match(path_pattern)
+
+    def full_match(self, pattern: str | os.PathLike[str]) -> bool:
+        """Return whether this path fully matches the given pattern.
+
+        Unlike :meth:`match`, always anchors the pattern against the entire path. Supports the
+        ``'**'`` wildcard. Only the path is matched; the container is not considered.
+
+        Args:
+            pattern: A :class:`str` or :class:`os.PathLike` object.
+
+        .. warning::
+            :class:`ContainerPath` is not :class:`os.PathLike`. A :class:`ContainerPath` instance
+            is not a valid value for ``pattern``, and will result in a :class:`TypeError`.
+        """
+        if isinstance(pattern, ContainerPath):
+            raise TypeError(
+                f'ContainerPath is not a valid pattern for ContainerPath.full_match: {pattern!r}'
+            )
+        pat_str = os.fspath(pattern)
+        if sys.version_info >= (3, 13):
+            return self._path.full_match(pat_str)  # type: ignore[attr-defined]
+        return _compat.full_match(str(self._path), pat_str)
 
     def with_name(self, name: str) -> Self:
         """Return a new ContainerPath, with the same container, but with the path name replaced.

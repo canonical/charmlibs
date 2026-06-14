@@ -21,9 +21,10 @@ import os
 import pathlib
 import pwd
 import shutil
+import sys
 import typing
 
-from . import _constants
+from . import _compat, _constants
 
 if typing.TYPE_CHECKING:
     from collections.abc import Iterator
@@ -170,6 +171,13 @@ class LocalPath(pathlib.PosixPath):
         # On Python 3.12 and earlier, pathlib.Path.glob only accepts a str pattern.
         # ContainerPath.glob accepts str | os.PathLike[str], so we normalise here to match.
         return super().glob(os.fspath(pattern))
+
+    def full_match(self, pattern: str | os.PathLike[str]) -> bool:
+        # Normalise via os.fspath for consistent behaviour across Python versions.
+        pat_str = os.fspath(pattern)
+        if sys.version_info >= (3, 13):
+            return super().full_match(pat_str)  # type: ignore[attr-defined]
+        return _compat.full_match(str(self), pat_str)
 
     def mkdir(
         self,

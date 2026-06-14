@@ -125,6 +125,22 @@ class PathProtocol(typing.Protocol):
         """
         ...
 
+    def full_match(self, pattern: str | os.PathLike[str]) -> bool:
+        """Return whether this path fully matches the given pattern.
+
+        Unlike :meth:`match`, always anchors the pattern against the entire path. A relative
+        pattern is anchored from the filesystem root, so it must describe the full path. Supports
+        the ``'**'`` wildcard, which matches zero or more path components.
+
+        Args:
+            pattern: A :class:`str` or :class:`os.PathLike` object.
+
+        .. warning::
+            :class:`ContainerPath` is not :class:`os.PathLike`. A :class:`ContainerPath` instance
+            is not a valid value for ``pattern``, and will result in a :class:`TypeError`.
+        """
+        ...
+
     def with_name(self, name: str) -> Self:
         """Return a new instance of the same type, with the path name replaced.
 
@@ -571,10 +587,9 @@ class PathProtocol(typing.Protocol):
 # this will always return False with a PosixPath. Since we assume a Linux container
 # so let's just drop it from the protocol for now
 
-# def full_match(self, pattern: str, * case_sensitive: bool = False) -> bool: ...
-# 3.13+
-# not part of the protocol but may eventually be provided on ContainerPath
-# to ease compatibility with pathlib.Path on 3.13+
+# full_match is in the protocol (added in the charmlibs#369 follow-up)
+# LocalPath polyfills on 3.10-3.12 via _compat.full_match; 3.13+ inherits.
+# ContainerPath implements via self._path.full_match on 3.13+; 3.10-3.12 uses _compat.full_match.
 
 # def relative_to(self, other: _StrPath, /) -> Self: ...
 # this produces relative paths, which we shouldn't be using in any code designed to
