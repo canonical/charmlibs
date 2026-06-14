@@ -175,7 +175,7 @@ This part is a bit trickier.
 With any luck, your library was previously developed in a placeholder charm that exists purely for library distribution.
 If your library's development and testing was tightly coupled to a real charm, this step will be more involved.
 You'll need to consider which tests can live alongside the library, and which only make sense with the charm.
-You might want to add a simplified dummy charm to run some of the tests against.
+You might want to add a simplified placeholder charm to run some of the tests against.
 
 ```{warning}
 Don't add `pytest` to your `pyproject.toml`.
@@ -191,7 +191,7 @@ If your library wasn't tightly coupled to a real charm, these steps should be su
 
 1. Add any unit test dependencies to the `unit` dependency group in your `pyproject.toml` (using `just add`).
 2. Copy any relevant contents of your `conftest.py` to `tests/unit/conftest.py`.
-3. Copy your library's existing unit test files to `tests/unit/`, along with any data files, dummy charms, and so on.
+3. Copy your library's existing unit test files to `tests/unit/`, along with any data files, placeholder charms, and so on.
 4. Correct the imports in those files.
 
 Replace imports like this:

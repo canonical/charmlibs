@@ -1,6 +1,8 @@
 import datetime
+import os
 import pathlib
 import sys
+import textwrap
 
 # local extensions
 sys.path.insert(0, str(pathlib.Path(__file__).parent / 'extensions'))
@@ -60,10 +62,17 @@ html_context = {
     "repo_folder": "/.docs/",
     "display_contributors": False,
     'github_issues': 'enabled',  # Required for feedback button
+    # Passes the top-level 'author' value to the theme
+    "author": author,
+    # Documentation license information
+    "license": {
+        "name": "CC-BY-SA 4.0",
+        "url": "https://creativecommons.org/licenses/by-sa/4.0/",
+    },
 }
 # Template and asset locations
-html_static_path = [".sphinx/_static"]
-templates_path = [".sphinx/_templates"]
+html_static_path = ["_static"]
+templates_path = ["_templates"]
 
 # Sitemap configuration: https://sphinx-sitemap.readthedocs.io/
 html_baseurl = 'https://documentation.ubuntu.com/charmlibs/'
@@ -92,6 +101,24 @@ sitemap_excludes = [  # Exclude generated pages from the sitemap:
 
 redirects = {}
 
+############################
+# sphinx-llm configuration #
+############################
+
+# This description is included in llms.txt to provide some initial context for the
+# documentation.
+llms_txt_description = textwrap.dedent(
+    """\
+    This is the documentation for charmlibs, the home of Canonical's charm libraries:
+    reusable Python packages for Juju charms, published on PyPI from the charmlibs
+    monorepo.
+    """
+)
+
+# The base URL for references built by sphinx-markdown-builder.
+if os.environ.get("READTHEDOCS"):
+    markdown_http_base = html_baseurl
+
 ###########################
 # Link checker exceptions #
 ###########################
@@ -116,21 +143,24 @@ linkcheck_retries = 3
 ########################
 
 # NOTE: The canonical_sphinx extension is required for the starter pack.
-#       It automatically enables the following extensions:
-#       - custom-rst-roles
-#       - myst_parser
-#       - notfound.extension
-#       - related-links
-#       - sphinx_copybutton
-#       - sphinx_design
-#       - sphinx_reredirects
-#       - sphinx_tabs.tabs
-#       - sphinxcontrib.jquery
-#       - sphinxext.opengraph
-#       - terminal-output
-#       - youtube-links
+#       Since Sphinx Stack 2.0 (canonical-sphinx ~=0.6), it no longer bundles the
+#       extensions that were previously auto-enabled by canonical-sphinx[full];
+#       only myst_parser is still activated automatically. Every other extension
+#       must now be declared explicitly below (and installed via
+#       _dev/requirements.txt).
 extensions = [
     "canonical_sphinx",
+    # Previously auto-enabled by canonical-sphinx[full]
+    "notfound.extension",
+    "sphinx_design",
+    "sphinx_reredirects",
+    "sphinxcontrib.jquery",
+    "sphinxext.opengraph",
+    # Previously bundled as canonical-sphinx-extensions
+    "sphinx_related_links",
+    # llms.txt generation (Sphinx Stack 2.0)
+    "sphinx_llm.txt",
+    # charmlibs-specific extensions
     "sphinxcontrib.cairosvgconverter",
     "sphinxcontrib.mermaid",
     "sphinx_last_updated_by_git",
@@ -167,11 +197,13 @@ exclude_patterns = [
 
 # Adds custom CSS files, located under 'html_static_path'
 html_css_files = [
+    "https://assets.ubuntu.com/v1/d86746ef-cookie_banner.css",
     "project_specific.css",
 ]
 
 # Adds custom JavaScript files, located under 'html_static_path'
 html_js_files = [
+    "https://assets.ubuntu.com/v1/287a5e8f-bundle.js",
     "tag_click_search.js",
 ]
 
