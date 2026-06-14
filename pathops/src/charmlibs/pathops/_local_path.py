@@ -171,7 +171,9 @@ class LocalPath(pathlib.PosixPath):
         # ContainerPath.glob accepts str | os.PathLike[str], so we normalise here to match.
         return super().glob(os.fspath(pattern))
 
-    def match(self, path_pattern: str | os.PathLike[str]) -> bool:
+    def match(  # pyright: ignore[reportIncompatibleMethodOverride]
+        self, path_pattern: str | os.PathLike[str]
+    ) -> bool:
         # On Python 3.11, pathlib.Path.match only accepts a str pattern (3.12 widened it to
         # path-like). On Python 3.14, pathlib.PurePath.match accepts any object with
         # `with_segments`, which would silently allow a ContainerPath through. Normalising
