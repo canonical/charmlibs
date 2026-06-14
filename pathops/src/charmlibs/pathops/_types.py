@@ -116,12 +116,19 @@ class PathProtocol(typing.Protocol):
         ...
 
     # NOTE: Not supported -- (Python 3.12) ``case_sensitive`` keyword argument
-    def match(self, path_pattern: str) -> bool:
+    def match(self, path_pattern: str | os.PathLike[str]) -> bool:
         """Return whether this path matches the given pattern.
 
         If the pattern is relative, matching is done from the right; otherwise, the entire path is
         matched. The recursive wildcard ``'**'`` is **not** supported by this method. Matching is
         always case-sensitive.
+
+        Args:
+            path_pattern: A :class:`str` or :class:`os.PathLike` object.
+
+        .. warning::
+            :class:`ContainerPath` is not :class:`os.PathLike`. A :class:`ContainerPath` instance
+            is not a valid value for ``path_pattern``, and will result in a :class:`TypeError`.
         """
         ...
 
@@ -571,10 +578,13 @@ class PathProtocol(typing.Protocol):
 # this will always return False with a PosixPath. Since we assume a Linux container
 # so let's just drop it from the protocol for now
 
-# def full_match(self, pattern: str, * case_sensitive: bool = False) -> bool: ...
+# def full_match(self, pattern: str | os.PathLike[str], *, case_sensitive: bool = False) -> bool:
 # 3.13+
-# not part of the protocol but may eventually be provided on ContainerPath
-# to ease compatibility with pathlib.Path on 3.13+
+# not part of the protocol but may eventually be provided on ContainerPath and LocalPath
+# to ease compatibility with pathlib.Path on 3.13+ (charmlibs#369). Deferred for now —
+# the workaround on older Python is straightforward (call match without anchoring), so
+# adding it is not urgent. The path-like-pattern shim added by charmlibs#369 will need to
+# extend here too.
 
 # def relative_to(self, other: _StrPath, /) -> Self: ...
 # this produces relative paths, which we shouldn't be using in any code designed to

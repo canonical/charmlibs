@@ -171,6 +171,20 @@ class LocalPath(pathlib.PosixPath):
         # ContainerPath.glob accepts str | os.PathLike[str], so we normalise here to match.
         return super().glob(os.fspath(pattern))
 
+    def match(
+        self, path_pattern: str | os.PathLike[str], *, case_sensitive: bool | None = None
+    ) -> bool:
+        # On Python 3.11, pathlib.Path.match only accepts a str pattern (3.12 widened it to
+        # path-like). On Python 3.14, pathlib.PurePath.match accepts any object with
+        # `with_segments`, which would silently allow a ContainerPath through. Normalising
+        # via os.fspath gives us a consistent, narrow API: str | os.PathLike[str] on every
+        # supported version, with a clear TypeError for anything else (including ContainerPath,
+        # which is not os.PathLike).
+        kwargs: dict[str, bool] = {}
+        if case_sensitive is not None:
+            kwargs['case_sensitive'] = case_sensitive
+        return super().match(os.fspath(path_pattern), **kwargs)
+
     def mkdir(
         self,
         mode: int = _constants.DEFAULT_MKDIR_MODE,
