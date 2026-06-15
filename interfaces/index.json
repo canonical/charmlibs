@@ -343,6 +343,19 @@
     "status": "draft"
   },
   {
+    "name": "istio_metadata",
+    "version": "0",
+    "lib": "charmlibs.interfaces.istio_metadata",
+    "lib_url": "https://pypi.org/project/charmlibs-interfaces-istio-metadata",
+    "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/istio_metadata/",
+    "summary": "Share Istio installation metadata between charms.",
+    "description": "The `istio_metadata` interface allows an Istio control plane charm to share information about its installation (such as the root namespace) with other charms that need to interoperate with Istio.\nThe provider charm (the Istio control plane) publishes the metadata, and requirer charms read it to configure their own integration with Istio.",
+    "tags": [
+      "networking"
+    ],
+    "status": "draft"
+  },
+  {
     "name": "jwt",
     "version": "0",
     "lib": "",

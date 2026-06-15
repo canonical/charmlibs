@@ -1830,6 +1830,30 @@ interfaces:
   description: Deprecated in favour of ``charmlibs.interfaces.gateway_metadata``.
   tags:
   - networking
+- name: charmlibs.interfaces.istio_metadata
+  status: recommended
+  url: https://pypi.org/project/charmlibs-interfaces-istio-metadata
+  docs: https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/istio_metadata
+  src: https://github.com/canonical/charmlibs/tree/main/interfaces/istio_metadata
+  kind: PyPI
+  rel_name: istio_metadata
+  rel_url_charmhub: ''
+  rel_url_schema: https://documentation.ubuntu.com/charmlibs/reference/interfaces/istio_metadata/v0/
+  description: Share Istio installation metadata (e.g. root namespace) between charms.
+  tags:
+  - networking
+- name: charms.istio_k8s.istio_metadata
+  status: legacy
+  url: https://charmhub.io/istio-k8s/libraries/istio_metadata
+  docs: ''
+  src: https://github.com/canonical/istio-k8s-operator
+  kind: Charmhub
+  rel_name: istio_metadata
+  rel_url_charmhub: ''
+  rel_url_schema: ''
+  description: Deprecated in favour of ``charmlibs.interfaces.istio_metadata``.
+  tags:
+  - networking
 - name: dpcharmlibs.interfaces
   status: ''
   url: https://pypi.org/project/dpcharmlibs-interfaces
