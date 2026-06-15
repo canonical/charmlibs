@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for the istio-metadata lib requirer and provider classes.
+"""Tests for the istio_metadata lib requirer and provider classes.
 
 Ported from `tests/unit/test_istio_metadata_lib.py` in the istio-k8s-operator
 repository.

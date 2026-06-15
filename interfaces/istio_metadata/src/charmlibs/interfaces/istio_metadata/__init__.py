@@ -14,7 +14,7 @@
 
 """Istio metadata interface library.
 
-This library provides the provider and requirer sides of the ``istio-metadata``
+This library provides the provider and requirer sides of the ``istio_metadata``
 relation interface, used to transfer information about an instance of Istio
 (such as its root namespace) to charms that need to interface with Istio.
 

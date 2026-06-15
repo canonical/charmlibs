@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Schema models for the istio-metadata interface.
+"""Schema models for the istio_metadata interface.
 
 This module is the source of truth for the databag wire format of the
-``istio-metadata`` interface, and is symlinked from
+``istio_metadata`` interface, and is symlinked from
 ``interface/v0/schema.py`` so it can be discovered as the canonical schema
 on Charmhub.
 
@@ -28,7 +28,7 @@ from pydantic import BaseModel, Field
 
 
 class IstioMetadataAppData(BaseModel):
-    """Data model for the istio-metadata interface."""
+    """Data model for the istio_metadata interface."""
 
     root_namespace: str = Field(
         description='The root namespace for the Istio installation.',

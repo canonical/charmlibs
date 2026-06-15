@@ -20,23 +20,23 @@ dependencies = [
 ]
 
 [dependency-groups]
-lint = [  # installed for `just lint interfaces/istio-metadata` (unit, functional, and integration are also installed)
+lint = [  # installed for `just lint interfaces/istio_metadata` (unit, functional, and integration are also installed)
     # "typing_extensions",
 ]
-unit = [  # installed for `just unit interfaces/istio-metadata`
+unit = [  # installed for `just unit interfaces/istio_metadata`
     "ops[testing]",
 ]
-functional = [  # installed for `just functional interfaces/istio-metadata`
+functional = [  # installed for `just functional interfaces/istio_metadata`
 ]
-integration = [  # installed for `just integration interfaces/istio-metadata`
+integration = [  # installed for `just integration interfaces/istio_metadata`
     "jubilant",
 ]
 
 [project.urls]
-"Documentation" = "https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/istio-metadata"
-"Repository" = "https://github.com/canonical/charmlibs/tree/main/interfaces/istio-metadata"
+"Documentation" = "https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/istio_metadata"
+"Repository" = "https://github.com/canonical/charmlibs/tree/main/interfaces/istio_metadata"
 "Issues" = "https://github.com/canonical/charmlibs/issues"
-"Changelog" = "https://github.com/canonical/charmlibs/blob/main/interfaces/istio-metadata/CHANGELOG.md"
+"Changelog" = "https://github.com/canonical/charmlibs/blob/main/interfaces/istio_metadata/CHANGELOG.md"
 
 [build-system]
 requires = ["hatchling"]

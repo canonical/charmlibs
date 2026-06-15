@@ -43,7 +43,7 @@ class IstioMetadataRequirer:
     ) -> None:
         """Initialize the IstioMetadataRequirer object.
 
-        This object is for accessing data from relations that use the istio-metadata
+        This object is for accessing data from relations that use the istio_metadata
         interface.  It **does not** autonomously handle the events associated with
         that relation.  It is up to the charm using this object to observe those
         events as they see fit.  Typically, that charm should observe this
@@ -103,7 +103,7 @@ class IstioMetadataProvider:
         """Initialize the IstioMetadataProvider object.
 
         This object is for serializing and sending data to a relation that uses the
-        istio-metadata interface - it does not automatically observe any events for
+        istio_metadata interface - it does not automatically observe any events for
         that relation.  It is up to the charm using this to call publish when it is
         appropriate to do so, typically on at least the charm's leader_elected event
         and this relation's relation_joined event.
