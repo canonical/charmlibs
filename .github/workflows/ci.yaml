@@ -133,7 +133,9 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@v7
       - name: Run unit tests for the repository tooling scripts
-        run: uvx --from rust-just just scripts-unit
+        run: uvx --from rust-just just _scripts-unit
+      - name: Run static analysis for the repository tooling scripts
+        run: uvx --from rust-just just _scripts-static
 
   template-and-example-in-sync:
     runs-on: ubuntu-latest
@@ -161,7 +163,7 @@ jobs:
       - uses: astral-sh/setup-uv@v7
       - working-directory: interfaces
         run: |
-          uvx --from rust-just just interface init --no-input project_slug=example-interface
+          uvx --from rust-just just init --interface --no-input project_slug=example-interface
           rm -rf .example
           mv example-interface .example
           # check if tracked files changed, or any new files were added

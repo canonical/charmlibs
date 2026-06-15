@@ -66,7 +66,7 @@ class Info:
     description: str = ''
     status: str = ''
     schema_path: str = ''
-    docs: dict[str, list[str]] = dataclasses.field(default_factory=dict)
+    docs: dict[str, list[str]] = dataclasses.field(default_factory=dict[str, list[str]])
     tags: list[str] = dataclasses.field(default_factory=list[str])
 
     def to_dict(self, *fields: str) -> dict[str, object]:
