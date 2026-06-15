@@ -122,7 +122,7 @@ In principle we can put all our library code here, but it's good practice to use
 
 In Python, names prefixed with a single underscore are private.
 This isn't enforced technically (a user who knows your library layout can import private symbols), but semantically there are no stability guarantees when using private variables.
-`charmlibs` follow semantic verisoning, so if we expose something publicly, we're promising to support it until at least our next major verson.
+`charmlibs` follow semantic versioning, so if we expose something publicly, we're promising to support it until at least our next major version.
 Let's add a private module where our feature implementation will live.
 
 Create the file `src/charmlibs/uptime/_uptime.py`, then copy the copyright header from `src/charmlibs/uptime/__init__.py` to `_uptime.py`. Next, add the following code to `_uptime.py`:
@@ -269,7 +269,7 @@ def test_hostname():
 
 Now run `just functional uptime` to verify that our new functional test passes.
 
-Realisticaly, our `uptime` function isn't really a good fit for functional tests, as its interaction with the external world is limited to fast and reliable system calls.
+Realistically, our `uptime` function isn't really a good fit for functional tests, as its interaction with the external world is limited to fast and reliable system calls.
 In this case, the library's core functionality would be well exercised by unit tests alone.
 We should still use full Juju integration tests to ensure everything is working correctly in the charm context, but in this case we could drop the functional tests altogether by removing the `tests/functional` directory.
 The functional tests would then show as skipped in CI.
