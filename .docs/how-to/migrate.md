@@ -32,7 +32,7 @@ just init
 :sync: interface
 
 ```bash
-just interface init
+just init --interface
 ```
 ````
 `````
@@ -80,7 +80,7 @@ If `init` fails because the directory already exists, take a look at the directo
 It may be that the interface definitions are already hosted in the repo under `interfaces/<interface name>/interface`.
 In this case:
 - Temporarily move the `<interface name>` directory.
-- Re-run `just interface init`.
+- Re-run `just init --interface`.
 - Then add the `interface` subdirectory to your newly generated project.
 
 You'll also want to check for any config files under the old `<interface name>` directory (for example, a `ruff.toml` file), and incorporate any applicable settings into your project's `pyproject.toml`.

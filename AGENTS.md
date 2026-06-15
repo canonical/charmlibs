@@ -100,7 +100,7 @@ The `<package>` argument is the path from the repo root, e.g. `pathops` or `inte
 | `just docs` | Alias for `just docs html` |
 | `just add <package> <dep>` | Add a dependency to a library |
 | `just init` | Scaffold a new general library |
-| `just interface init` | Scaffold a new interface library |
+| `just init --interface` | Scaffold a new interface library |
 
 Extra arguments to `just unit`, `just functional`, and `just integration-*` are passed through to pytest:
 
@@ -206,7 +206,7 @@ Interface libraries manage the structured data that charms exchange over a Juju 
 - Source under `src/charmlibs/interfaces/<interface_name>/`.
 - Usually include a `testing/` subdirectory with a separate `charmlibs-interfaces-<name>-testing` package. This provides `relation_for_provider()` and `relation_for_requirer()` helpers for charm unit tests.
 - Typically have unit and integration tests but no functional tests (all meaningful interaction is through Juju).
-- Use `just interface init` to scaffold.
+- Use `just init --interface` to scaffold.
 
 Read more: [how to design relation interfaces](https://documentation.ubuntu.com/charmlibs/how-to/design-relation-interfaces/), [how to provide relation data for charm tests](https://documentation.ubuntu.com/charmlibs/how-to/provide-relation-data-for-charm-tests/).
 
