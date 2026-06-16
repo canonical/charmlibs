@@ -25,9 +25,9 @@ functional = []
 integration = []
 
 [project.urls]
-"Repository" = "https://github.com/canonical/charmlibs"
-"Issues" = "https://github.com/canonical/charmlibs/issues"
 "Documentation" = "https://documentation.ubuntu.com/charmlibs/reference/charmlibs/systemd/"
+"Repository" = "https://github.com/canonical/charmlibs/tree/main/systemd"
+"Issues" = "https://github.com/canonical/charmlibs/issues"
 "Changelog" = "https://github.com/canonical/charmlibs/blob/main/systemd/CHANGELOG.md"
 
 [build-system]

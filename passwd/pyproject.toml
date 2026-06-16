@@ -32,8 +32,10 @@ integration = [  # installed for `just integration passwd`
 ]
 
 [project.urls]
-"Repository" = "https://github.com/canonical/charmlibs"
+"Documentation" = "https://documentation.ubuntu.com/charmlibs/reference/charmlibs/passwd/"
+"Repository" = "https://github.com/canonical/charmlibs/tree/main/passwd"
 "Issues" = "https://github.com/canonical/charmlibs/issues"
+"Changelog" = "https://github.com/canonical/charmlibs/blob/main/passwd/CHANGELOG.md"
 
 [build-system]
 requires = ["hatchling"]

@@ -32,8 +32,10 @@ integration = [  # installed for `just integration sysctl`
 ]
 
 [project.urls]
-"Repository" = "https://github.com/canonical/charmlibs"
+"Documentation" = "https://documentation.ubuntu.com/charmlibs/reference/charmlibs/sysctl/"
+"Repository" = "https://github.com/canonical/charmlibs/tree/main/sysctl"
 "Issues" = "https://github.com/canonical/charmlibs/issues"
+"Changelog" = "https://github.com/canonical/charmlibs/blob/main/sysctl/CHANGELOG.md"
 
 [build-system]
 requires = ["hatchling"]
