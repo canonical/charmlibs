@@ -422,6 +422,7 @@ def interfaces_json(argv: list[str]) -> int:
         'version',
         'lib',
         'lib_url',
+        'lib_docs_url',
         'docs_url',
         'summary',
         'description',

@@ -61,7 +61,8 @@ class Info:
     version: str = ''
     lib: str = ''
     lib_url: str = ''
-    docs_url: str = ''
+    docs_url: str = ''  # Library docs URL for packages; interface docs URL for interfaces.
+    lib_docs_url: str = ''  # Identical to docs_url for packages.
     summary: str = ''
     description: str = ''
     status: str = ''
@@ -188,6 +189,8 @@ def _ls(
                 info.lib_url = _lib_urls().get(_get_lib_name(category, root, path), '')
             if 'docs_url' in output:
                 info.docs_url = _get_docs_url(category, root, path)
+            if 'lib_docs_url' in output:
+                info.lib_docs_url = _get_lib_docs_url(category, root, path)
             if 'status' in output:
                 info.status = _get_status(category, root, path)
             if 'schema_path' in output:
@@ -361,6 +364,7 @@ def _get_lib_name(category: str, root: pathlib.Path, path: pathlib.Path) -> str:
 
 
 def _get_docs_url(category: str, root: pathlib.Path, path: pathlib.Path) -> str:
+    """Return URL to the library docs for this package, or interface docs for this interface."""
     if category == 'packages':
         url = _pyproject_toml(path, root=root)['project']['urls'].get('Documentation', '')
         return url.strip()
@@ -368,7 +372,21 @@ def _get_docs_url(category: str, root: pathlib.Path, path: pathlib.Path) -> str:
     return f'https://documentation.ubuntu.com/charmlibs/reference/interfaces/{path.name}/'
 
 
+def _get_lib_docs_url(category: str, root: pathlib.Path, path: pathlib.Path) -> str:
+    """Return URL to the docs for this library (or the library for this interface)."""
+    if category == 'packages':
+        return _get_docs_url(category, root, path)
+    assert category == 'interfaces'
+    lib = _get_lib_name('interfaces', root, path)
+    if not lib:
+        return ''
+    if lib.startswith('charmlibs.'):
+        return _get_docs_url('packages', root, path)
+    return _lib_docs_urls().get(lib, '')
+
+
 def _get_status(category: str, root: pathlib.Path, path: pathlib.Path) -> str:
+    """Return the 'draft' or 'published' status of this interface ('' for packages or missing)."""
     if category == 'packages':
         return ''
     assert category == 'interfaces'
@@ -401,6 +419,7 @@ def _get_docs(root: pathlib.Path, path: pathlib.Path) -> dict[str, list[str]]:
 
 
 def _get_schema_path_str(category: str, root: pathlib.Path, path: pathlib.Path) -> str:
+    """Return the path to the schema.py file for this interface ('' for libs or missing)."""
     if category == 'packages':
         return ''
     assert category == 'interfaces'
@@ -411,11 +430,14 @@ def _get_schema_path_str(category: str, root: pathlib.Path, path: pathlib.Path) 
 def _get_dist_name(package: pathlib.Path, root: pathlib.Path = _REPO_ROOT) -> str:
     """Load distribution package name from pyproject.toml and normalize it."""
     name = _pyproject_toml(package, root=root)['project']['name']
-    return _normalize(name.strip())
+    # Normalize distribution package name according to PyPI rules.
+    # https://packaging.python.org/en/latest/specifications/name-normalization/#name-normalization
+    return re.sub(r'[-_.]+', '-', name).lower().strip()
 
 
 @functools.cache
 def _get_package_version(package: pathlib.Path, root: pathlib.Path = _REPO_ROOT) -> str:
+    """Return the runtime version of the package."""
     name = _get_dist_name(package, root=root)
     script = f'import importlib.metadata; print(importlib.metadata.version("{name}"))'
     cmd = ['uv', 'run', '--no-project', '--with', root / package, 'python', '-c', script]
@@ -441,9 +463,43 @@ def _interface_yaml(path: pathlib.Path, root: pathlib.Path = _REPO_ROOT):
         return yaml.safe_load(f)
 
 
+#############
+# libs.yaml #
+#############
+
+
+@dataclasses.dataclass
+class _LibEntry:
+    name: str
+    status: str
+    url: str
+    docs: str
+    src: str
+    kind: str
+    description: str
+    tags: list[str]
+
+
+@functools.cache
 def _lib_urls() -> dict[str, str]:
-    result: dict[str, str] = {}
-    for entry in (*_libs_yaml()['general'], *_libs_yaml()['interfaces']):
+    return {name: entry.url for name, entry in _all_libs_by_name().items()}
+
+
+@functools.cache
+def _lib_docs_urls() -> dict[str, str]:
+    return {name: entry.docs for name, entry in _all_libs_by_name().items()}
+
+
+@functools.cache
+def _lib_tags() -> dict[str, list[str]]:
+    return {name: sorted(entry.tags) for name, entry in _all_libs_by_name().items()}
+
+
+@functools.cache
+def _all_libs_by_name() -> dict[str, _LibEntry]:
+    libs_yaml = yaml.safe_load((_REPO_ROOT / '.docs' / 'reference' / 'libs.yaml').read_text())
+    result: dict[str, _LibEntry] = {}
+    for entry in (*libs_yaml['general'], *libs_yaml['interfaces']):
         # Library names should be unique, but we currently have an entry for
         # charms.data_platform_libs.data_interfaces for each interface it supports
         # This doesn't break our lookups though, since they all have the same metadata
@@ -452,28 +508,10 @@ def _lib_urls() -> dict[str, str]:
             entry['name'] not in result
             or entry['name'] == 'charms.data_platform_libs.data_interfaces'
         )
-        result[entry['name']] = entry['url']
+        result[entry['name']] = _LibEntry(**{
+            k.name: entry[k.name] for k in dataclasses.fields(_LibEntry)
+        })
     return result
-
-
-def _lib_tags() -> dict[str, list[str]]:
-    return {
-        entry['name']: sorted(entry.get('tags') or [])
-        for entry in (*_libs_yaml()['general'], *_libs_yaml()['interfaces'])
-    }
-
-
-@functools.cache
-def _libs_yaml():
-    return yaml.safe_load((_REPO_ROOT / '.docs' / 'reference' / 'libs.yaml').read_text())
-
-
-def _normalize(name: str) -> str:
-    """Normalize distribution package name according to PyPI rules.
-
-    https://packaging.python.org/en/latest/specifications/name-normalization/#name-normalization
-    """
-    return re.sub(r'[-_.]+', '-', name).lower()
 
 
 if __name__ == '__main__':
