@@ -82,7 +82,7 @@ When a requirer's initially configured attributes cannot be fulfilled by the pro
 - **FR-010**: The change MUST be fully backwards compatible: a capability-aware requirer interoperates with a legacy provider, and a legacy requirer interoperates with a capability-advertising provider, with no behavioral change to existing flows.
 - **FR-011**: When a request is denied, the requirer MUST be able to re-derive compatible attributes from the provider's capabilities and resubmit, with rotation/cleanup performed only on deliberate events (e.g. an explicit sync or the denial event), not on every attribute change.
 - **FR-012**: An already-compatible certificate request MUST NOT trigger rotation when capabilities later become available, because capabilities only become more restrictive over time.
-- **FR-013**: The library MUST provide guidance/affordances so that consuming charms can subscribe to capability/denial-driven refreshes deliberately, to avoid unintended certificate rotations.
+- **FR-013**: To let requirers adapt deliberately without reading databags or wiring events, the library MUST allow `certificate_requests` to be supplied as a callable (in addition to a list). When supplied as a callable, the library resolves it once per hook and uses that result as the request set for the hook — so a requirer can build its request from `get_provider_capabilities()` at the right time. Static lists behave exactly as before.
 
 ### Key Entities _(include if feature involves data)_
 
@@ -103,7 +103,7 @@ When a requirer's initially configured attributes cannot be fulfilled by the pro
 ## Assumptions
 
 - This work targets the `tls-certificates` interface v4 and its corresponding library classes (provider-side and requirer-side), in line with the existing repository structure.
-- Capability adaptation logic that maps a capability set onto concrete request attributes lives in the consuming requirer charm (best-effort), while the library provides the data model, the provider-side setter, and the requirer-side getter.
+- Adaptation _policy_ lives in the consuming charm. The library provides the capability getter and lets `certificate_requests` be a callable so that policy can run after relation data is readable. Churn avoidance stays the charm's responsibility (the callable should keep the request stable while a compatible certificate is already held).
 - "Operator configuration takes precedence" means explicitly set configuration values; values left at their defaults are eligible for capability-driven adaptation.
 - The provider is the source of truth: the capability data model represents each attribute as optional with no assumed value, so absence on the wire means "unspecified" rather than a concrete true/false. Any implementation sketch that shows field-level defaults must be reconciled to this rule — a value the provider never advertised is treated by the requirer as unknown, not as that default.
 - Capabilities are assumed to only ever become more restrictive over the lifetime of a relation; this assumption underpins the no-unnecessary-rotation guarantees.
