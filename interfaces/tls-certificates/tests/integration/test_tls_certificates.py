@@ -200,3 +200,60 @@ class TestIntegration:
 
         task = juju.run(f"{new_app_and_unit_requirer_app_name}/0", "get-unit-certificate")
         _assert_certificate_fields(task)
+
+    def test_given_requirer_and_provider_support_capabilities_when_related_then_capabilities_are_advertised(
+        self, juju: jubilant.Juju
+    ):
+        task = juju.run(f"{TLS_CERTIFICATES_REQUIRER_APP_NAME}/0", "get-provider-capabilities")
+        assert task.results.get("available") == "true"
+        assert task.results.get("supports-ip-sans") == "True"
+        assert task.results.get("provider-type") == "self-signed"
+
+
+class TestProviderCapabilitiesUpgrade:
+    """Verify capability advertisement does not break cross-version compatibility."""
+
+    @pytest.mark.upgrade
+    def test_given_provider_supports_capabilities_and_requirer_does_not_when_related_then_requirer_gets_certs(
+        self, juju: jubilant.Juju
+    ):
+        """A capability-advertising provider works with a legacy requirer (no capability key)."""
+        requirer_app_name = "old-requirer-new-provider-req"
+        provider_app_name = "old-requirer-new-provider-prov"
+
+        juju.deploy(REQUIRER_PUBLISHED, app=requirer_app_name, base="ubuntu@22.04")
+        juju.deploy(PROVIDER_LOCAL, app=provider_app_name, base="ubuntu@22.04")
+        juju.integrate(requirer_app_name, provider_app_name)
+        juju.wait(
+            lambda status: jubilant.all_active(status, requirer_app_name, provider_app_name),
+            timeout=1000,
+        )
+
+        task = juju.run(f"{requirer_app_name}/0", "get-certificate")
+        _assert_certificate_fields(task)
+
+        juju.remove_application(requirer_app_name, provider_app_name)
+
+    @pytest.mark.upgrade
+    def test_given_requirer_supports_capabilities_and_provider_does_not_when_related_then_capabilities_unavailable(
+        self, juju: jubilant.Juju
+    ):
+        """A new requirer reports capabilities unavailable for a legacy provider but still works."""
+        requirer_app_name = "new-requirer-old-provider-req"
+        provider_app_name = "new-requirer-old-provider-prov"
+
+        juju.deploy(REQUIRER_LOCAL, app=requirer_app_name, base="ubuntu@22.04")
+        juju.deploy(PROVIDER_PUBLISHED, app=provider_app_name, base="ubuntu@22.04")
+        juju.integrate(requirer_app_name, provider_app_name)
+        juju.wait(
+            lambda status: jubilant.all_active(status, requirer_app_name, provider_app_name),
+            timeout=1000,
+        )
+
+        task = juju.run(f"{requirer_app_name}/0", "get-certificate")
+        _assert_certificate_fields(task)
+
+        task = juju.run(f"{requirer_app_name}/0", "get-provider-capabilities")
+        assert task.results.get("available") == "false"
+
+        juju.remove_application(requirer_app_name, provider_app_name)

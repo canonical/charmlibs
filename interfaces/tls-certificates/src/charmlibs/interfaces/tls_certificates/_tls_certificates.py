@@ -311,11 +311,36 @@ class _RequestError(pydantic.BaseModel):
     error: CertificateError
 
 
+class ProviderCapabilities(pydantic.BaseModel):
+    """Best-effort description of what a provider's certificate server supports.
+
+    Every attribute is independently optional and defaults to ``None``. A value of
+    ``None`` means the provider has not advertised that capability ("unspecified /
+    unknown") and MUST NOT be interpreted as an assumed default by the requirer.
+
+    Attributes:
+        supports_ip_sans: Whether IP addresses are accepted in SANs.
+        supports_wildcard_dns: Whether wildcard DNS entries are accepted.
+        supports_subdomain: Whether subdomain certificates can be issued.
+        supports_ca_certificates: Whether CA certificates can be issued.
+        allowed_domains: Optional list of allowed DNS domains.
+        provider_type: Optional provider-type hint (e.g. "acme", "vault", "self-signed").
+    """
+
+    supports_ip_sans: bool | None = None
+    supports_wildcard_dns: bool | None = None
+    supports_subdomain: bool | None = None
+    supports_ca_certificates: bool | None = None
+    allowed_domains: list[str] | None = None
+    provider_type: str | None = None
+
+
 class _ProviderApplicationData(_DatabagModel):
     """Provider application data model."""
 
     certificates: list[_Certificate] = []
     request_errors: list[_RequestError] = []
+    capabilities: ProviderCapabilities | None = None
 
 
 class _RequirerData(_DatabagModel):
@@ -2497,6 +2522,32 @@ class TLSCertificatesRequiresV4(Object):
         """
         return self._load_provider_certificate_errors()
 
+    def get_provider_capabilities(self) -> ProviderCapabilities | None:
+        """Return the capabilities advertised by the provider, best-effort.
+
+        Returns:
+            A ProviderCapabilities object when the provider advertises capabilities,
+            or None when there is no relation, no remote application, the provider has
+            not advertised capabilities, or the provider data is invalid. Never raises.
+            Individual fields of the returned object may be None (unspecified).
+        """
+        relation = self.model.get_relation(self.relationship_name)
+        if not relation:
+            logger.debug("No relation: %s", self.relationship_name)
+            return None
+        if not relation.app:
+            logger.debug("No remote app in relation: %s", self.relationship_name)
+            return None
+        try:
+            provider_relation_data = _ProviderApplicationData.load(relation.data[relation.app])
+        except DataValidationError:
+            logger.warning("Invalid relation data")
+            return None
+        except ModelError:
+            logger.warning("Relation data not available")
+            return None
+        return provider_relation_data.capabilities
+
     def get_request_error(self, csr: CertificateSigningRequest) -> ProviderCertificateError | None:
         """Get the request error for a specific CSR.
 
@@ -3053,13 +3104,19 @@ class TLSCertificatesRequiresV4(Object):
 class TLSCertificatesProvidesV4(Object):
     """TLS certificates provider class to be instantiated by TLS certificates providers."""
 
-    def __init__(self, charm: CharmBase, relationship_name: str):
+    def __init__(
+        self,
+        charm: CharmBase,
+        relationship_name: str,
+        provider_capabilities: ProviderCapabilities | None = None,
+    ):
         super().__init__(charm, relationship_name)
         self.framework.observe(charm.on[relationship_name].relation_joined, self._configure)
         self.framework.observe(charm.on[relationship_name].relation_changed, self._configure)
         self.framework.observe(charm.on.update_status, self._configure)
         self.charm = charm
         self.relationship_name = relationship_name
+        self.provider_capabilities = provider_capabilities
         self._security_logger = _OWASPLogger(application=f"tls-certificates-{charm.app.name}")
 
     def _configure(self, _: EventBase) -> None:
@@ -3067,11 +3124,41 @@ class TLSCertificatesProvidesV4(Object):
 
         This is a common hook triggered on a regular basis.
 
-        Revoke certificates for which no csr exists
+        Revoke certificates for which no csr exists and refresh advertised capabilities.
         """
         if not self.model.unit.is_leader():
             return
         self._remove_certificates_for_which_no_csr_exists()
+        self._publish_capabilities()
+
+    def _publish_capabilities(self) -> None:
+        """Publish the provider's capabilities into every relation's application data.
+
+        No-op when no capabilities were supplied at initialization. Preserves the
+        existing ``certificates`` and ``request_errors`` keys (load-modify-dump).
+        """
+        if self.provider_capabilities is None:
+            return
+        for relation in self._get_tls_relations():
+            self._dump_provider_capabilities(
+                relation=relation, capabilities=self.provider_capabilities
+            )
+
+    def _dump_provider_capabilities(
+        self, relation: Relation, capabilities: ProviderCapabilities
+    ) -> None:
+        """Dump provider capabilities to relation data, preserving other fields."""
+        try:
+            provider_data = _ProviderApplicationData.load(relation.data[self.charm.app])
+        except DataValidationError:
+            logger.warning("Failed to load provider relation data")
+            return
+        provider_data.capabilities = capabilities
+        try:
+            provider_data.dump(relation.data[self.model.app])
+            logger.info("Provider capabilities relation data updated")
+        except ModelError:
+            logger.warning("Failed to update relation data")
 
     def _remove_certificates_for_which_no_csr_exists(self) -> None:
         provider_certificates = self.get_provider_certificates()

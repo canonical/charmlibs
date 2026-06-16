@@ -2,6 +2,7 @@
 # Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+import json
 import uuid
 from datetime import datetime, timedelta, timezone
 from ipaddress import IPv6Address
@@ -27,6 +28,9 @@ from charmlibs.interfaces.tls_certificates import (
     generate_certificate,
     generate_csr,
     generate_private_key,
+)
+from charmlibs.interfaces.tls_certificates._tls_certificates import (
+    _ProviderApplicationData,
 )
 
 
@@ -585,3 +589,20 @@ def test_given_chain_with_invalid_order_when_chain_has_valid_order_then_returns_
     )
     assert not chain_has_valid_order([str(ca_certificate), str(certificate)])
     assert not chain_has_valid_order([str(certificate), "Random string"])
+
+
+class TestProviderCapabilities:
+    def test_given_no_capabilities_when_dumped_then_capabilities_key_absent(self):
+        databag: dict[str, str] = {}
+
+        _ProviderApplicationData().dump(databag)
+
+        assert "capabilities" not in databag
+
+    def test_given_unknown_capability_keys_when_loaded_then_keys_are_ignored(self):
+        databag = {"capabilities": json.dumps({"supports_ip_sans": True, "unknown_key": "value"})}
+
+        loaded = _ProviderApplicationData.load(databag)
+
+        assert loaded.capabilities is not None
+        assert loaded.capabilities.supports_ip_sans is True

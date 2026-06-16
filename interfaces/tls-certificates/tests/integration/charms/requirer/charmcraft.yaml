@@ -71,3 +71,6 @@ actions:
 
   renew-certificate:
     description: Renews the TLS Certificate.
+
+  get-provider-capabilities:
+    description: Returns the provider capabilities advertised over the relation.

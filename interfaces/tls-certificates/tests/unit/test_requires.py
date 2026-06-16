@@ -5,6 +5,7 @@ import datetime
 import json
 from collections.abc import Iterable
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -13,6 +14,7 @@ import yaml
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from ops import testing
+from ops.charm import ActionEvent, CharmBase
 from ops.testing import ActionFailed, Secret
 
 from certificates import (
@@ -24,10 +26,12 @@ from certificates import (
 from charmlibs.interfaces.tls_certificates import (
     Certificate,
     CertificateAvailableEvent,
+    CertificateRequestAttributes,
     CertificateSigningRequest,
     Mode,
     PrivateKey,
     TLSCertificatesError,
+    TLSCertificatesRequiresV4,
 )
 from requirer_charm import (
     DummyTLSCertificatesRequirerCharm,
@@ -2426,3 +2430,105 @@ class TestTLSCertificatesRequiresV4:
         )
 
         assert not any(secret.label == certificate_secret_label for secret in state_out.secrets)
+
+
+CAPABILITY_REQUIRER_META = {
+    "name": "tls-certificates-capability-requirer",
+    "requires": {"certificates": {"interface": "tls-certificates"}},
+}
+
+CAPABILITY_REQUIRER_ACTIONS = {
+    "get-provider-capabilities": {"description": "Return the provider's advertised capabilities."},
+}
+
+
+class CapabilityRequirerCharm(CharmBase):
+    def __init__(self, *args: Any):
+        super().__init__(*args)
+        self.certificates = TLSCertificatesRequiresV4(
+            charm=self,
+            relationship_name="certificates",
+            certificate_requests=[CertificateRequestAttributes(common_name="example.com")],
+        )
+        self.framework.observe(
+            self.on.get_provider_capabilities_action,
+            self._on_get_provider_capabilities_action,
+        )
+
+    def _on_get_provider_capabilities_action(self, event: ActionEvent) -> None:
+        capabilities = self.certificates.get_provider_capabilities()
+        if capabilities is None:
+            event.set_results({"available": False})
+            return
+        event.set_results({
+            "available": True,
+            "provider-type": capabilities.provider_type or "",
+            "supports-ip-sans": str(capabilities.supports_ip_sans),
+        })
+
+
+class TestRequirerGetProviderCapabilities:
+    @pytest.fixture(autouse=True)
+    def context(self):
+        self.ctx = testing.Context(
+            charm_type=CapabilityRequirerCharm,
+            meta=CAPABILITY_REQUIRER_META,
+            actions=CAPABILITY_REQUIRER_ACTIONS,
+        )
+
+    def _run_action(self, state_in: testing.State) -> dict[str, Any]:
+        self.ctx.run(self.ctx.on.action("get-provider-capabilities"), state_in)
+        return self.ctx.action_results or {}
+
+    def test_given_provider_advertises_capabilities_when_get_then_returned(self):
+        relation = testing.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-provider",
+            remote_app_data={
+                "capabilities": json.dumps({
+                    "supports_ip_sans": False,
+                    "provider_type": "vault",
+                })
+            },
+        )
+        state_in = testing.State(relations={relation}, leader=True)
+
+        results = self._run_action(state_in)
+
+        assert results["available"] is True
+        assert results["provider-type"] == "vault"
+        assert results["supports-ip-sans"] == "False"
+
+    def test_given_no_relation_when_get_then_unavailable(self):
+        state_in = testing.State(leader=True)
+
+        results = self._run_action(state_in)
+
+        assert results["available"] is False
+
+    def test_given_legacy_provider_without_capabilities_when_get_then_unavailable(self):
+        relation = testing.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-provider",
+            remote_app_data={"certificates": json.dumps([])},
+        )
+        state_in = testing.State(relations={relation}, leader=True)
+
+        results = self._run_action(state_in)
+
+        assert results["available"] is False
+
+    def test_given_invalid_provider_data_when_get_then_unavailable(self):
+        relation = testing.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-provider",
+            remote_app_data={"capabilities": "not-json"},
+        )
+        state_in = testing.State(relations={relation}, leader=True)
+
+        results = self._run_action(state_in)
+
+        assert results["available"] is False
