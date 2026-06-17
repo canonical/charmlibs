@@ -1636,7 +1636,7 @@ interfaces:
   status: recommended
   url: https://pypi.org/project/charmlibs-interfaces-service-mesh
   docs: https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/service-mesh
-  src: https://github.com/canonical/charmlibs/tree/main/interfaces/service-mesh
+  src: https://github.com/canonical/charmlibs/tree/main/interfaces/service_mesh
   kind: PyPI
   rel_name: service_mesh
   rel_url_charmhub: https://charmhub.io/integrations/service_mesh
@@ -1784,7 +1784,7 @@ interfaces:
   status: recommended
   url: https://pypi.org/project/charmlibs-interfaces-istio-request-auth
   docs: https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/istio-request-auth
-  src: https://github.com/canonical/charmlibs/tree/main/interfaces/istio-request-auth
+  src: https://github.com/canonical/charmlibs/tree/main/interfaces/istio_request_auth
   kind: PyPI
   rel_name: istio-request-auth
   rel_url_charmhub: ''
@@ -1810,7 +1810,7 @@ interfaces:
   status: recommended
   url: https://pypi.org/project/charmlibs-interfaces-gateway-metadata
   docs: https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/gateway-metadata
-  src: https://github.com/canonical/charmlibs/tree/main/interfaces/gateway-metadata
+  src: https://github.com/canonical/charmlibs/tree/main/interfaces/gateway_metadata
   kind: PyPI
   rel_name: gateway-metadata
   rel_url_charmhub: ''
@@ -1871,7 +1871,7 @@ interfaces:
   status: recommended
   url: https://pypi.org/project/charmlibs-interfaces-istio-ingress-route
   docs: https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/istio-ingress-route
-  src: https://github.com/canonical/charmlibs/tree/main/interfaces/istio-ingress-route
+  src: https://github.com/canonical/charmlibs/tree/main/interfaces/istio_ingress_route
   kind: PyPI
   rel_name: istio-ingress-route
   rel_url_charmhub: ''
