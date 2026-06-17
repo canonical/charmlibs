@@ -1636,7 +1636,7 @@ interfaces:
   status: recommended
   url: https://pypi.org/project/charmlibs-interfaces-service-mesh
   docs: https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/service-mesh
-  src: https://github.com/canonical/charmlibs/tree/main/interfaces/service-mesh
+  src: https://github.com/canonical/charmlibs/tree/main/interfaces/service_mesh
   kind: PyPI
   rel_name: service_mesh
   rel_url_charmhub: https://charmhub.io/integrations/service_mesh
@@ -1784,7 +1784,7 @@ interfaces:
   status: recommended
   url: https://pypi.org/project/charmlibs-interfaces-istio-request-auth
   docs: https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/istio-request-auth
-  src: https://github.com/canonical/charmlibs/tree/main/interfaces/istio-request-auth
+  src: https://github.com/canonical/charmlibs/tree/main/interfaces/istio_request_auth
   kind: PyPI
   rel_name: istio-request-auth
   rel_url_charmhub: ''
@@ -1810,7 +1810,7 @@ interfaces:
   status: recommended
   url: https://pypi.org/project/charmlibs-interfaces-gateway-metadata
   docs: https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/gateway-metadata
-  src: https://github.com/canonical/charmlibs/tree/main/interfaces/gateway-metadata
+  src: https://github.com/canonical/charmlibs/tree/main/interfaces/gateway_metadata
   kind: PyPI
   rel_name: gateway-metadata
   rel_url_charmhub: ''
@@ -1830,6 +1830,30 @@ interfaces:
   description: Deprecated in favour of ``charmlibs.interfaces.gateway_metadata``.
   tags:
   - networking
+- name: charmlibs.interfaces.istio_metadata
+  status: recommended
+  url: https://pypi.org/project/charmlibs-interfaces-istio-metadata
+  docs: https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/istio_metadata
+  src: https://github.com/canonical/charmlibs/tree/main/interfaces/istio_metadata
+  kind: PyPI
+  rel_name: istio_metadata
+  rel_url_charmhub: ''
+  rel_url_schema: https://canonical.com/juju/docs/charmlibs/reference/interfaces/istio_metadata/v0/
+  description: Share Istio installation metadata (e.g. root namespace) between charms.
+  tags:
+  - networking
+- name: charms.istio_k8s.istio_metadata
+  status: legacy
+  url: https://charmhub.io/istio-k8s/libraries/istio_metadata
+  docs: ''
+  src: https://github.com/canonical/istio-k8s-operator
+  kind: Charmhub
+  rel_name: istio_metadata
+  rel_url_charmhub: ''
+  rel_url_schema: ''
+  description: Deprecated in favour of ``charmlibs.interfaces.istio_metadata``.
+  tags:
+  - networking
 - name: dpcharmlibs.interfaces
   status: ''
   url: https://pypi.org/project/dpcharmlibs-interfaces
@@ -1847,7 +1871,7 @@ interfaces:
   status: recommended
   url: https://pypi.org/project/charmlibs-interfaces-istio-ingress-route
   docs: https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/istio-ingress-route
-  src: https://github.com/canonical/charmlibs/tree/main/interfaces/istio-ingress-route
+  src: https://github.com/canonical/charmlibs/tree/main/interfaces/istio_ingress_route
   kind: PyPI
   rel_name: istio-ingress-route
   rel_url_charmhub: ''

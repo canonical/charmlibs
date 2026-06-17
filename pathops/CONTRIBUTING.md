@@ -39,14 +39,14 @@ just check pathops
 Pathops is very concerned with `pathlib` compatibility across Python versions. Unit tests should be run with the Python versions supported by Ubuntu LTS releases (which charms will run with). Run the unit tests against these versions with:
 
 ```bash
-just python=3.10 unit pathops
-just python=3.12 unit pathops
-just python=3.14 unit pathops
+just unit --python 3.10 pathops
+just unit --python 3.12 pathops
+just unit --python 3.14 pathops
 ```
 
 Also run static analysis the same way to ensure typing compatibility is preserved as intended.
 ```bash
-just python=<version> static pathops
+just static --python <version> pathops
 ```
 
 Unit tests live under `tests/unit/`. They test `ContainerPath`, `LocalPath`, and `ensure_contents` without a real Pebble instance. `ContainerPath` is constructed using a dummy `ops.Container` backend (see `tests/unit/conftest.py`), and Pebble API calls are monkeypatched using the helpers in `tests/unit/utils.py`.

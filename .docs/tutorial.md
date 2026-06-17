@@ -68,7 +68,7 @@ Get started by running `just init`, and provide the requested information intera
 - The author information to display on PyPI (e.g. `The <YOUR TEAM NAME> team at Canonical`).
 
 ````{tip}
-If you're working on an interface library, run `just interface init` instead.
+If you're working on an interface library, run `just init --interface` instead.
 This will create the library directory under the `interfaces/` directory and set it up to use the `charmlibs.interfaces` namespace.
 ````
 
