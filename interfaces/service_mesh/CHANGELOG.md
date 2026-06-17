@@ -1,8 +1,8 @@
 # Changelog
 
-## 1.0.0
+## 1.0.2 - 16 June 2026
 
-Initial release. Migrated from `charms.istio_beacon_k8s.v0.service_mesh` (v0.19).
+- Minor docstring and README updates.
 
 ## 1.0.1 - 29 April 2026
 
@@ -10,6 +10,6 @@ Initial release. Migrated from `charms.istio_beacon_k8s.v0.service_mesh` (v0.19)
 - pins pydantic to >=2,<3
 - pins canonical-service-mesh to <1
 
-## 1.0.2 - 16 June 2026
+## 1.0.0
 
-- Minor docstring and README updates.
+Initial release. Migrated from `charms.istio_beacon_k8s.v0.service_mesh` (v0.19).

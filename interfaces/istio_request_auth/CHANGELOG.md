@@ -1,3 +1,14 @@
+# Changelog
+
+## 0.0.3 - 16 June 2026
+
+- Minor docstring and README updates.
+
+## 0.0.2 - 29 April 2026
+
+- pins ops to >=2.23.1,<4
+- pins pydantic to >=2,<3
+
 ## 0.0.1 - 22 April 2026
 
 Initial release.
@@ -8,12 +19,3 @@ The initial `istio-request-auth` interface library provides the following featur
 - Lets charms specify multiple trusted issuers and their corresponding header-claim mappings as a list of jwt_rules
 - Provides convienience data models for describing JWTRules
 - Models the top level data bag as datamodel
-
-## 0.0.2 - 29 April 2026
-
-- pins ops to >=2.23.1,<4
-- pins pydantic to >=2,<3
-
-## 0.0.3 - 16 June 2026
-
-- Minor docstring and README updates.
