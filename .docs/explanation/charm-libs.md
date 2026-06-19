@@ -39,9 +39,7 @@ The `lib/` directory is added to the [PYTHONPATH](https://docs.python.org/3/usin
 
 Charmhub-hosted libraries are typically committed to your charm's version control.
 
-> Read more:
-> - {ref}`manage-charmhub-libraries`
-> - {ref}`Charmcraft | Manage libraries <charmcraft:manage-libraries>`
+Read more: {ref}`manage-charmhub-libraries`, {ref}`Charmcraft | Manage libraries <charmcraft:manage-libraries>`
 
 (charm-libs-purpose)=
 ## Library purpose

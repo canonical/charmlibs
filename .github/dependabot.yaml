@@ -9,6 +9,8 @@ updates:
       interval: "monthly"  # This is hard-coded to the 1st of the month
     labels:
       - "dependencies"
+    cooldown:
+      default-days: 7
   # Monthly update to repo wide Python testing dependencies
   # These are defined in /pyproject.toml and /test-requirements.txt
   - package-ecosystem: "pip"
@@ -17,6 +19,8 @@ updates:
       interval: "monthly"
     labels:
       - "dependencies"
+    cooldown:
+      default-days: 7
     groups:
       test-deps:
         patterns:

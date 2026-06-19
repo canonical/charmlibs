@@ -19,18 +19,13 @@ shared between charms that intend to provide or consume OTLP telemetry.
 For user-facing documentation, see the package-level docstring in __init__.py.
 """
 
-import copy
-import hashlib
 import json
 import logging
 from collections import OrderedDict
 from collections.abc import Sequence
-from pathlib import Path
 from typing import Any, Final, Literal
 
 from cosl.juju_topology import JujuTopology
-from cosl.rules import AlertRules, InjectResult, generic_alert_groups
-from cosl.types import OfficialRuleFileFormat
 from cosl.utils import LZMABase64
 from ops import CharmBase
 from pydantic import (
@@ -41,6 +36,8 @@ from pydantic import (
     field_validator,
 )
 
+from ._rules import RuleStore, _RulesModel, inject_extra_labels_into_rules, inject_generic_rules
+
 DEFAULT_REQUIRER_RELATION_NAME = 'send-otlp'
 DEFAULT_PROVIDER_RELATION_NAME = 'receive-otlp'
 DEFAULT_LOKI_RULES_RELATIVE_PATH = './src/loki_alert_rules'
@@ -48,21 +45,6 @@ DEFAULT_PROM_RULES_RELATIVE_PATH = './src/prometheus_alert_rules'
 
 
 logger = logging.getLogger(__name__)
-
-
-class _RulesModel(BaseModel):
-    """Rules of various formats (query languages) to support in the relation databag."""
-
-    logql: OfficialRuleFileFormat = Field(
-        description='LogQL alerting and recording rules, following the '
-        'OfficialRuleFileFormat from cos-lib.',
-        default_factory=OfficialRuleFileFormat,
-    )
-    promql: OfficialRuleFileFormat = Field(
-        description='PromQL alerting and recording rules, following the '
-        'OfficialRuleFileFormat from cos-lib.',
-        default_factory=OfficialRuleFileFormat,
-    )
 
 
 class OtlpEndpoint(BaseModel):
@@ -75,13 +57,17 @@ class OtlpEndpoint(BaseModel):
     telemetries: Sequence[str] = Field(
         description='Telemetry signal types accepted by this endpoint.'
     )
+    insecure: bool = Field(
+        description='Whether this endpoint requires an insecure connection (e.g. no TLS).',
+        default=False,
+    )
 
 
 class _OtlpEndpoint(OtlpEndpoint):
     """A pydantic model for a single OTLP endpoint."""
 
 
-class OtlpProviderAppData(BaseModel):
+class _OtlpProviderAppData(BaseModel):
     """A pydantic model for the OTLP provider's app databag."""
 
     endpoints: list[_OtlpEndpoint] = Field(
@@ -89,7 +75,7 @@ class OtlpProviderAppData(BaseModel):
     )
 
 
-class OtlpRequirerAppData(BaseModel):
+class _OtlpRequirerAppData(BaseModel):
     """A pydantic model for the OTLP requirer's app databag.
 
     The rules are compressed when saved to databag to avoid hitting databag
@@ -133,10 +119,13 @@ class OtlpRequirer:
             endpoints.
         telemetries: The telemetries to filter for in the provider's OTLP
             endpoints.
-        loki_rules_path: The path to Loki alerting and recording rules provided
-            by this charm.
-        prometheus_rules_path: The path to Prometheus alerting and recording
-            rules provided by this charm.
+        aggregator_peer_relation_name: Name of the peers relation of this
+            charm. This should only be set IFF the charm is an aggregator AND
+            it has a peer relation with this name. When provided, generic
+            aggregator rules are used instead of application-level rules.
+        rules: Rules of different types e.g., logql or promql, that the
+            requirer will publish for the provider.
+        extra_alert_labels: Dict of extra labels to inject alert rules with.
     """
 
     def __init__(
@@ -146,10 +135,12 @@ class OtlpRequirer:
         protocols: Sequence[Literal['http', 'grpc']] | None = None,
         telemetries: Sequence[Literal['logs', 'metrics', 'traces']] | None = None,
         *,
-        loki_rules_path: str | Path = DEFAULT_LOKI_RULES_RELATIVE_PATH,
-        prometheus_rules_path: str | Path = DEFAULT_PROM_RULES_RELATIVE_PATH,
+        aggregator_peer_relation_name: str | None = None,
+        rules: RuleStore | None = None,
+        extra_alert_labels: dict[str, str] | None = None,
     ):
         self._charm = charm
+        self._topology = JujuTopology.from_charm(charm)
         self._relation_name = relation_name
         self._protocols: list[Literal['http', 'grpc']] = (
             list(protocols) if protocols is not None else []
@@ -157,9 +148,9 @@ class OtlpRequirer:
         self._telemetries: list[Literal['logs', 'metrics', 'traces']] = (
             list(telemetries) if telemetries is not None else []
         )
-        self._topology = JujuTopology.from_charm(charm)
-        self._loki_rules_path: str | Path = loki_rules_path
-        self._prom_rules_path: str | Path = prometheus_rules_path
+        self._aggregator_peer_relation_name = aggregator_peer_relation_name
+        self._rules = rules if rules is not None else RuleStore(self._topology)
+        self._extra_alert_labels = extra_alert_labels or {}
 
     def _filter_endpoints(self, endpoints: list[_OtlpEndpoint]) -> list[_OtlpEndpoint]:
         """Filter out unsupported OtlpEndpoints.
@@ -198,45 +189,36 @@ class OtlpRequirer:
         modern_score: Final = {'grpc': 2, 'http': 1}
         return max(endpoints, key=lambda e: modern_score.get(e.protocol, 0))
 
+    def _handle_alert_rules(self) -> RuleStore:
+        """Maintain the rule store with common alert rule operations."""
+        rule_store = inject_generic_rules(
+            self._charm,
+            self._rules,
+            self._topology,
+            self._aggregator_peer_relation_name,
+        )
+        rule_store = inject_extra_labels_into_rules(rule_store, self._extra_alert_labels)
+        return rule_store
+
     def publish(self):
         """Triggers programmatically the update of the relation data.
 
-        The rule files exist in separate directories, distinguished by format
-        (logql|promql), each including alerting and recording rule types. The
-        charm uses these paths as aggregation points for rules, acting as their
-        source of truth. For each type of rule, the charm may aggregate rules
-        from:
-
-            - rules bundled in the charm's source code
-            - any rules provided by related charms
-
-        Generic, injected rules (not specific to any charm) are always
-        published. Besides these generic rules, the inclusion of bundled rules
-        and rules from related charms is the responsibility of the charm using
-        the library. Including bundled rules and rules from related charms is
-        achieved by copying these rules to the respective paths within the
-        charm's filesystem and providing those paths to the OtlpRequirer
-        constructor.
+        These rule sources are included when publishing:
+            - Any rules provided at the instantiation of this class.
+            - Generic (not specific to any charm) PromQL rules.
         """
         if not self._charm.unit.is_leader():
             # Only the leader unit can write to app data.
             return
 
-        # Define the rule types
-        loki_rules = AlertRules(query_type='logql', topology=self._topology)
-        prom_rules = AlertRules(query_type='promql', topology=self._topology)
-
-        # Add rules
-        prom_rules.add(
-            copy.deepcopy(generic_alert_groups.aggregator_rules),
-            group_name_prefix=self._topology.identifier,
-        )
-        loki_rules.add_path(self._loki_rules_path, recursive=True)
-        prom_rules.add_path(self._prom_rules_path, recursive=True)
+        self._rules = self._handle_alert_rules()
 
         # Publish to databag
-        databag = OtlpRequirerAppData.model_validate({
-            'rules': {'logql': loki_rules.as_dict(), 'promql': prom_rules.as_dict()},
+        databag = _OtlpRequirerAppData.model_validate({
+            'rules': {
+                'logql': self._rules.logql.as_dict(),
+                'promql': self._rules.promql.as_dict(),
+            },
             'metadata': self._topology.as_dict(),
         })
         for relation in self._charm.model.relations[self._relation_name]:
@@ -260,11 +242,10 @@ class OtlpRequirer:
                 continue
 
             try:
-                provider = relation.load(OtlpProviderAppData, relation.app)
+                provider = relation.load(_OtlpProviderAppData, relation.app)
             except ValidationError as e:
                 logger.error('OTLP databag failed validation: %s', e)
                 continue
-
             if endpoints := self._filter_endpoints(provider.endpoints):
                 endpoint_map[relation.id] = self._favor_modern_endpoints(endpoints)
 
@@ -294,14 +275,18 @@ class OtlpProvider:
         protocol: Literal['http', 'grpc'],
         endpoint: str,
         telemetries: Sequence[Literal['logs', 'metrics', 'traces']],
-    ):
-        """Add an OtlpEndpoint to the list of endpoints to publish.
-
-        Call this method after endpoint-changing events e.g. TLS and ingress.
-        """
+        insecure: bool = False,
+    ) -> 'OtlpProvider':
+        """Add an OtlpEndpoint to the list of endpoints to publish."""
         self._endpoints.append(
-            _OtlpEndpoint(protocol=protocol, endpoint=endpoint, telemetries=telemetries)
+            _OtlpEndpoint(
+                protocol=protocol,
+                endpoint=endpoint,
+                telemetries=telemetries,
+                insecure=insecure,
+            )
         )
+        return self
 
     def publish(self) -> None:
         """Triggers programmatically the update of the relation data."""
@@ -309,68 +294,53 @@ class OtlpProvider:
             # Only the leader unit can write to app data.
             return
 
-        databag = OtlpProviderAppData.model_validate({'endpoints': self._endpoints})
+        databag = _OtlpProviderAppData.model_validate({'endpoints': self._endpoints})
         for relation in self._charm.model.relations[self._relation_name]:
             relation.save(databag, self._charm.app)
 
-    def rules(self, query_type: Literal['logql', 'promql']):
+    @property
+    def rules(self) -> dict[int, RuleStore]:
         """Fetch rules for all relations of the desired query and rule types.
 
-        This method returns all rules of the desired query and rule types
-        provided by related OTLP requirer charms. These rules may be used to
-        generate a rules file for each relation since the returned list of
-        groups are indexed by relation ID. This method ensures rules:
+        This method returns all rules of varying query and rule types, provided
+        by related OTLP requirer charms. This method ensures rules:
 
-            - have Juju topology from the rule's labels injected into the expr.
-            - are valid using CosTool.
+            - have labels from the charm's Juju topology.
+            - have expression labels from the charm's Juju topology.
+            - are validated using CosTool.
 
         Returns:
-            a mapping of relation ID to a dictionary of alert rule groups
-            following the OfficialRuleFileFormat from cos-lib.
+            a mapping of relation ID to a RuleStore object.
         """
-        rules_map: dict[str, dict[str, Any]] = {}
-        rules_obj = AlertRules(query_type, self._topology)
+        rules_map: dict[int, RuleStore] = {}
+        # Instantiate Rules with topology to ensure that rules always have an identifier
         for relation in self._charm.model.relations[self._relation_name]:
             if not relation.data[relation.app]:
                 # The databags haven't initialized yet, continue
                 continue
 
             try:
-                requirer = relation.load(OtlpRequirerAppData, relation.app)
+                requirer = relation.load(_OtlpRequirerAppData, relation.app)
             except ValidationError as e:
                 logger.error('OTLP databag failed validation: %s', e)
                 continue
 
-            # Get rules for the desired query type
-            rules_for_type: dict[str, Any] | None = getattr(requirer.rules, query_type, None)
-            if not rules_for_type:
-                continue
-
-            result: InjectResult = rules_obj.inject_and_validate_rules(
-                rules_for_type, requirer.metadata
+            # Create a RuleStore for this relation's rules, and inject topology labels
+            rules = RuleStore(self._topology)
+            logql_result = rules.logql.inject_and_validate_rules(
+                requirer.rules.logql, requirer.metadata
             )
-            if result.errmsg and self._charm.unit.is_leader():
-                relation.data[self._charm.app]['event'] = json.dumps({'errors': result.errmsg})
+            promql_result = rules.promql.inject_and_validate_rules(
+                requirer.rules.promql, requirer.metadata
+            )
+            if logql_result.rules and not logql_result.errmsg:
+                rules.logql.add(logql_result.rules)
+            if promql_result.rules and not promql_result.errmsg:
+                rules.promql.add(promql_result.rules)
+            for errmsg in [logql_result.errmsg, promql_result.errmsg]:
+                if errmsg and self._charm.unit.is_leader():
+                    relation.data[self._charm.app]['event'] = json.dumps({'errors': errmsg})
 
-            # If an identifier does not exist, we generate a deterministic hash
-            # derived from the rules content so the rules can still be recorded
-            # for this relation. This avoids dropping rules when the upstream
-            # requirer metadata does not provide an identifier.
-            identifier = result.identifier
-            if identifier is None:
-                try:
-                    rules_json = json.dumps(result.rules, sort_keys=True)
-                except (TypeError, ValueError):
-                    rules_json = repr(result.rules)
-
-                content_hash = hashlib.sha256(rules_json.encode('utf-8')).hexdigest()[:12]
-                identifier = content_hash
-                logger.debug(
-                    'No identifier from injected rules for relation %s; generated hash %s',
-                    relation.id,
-                    identifier,
-                )
-
-            rules_map[identifier] = result.rules
+            rules_map[relation.id] = rules
 
         return rules_map

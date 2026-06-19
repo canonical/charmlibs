@@ -24,7 +24,14 @@ import os
 import pathlib
 import subprocess
 
-_GLOBAL_FILES = {'.github', '.scripts', 'justfile', 'pyproject.toml'}
+_GLOBAL_FILES = {
+    '.github',
+    '.scripts',
+    'justfile',
+    'pyproject.toml',
+    'uv.lock',
+    'test-requirements.txt',
+}
 _REPO_ROOT = pathlib.Path(__file__).parent.parent
 
 logging.basicConfig(level=logging.DEBUG)
@@ -45,7 +52,7 @@ def _main() -> None:
     else:
         cmd.append(args.git_base_ref)
     if args.name_only:
-        cmd.append('--name-only')
+        cmd.extend(['--output-only', 'name'])
     result = subprocess.check_output(cmd, text=True).strip()
     output = f'result={result}'
     logger.info(output)

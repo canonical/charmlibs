@@ -6,16 +6,23 @@ requires-python = ">=3.10"
 authors = [
     {name="The Charm Tech team at Canonical"},
 ]
+license = "Apache-2.0"
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: Apache Software License",
     "Intended Audience :: Developers",
     "Operating System :: POSIX :: Linux",
     "Development Status :: 5 - Production/Stable",
 ]
 dynamic = ["version"]
 dependencies = [
-    # "ops",
+    # Libraries should use clear but wide dependency bounds to avoid overly constraining charms.
+    # Ops 3 is backwards compatible with Ops 2, but drops Python 3.8 support.
+    # Ops 3 has new features not present in Ops 2.23 (the last Ops 2 feature release).
+    # See the Ops 2.23 maintenance branch changelog and the Ops 3 changelog for current information:
+    # - https://github.com/canonical/operator/blob/2.23-maintenance/CHANGES.md
+    # - https://github.com/canonical/operator/blob/main/CHANGES.md
+    # Set the dependency bounds according to the features and fixes your library needs.
+    # "ops>=2.23.1,<4",
 ]
 
 [dependency-groups]
@@ -32,8 +39,10 @@ integration = [  # installed for `just integration example`
 ]
 
 [project.urls]
-"Repository" = "https://github.com/canonical/charmlibs"
+"Documentation" = "https://documentation.ubuntu.com/charmlibs/reference/charmlibs/example"
+"Repository" = "https://github.com/canonical/charmlibs/tree/main/example"
 "Issues" = "https://github.com/canonical/charmlibs/issues"
+"Changelog" = "https://github.com/canonical/charmlibs/blob/main/example/CHANGELOG.md"
 
 [build-system]
 requires = ["hatchling"]

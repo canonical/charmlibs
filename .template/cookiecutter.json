@@ -8,6 +8,7 @@
   "__pkg": "{{ cookiecutter.project_slug.replace('-', '_') }}",
   "__import_pkg": "{{ cookiecutter.__ns }}.{{ cookiecutter.__pkg }}",
   "__dist_pkg": "{{ cookiecutter.__import_pkg.replace('.', '-').replace('_', '-') }}",
+  "__canonical_name": "{{ cookiecutter.__pkg.replace('_', '-') }}",
   "__prompts__": {
     "project_slug": "🌈 The project name",
     "min_python_version": "🐍 The minimum Python version supported by the package",

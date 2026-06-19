@@ -6,17 +6,27 @@ requires-python = ">=3.10"
 authors = [
     {name="The Charm Tech team at Canonical"},
 ]
+license = "Apache-2.0"
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: Apache Software License",
     "Intended Audience :: Developers",
     "Operating System :: POSIX :: Linux",
     "Development Status :: 5 - Production/Stable",
 ]
 dynamic = ["version"]
 dependencies = [
-    # "ops",
+    # Libraries should use clear but wide dependency bounds to avoid overly constraining charms.
+    # Ops 3 is backwards compatible with Ops 2, but drops Python 3.8 support.
+    # Ops 3 has new features not present in Ops 2.23 (the last Ops 2 feature release).
+    # See the Ops 2.23 maintenance branch changelog and the Ops 3 changelog for current information:
+    # - https://github.com/canonical/operator/blob/2.23-maintenance/CHANGES.md
+    # - https://github.com/canonical/operator/blob/main/CHANGES.md
+    # Set the dependency bounds according to the features and fixes your library needs.
+    # "ops>=2.23.1,<4",
 ]
+
+[project.optional-dependencies]
+testing = ["charmlibs-interfaces-example-interface-testing==0.0.0.dev0"]
 
 [dependency-groups]
 lint = [  # installed for `just lint interfaces/example-interface` (unit, functional, and integration are also installed)
@@ -24,6 +34,7 @@ lint = [  # installed for `just lint interfaces/example-interface` (unit, functi
 ]
 unit = [  # installed for `just unit interfaces/example-interface`
     "ops[testing]",
+    "charmlibs-interfaces-example-interface[testing]",
 ]
 functional = [  # installed for `just functional interfaces/example-interface`
 ]
@@ -32,8 +43,10 @@ integration = [  # installed for `just integration interfaces/example-interface`
 ]
 
 [project.urls]
-"Repository" = "https://github.com/canonical/charmlibs"
+"Documentation" = "https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/example-interface"
+"Repository" = "https://github.com/canonical/charmlibs/tree/main/interfaces/example-interface"
 "Issues" = "https://github.com/canonical/charmlibs/issues"
+"Changelog" = "https://github.com/canonical/charmlibs/blob/main/interfaces/example-interface/CHANGELOG.md"
 
 [build-system]
 requires = ["hatchling"]
@@ -44,6 +57,9 @@ packages = ["src/charmlibs"]
 
 [tool.hatch.version]
 path = "src/charmlibs/interfaces/example_interface/_version.py"
+
+[tool.uv.sources]
+charmlibs-interfaces-example-interface-testing = { path = "testing", editable = true }
 
 [tool.ruff]
 extend = "../../pyproject.toml"

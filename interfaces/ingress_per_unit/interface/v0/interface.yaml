@@ -1,6 +1,7 @@
 name: ingress_per_unit
 version: 0
 status: published
+lib: charms.traefik_k8s.ingress_per_unit
 
 providers:
   - name: traefik-k8s

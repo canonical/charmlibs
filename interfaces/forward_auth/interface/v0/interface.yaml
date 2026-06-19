@@ -3,6 +3,7 @@ internal: true
 
 version: 0
 status: draft
+lib: charms.oathkeeper.forward_auth
 
 providers:
   - name: oathkeeper-operator

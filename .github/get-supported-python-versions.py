@@ -36,10 +36,12 @@ import pathlib
 import packaging.specifiers
 import tomli
 
+# The Python versions encoded here should be updated to reflect Ubuntu LTS releases.
+# The latest Python stable release (if different) should also be included.
 VERSIONS = [
     '3.10',  # Ubuntu 22.04  (ops 3)
     '3.12',  # Ubuntu 24.04
-    '3.13',  # latest Python release
+    '3.14',  # Ubuntu 26.04
 ]
 
 
@@ -52,10 +54,14 @@ def _parse_args() -> pathlib.Path:
 
 def _main(package: pathlib.Path) -> None:
     versions = _get_supported_python_versions(package=package)
-    line = f'versions={json.dumps(versions)}'
-    print(line)
+    lines = [
+        f'versions={json.dumps(versions)}',
+        f'min_version={versions[0]}',
+    ]
     with pathlib.Path(os.environ['GITHUB_OUTPUT']).open('a') as f:
-        print(line, file=f)
+        for line in lines:
+            print(line)  # logging
+            print(line, file=f)
 
 
 def _get_supported_python_versions(package: pathlib.Path) -> list[str]:

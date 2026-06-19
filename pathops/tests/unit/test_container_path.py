@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import operator
 import pathlib
+import sys
 import typing
 
 import ops
@@ -205,7 +206,10 @@ class TestMatch:
 
     def test_pattern_cant_be_container_path(self, container: ops.Container):
         container_path = ContainerPath('/', container=container)
-        with pytest.raises(TypeError):
+        if sys.version_info < (3, 14):
+            with pytest.raises(TypeError):
+                container_path.match(container_path)  # type: ignore
+        else:
             container_path.match(container_path)  # type: ignore
 
 

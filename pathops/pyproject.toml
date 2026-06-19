@@ -6,9 +6,9 @@ requires-python = ">=3.10"
 authors = [
     {name="The Charm Tech team at Canonical Ltd."},
 ]
+license = "Apache-2.0"
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: Apache Software License",
     "Intended Audience :: Developers",
     "Operating System :: POSIX :: Linux",
     "Development Status :: 5 - Production/Stable",
@@ -30,7 +30,7 @@ integration = [
 
 [project.urls]
 "Documentation" = "https://documentation.ubuntu.com/charmlibs/reference/charmlibs/pathops/"
-"Repository" = "https://github.com/canonical/charmlibs"
+"Repository" = "https://github.com/canonical/charmlibs/tree/main/pathops"
 "Issues" = "https://github.com/canonical/charmlibs/issues"
 "Changelog" = "https://github.com/canonical/charmlibs/blob/main/pathops/CHANGELOG.md"
 
@@ -57,4 +57,6 @@ pebble = ["v1.1.1","master"]
 ubuntu = ["22.04", "latest"]
 
 [tool.charmlibs.integration]
-tags = ["22.04", "24.04"]
+# tags to run integration tests with (defaults to running once with no tag, i.e. tags = [''])
+# Available in CI in tests/integration/pack.sh and integration tests as CHARMLIBS_TAG
+tags = ["22.04", "24.04"]  # The pathops pack.sh script uses CHARMLIBS_TAG to determine which base to pack for.

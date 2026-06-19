@@ -33,7 +33,7 @@ jobs:
         id: schema
         run: |
           set -xueo pipefail
-          SCHEMA=$(.scripts/ls.py interfaces --regex "interfaces/$INTERFACE" --output schema_path | jq -r '.[].schema_path')
+          SCHEMA=$(.scripts/ls.py interfaces --regex "interfaces/$INTERFACE" --output-only schema_path --no-json)
           echo "result=$SCHEMA" >> "$GITHUB_OUTPUT"
       - name: Check schema can be run if it exists
         if: steps.schema.outputs.result
@@ -62,11 +62,16 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@v7
       - name: Run interface tests
+        env:
+          VERSION: ${{ matrix.version }}
+          ROLE: ${{ matrix.role }}
+          CHARM_NAME: ${{ matrix.charm_name }}
+          ENDPOINT: ${{ matrix.endpoint }}
         run: |
           set -xueo pipefail
           .scripts/run-interface-tests.py \
             "$INTERFACE" \
-            ${{ matrix.version }} \
-            ${{ matrix.role }} \
-            ${{ matrix.charm_name }} \
-            ${{ matrix.endpoint }}
+            "$VERSION" \
+            "$ROLE" \
+            "$CHARM_NAME" \
+            "$ENDPOINT"

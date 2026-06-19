@@ -6,24 +6,37 @@ requires-python = ">={{ cookiecutter.min_python_version }}"
 authors = [
     {name="{{ cookiecutter.author }}"},
 ]
+license = "Apache-2.0"
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: Apache Software License",
     "Intended Audience :: Developers",
     "Operating System :: POSIX :: Linux",
     "Development Status :: 5 - Production/Stable",
 ]
 dynamic = ["version"]
 dependencies = [
-    # "ops",
+    # Libraries should use clear but wide dependency bounds to avoid overly constraining charms.
+    # Ops 3 is backwards compatible with Ops 2, but drops Python 3.8 support.
+    # Ops 3 has new features not present in Ops 2.23 (the last Ops 2 feature release).
+    # See the Ops 2.23 maintenance branch changelog and the Ops 3 changelog for current information:
+    # - https://github.com/canonical/operator/blob/2.23-maintenance/CHANGES.md
+    # - https://github.com/canonical/operator/blob/main/CHANGES.md
+    # Set the dependency bounds according to the features and fixes your library needs.
+    # "ops>=2.23.1,<4",
 ]
-
+{% if cookiecutter._interface %}
+[project.optional-dependencies]
+testing = ["{{ cookiecutter.__dist_pkg }}-testing==0.0.0.dev0"]
+{% endif %}
 [dependency-groups]
 lint = [  # installed for `just lint {{ cookiecutter.__path_prefix }}{{ cookiecutter.project_slug }}` (unit, functional, and integration are also installed)
     # "typing_extensions",
 ]
 unit = [  # installed for `just unit {{ cookiecutter.__path_prefix }}{{ cookiecutter.project_slug }}`
     "ops[testing]",
+{%- if cookiecutter._interface %}
+    "{{ cookiecutter.__dist_pkg }}[testing]",
+{%- endif %}
 ]
 functional = [  # installed for `just functional {{ cookiecutter.__path_prefix }}{{ cookiecutter.project_slug }}`
 ]
@@ -32,8 +45,10 @@ integration = [  # installed for `just integration {{ cookiecutter.__path_prefix
 ]
 
 [project.urls]
-"Repository" = "https://github.com/canonical/charmlibs"
+"Documentation" = "https://documentation.ubuntu.com/charmlibs/reference/charmlibs/{{ cookiecutter.__path_prefix }}{{ cookiecutter.__canonical_name }}"
+"Repository" = "https://github.com/canonical/charmlibs/tree/main/{{ cookiecutter.__path_prefix }}{{ cookiecutter.project_slug }}"
 "Issues" = "https://github.com/canonical/charmlibs/issues"
+"Changelog" = "https://github.com/canonical/charmlibs/blob/main/{{ cookiecutter.__path_prefix }}{{ cookiecutter.project_slug }}/CHANGELOG.md"
 
 [build-system]
 requires = ["hatchling"]
@@ -44,7 +59,10 @@ packages = ["src/charmlibs"]
 
 [tool.hatch.version]
 path = "src/charmlibs/{{ cookiecutter.__path_prefix }}{{ cookiecutter.__pkg}}/_version.py"
-
+{% if cookiecutter._interface %}
+[tool.uv.sources]
+{{ cookiecutter.__dist_pkg }}-testing = { path = "testing", editable = true }
+{% endif %}
 [tool.ruff]
 extend = "{{ '../' if cookiecutter._interface else '' }}../pyproject.toml"
 src = ["src", "tests/unit", "tests/functional", "tests/integration"]  # correctly sort local imports in tests
