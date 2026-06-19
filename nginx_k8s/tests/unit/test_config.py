@@ -434,9 +434,7 @@ def test_upstreams_servers_are_sorted():
         nginx = NginxConfig(
             'localhost',
             upstream_configs=[NginxUpstream('otlp-grpc', 4317, 'distributor')],
-            server_ports_to_locations={
-                4317: [NginxLocationConfig(backend='otlp-grpc', path='/')]
-            },
+            server_ports_to_locations={4317: [NginxLocationConfig(backend='otlp-grpc', path='/')]},
         )
 
         # WHEN _upstreams is called with multiple addresses in non-sorted order
@@ -448,11 +446,7 @@ def test_upstreams_servers_are_sorted():
         upstreams = nginx._upstreams({'distributor': addresses})
 
         # THEN the server entries in the upstream block are in sorted order
-        server_args = [
-            d['args'][0]
-            for d in upstreams[0]['block']
-            if d['directive'] == 'server'
-        ]
+        server_args = [d['args'][0] for d in upstreams[0]['block'] if d['directive'] == 'server']
         assert server_args == sorted(server_args)
 
 
