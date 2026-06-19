@@ -1,0 +1,5 @@
+Directory for local sphinx extensions.
+
+This directory is referenced in the docs `conf.py`, and in the `docs.just` file (for running unit tests).
+
+Modules must be manually added to `local_extensions` in `conf.py` for Sphinx to detect them.

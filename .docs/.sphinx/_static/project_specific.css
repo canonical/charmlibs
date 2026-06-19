@@ -1,0 +1,33 @@
+/**
+ * Increase the width of the right hand table of contents.
+ *
+ * The default width is 15em.
+ */
+.toc-drawer {
+  width: 16em;
+}
+
+/**
+ * Show emoji-tooltip as floating text when hovering over emoji-div.
+ *
+ * These classes are used in `non-relation-libs-table.rst`.
+ */
+.emoji-div {
+  position: relative;
+  display: inline-block;
+}
+.emoji-tooltip {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  background-color: #EBEBEB;
+  color: #000000;
+  padding: 5px;
+  border-radius: 5px;
+  white-space: nowrap;
+}
+.emoji-div:hover .emoji-tooltip {
+  display: block;
+  z-index: 9999;
+}
