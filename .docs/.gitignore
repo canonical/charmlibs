@@ -1,16 +1,15 @@
 # Environment
 *env*/
-.sphinx/venv/
+_dev/venv/
 
 # Sphinx
-.sphinx/warnings.txt
-.sphinx/.wordlist.dic
-.sphinx/.doctrees/
-.sphinx/node_modules/
+_dev/warnings.txt
+_dev/.doctrees/
+_dev/node_modules/
 
 # Vale
-.sphinx/styles/*
-.sphinx/vale.ini
+_dev/styles/*
+_dev/vale.ini
 
 # Build outputs
 _build
@@ -28,5 +27,8 @@ __pycache__
 charmlibs/
 interfaces/
 generated/
+
+# generated per-library diataxis include files
+_lib-*.md
 .~lock.*
 .save/

@@ -8,7 +8,7 @@ relatedlinks: "[Charmcraft](https://documentation.ubuntu.com/charmcraft/stable/)
 :maxdepth: 3
 :hidden: false
 
-tutorial
+tutorials/index
 how-to/index
 reference/index
 explanation/index
@@ -33,8 +33,8 @@ If you're new to charms, see {ref}`Juju | Charm <juju:charm>`.
 
 ````{grid} 1 1 2 2
 
-```{grid-item-card} [Tutorial](tutorial)
-**Start here:** Write your first charm library and contribute it to the monorepo.
+```{grid-item-card} [Tutorials](tutorials/index)
+**Start here:** [Write your first charm library](tutorial) and contribute it to the monorepo.
 ```
 
 ```{grid-item-card} [How-to guides](how-to/index)
@@ -42,6 +42,7 @@ If you're new to charms, see {ref}`Juju | Charm <juju:charm>`.
 - {ref}`Manage charm libraries <how-to-manage-charm-libraries>`
 - {ref}`Distribute charm libraries <how-to-python-package>`
 - {ref}`Migrate your library to the monorepo <how-to-migrate>`
+- {ref}`Provide relation data for charm tests <how-to-provide-data-for-charm-tests>`
 - {ref}`Customize functional tests <how-to-customize-functional-tests>`
 - {ref}`Customize integration tests <how-to-customize-integration-tests>`
 ```
@@ -52,7 +53,7 @@ If you're new to charms, see {ref}`Juju | Charm <juju:charm>`.
 :reverse:
 
 ```{grid-item-card} [Reference](reference/index)
-**Technical information** 
+**Technical information**
 - {ref}`General libraries <general-libs-listing>` and {ref}`interface libraries <interface-libs-listing>`
 - {ref}`charmlibs package docs <reference-charmlibs>`
 - {ref}`charmlibs.interfaces package docs <reference-charmlibs-interfaces>`
