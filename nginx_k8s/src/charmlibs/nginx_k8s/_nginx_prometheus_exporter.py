@@ -34,14 +34,18 @@ class NginxPrometheusExporter:
         nginx_insecure: bool = False,
         nginx_tls_port: int = 443,
         nginx_prometheus_exporter_port: int = 9113,
+        nginx_serves_tls: bool = False,
     ) -> None:
         self.port = nginx_prometheus_exporter_port
         self._container = container
         self._nginx_insecure = nginx_insecure
         self._nginx_port = nginx_port
         self._nginx_tls_port = nginx_tls_port
+        self._nginx_serves_tls = nginx_serves_tls
 
-    def reconcile(self, tls_config: TLSConfig | None = None) -> None:
+    def reconcile(
+        self, tls_config: TLSConfig | None = None, nginx_serves_tls: bool = False
+    ) -> None:
         """Configure pebble layer and restart if necessary."""
         if not self._container.can_connect():
             return
@@ -59,6 +63,7 @@ class NginxPrometheusExporter:
             self._layer_name,
             self._layer(
                 reload_sentinel=f'{cert_hash},{web_config_hash}',
+                nginx_serves_tls=nginx_serves_tls,
             ),
             combine=True,
         )
@@ -95,6 +100,15 @@ class NginxPrometheusExporter:
 
     @property
     def are_certificates_on_disk(self) -> bool:
+        """Return True if the certificates files are on disk.
+
+        This is used to determine whether the exporter should serve
+        metrics over HTTP or HTTPS
+        by checking whether the certificates are present on THIS container's FS.
+        It has no effect on whether or not the exporter will attempt to
+        scrape nginx over HTTP or HTTPS.
+        That is determined by the `nginx_serves_tls` parameter passed to the reconciler.
+        """
         return (
             self._container.can_connect()
             and self._container.exists(PROM_EXPORTER_KEY_PATH)
@@ -113,7 +127,7 @@ class NginxPrometheusExporter:
 
         return yaml.safe_dump(cfg)
 
-    def _layer(self, reload_sentinel: str) -> ops.pebble.Layer:
+    def _layer(self, reload_sentinel: str, nginx_serves_tls: bool = False) -> ops.pebble.Layer:
         return ops.pebble.Layer({
             'summary': 'Nginx prometheus exporter layer',
             'description': 'Pebble config layer for nginx-prometheus-exporter',
@@ -121,7 +135,7 @@ class NginxPrometheusExporter:
                 self._service_name: {
                     'override': 'replace',
                     'summary': 'Nginx prometheus exporter',
-                    'command': self.command,
+                    'command': self.command(nginx_serves_tls=nginx_serves_tls),
                     'startup': 'enabled',
                     'environment': {
                         '_reload': reload_sentinel,
@@ -130,10 +144,9 @@ class NginxPrometheusExporter:
             },
         })
 
-    @property
-    def command(self) -> str:
-        nginx_scheme = 'https' if self.are_certificates_on_disk else 'http'
-        nginx_port = self._nginx_tls_port if self.are_certificates_on_disk else self._nginx_port
+    def command(self, nginx_serves_tls: bool = False) -> str:
+        nginx_scheme = 'https' if nginx_serves_tls else 'http'
+        nginx_port = self._nginx_tls_port if nginx_serves_tls else self._nginx_port
 
         return (
             f'{self._executable_name} '

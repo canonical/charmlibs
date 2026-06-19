@@ -94,14 +94,14 @@ def test_exporter_web_config_file_switch(
     )
     assert '--nginx.scrape-uri=http://127.0.0.1:8080/status' in command
 
-    # AND WHEN we reconcile with a TLS config
+    # AND WHEN we reconcile with nginx_serves_tls=True
     with ctx(
         ctx.on.update_status(),
         state=ops.testing.State(containers={exporter_container}),
     ) as mgr:
-        NginxPrometheusExporter(mgr.charm.unit.get_container('nginx-pexp')).reconcile(
-            MOCK_TLS_CONFIG
-        )
+        NginxPrometheusExporter(
+            mgr.charm.unit.get_container('nginx-pexp')
+        ).reconcile(nginx_serves_tls=True)
         state_out = mgr.run()
 
     # THEN the scrape URI switches to HTTPS on the TLS port
