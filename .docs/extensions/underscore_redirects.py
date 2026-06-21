@@ -49,70 +49,54 @@ if typing.TYPE_CHECKING:
 
 def setup(app: sphinx.application.Sphinx) -> dict[str, str | bool]:
     """Sphinx extension entrypoint -- register the ``env-updated`` hook."""
-    app.connect('env-updated', _populate)
-    return {
-        'version': '1.0.0',
-        'parallel_read_safe': True,
-        'parallel_write_safe': True,
-    }
+    app.connect('env-updated', _automatic_redirects)
+    return {'version': '1.0.0', 'parallel_read_safe': True, 'parallel_write_safe': True}
 
 
-def _populate(app: sphinx.application.Sphinx, env: sphinx.environment.BuildEnvironment) -> None:
-    # Skip the per-package reference passes: they only build a subset of pages,
-    # so most redirect targets would be missing. The final combined pass
-    # (where 'package' is unset) is the one that writes the full site.
-    if getattr(app.config, 'package', None) is not None:
+def _automatic_redirects(
+    app: sphinx.application.Sphinx, env: sphinx.environment.BuildEnvironment
+) -> None:
+    # Don't create redirects during the per-package passes.
+    if app.config.package is not None:
         return
-    # Only extend an existing dict mapping. If a user has configured
-    # rediraffe_redirects as a filename (str) or left it unset, respect that
-    # and don't clobber it.
-    existing = app.config.rediraffe_redirects
-    if not isinstance(existing, dict):
-        return
-    for variant, target in _build_redirects(set(env.found_docs)).items():
-        # Never overwrite a user-configured redirect.
-        if variant not in existing:
-            existing[variant] = target
+    target = typing.cast('dict[str, str]', app.config.rediraffe_redirects)
+    assert isinstance(target, dict)
+    redirects = _build_redirects(set(env.found_docs))
+    assert set(target).isdisjoint(redirects)
+    target.update(redirects)
 
 
 def _build_redirects(found_docs: set[str]) -> dict[str, str]:
-    """Return a ``{variant: original}`` redirect mapping for the given docnames.
+    """Redirect underscored names to hyphenated ones and vice versa.
 
-    For each docname, the separator-swapped variant (``-`` <-> ``_`` in every
-    path segment) is computed. If the variant differs from the original and is
-    not itself a real page, a redirect is added from the variant to the
-    original. Existing user redirects are never overwritten.
+    Categories area also separately aliased with both variants and with no separator.
     """
     redirects: dict[str, str] = {}
-    for docname in found_docs:
-        variant = _separator_variant(docname)
-        if variant is None:
-            continue
-        if variant in found_docs:
-            # Both separator variants are real pages; don't shadow either.
-            continue
-        if variant in redirects:
-            # Two originals map to the same variant (shouldn't happen with a
-            # pure swap, but guard against it regardless).
-            continue
-        redirects[variant] = docname
+    for docname in sorted(found_docs):
+        category, _, doc = docname.partition('/')
+        category_variants = {
+            category,
+            category.replace('-', '_'),  # e.g. how_to
+            category.replace('_', '-'),  # e.g. how-to
+            category.replace('_', '').replace('-', ''),  # e.g. howto
+        }
+        for category_variant in sorted(category_variants):
+            doc_variant = _separator_variant(doc)
+            if (category_variant, doc_variant) == (category, doc):
+                continue
+            alias = f'{category_variant}/{doc_variant}'
+            assert alias not in found_docs, f'Alias {alias} is a real page!'
+            assert alias not in redirects, f'Alias {alias} already redirects to {redirects[alias]}'
+            redirects[alias] = docname.removesuffix('index.html')
     return redirects
 
 
-def _separator_variant(docname: str) -> str | None:
-    """Return the docname with ``-`` and ``_`` swapped in each segment.
-
-    Returns ``None`` when the result is identical to the input (that is, when
-    no path segment contains either separator). Uses a NUL placeholder so the
-    swap is a true involution even for segments containing both separators.
-    """
-    new_parts: list[str] = []
-    changed = False
-    for part in docname.split('/'):
-        new_part = part.replace('-', '\0').replace('_', '-').replace('\0', '_')
-        if new_part != part:
-            changed = True
-        new_parts.append(new_part)
-    if not changed:
-        return None
-    return '/'.join(new_parts)
+def _separator_variant(docname: str) -> str:
+    """Return the docname with ``-`` and ``_`` swapped."""
+    if '-' in docname:
+        assert '_' not in docname, f"Docname {docname} should not contain both '-' and '_'"
+        return docname.replace('-', '_')
+    if '_' in docname:
+        assert '-' not in docname, f"Docname {docname} should not contain both '-' and '_'"
+        return docname.replace('_', '-')
+    return docname
