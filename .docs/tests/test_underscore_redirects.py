@@ -21,6 +21,8 @@ from __future__ import annotations
 import types
 import typing
 
+import pytest
+
 import underscore_redirects
 
 if typing.TYPE_CHECKING:
@@ -43,29 +45,24 @@ def test_separator_variant_underscores_to_hyphens():
     )
 
 
-def test_separator_variant_mixed_segment():
-    # A segment with both separators is a true involution.
-    variant = underscore_redirects._separator_variant('foo-bar_baz/qux')
-    assert variant == 'foo_bar-baz/qux'
-    assert underscore_redirects._separator_variant(variant) == 'foo-bar_baz/qux'
+def test_separator_variant_mixed_segment_raises():
+    # A docname containing both separators is a configuration error.
+    with pytest.raises(AssertionError, match="should not contain both"):
+        underscore_redirects._separator_variant('foo-bar_baz/qux')
 
 
-def test_separator_variant_no_separators_returns_none():
-    assert underscore_redirects._separator_variant('index') is None
-    assert underscore_redirects._separator_variant('reference/v1') is None
+def test_separator_variant_no_separators_returns_unchanged():
+    assert underscore_redirects._separator_variant('index') == 'index'
+    assert underscore_redirects._separator_variant('reference/v1') == 'reference/v1'
 
 
 def test_separator_variant_is_involution():
     for docname in [
         'how-to/manage-libraries',
         'reference/interfaces/fiveg_core_gnb/v1',
-        'a-b_c/d-e_f',
         'index',
     ]:
         variant = underscore_redirects._separator_variant(docname)
-        if variant is None:
-            assert docname == 'index'
-            continue
         assert underscore_redirects._separator_variant(variant) == docname
 
 
@@ -75,7 +72,11 @@ def test_separator_variant_is_involution():
 def test_build_redirects_hyphenated_page_gets_underscore_alias():
     found = {'how-to/manage-libraries', 'index'}
     redirects = underscore_redirects._build_redirects(found)
-    assert redirects == {'how_to/manage_libraries': 'how-to/manage-libraries'}
+    assert redirects == {
+        'how-to/manage_libraries': 'how-to/manage-libraries',
+        'how_to/manage_libraries': 'how-to/manage-libraries',
+        'howto/manage_libraries': 'how-to/manage-libraries',
+    }
 
 
 def test_build_redirects_underscored_page_gets_hyphen_alias():
@@ -86,10 +87,13 @@ def test_build_redirects_underscored_page_gets_hyphen_alias():
     }
 
 
-def test_build_redirects_both_variants_present_no_redirect():
-    # When both separator variants are real pages, neither shadows the other.
+def test_build_redirects_both_variants_present_raises():
+    # When both separator variants are real pages, the generated alias would
+    # collide with a real page -- a configuration error that should fail
+    # loudly rather than silently shadowing a page.
     found = {'how-to/foo', 'how_to/foo'}
-    assert underscore_redirects._build_redirects(found) == {}
+    with pytest.raises(AssertionError, match='is a real page'):
+        underscore_redirects._build_redirects(found)
 
 
 def test_build_redirects_no_separators_no_redirects():
@@ -98,15 +102,18 @@ def test_build_redirects_no_separators_no_redirects():
 
 def test_build_redirects_is_pure_function():
     # _build_redirects is a pure function over found_docs; it doesn't know
-    # about user-configured redirects. Merge protection lives in _populate
-    # (see test_populate_does_not_overwrite_user_redirect_with_generated).
+    # about user-configured redirects. Merge protection lives in
+    # _automatic_redirects (see
+    # test_populate_does_not_overwrite_user_redirect_with_generated).
     found = {'how-to/manage-libraries', 'index'}
     assert underscore_redirects._build_redirects(found) == {
-        'how_to/manage_libraries': 'how-to/manage-libraries'
+        'how-to/manage_libraries': 'how-to/manage-libraries',
+        'how_to/manage_libraries': 'how-to/manage-libraries',
+        'howto/manage_libraries': 'how-to/manage-libraries',
     }
 
 
-# --- _populate (integration with config) ---
+# --- _automatic_redirects (integration with config) ---
 
 
 def _make_app(
@@ -115,7 +122,7 @@ def _make_app(
     rediraffe_redirects: dict[str, str] | str | None = None,
     found_docs: typing.Iterable[str] = (),
 ) -> sphinx.application.Sphinx:
-    """Build a minimal fake Sphinx app/config/env for ``_populate()``."""
+    """Build a minimal fake Sphinx app/config/env for ``_automatic_redirects()``."""
     config = types.SimpleNamespace(
         package=package,
         rediraffe_redirects=rediraffe_redirects,
@@ -131,59 +138,61 @@ def _rediraffe_redirects(app: sphinx.application.Sphinx) -> dict[str, str] | str
     return typing.cast('types.SimpleNamespace', app.config).rediraffe_redirects
 
 
-def test_populate_extends_dict_in_final_pass():
+def test_automatic_redirects_extends_dict_in_final_pass():
     app = _make_app(
         rediraffe_redirects={},
         found_docs={'how-to/manage-libraries', 'index'},
     )
-    underscore_redirects._populate(app, app.env)
-    assert _rediraffe_redirects(app) == {'how_to/manage_libraries': 'how-to/manage-libraries'}
+    underscore_redirects._automatic_redirects(app, app.env)
+    redirects = _rediraffe_redirects(app)
+    assert isinstance(redirects, dict)
+    assert redirects['how_to/manage_libraries'] == 'how-to/manage-libraries'
 
 
-def test_populate_skips_per_package_pass():
+def test_automatic_redirects_skips_per_package_pass():
     app = _make_app(
         package='pathops',
         rediraffe_redirects={},
         found_docs={'how-to/manage-libraries', 'index'},
     )
-    underscore_redirects._populate(app, app.env)
+    underscore_redirects._automatic_redirects(app, app.env)
     assert _rediraffe_redirects(app) == {}
 
 
-def test_populate_preserves_existing_user_redirects():
+def test_automatic_redirects_preserves_existing_user_redirects():
     app = _make_app(
         rediraffe_redirects={'old/page': 'new/page'},
         found_docs={'how-to/manage-libraries', 'index'},
     )
-    underscore_redirects._populate(app, app.env)
+    underscore_redirects._automatic_redirects(app, app.env)
     redirects = _rediraffe_redirects(app)
     assert isinstance(redirects, dict)
     assert redirects['old/page'] == 'new/page'
     assert redirects['how_to/manage_libraries'] == 'how-to/manage-libraries'
 
 
-def test_populate_noop_when_rediraffe_redirects_not_a_dict():
-    # If rediraffe_redirects is a filename (str) or None, don't clobber it.
+def test_automatic_redirects_raises_when_rediraffe_redirects_not_a_dict():
+    # The extension requires rediraffe_redirects to be a dict; a filename
+    # (str) or None is a misconfiguration and should fail loudly.
     for value in (None, 'redirects.txt'):
         app = _make_app(
             rediraffe_redirects=value,
             found_docs={'how-to/manage-libraries', 'index'},
         )
-        underscore_redirects._populate(app, app.env)
-        assert _rediraffe_redirects(app) is value
+        with pytest.raises(AssertionError):
+            underscore_redirects._automatic_redirects(app, app.env)
 
 
-def test_populate_does_not_overwrite_user_redirect_with_generated():
-    # A user-configured redirect for a variant that would also be generated
-    # must be preserved.
+def test_automatic_redirects_raises_when_user_redirect_shadows_generated():
+    # A user-configured redirect whose key collides with a generated alias
+    # is a configuration error -- the build should fail rather than silently
+    # overwrite the user's redirect.
     app = _make_app(
         rediraffe_redirects={'how_to/manage_libraries': 'custom/target'},
         found_docs={'how-to/manage-libraries', 'index'},
     )
-    underscore_redirects._populate(app, app.env)
-    redirects = _rediraffe_redirects(app)
-    assert isinstance(redirects, dict)
-    assert redirects['how_to/manage_libraries'] == 'custom/target'
+    with pytest.raises(AssertionError):
+        underscore_redirects._automatic_redirects(app, app.env)
 
 
 # --- setup ---
