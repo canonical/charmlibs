@@ -32,8 +32,10 @@ integration = [  # installed for `just integration interfaces/certificate_transf
 ]
 
 [project.urls]
-"Repository" = "https://github.com/canonical/charmlibs"
+"Documentation" = "https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/certificate-transfer"
+"Repository" = "https://github.com/canonical/charmlibs/tree/main/interfaces/certificate_transfer"
 "Issues" = "https://github.com/canonical/charmlibs/issues"
+"Changelog" = "https://github.com/canonical/charmlibs/blob/main/interfaces/certificate_transfer/CHANGELOG.md"
 
 [build-system]
 requires = ["hatchling"]

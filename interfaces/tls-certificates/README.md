@@ -8,6 +8,8 @@ To install, add `charmlibs-interfaces-tls-certificates` to your Python dependenc
 from charmlibs.interfaces import tls_certificates
 ```
 
-See the [reference documentation](https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/tls-certificates).
-
-Also see the [usage documentation](https://charmhub.io/tls-certificates-interface) on Charmhub. This documentation was written when the library was hosted on Charmhub, so some parts might not be directly applicable.
+Read more:
+- [Tutorial](https://documentation.ubuntu.com/charmlibs/tutorials/charmlibs/interfaces/tls-certificates/tutorial/)
+- [Library reference](https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/tls-certificates/)
+- [How to configure certificate requests](https://documentation.ubuntu.com/charmlibs/how-to/charmlibs/interfaces/tls-certificates/configure-certificate-requests/)
+- [Explanation of the library design](https://documentation.ubuntu.com/charmlibs/explanation/charmlibs/interfaces/tls-certificates/design/)
