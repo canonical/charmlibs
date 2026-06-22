@@ -44,7 +44,10 @@ class NginxPrometheusExporter:
         self._nginx_serves_tls = nginx_serves_tls
 
     def reconcile(
-        self, tls_config: TLSConfig | None = None, nginx_serves_tls: bool = False
+        self,
+        tls_config: TLSConfig | None = None,
+        # The Coordinator sets nginx_serves_tls to Nginx's are_certificates_on_disk property.
+        nginx_serves_tls: bool = False,
     ) -> None:
         """Configure pebble layer and restart if necessary."""
         if not self._container.can_connect():
