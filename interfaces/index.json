@@ -817,7 +817,7 @@
     "version": "1",
     "lib": "charmlibs.interfaces.tls_certificates",
     "lib_url": "https://pypi.org/project/charmlibs-interfaces-tls-certificates",
-    "lib_docs_url": "",
+    "lib_docs_url": "https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/tls-certificates",
     "docs_url": "https://documentation.ubuntu.com/charmlibs/reference/interfaces/tls-certificates/",
     "summary": "Securely request TLS certificates.",
     "description": "The `tls-certificates` interface allows charms to securely request and receive TLS certificates. The requirer charm is responsible for its private key and defining its certificate signing requests (CSRs). The provider charm delivers the certificate for each request, including the CA chain and CA certificate.",
