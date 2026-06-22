@@ -21,9 +21,8 @@ from __future__ import annotations
 import types
 import typing
 
-import pytest
-
 import automatic_redirects
+import pytest
 
 if typing.TYPE_CHECKING:
     import sphinx.application
@@ -47,7 +46,7 @@ def test_separator_variant_underscores_to_hyphens():
 
 def test_separator_variant_mixed_segment_raises():
     # A docname containing both separators is a configuration error.
-    with pytest.raises(AssertionError, match="should not contain both"):
+    with pytest.raises(AssertionError, match='should not contain both'):
         automatic_redirects._separator_variant('foo-bar_baz/qux')
 
 
