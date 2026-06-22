@@ -428,6 +428,28 @@ def test_generate_nginx_config_with_extra_http_variables():
         assert sample_config_path.read_text() == generated_config
 
 
+def test_upstreams_servers_are_sorted():
+    # GIVEN a NginxConfig with one upstream config
+    with mock_resolv_conf(f'nameserver {sample_dns_ip}'):
+        nginx = NginxConfig(
+            'localhost',
+            upstream_configs=[NginxUpstream('otlp-grpc', 4317, 'distributor')],
+            server_ports_to_locations={4317: [NginxLocationConfig(backend='otlp-grpc', path='/')]},
+        )
+
+        # WHEN _upstreams is called with multiple addresses in non-sorted order
+        addresses = {
+            'distributor-2.svc.cluster.local',
+            'distributor-0.svc.cluster.local',
+            'distributor-1.svc.cluster.local',
+        }
+        upstreams = nginx._upstreams({'distributor': addresses})
+
+        # THEN the server entries in the upstream block are in sorted order
+        server_args = [d['args'][0] for d in upstreams[0]['block'] if d['directive'] == 'server']
+        assert server_args == sorted(server_args)
+
+
 def test_exception_raised_if_nginx_module_missing(caplog):
     # GIVEN an instance of Nginx class
     mock_container = MagicMock()
