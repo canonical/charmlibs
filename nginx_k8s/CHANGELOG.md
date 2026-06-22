@@ -1,3 +1,8 @@
+# 1.0.0 - 22 June 2026
+
+This change introduces necessary fixes to logic related to the Nginx Prometheus Exporter. As part of this fix, a breaking change is introduced, warranting a bump of the major version. The changes include:
+- ensure that the NginxPrometheusExporter correctly configures based on the availability of TLS certificates
+
 # 0.1.1 - 19 June 2026
 
 This includes a small bugfix only.

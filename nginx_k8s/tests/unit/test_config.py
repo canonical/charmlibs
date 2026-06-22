@@ -24,6 +24,12 @@ from charmlibs.nginx_k8s import (
 
 sample_dns_ip = '198.18.0.0'
 
+# sha256('') + ',' + sha256(yaml.safe_dump({})) for the no-TLS case
+_PEXP_RELOAD_NO_TLS = (
+    'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855,'
+    'ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356'
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -142,17 +148,21 @@ def test_has_config_changed(ctx: testing.Context, nginx_container):
             NginxPrometheusExporter,
             (),
             {
-                'summary': 'Nginx prometheus exporter layer.',
-                'description': 'Pebble config layer for the Nginx Prometheus exporter service.',
+                'summary': 'Nginx prometheus exporter layer',
+                'description': 'Pebble config layer for nginx-prometheus-exporter',
                 'services': {
                     'nginx-prometheus-exporter': {
-                        'summary': 'Nginx prometheus exporter service.',
+                        'summary': 'Nginx prometheus exporter',
                         'startup': 'enabled',
                         'override': 'replace',
                         'command': 'nginx-prometheus-exporter '
-                        '--no-nginx.ssl-verify '
                         '--web.listen-address=:9113 '
-                        '--nginx.scrape-uri=https://127.0.0.1:8080/status',
+                        '--nginx.scrape-uri=http://127.0.0.1:8080/status '
+                        '--no-nginx.ssl-verify '
+                        '--web.config.file=/etc/exporter/web-config.yaml',
+                        'environment': {
+                            '_reload': _PEXP_RELOAD_NO_TLS,
+                        },
                     }
                 },
             },
