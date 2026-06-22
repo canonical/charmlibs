@@ -1,3 +1,7 @@
+# 1.0.1 - 22 June 2026
+
+This change ensures that _tls_config checks the correct path for a CA cert. If the module checks the wrong path, it cannot correctly determine whether TLS is enabled or not.
+
 # 1.0.0 - 22 June 2026
 
 This change introduces necessary fixes to logic related to the Nginx Prometheus Exporter. As part of this fix, a breaking change is introduced, warranting a bump of the major version. The changes include:
