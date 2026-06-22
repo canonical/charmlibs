@@ -3,6 +3,7 @@
 
 import base64
 import json
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -34,7 +35,6 @@ class TestTLSCertificatesProvidesV4:
         self.ctx = scenario.Context(
             charm_type=DummyTLSCertificatesProviderCharm,
             meta=METADATA,
-            actions=METADATA["actions"],
         )
 
     def test_given_no_certificate_requests_when_get_requirer_csrs_then_no_csrs_are_returned(
@@ -1333,3 +1333,39 @@ class TestProviderCapabilityAdvertisement:
         )
         assert capabilities["provider_type"] == "vault"
         assert capabilities["supports_ip_sans"] is True
+
+    def test_given_unchanged_capabilities_when_relation_changed_again_then_no_rewrite(
+        self, caplog: pytest.LogCaptureFixture
+    ):
+        relation = scenario.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-requirer",
+        )
+        config: dict[str, str | int | float | bool] = {
+            "advertise": True,
+            "provider-type": "acme",
+            "supports-ip-sans": False,
+        }
+        state_in = scenario.State(relations={relation}, leader=True, config=config)
+
+        # First publish writes the capabilities to the application databag.
+        with caplog.at_level(logging.INFO):
+            state_mid = self.ctx.run(self.ctx.on.relation_changed(relation), state_in)
+        published = dict(state_mid.get_relation(relation.id).local_app_data)
+        assert "capabilities" in published
+        assert "Provider capabilities relation data updated" in caplog.text
+
+        # Re-running with the already-published, unchanged data must be a no-op.
+        caplog.clear()
+        relation_unchanged = scenario.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-requirer",
+            local_app_data=published,
+        )
+        state_in_2 = scenario.State(relations={relation_unchanged}, leader=True, config=config)
+        with caplog.at_level(logging.INFO):
+            self.ctx.run(self.ctx.on.relation_changed(relation_unchanged), state_in_2)
+
+        assert "Provider capabilities relation data updated" not in caplog.text
