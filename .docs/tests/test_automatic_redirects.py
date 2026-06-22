@@ -14,7 +14,7 @@
 
 # ruff: noqa: D103 (function docstrings)
 
-"""Unit tests for the `underscore_redirects` local Sphinx extension."""
+"""Unit tests for the `automatic_redirects` local Sphinx extension."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ import typing
 
 import pytest
 
-import underscore_redirects
+import automatic_redirects
 
 if typing.TYPE_CHECKING:
     import sphinx.application
@@ -33,14 +33,14 @@ if typing.TYPE_CHECKING:
 
 
 def test_separator_variant_hyphens_to_underscores():
-    assert underscore_redirects._separator_variant('how-to/manage-libraries') == (
+    assert automatic_redirects._separator_variant('how-to/manage-libraries') == (
         'how_to/manage_libraries'
     )
 
 
 def test_separator_variant_underscores_to_hyphens():
     assert (
-        underscore_redirects._separator_variant('reference/interfaces/fiveg_core_gnb/v1')
+        automatic_redirects._separator_variant('reference/interfaces/fiveg_core_gnb/v1')
         == 'reference/interfaces/fiveg-core-gnb/v1'
     )
 
@@ -48,12 +48,12 @@ def test_separator_variant_underscores_to_hyphens():
 def test_separator_variant_mixed_segment_raises():
     # A docname containing both separators is a configuration error.
     with pytest.raises(AssertionError, match="should not contain both"):
-        underscore_redirects._separator_variant('foo-bar_baz/qux')
+        automatic_redirects._separator_variant('foo-bar_baz/qux')
 
 
 def test_separator_variant_no_separators_returns_unchanged():
-    assert underscore_redirects._separator_variant('index') == 'index'
-    assert underscore_redirects._separator_variant('reference/v1') == 'reference/v1'
+    assert automatic_redirects._separator_variant('index') == 'index'
+    assert automatic_redirects._separator_variant('reference/v1') == 'reference/v1'
 
 
 def test_separator_variant_is_involution():
@@ -62,8 +62,8 @@ def test_separator_variant_is_involution():
         'reference/interfaces/fiveg_core_gnb/v1',
         'index',
     ]:
-        variant = underscore_redirects._separator_variant(docname)
-        assert underscore_redirects._separator_variant(variant) == docname
+        variant = automatic_redirects._separator_variant(docname)
+        assert automatic_redirects._separator_variant(variant) == docname
 
 
 # --- _build_redirects ---
@@ -71,7 +71,7 @@ def test_separator_variant_is_involution():
 
 def test_build_redirects_hyphenated_page_gets_underscore_alias():
     found = {'how-to/manage-libraries', 'index'}
-    redirects = underscore_redirects._build_redirects(found)
+    redirects = automatic_redirects._build_redirects(found)
     assert redirects == {
         'how-to/manage_libraries': 'how-to/manage-libraries',
         'how_to/manage_libraries': 'how-to/manage-libraries',
@@ -81,7 +81,7 @@ def test_build_redirects_hyphenated_page_gets_underscore_alias():
 
 def test_build_redirects_underscored_page_gets_hyphen_alias():
     found = {'reference/interfaces/fiveg_core_gnb/v1', 'index'}
-    redirects = underscore_redirects._build_redirects(found)
+    redirects = automatic_redirects._build_redirects(found)
     assert redirects == {
         'reference/interfaces/fiveg-core-gnb/v1': 'reference/interfaces/fiveg_core_gnb/v1'
     }
@@ -93,20 +93,20 @@ def test_build_redirects_both_variants_present_raises():
     # loudly rather than silently shadowing a page.
     found = {'how-to/foo', 'how_to/foo'}
     with pytest.raises(AssertionError, match='is a real page'):
-        underscore_redirects._build_redirects(found)
+        automatic_redirects._build_redirects(found)
 
 
 def test_build_redirects_no_separators_no_redirects():
-    assert underscore_redirects._build_redirects({'index', 'reference/v1'}) == {}
+    assert automatic_redirects._build_redirects({'index', 'reference/v1'}) == {}
 
 
 def test_build_redirects_is_pure_function():
     # _build_redirects is a pure function over found_docs; it doesn't know
     # about user-configured redirects. Merge protection lives in
     # _automatic_redirects (see
-    # test_populate_does_not_overwrite_user_redirect_with_generated).
+    # test_automatic_redirects_raises_when_user_redirect_shadows_generated).
     found = {'how-to/manage-libraries', 'index'}
-    assert underscore_redirects._build_redirects(found) == {
+    assert automatic_redirects._build_redirects(found) == {
         'how-to/manage_libraries': 'how-to/manage-libraries',
         'how_to/manage_libraries': 'how-to/manage-libraries',
         'howto/manage_libraries': 'how-to/manage-libraries',
@@ -143,7 +143,7 @@ def test_automatic_redirects_extends_dict_in_final_pass():
         rediraffe_redirects={},
         found_docs={'how-to/manage-libraries', 'index'},
     )
-    underscore_redirects._automatic_redirects(app, app.env)
+    automatic_redirects._automatic_redirects(app, app.env)
     redirects = _rediraffe_redirects(app)
     assert isinstance(redirects, dict)
     assert redirects['how_to/manage_libraries'] == 'how-to/manage-libraries'
@@ -155,7 +155,7 @@ def test_automatic_redirects_skips_per_package_pass():
         rediraffe_redirects={},
         found_docs={'how-to/manage-libraries', 'index'},
     )
-    underscore_redirects._automatic_redirects(app, app.env)
+    automatic_redirects._automatic_redirects(app, app.env)
     assert _rediraffe_redirects(app) == {}
 
 
@@ -164,7 +164,7 @@ def test_automatic_redirects_preserves_existing_user_redirects():
         rediraffe_redirects={'old/page': 'new/page'},
         found_docs={'how-to/manage-libraries', 'index'},
     )
-    underscore_redirects._automatic_redirects(app, app.env)
+    automatic_redirects._automatic_redirects(app, app.env)
     redirects = _rediraffe_redirects(app)
     assert isinstance(redirects, dict)
     assert redirects['old/page'] == 'new/page'
@@ -180,7 +180,7 @@ def test_automatic_redirects_raises_when_rediraffe_redirects_not_a_dict():
             found_docs={'how-to/manage-libraries', 'index'},
         )
         with pytest.raises(AssertionError):
-            underscore_redirects._automatic_redirects(app, app.env)
+            automatic_redirects._automatic_redirects(app, app.env)
 
 
 def test_automatic_redirects_raises_when_user_redirect_shadows_generated():
@@ -192,7 +192,7 @@ def test_automatic_redirects_raises_when_user_redirect_shadows_generated():
         found_docs={'how-to/manage-libraries', 'index'},
     )
     with pytest.raises(AssertionError):
-        underscore_redirects._automatic_redirects(app, app.env)
+        automatic_redirects._automatic_redirects(app, app.env)
 
 
 # --- setup ---
@@ -202,7 +202,7 @@ def test_setup_returns_metadata():
     def _connect(*args: object, **kwargs: object) -> None:
         pass
 
-    metadata = underscore_redirects.setup(
+    metadata = automatic_redirects.setup(
         typing.cast('sphinx.application.Sphinx', types.SimpleNamespace(connect=_connect))
     )
     assert metadata['version'] == '1.0.0'

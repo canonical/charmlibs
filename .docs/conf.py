@@ -11,7 +11,7 @@ local_extensions = [
     'interface_docs',
     'package_docs',
     'diataxis_docs_fallback',
-    'underscore_redirects',
+    'automatic_redirects',
 ]
 
 # So that sphinx.ext.autodoc can find charmlibs code
@@ -109,7 +109,7 @@ sitemap_excludes = [  # Exclude generated pages from the sitemap:
 redirects = {}
 
 # sphinx-rerediraffe: https://github.com/wpilibsuite/sphinx-rerediraffe
-# Used by the local `underscore_redirects` extension, which populates this
+# Used by the local `automatic_redirects` extension, which populates this
 # mapping at build time with separator-variant aliases (for example,
 # `how_to/manage_libraries` -> `how-to/manage-libraries`). Seed it as an empty
 # dict so the extension can extend it; set to None to disable redirect
