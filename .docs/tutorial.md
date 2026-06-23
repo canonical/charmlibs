@@ -243,7 +243,7 @@ You should also feel free to split your tests across as many files as needed to 
 
 For more on `ops.testing`, see:
 - [ops.testing reference docs for custom events](ops.testing.CharmEvents.custom)
-- [ops.testing how-to for testing that a custom event is emitted](https://documentation.ubuntu.com/ops/latest/howto/manage-libraries/#test-that-the-custom-event-is-emitted)
+- [ops.testing how-to for testing that a custom event is emitted](https://canonical.com/juju/docs/ops/latest/howto/manage-libraries/#test-that-the-custom-event-is-emitted)
 
 (tutorial-add-functional-tests)=
 ### Add functional tests

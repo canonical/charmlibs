@@ -18,8 +18,8 @@ Then run `just` or `just help` from anywhere in the repository for usage.
 # Adding a new library
 
 Run `just init` to create a new general library, or `just init --interface` for a new interface library.
-We recommend following the [tutorial](https://documentation.ubuntu.com/charmlibs/tutorial) to learn how to add your library to the `charmlibs` monorepo.
-If you're migrating a library that was published elsewhere, read the [how-to guide for migrating an existing library to this repository](https://documentation.ubuntu.com/charmlibs/how-to/migrate/).
+We recommend following the [tutorial](https://canonical.com/juju/docs/charmlibs/tutorial) to learn how to add your library to the `charmlibs` monorepo.
+If you're migrating a library that was published elsewhere, read the [how-to guide for migrating an existing library to this repository](https://canonical.com/juju/docs/charmlibs/how-to/migrate/).
 
 # Working on an existing library
 
@@ -57,7 +57,7 @@ just add pathops 'pydantic>=2'
 
 - Integration tests involve packing real test charms and deploying them on a Juju cloud. Pack first with `just pack-k8s <package>` or `just pack-machine <package>`, then run `just integration-k8s <package>` or `just integration-machine <package>`.
 
-Read more: [the different types of tests](https://documentation.ubuntu.com/charmlibs/explanation/charmlibs-tests/).
+Read more: [the different types of tests](https://canonical.com/juju/docs/charmlibs/explanation/charmlibs-tests/).
 
 # Pull requests
 
@@ -76,4 +76,4 @@ Libraries are automatically published to PyPI when a merged PR bumps the version
 
 Any PR that would trigger a release must also update the library's `CHANGELOG.md` — CI will block the merge otherwise.
 
-Read more: [publishing packages from the monorepo](https://documentation.ubuntu.com/charmlibs/explanation/charmlibs-publishing/).
+Read more: [publishing packages from the monorepo](https://canonical.com/juju/docs/charmlibs/explanation/charmlibs-publishing/).

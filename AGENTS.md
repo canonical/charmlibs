@@ -7,7 +7,7 @@
 **Key concepts:**
 
 - **Juju** — Canonical's open-source orchestration engine. Deploys and manages applications on Kubernetes and bare-metal/VM clouds.
-- **Charm** — a Python program that uses the [ops](https://documentation.ubuntu.com/ops/) framework to respond to Juju lifecycle events and manage a workload. Charms can be Kubernetes-based (using [Pebble](https://documentation.ubuntu.com/pebble/) to manage container processes) or machine-based.
+- **Charm** — a Python program that uses the [ops](https://canonical.com/juju/docs/ops/) framework to respond to Juju lifecycle events and manage a workload. Charms can be Kubernetes-based (using [Pebble](https://ubuntu.com/docs/pebble/) to manage container processes) or machine-based.
 - **Juju relation** — a named connection between two charms, backed by shared key-value stores called *databags*. Relations are how charms communicate and exchange structured configuration.
 - **Charm library** — a reusable Python package that charm authors import. All libraries in this repo are distributed as Python packages on PyPI (not Charmhub-hosted single-file modules, which are a legacy distribution method).
 
@@ -40,7 +40,7 @@ charmlibs/
 │       ├── testing/        # Optional testing subpackage for charm unit tests
 │       ├── pyproject.toml
 │       └── ...
-├── .docs/                  # Sphinx source for documentation.ubuntu.com/charmlibs
+├── .docs/                  # Sphinx source for canonical.com/juju/docs/charmlibs
 ├── .template/              # Cookiecutter template used by `just init`
 ├── .github/workflows/      # CI: ci.yaml, test-package.yaml, test-interface.yaml, publish.yaml
 ├── justfile                # Task runner recipes
@@ -127,7 +127,7 @@ just add interfaces/tls-certificates --requirements my-requirements.txt
 
 A test type is only executed if the corresponding `tests/` subdirectory exists. Remove a directory to skip that test type entirely.
 
-Read more: [types of tests in the charmlibs monorepo](https://documentation.ubuntu.com/charmlibs/explanation/charmlibs-tests/).
+Read more: [types of tests in the charmlibs monorepo](https://canonical.com/juju/docs/charmlibs/explanation/charmlibs-tests/).
 
 ### Running functional tests with Workshop
 
@@ -208,7 +208,7 @@ Interface libraries manage the structured data that charms exchange over a Juju 
 - Typically have unit and integration tests but no functional tests (all meaningful interaction is through Juju).
 - Use `just init --interface` to scaffold.
 
-Read more: [how to design relation interfaces](https://documentation.ubuntu.com/charmlibs/how-to/design-relation-interfaces/), [how to provide relation data for charm tests](https://documentation.ubuntu.com/charmlibs/how-to/provide-relation-data-for-charm-tests/).
+Read more: [how to design relation interfaces](https://canonical.com/juju/docs/charmlibs/how-to/design-relation-interfaces/), [how to provide relation data for charm tests](https://canonical.com/juju/docs/charmlibs/how-to/provide-relation-data-for-charm-tests/).
 
 ## Documentation
 
@@ -220,7 +220,7 @@ just docs html pathops
 
 This is also run as part of `just check`. The full docs site (all packages) is built with `just docs`.
 
-When writing or editing docstrings in `__init__.py` or other public modules, remember they appear verbatim in the published reference at [documentation.ubuntu.com/charmlibs](https://documentation.ubuntu.com/charmlibs). Keep them informative for library users, not implementation notes.
+When writing or editing docstrings in `__init__.py` or other public modules, remember they appear verbatim in the published reference at [canonical.com/juju/docs/charmlibs](https://canonical.com/juju/docs/charmlibs). Keep them informative for library users, not implementation notes.
 
 Don't use block quotes (`>`) for "Read more", "See also", or similar cross-reference sections. Instead, use bare text like `Read more: {ref}\`some-page\`` or, for two links, a comma-separated list or, for three or more links a bulleted list. For example:
 
@@ -232,10 +232,10 @@ Read more: {ref}`charm-libs-charmhub-hosted`, {ref}`Charmcraft | Manage librarie
 
 ### Migrating a library's docs
 
-To bring an existing library's tutorials, how-to guides, and explanations into the monorepo, follow the **Migrate your library's docs** section of [How to migrate to the charmlibs monorepo](https://documentation.ubuntu.com/charmlibs/how-to/migrate/). In short:
+To bring an existing library's tutorials, how-to guides, and explanations into the monorepo, follow the **Migrate your library's docs** section of [How to migrate to the charmlibs monorepo](https://canonical.com/juju/docs/charmlibs/how-to/migrate/). In short:
 
 - For Charmhub-hosted docs, download each Discourse topic with `uv run .scripts/import-discourse-docs.py <discourse-url> <output-file>`, choosing a diataxis category (and so an output path) for each.
-- Then edit the imported pages to fit charmlibs conventions, following [How to add docs to a library](https://documentation.ubuntu.com/charmlibs/how-to/add-library-docs/).
+- Then edit the imported pages to fit charmlibs conventions, following [How to add docs to a library](https://canonical.com/juju/docs/charmlibs/how-to/add-library-docs/).
 
 There is no `reference` docs category — reference docs are generated from docstrings.
 
@@ -251,10 +251,10 @@ There is no `reference` docs category — reference docs are generated from docs
 | Resource | URL |
 |----------|-----|
 | charmlibs docs | .docs/index.md |
-| ops (charm framework) | https://documentation.ubuntu.com/ops/ |
-| ops.testing reference | https://documentation.ubuntu.com/ops/latest/reference/ops-testing/ |
+| ops (charm framework) | https://canonical.com/juju/docs/ops/ |
+| ops.testing reference | https://canonical.com/juju/docs/ops/latest/reference/ops-testing/ |
 | Juju docs | https://documentation.ubuntu.com/juju/latest/llms.txt |
 | Charmcraft docs | https://documentation.ubuntu.com/charmcraft/stable/ |
-| Jubilant (integration test client) | https://documentation.ubuntu.com/jubilant/ |
-| Pebble | https://documentation.ubuntu.com/pebble/ |
+| Jubilant (integration test client) | https://canonical.com/juju/docs/jubilant/ |
+| Pebble | https://ubuntu.com/docs/pebble/ |
 | Concierge (CI Juju setup) | https://raw.githubusercontent.com/canonical/concierge/refs/heads/main/README.md |

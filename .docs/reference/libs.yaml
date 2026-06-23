@@ -208,7 +208,7 @@ general:
 - name: charmlibs.apt
   status: recommended
   url: https://pypi.org/project/charmlibs-apt
-  docs: https://documentation.ubuntu.com/charmlibs/reference/charmlibs/apt
+  docs: https://canonical.com/juju/docs/charmlibs/reference/charmlibs/apt
   src: https://github.com/canonical/charmlibs/tree/main/apt
   kind: PyPI
   machine: true
@@ -219,7 +219,7 @@ general:
 - name: charmlibs.passwd
   status: recommended
   url: https://pypi.org/project/charmlibs-passwd
-  docs: https://documentation.ubuntu.com/charmlibs/reference/charmlibs/passwd
+  docs: https://canonical.com/juju/docs/charmlibs/reference/charmlibs/passwd
   src: https://github.com/canonical/charmlibs/tree/main/passwd
   kind: PyPI
   machine: true
@@ -230,7 +230,7 @@ general:
 - name: charmlibs.pathops
   status: recommended
   url: https://pypi.org/project/charmlibs-pathops
-  docs: https://documentation.ubuntu.com/charmlibs/reference/charmlibs/pathops
+  docs: https://canonical.com/juju/docs/charmlibs/reference/charmlibs/pathops
   src: https://github.com/canonical/charmlibs/tree/main/pathops
   kind: PyPI
   machine: true
@@ -241,7 +241,7 @@ general:
 - name: charmlibs.rollingops
   status: recommended
   url: https://pypi.org/project/charmlibs-rollingops
-  docs: https://documentation.ubuntu.com/charmlibs/reference/charmlibs/rollingops
+  docs: https://canonical.com/juju/docs/charmlibs/reference/charmlibs/rollingops
   src: https://github.com/canonical/charmlibs/tree/main/rollingops
   kind: PyPI
   machine: true
@@ -253,7 +253,7 @@ general:
 - name: charmlibs.snap
   status: recommended
   url: https://pypi.org/project/charmlibs-snap
-  docs: https://documentation.ubuntu.com/charmlibs/reference/charmlibs/snap
+  docs: https://canonical.com/juju/docs/charmlibs/reference/charmlibs/snap
   src: https://github.com/canonical/charmlibs/tree/main/snap
   kind: PyPI
   machine: true
@@ -264,7 +264,7 @@ general:
 - name: charmlibs.sysctl
   status: recommended
   url: https://pypi.org/project/charmlibs-sysctl
-  docs: https://documentation.ubuntu.com/charmlibs/reference/charmlibs/sysctl
+  docs: https://canonical.com/juju/docs/charmlibs/reference/charmlibs/sysctl
   src: https://github.com/canonical/charmlibs/tree/main/sysctl
   kind: PyPI
   machine: true
@@ -275,7 +275,7 @@ general:
 - name: charmlibs.systemd
   status: recommended
   url: https://pypi.org/project/charmlibs-systemd
-  docs: https://documentation.ubuntu.com/charmlibs/reference/charmlibs/systemd
+  docs: https://canonical.com/juju/docs/charmlibs/reference/charmlibs/systemd
   src: https://github.com/canonical/charmlibs/tree/main/systemd
   kind: PyPI
   machine: true
@@ -784,7 +784,7 @@ interfaces:
   kind: Charmhub
   rel_name: opencti-connector
   rel_url_charmhub: https://charmhub.io/integrations/opencti_connector
-  rel_url_schema: https://documentation.ubuntu.com/charmlibs/reference/interfaces/opencti_connector/v0/
+  rel_url_schema: https://canonical.com/juju/docs/charmlibs/reference/interfaces/opencti_connector/v0/
   description: ''
   tags:
   - security
@@ -1635,7 +1635,7 @@ interfaces:
 - name: charmlibs.interfaces.service_mesh
   status: recommended
   url: https://pypi.org/project/charmlibs-interfaces-service-mesh
-  docs: https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/service-mesh
+  docs: https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/service-mesh
   src: https://github.com/canonical/charmlibs/tree/main/interfaces/service_mesh
   kind: PyPI
   rel_name: service_mesh
@@ -1683,7 +1683,7 @@ interfaces:
 - name: charmlibs.interfaces.tls_certificates
   status: recommended
   url: https://pypi.org/project/charmlibs-interfaces-tls-certificates
-  docs: https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/tls_certificates
+  docs: https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/tls_certificates
   src: https://github.com/canonical/charmlibs/tree/main/interfaces/tls_certificates
   kind: PyPI
   rel_name: tls_certificates
@@ -1775,7 +1775,7 @@ interfaces:
   kind: PyPI
   rel_name: litmus_auth
   rel_url_charmhub: https://charmhub.io/integrations/litmus_auth
-  rel_url_schema: https://documentation.ubuntu.com/charmlibs/reference/interfaces/litmus_auth/v0/
+  rel_url_schema: https://canonical.com/juju/docs/charmlibs/reference/interfaces/litmus_auth/v0/
   description: ''
   tags:
   - internal
@@ -1783,7 +1783,7 @@ interfaces:
 - name: charmlibs.interfaces.istio_request_auth
   status: recommended
   url: https://pypi.org/project/charmlibs-interfaces-istio-request-auth
-  docs: https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/istio-request-auth
+  docs: https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/istio-request-auth
   src: https://github.com/canonical/charmlibs/tree/main/interfaces/istio_request_auth
   kind: PyPI
   rel_name: istio-request-auth
@@ -1809,7 +1809,7 @@ interfaces:
 - name: charmlibs.interfaces.gateway_metadata
   status: recommended
   url: https://pypi.org/project/charmlibs-interfaces-gateway-metadata
-  docs: https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/gateway-metadata
+  docs: https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/gateway-metadata
   src: https://github.com/canonical/charmlibs/tree/main/interfaces/gateway_metadata
   kind: PyPI
   rel_name: gateway-metadata
@@ -1833,12 +1833,12 @@ interfaces:
 - name: charmlibs.interfaces.istio_metadata
   status: recommended
   url: https://pypi.org/project/charmlibs-interfaces-istio-metadata
-  docs: https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/istio_metadata
+  docs: https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/istio_metadata
   src: https://github.com/canonical/charmlibs/tree/main/interfaces/istio_metadata
   kind: PyPI
   rel_name: istio_metadata
   rel_url_charmhub: ''
-  rel_url_schema: https://documentation.ubuntu.com/charmlibs/reference/interfaces/istio_metadata/v0/
+  rel_url_schema: https://canonical.com/juju/docs/charmlibs/reference/interfaces/istio_metadata/v0/
   description: Share Istio installation metadata (e.g. root namespace) between charms.
   tags:
   - networking
@@ -1870,7 +1870,7 @@ interfaces:
 - name: charmlibs.interfaces.istio_ingress_route
   status: recommended
   url: https://pypi.org/project/charmlibs-interfaces-istio-ingress-route
-  docs: https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/istio-ingress-route
+  docs: https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/istio-ingress-route
   src: https://github.com/canonical/charmlibs/tree/main/interfaces/istio_ingress_route
   kind: PyPI
   rel_name: istio-ingress-route

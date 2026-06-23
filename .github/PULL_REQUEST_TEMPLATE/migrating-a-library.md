@@ -4,10 +4,10 @@ Template: Migrating an existing Charmhub-hosted library into the charmlibs monor
 If you selected the wrong template, go back one page in your browser.
 
 Read first:
-https://documentation.ubuntu.com/charmlibs/how-to/python-package/#what-can-i-publish-under-the-charmlibs-namespace
+https://canonical.com/juju/docs/charmlibs/how-to/python-package/#what-can-i-publish-under-the-charmlibs-namespace
 
 To learn how to migrate a library:
-https://documentation.ubuntu.com/charmlibs/how-to/migrate/
+https://canonical.com/juju/docs/charmlibs/how-to/migrate/
 -->
 
 This PR migrates an existing library to the charmlibs monorepo. <!-- update with relevant context -->
@@ -53,7 +53,7 @@ Tests and docs:
 
 - [ ] Directory name exactly matches the interface name as written in `charmcraft.yaml`.
 - [ ] Interface metadata added (or updated if necessary), or an issue created and tracked to do this as a follow-up task.
-- [ ] Testing package added under `interfaces/<name>/testing/` exporting `relation_for_provider` and `relation_for_requirer` if needed (see [how-to guide](https://documentation.ubuntu.com/charmlibs/how-to/provide-relation-data-for-charm-tests/)), or an issue created and tracked to do this as a follow-up task.
+- [ ] Testing package added under `interfaces/<name>/testing/` exporting `relation_for_provider` and `relation_for_requirer` if needed (see [how-to guide](https://canonical.com/juju/docs/charmlibs/how-to/provide-relation-data-for-charm-tests/)), or an issue created and tracked to do this as a follow-up task.
 
 
 ## Commit strategy

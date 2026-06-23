@@ -369,7 +369,7 @@ def _get_docs_url(category: str, root: pathlib.Path, path: pathlib.Path) -> str:
         url = _pyproject_toml(path, root=root)['project']['urls'].get('Documentation', '')
         return url.strip()
     assert category == 'interfaces'
-    return f'https://documentation.ubuntu.com/charmlibs/reference/interfaces/{path.name}/'
+    return f'https://canonical.com/juju/docs/charmlibs/reference/interfaces/{path.name}/'
 
 
 def _get_lib_docs_url(category: str, root: pathlib.Path, path: pathlib.Path) -> str:

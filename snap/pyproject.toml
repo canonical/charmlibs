@@ -27,7 +27,7 @@ functional = []
 integration = []
 
 [project.urls]
-"Documentation" = "https://documentation.ubuntu.com/charmlibs/reference/charmlibs/snap/"
+"Documentation" = "https://canonical.com/juju/docs/charmlibs/reference/charmlibs/snap/"
 "Repository" = "https://github.com/canonical/charmlibs/tree/main/snap"
 "Issues" = "https://github.com/canonical/charmlibs/issues"
 "Changelog" = "https://github.com/canonical/charmlibs/blob/main/snap/CHANGELOG.md"
