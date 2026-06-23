@@ -29,7 +29,7 @@
 
 # charmlibs packages (alphabetical)
 /apt/ @canonical/charmlibs-maintainers
-/nginx_k8s/ @canonical/tracing-and-profiling
+/nginx_k8s/ @canonical/observability
 /passwd/ @canonical/charmlibs-maintainers
 /pathops/ @canonical/charmlibs-maintainers
 /rollingops/ @canonical/data
