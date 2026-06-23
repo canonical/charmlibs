@@ -24,6 +24,12 @@ from charmlibs.nginx_k8s import (
 
 sample_dns_ip = '198.18.0.0'
 
+# sha256('') + ',' + sha256(yaml.safe_dump({})) for the no-TLS case
+_PEXP_RELOAD_NO_TLS = (
+    'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855,'
+    'ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356'
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -142,17 +148,21 @@ def test_has_config_changed(ctx: testing.Context, nginx_container):
             NginxPrometheusExporter,
             (),
             {
-                'summary': 'Nginx prometheus exporter layer.',
-                'description': 'Pebble config layer for the Nginx Prometheus exporter service.',
+                'summary': 'Nginx prometheus exporter layer',
+                'description': 'Pebble config layer for nginx-prometheus-exporter',
                 'services': {
                     'nginx-prometheus-exporter': {
-                        'summary': 'Nginx prometheus exporter service.',
+                        'summary': 'Nginx prometheus exporter',
                         'startup': 'enabled',
                         'override': 'replace',
                         'command': 'nginx-prometheus-exporter '
-                        '--no-nginx.ssl-verify '
                         '--web.listen-address=:9113 '
-                        '--nginx.scrape-uri=https://127.0.0.1:8080/status',
+                        '--nginx.scrape-uri=http://127.0.0.1:8080/status '
+                        '--no-nginx.ssl-verify '
+                        '--web.config.file=/etc/exporter/web-config.yaml',
+                        'environment': {
+                            '_reload': _PEXP_RELOAD_NO_TLS,
+                        },
                     }
                 },
             },
@@ -426,6 +436,28 @@ def test_generate_nginx_config_with_extra_http_variables():
             / 'sample_litmus_conf_with_extra_http_variables.txt'
         )
         assert sample_config_path.read_text() == generated_config
+
+
+def test_upstreams_servers_are_sorted():
+    # GIVEN a NginxConfig with one upstream config
+    with mock_resolv_conf(f'nameserver {sample_dns_ip}'):
+        nginx = NginxConfig(
+            'localhost',
+            upstream_configs=[NginxUpstream('otlp-grpc', 4317, 'distributor')],
+            server_ports_to_locations={4317: [NginxLocationConfig(backend='otlp-grpc', path='/')]},
+        )
+
+        # WHEN _upstreams is called with multiple addresses in non-sorted order
+        addresses = {
+            'distributor-2.svc.cluster.local',
+            'distributor-0.svc.cluster.local',
+            'distributor-1.svc.cluster.local',
+        }
+        upstreams = nginx._upstreams({'distributor': addresses})
+
+        # THEN the server entries in the upstream block are in sorted order
+        server_args = [d['args'][0] for d in upstreams[0]['block'] if d['directive'] == 'server']
+        assert server_args == sorted(server_args)
 
 
 def test_exception_raised_if_nginx_module_missing(caplog):

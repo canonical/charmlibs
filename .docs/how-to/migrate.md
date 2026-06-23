@@ -123,7 +123,7 @@ Now follow these steps to migrate your library's source code:
 1. Copy the copyright header from `__init__.py` to `_<name>.py` to satisfy the linter.
 2. Move the docstring from `_<name>.py` to `__init__.py` so that it's included in your library's automatically built reference docs.
 3. Document in the `_<name>.py` docstring the API and patch version of the source code that you're migrating. This will be helpful for future maintainers and users if they need to debug issues.
-4. Delete `LIB_ID`, `LIB_API`, and `LIB_PATCH` from `_<name>.py` -- unless they're used internally by the library, then you'll need to keep them for now.
+4. Delete `LIBID`, `LIBAPI`, and `LIBPATCH` from `_<name>.py` -- unless they're used internally by the library, then you'll need to keep them for now.
 5. Move the contents of `PYDEPS` to the `dependencies` entry in your `pyproject.toml` (using `just add`), and delete the `PYDEPS` variable. You'll also need to add any additional dependencies that were assumed to be provided by the charm, like `ops` or `pydantic`. Consider adding version constraints to your dependencies too.
 6. Import the public API of your library to `__init__.py` and add the imported names to `__all__`, like this:
 ```python
