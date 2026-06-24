@@ -33,7 +33,7 @@ integration = [  # installed for `just integration interfaces/istio_ingress_rout
 ]
 
 [project.urls]
-"Documentation" = "https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/istio-ingress-route"
+"Documentation" = "https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/istio-ingress-route"
 "Repository" = "https://github.com/canonical/charmlibs/tree/main/interfaces/istio_ingress_route"
 "Issues" = "https://github.com/canonical/charmlibs/issues"
 "Changelog" = "https://github.com/canonical/charmlibs/blob/main/interfaces/istio_ingress_route/CHANGELOG.md"

@@ -34,7 +34,7 @@ integration = [  # installed for `just integration interfaces/service_mesh`
 ]
 
 [project.urls]
-"Documentation" = "https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/service-mesh"
+"Documentation" = "https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/service-mesh"
 "Repository" = "https://github.com/canonical/charmlibs/tree/main/interfaces/service_mesh"
 "Issues" = "https://github.com/canonical/charmlibs/issues"
 "Changelog" = "https://github.com/canonical/charmlibs/blob/main/interfaces/service_mesh/CHANGELOG.md"
