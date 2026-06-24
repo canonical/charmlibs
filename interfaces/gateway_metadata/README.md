@@ -8,4 +8,4 @@ To install, add `charmlibs-interfaces-gateway-metadata` to your Python dependenc
 from charmlibs.interfaces import gateway_metadata
 ```
 
-See the [reference documentation](https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/gateway-metadata) for more.
+See the [reference documentation](https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/gateway-metadata) for more.
