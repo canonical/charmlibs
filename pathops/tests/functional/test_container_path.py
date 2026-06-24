@@ -262,8 +262,14 @@ class TestGlob:
 @pytest.mark.parametrize('filename', utils.FILENAMES_PLUS)
 @pytest.mark.parametrize('method', ['owner', 'group'])
 def test_owner_and_group(
-    container: ops.Container, session_dir: pathlib.Path, method: str, filename: str
+    container: ops.Container,
+    session_dir: pathlib.Path,
+    pebble_resolves_groups: bool,
+    method: str,
+    filename: str,
 ):
+    if method == 'group' and not pebble_resolves_groups:
+        pytest.xfail('Pebble cannot resolve LDAP/SSSD groups')
     path = session_dir / filename
     pathlib_method = getattr(path, method)
     container_path = ContainerPath(path, container=container)
@@ -493,8 +499,14 @@ class TestWrite:
         assert (path.owner(), path.group()) == (user, group)
 
     def test_user_and_group_ok(
-        self, container: ops.Container, tmp_path: pathlib.Path, method: Callable[..., None]
+        self,
+        container: ops.Container,
+        tmp_path: pathlib.Path,
+        pebble_resolves_groups: bool,
+        method: Callable[..., None],
     ):
+        if not pebble_resolves_groups:
+            pytest.xfail('Pebble cannot resolve LDAP/SSSD groups')
         user = getpass.getuser()
         group = grp.getgrgid(pwd.getpwnam(user).pw_gid).gr_name
         path = tmp_path / 'filename'

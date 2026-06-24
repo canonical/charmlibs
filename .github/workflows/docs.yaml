@@ -43,9 +43,7 @@ jobs:
         id: spellcheck-step
         if: success() || failure()
         continue-on-error: true
-        uses: canonical/documentation-workflows/spellcheck@6f9c05eae99ca9fff05250810bba2a71a380ebd1  # main
-        with:
-          working-directory: .docs
+        run: uvx --from=rust-just just docs spelling
       # Disable link checking until we get a more robust solution.
       # The current approach often fails due to rate limiting and timeouts.
       # - name: Links
