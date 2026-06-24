@@ -33,7 +33,7 @@ integration = [
 ]
 
 [project.urls]
-"Documentation" = "https://canonical.com/juju/docs/charmlibsreference/charmlibs/nginx_k8s/"
+"Documentation" = "https://canonical.com/juju/docs/charmlibs/reference/charmlibs/nginx_k8s/"
 "Repository" = "https://github.com/canonical/charmlibs"
 "Issues" = "https://github.com/canonical/charmlibs/issues"
 "Changelog" = "https://github.com/canonical/charmlibs/blob/main/nginx_k8s/CHANGELOG.md"
