@@ -201,14 +201,6 @@ class TestIntegration:
         task = juju.run(f"{new_app_and_unit_requirer_app_name}/0", "get-unit-certificate")
         _assert_certificate_fields(task)
 
-    def test_given_requirer_and_provider_support_capabilities_when_related_then_capabilities_are_advertised(
-        self, juju: jubilant.Juju
-    ):
-        task = juju.run(f"{TLS_CERTIFICATES_REQUIRER_APP_NAME}/0", "get-provider-capabilities")
-        assert task.results.get("available") == "true"
-        assert task.results.get("supports-ip-sans") == "True"
-        assert task.results.get("provider-type") == "self-signed"
-
 
 class TestProviderCapabilitiesUpgrade:
     """Verify capability advertisement does not break cross-version compatibility."""

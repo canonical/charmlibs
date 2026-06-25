@@ -326,21 +326,19 @@ class ProviderCapabilities(pydantic.BaseModel):
       ``True`` means supported, ``False`` means **advertised as unsupported**, and ``None``
       means the provider advertised capabilities but left this one unspecified. A ``None``
       field MUST NOT be interpreted as an assumed default by the requirer.
-
-    Attributes:
-        supports_ip_sans: Whether IP addresses are accepted in SANs.
-        supports_wildcard_dns: Whether wildcard DNS entries are accepted.
-        supports_subdomain: Whether subdomain certificates can be issued.
-        supports_ca_certificates: Whether CA certificates can be issued.
-        allowed_domains: Optional list of allowed DNS domains.
-        provider_type: Optional provider-type hint (e.g. "acme", "vault", "self-signed").
     """
 
+    #: Whether IP addresses are accepted in SANs.
     supports_ip_sans: bool | None = None
+    #: Whether wildcard DNS entries are accepted.
     supports_wildcard_dns: bool | None = None
+    #: Whether subdomain certificates can be issued.
     supports_subdomain: bool | None = None
+    #: Whether CA certificates can be issued.
     supports_ca_certificates: bool | None = None
+    #: Optional list of allowed DNS domains.
     allowed_domains: list[str] | None = None
+    #: Optional provider-type hint (e.g. "acme", "vault", "self-signed").
     provider_type: str | None = None
 
 
@@ -1773,6 +1771,24 @@ class CertificatesRequirerCharmEvents(CharmEvents):
     certificate_denied = EventSource(CertificateDeniedEvent)
 
 
+if TYPE_CHECKING:
+    _CertificateRequestsByMode: TypeAlias = dict[
+        Literal[Mode.APP, Mode.UNIT], list[CertificateRequestAttributes]
+    ]
+    # Each request input may be supplied either statically or as a capability-aware
+    # callable invoked with the provider's advertised ProviderCapabilities (or None).
+    _CertificateRequestsArg: TypeAlias = (
+        list[CertificateRequestAttributes]
+        | Callable[[ProviderCapabilities | None], list[CertificateRequestAttributes]]
+        | None
+    )
+    _CertificateRequestsByModeArg: TypeAlias = (
+        _CertificateRequestsByMode
+        | Callable[[ProviderCapabilities | None], _CertificateRequestsByMode]
+        | None
+    )
+
+
 class TLSCertificatesRequiresV4(Object):
     """A class to manage the TLS certificates interface for a unit or app."""
 
@@ -1782,17 +1798,12 @@ class TLSCertificatesRequiresV4(Object):
         self,
         charm: CharmBase,
         relationship_name: str,
-        certificate_requests: list[CertificateRequestAttributes]
-        | Callable[[ProviderCapabilities | None], list[CertificateRequestAttributes]]
-        | None = None,
+        certificate_requests: _CertificateRequestsArg = None,
         mode: Mode = Mode.UNIT,
         refresh_events: list[BoundEvent] | None = None,
         private_key: PrivateKey | None = None,
         renewal_relative_time: float = 0.9,
-        certificate_requests_by_mode: dict[
-            Literal[Mode.APP, Mode.UNIT], list[CertificateRequestAttributes]
-        ]
-        | None = None,
+        certificate_requests_by_mode: _CertificateRequestsByModeArg = None,
     ):
         """Create a new instance of the TLSCertificatesRequiresV4 class.
 
@@ -1804,16 +1815,13 @@ class TLSCertificatesRequiresV4(Object):
                 - Use this when mode is Mode.UNIT or Mode.APP (single mode).
                 - Must be None or empty when using mode=Mode.APP_AND_UNIT.
                 - Mutually exclusive with certificate_requests_by_mode.
-                - May be supplied as a list, or as a callable returning a list.
-                  When a callable is supplied, the library resolves it on every hook that
-                  builds requests (both the reconcile path and the renewal path triggered
-                  by secret expiry) and uses the result as the request set for that hook.
-                  The callable is invoked with a single argument: the provider's currently
-                  advertised capabilities as a ``ProviderCapabilities`` object, or ``None``
-                  when the provider has not advertised capabilities yet (see
-                  ``ProviderCapabilities`` for the not-advertised vs unsupported semantics).
-                  Keep the callable a pure read with no side effects; gating churn (avoiding
-                  needless request changes) is the charm author's responsibility.
+                - May be supplied as a list, or as a capability-aware callable returning a
+                  list. The callable is invoked with the provider's currently advertised
+                  ``ProviderCapabilities`` (or ``None`` when none are advertised yet) and is
+                  resolved on every hook that builds requests (reconcile and renewal). Keep it
+                  a pure read with no side effects; gating churn is the charm's responsibility.
+                  Until the first resolution, the public ``certificate_requests`` attribute is
+                  empty.
             mode (Mode): Whether to use UNIT, APP or APP_AND_UNIT certificates mode. Default is
                 Mode.UNIT.
                 In UNIT mode the requirer will place the csr in the unit relation data.
@@ -1850,6 +1858,9 @@ class TLSCertificatesRequiresV4(Object):
                 - Must be None when mode is Mode.UNIT or Mode.APP.
                 - Keys must be Mode.APP and/or Mode.UNIT (not Mode.APP_AND_UNIT).
                 - Mutually exclusive with certificate_requests.
+                - May also be supplied as a capability-aware callable returning the dictionary
+                  (same resolution semantics as the callable form of certificate_requests),
+                  so APP_AND_UNIT requests can react to provider capabilities too.
 
         Example:
                     certificate_requests_by_mode={
@@ -1871,20 +1882,28 @@ class TLSCertificatesRequiresV4(Object):
         self.charm = charm
         self.relationship_name = relationship_name
         self.mode = mode
+        self._certificate_requests_input = certificate_requests
         self._certificate_requests_by_mode = certificate_requests_by_mode
-        if callable(certificate_requests):
-            # A callable is resolved every hook that builds requests (reconcile and
-            # renewal), since it may depend on relation data (such as the provider's
-            # advertised capabilities) that isn't readable at construction time.
-            self._certificate_requests_callable: (
-                Callable[[ProviderCapabilities | None], list[CertificateRequestAttributes]] | None
-            ) = certificate_requests
+        if callable(certificate_requests) or callable(certificate_requests_by_mode):
+            # A capability-aware callable is resolved on every hook that builds requests
+            # (reconcile and renewal), since it depends on relation data (the provider's
+            # advertised capabilities) that isn't readable at construction time. The
+            # mode/parameter pairing is validated eagerly; the callable's (deferred) content
+            # is validated each time it is resolved. Until then, certificate_requests is empty.
+            if mode == Mode.APP_AND_UNIT and certificate_requests:
+                raise TLSCertificatesError(
+                    "certificate_requests must be None in APP_AND_UNIT mode; "
+                    "use certificate_requests_by_mode."
+                )
+            if mode != Mode.APP_AND_UNIT and certificate_requests_by_mode is not None:
+                raise TLSCertificatesError(
+                    "certificate_requests_by_mode must be None when the mode is UNIT or APP."
+                )
             self.certificate_requests: list[CertificateRequestAttributes] = []
             self._certificate_mode_map: dict[
                 CertificateRequestAttributes, Literal[Mode.APP, Mode.UNIT]
             ] = {}
         else:
-            self._certificate_requests_callable = None
             self.certificate_requests, self._certificate_mode_map = (
                 self._validate_and_map_certificate_requests(
                     mode, certificate_requests_by_mode, certificate_requests
@@ -2018,28 +2037,34 @@ class TLSCertificatesRequiresV4(Object):
         self._renew_expiring_certificates()
 
     def _resolve_certificate_requests(self) -> None:
-        """Resolve a callable ``certificate_requests`` for the current hook.
+        """Resolve callable ``certificate_requests``/``certificate_requests_by_mode``.
 
-        When ``certificate_requests`` was provided as a callable, invoke it with the
-        provider's currently-advertised capabilities (or ``None`` when the provider
-        has not advertised capabilities yet) and update ``self.certificate_requests``
-        and ``self._certificate_mode_map``.
+        When either request input was provided as a capability-aware callable, invoke it
+        with the provider's currently-advertised capabilities (or ``None`` when none are
+        advertised yet) and update ``self.certificate_requests`` and
+        ``self._certificate_mode_map``.
 
-        This is a no-op when ``certificate_requests`` was provided as a static list,
-        in which case the requests were validated and mapped once in ``__init__``.
-        It must be called from every code path that builds and sends requests (both
-        the reconcile path in ``_configure`` and the renewal path in
-        ``_renew_certificate_request``), so that renewals don't iterate an empty
-        request set when a callable is used.
+        This is a no-op when both inputs were static, in which case they were validated and
+        mapped once in ``__init__``. It must be called from every code path that builds and
+        sends requests (both the reconcile path in ``_configure`` and the renewal path in
+        ``_renew_certificate_request``), so that renewals don't iterate an empty request set
+        when a callable is used.
         """
-        if self._certificate_requests_callable is None:
+        if not (
+            callable(self._certificate_requests_input)
+            or callable(self._certificate_requests_by_mode)
+        ):
             return
         capabilities = self.get_provider_capabilities()
+        requests = self._certificate_requests_input
+        if callable(requests):
+            requests = requests(capabilities)
+        requests_by_mode = self._certificate_requests_by_mode
+        if callable(requests_by_mode):
+            requests_by_mode = requests_by_mode(capabilities)
         self.certificate_requests, self._certificate_mode_map = (
             self._validate_and_map_certificate_requests(
-                self.mode,
-                self._certificate_requests_by_mode,
-                self._certificate_requests_callable(capabilities),
+                self.mode, requests_by_mode, requests or []
             )
         )
 
@@ -3177,6 +3202,7 @@ class TLSCertificatesProvidesV4(Object):
         provider_capabilities: ProviderCapabilities | None = None,
     ):
         super().__init__(charm, relationship_name)
+        self.framework.observe(charm.on[relationship_name].relation_created, self._configure)
         self.framework.observe(charm.on[relationship_name].relation_joined, self._configure)
         self.framework.observe(charm.on[relationship_name].relation_changed, self._configure)
         self.framework.observe(charm.on.update_status, self._configure)
@@ -3198,35 +3224,28 @@ class TLSCertificatesProvidesV4(Object):
         self._publish_capabilities()
 
     def _publish_capabilities(self) -> None:
-        """Publish the provider's capabilities into every relation's application data.
+        """Synchronise the provider's capabilities into every relation's application data.
 
-        No-op when no capabilities were supplied at initialization. Preserves the
-        existing ``certificates`` and ``request_errors`` keys (load-modify-dump).
+        Writes the capabilities supplied at initialization, or clears any previously
+        published capabilities when none are supplied (so requirers don't keep observing
+        stale data after a provider stops advertising). Writes are no-op-if-unchanged to
+        avoid ``relation-changed`` churn, and preserve the existing ``certificates`` and
+        ``request_errors`` keys (load-modify-dump).
         """
-        if self.provider_capabilities is None:
-            return
         for relation in self._get_tls_relations():
-            self._dump_provider_capabilities(
-                relation=relation, capabilities=self.provider_capabilities
-            )
-
-    def _dump_provider_capabilities(
-        self, relation: Relation, capabilities: ProviderCapabilities
-    ) -> None:
-        """Dump provider capabilities to relation data, preserving other fields."""
-        try:
-            provider_data = _ProviderApplicationData.load(relation.data[self.charm.app])
-        except DataValidationError:
-            logger.warning("Failed to load provider relation data")
-            return
-        if provider_data.capabilities == capabilities:
-            return
-        provider_data.capabilities = capabilities
-        try:
-            provider_data.dump(relation.data[self.model.app])
-            logger.info("Provider capabilities relation data updated")
-        except ModelError:
-            logger.warning("Failed to update relation data")
+            try:
+                provider_data = _ProviderApplicationData.load(relation.data[self.charm.app])
+            except DataValidationError:
+                logger.warning("Failed to load provider relation data")
+                continue
+            if provider_data.capabilities == self.provider_capabilities:
+                continue
+            provider_data.capabilities = self.provider_capabilities
+            try:
+                provider_data.dump(relation.data[self.model.app])
+                logger.info("Provider capabilities relation data updated")
+            except ModelError:
+                logger.warning("Failed to update relation data")
 
     def _remove_certificates_for_which_no_csr_exists(self) -> None:
         provider_certificates = self.get_provider_certificates()

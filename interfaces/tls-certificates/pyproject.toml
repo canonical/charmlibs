@@ -84,6 +84,7 @@ ignore = [
 ]
 
 [tool.pytest.ini_options]
+addopts = ["-x"]
 markers = [
     "upgrade: test that refreshes the chamr with the new library version",
 ]

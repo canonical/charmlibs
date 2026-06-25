@@ -5,7 +5,7 @@ import datetime
 import json
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Literal
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -90,6 +90,8 @@ class TestTLSCertificatesRequiresV4:
         self.ctx = testing.Context(
             charm_type=DummyTLSCertificatesRequirerCharm,
             meta=METADATA,
+            config=METADATA["config"],
+            actions=METADATA["actions"],
         )
 
     def test_given_private_key_not_created_and_not_passed_when_certificates_relation_created_then_private_key_is_generated(
@@ -296,6 +298,8 @@ class TestTLSCertificatesRequiresV4:
         ctx = testing.Context(
             charm_type=DummyTLSCertificatesRequirerCharmAppAndUnit,
             meta=METADATA,
+            config=METADATA["config"],
+            actions=METADATA["actions"],
         )
         certificates_relation = testing.Relation(
             endpoint="certificates",
@@ -322,6 +326,8 @@ class TestTLSCertificatesRequiresV4:
         ctx = testing.Context(
             charm_type=DummyTLSCertificatesRequirerCharmAppAndUnit,
             meta=METADATA,
+            config=METADATA["config"],
+            actions=METADATA["actions"],
         )
         certificates_relation = testing.Relation(
             endpoint="certificates",
@@ -348,6 +354,8 @@ class TestTLSCertificatesRequiresV4:
         ctx = testing.Context(
             charm_type=DummyTLSCertificatesRequirerCharmAppAndUnitWithPrivateKey,
             meta=METADATA,
+            config=METADATA["config"],
+            actions=METADATA["actions"],
         )
         certificates_relation = testing.Relation(
             endpoint="certificates",
@@ -378,6 +386,8 @@ class TestTLSCertificatesRequiresV4:
         ctx = testing.Context(
             charm_type=DummyTLSCertificatesRequirerCharmAppAndUnit,
             meta=METADATA,
+            config=METADATA["config"],
+            actions=METADATA["actions"],
         )
         csr_app = generate_csr(private_key=generate_private_key(), common_name="app.example.com")
         csr_unit = generate_csr(private_key=generate_private_key(), common_name="unit.example.com")
@@ -426,6 +436,8 @@ class TestTLSCertificatesRequiresV4:
         ctx = testing.Context(
             charm_type=DummyTLSCertificatesRequirerCharmAppAndUnit,
             meta=METADATA,
+            config=METADATA["config"],
+            actions=METADATA["actions"],
         )
         csr_unit = generate_csr(private_key=generate_private_key(), common_name="unit.example.com")
         mock_generate_csr.return_value = csr_unit
@@ -463,6 +475,8 @@ class TestTLSCertificatesRequiresV4:
         ctx = testing.Context(
             charm_type=DummyTLSCertificatesRequirerCharmAppAndUnitDuplicate,
             meta=METADATA,
+            config=METADATA["config"],
+            actions=METADATA["actions"],
         )
         certificates_relation = testing.Relation(
             endpoint="certificates",
@@ -2223,6 +2237,8 @@ class TestTLSCertificatesRequiresV4:
         context = testing.Context(
             charm_type=DummyTLSCertificatesRequirerCharm,
             meta=METADATA,
+            config=METADATA["config"],
+            actions=METADATA["actions"],
         )
 
         certificates_relation = testing.Relation(
@@ -2256,6 +2272,8 @@ class TestTLSCertificatesRequiresV4:
         context = testing.Context(
             charm_type=DummyTLSCertificatesRequirerCharm,
             meta=METADATA,
+            config=METADATA["config"],
+            actions=METADATA["actions"],
         )
 
         certificates_relation = testing.Relation(
@@ -2293,6 +2311,8 @@ class TestTLSCertificatesRequiresV4:
         context = testing.Context(
             charm_type=DummyTLSCertificatesRequirerCharm,
             meta=METADATA,
+            config=METADATA["config"],
+            actions=METADATA["actions"],
         )
 
         certificates_relation = testing.Relation(
@@ -2346,6 +2366,8 @@ class TestTLSCertificatesRequiresV4:
         context = testing.Context(
             charm_type=DummyTLSCertificatesRequirerCharm,
             meta=METADATA,
+            config=METADATA["config"],
+            actions=METADATA["actions"],
         )
 
         certificates_relation = testing.Relation(
@@ -2691,3 +2713,144 @@ class TestRequirerCallableCertificateRequests:
         )
 
         assert self._csr_common_names(state_out, relation.id) == ["default.example.com"]
+
+
+class CallableWithAppAndUnitModeCharm(CharmBase):
+    def __init__(self, *args: Any):
+        super().__init__(*args)
+        self.certificates = TLSCertificatesRequiresV4(
+            charm=self,
+            relationship_name="certificates",
+            certificate_requests=lambda _: [
+                CertificateRequestAttributes(common_name="example.com")
+            ],
+            mode=Mode.APP_AND_UNIT,
+        )
+
+
+class CallableWithRequestsByModeCharm(CharmBase):
+    def __init__(self, *args: Any):
+        super().__init__(*args)
+        self.certificates = TLSCertificatesRequiresV4(
+            charm=self,
+            relationship_name="certificates",
+            certificate_requests=lambda _: [
+                CertificateRequestAttributes(common_name="example.com")
+            ],
+            certificate_requests_by_mode={
+                Mode.UNIT: [CertificateRequestAttributes(common_name="unit.example.com")]
+            },
+        )
+
+
+class TestRequirerCallableValidation:
+    def test_given_callable_with_app_and_unit_mode_when_init_then_raises(self):
+        ctx = testing.Context(
+            charm_type=CallableWithAppAndUnitModeCharm,
+            meta=CAPABILITY_REQUIRER_META,
+        )
+        relation = testing.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-provider",
+        )
+        state_in = testing.State(relations={relation})
+
+        with pytest.raises(testing.errors.UncaughtCharmError):
+            ctx.run(ctx.on.relation_changed(relation), state_in)
+
+    def test_given_callable_with_requests_by_mode_when_init_then_raises(self):
+        ctx = testing.Context(
+            charm_type=CallableWithRequestsByModeCharm,
+            meta=CAPABILITY_REQUIRER_META,
+        )
+        relation = testing.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-provider",
+        )
+        state_in = testing.State(relations={relation})
+
+        with pytest.raises(testing.errors.UncaughtCharmError):
+            ctx.run(ctx.on.relation_changed(relation), state_in)
+
+
+class CallableByModeRequirerCharm(CharmBase):
+    def __init__(self, *args: Any):
+        super().__init__(*args)
+        self.certificates = TLSCertificatesRequiresV4(
+            charm=self,
+            relationship_name="certificates",
+            certificate_requests_by_mode=self._build_requests_by_mode,
+            mode=Mode.APP_AND_UNIT,
+        )
+
+    def _build_requests_by_mode(
+        self, capabilities: ProviderCapabilities | None
+    ) -> dict[Literal[Mode.APP, Mode.UNIT], list[CertificateRequestAttributes]]:
+        if capabilities is not None and capabilities.supports_ip_sans is False:
+            unit_name = "adapted-unit.example.com"
+        else:
+            unit_name = "default-unit.example.com"
+        return {
+            Mode.APP: [CertificateRequestAttributes(common_name="app.example.com")],
+            Mode.UNIT: [CertificateRequestAttributes(common_name=unit_name)],
+        }
+
+
+class TestRequirerCallableRequestsByMode:
+    @pytest.fixture(autouse=True)
+    def context(self):
+        self.ctx = testing.Context(
+            charm_type=CallableByModeRequirerCharm,
+            meta=CAPABILITY_REQUIRER_META,
+        )
+
+    def _csr_common_names(self, raw: str | None) -> list[str]:
+        if not raw:
+            return []
+        names: list[str] = []
+        for entry in json.loads(raw):
+            csr = x509.load_pem_x509_csr(entry["certificate_signing_request"].encode())
+            names.extend(
+                str(attr.value)
+                for attr in csr.subject.get_attributes_for_oid(x509.NameOID.COMMON_NAME)
+            )
+        return names
+
+    def test_given_callable_by_mode_when_relation_changed_then_app_and_unit_csrs_sent(self):
+        relation = testing.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-provider",
+        )
+        state_in = testing.State(relations={relation}, leader=True)
+
+        state_out = self.ctx.run(self.ctx.on.relation_changed(relation), state_in)
+
+        relation_out = next(r for r in state_out.relations if r.id == relation.id)
+        unit_names = self._csr_common_names(
+            relation_out.local_unit_data.get("certificate_signing_requests")
+        )
+        app_names = self._csr_common_names(
+            relation_out.local_app_data.get("certificate_signing_requests")
+        )
+        assert unit_names == ["default-unit.example.com"]
+        assert app_names == ["app.example.com"]
+
+    def test_given_callable_by_mode_reads_capabilities_then_unit_request_is_adapted(self):
+        relation = testing.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-provider",
+            remote_app_data={"capabilities": json.dumps({"supports_ip_sans": False})},
+        )
+        state_in = testing.State(relations={relation}, leader=True)
+
+        state_out = self.ctx.run(self.ctx.on.relation_changed(relation), state_in)
+
+        relation_out = next(r for r in state_out.relations if r.id == relation.id)
+        unit_names = self._csr_common_names(
+            relation_out.local_unit_data.get("certificate_signing_requests")
+        )
+        assert unit_names == ["adapted-unit.example.com"]

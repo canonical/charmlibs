@@ -141,7 +141,9 @@ class Capabilities(BaseModel):
 class ProviderApplicationData(BaseModel):
     """Provider application data model."""
 
-    certificates: Json[list[Certificate]] = Field(description="List of certificates.")
+    certificates: Json[list[Certificate]] | None = Field(
+        default=None, description="List of certificates."
+    )
     request_errors: Json[list[RequestError]] | None = Field(
         default=None, description="List of request errors."
     )
