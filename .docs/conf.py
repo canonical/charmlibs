@@ -6,7 +6,13 @@ import textwrap
 
 # local extensions
 sys.path.insert(0, str(pathlib.Path(__file__).parent / 'extensions'))
-local_extensions = ['generate_tables', 'interface_docs', 'package_docs', 'diataxis_docs_fallback']
+local_extensions = [
+    'generate_tables',
+    'interface_docs',
+    'package_docs',
+    'diataxis_docs_fallback',
+    'automatic_redirects',
+]
 
 # So that sphinx.ext.autodoc can find charmlibs code
 root = pathlib.Path(__file__).parent.parent
@@ -102,6 +108,14 @@ sitemap_excludes = [  # Exclude generated pages from the sitemap:
 
 redirects = {}
 
+# sphinx-rerediraffe: https://github.com/wpilibsuite/sphinx-rerediraffe
+# Used by the local `automatic_redirects` extension, which populates this
+# mapping at build time with separator-variant aliases (for example,
+# `how_to/manage_libraries` -> `how-to/manage-libraries`). Seed it as an empty
+# dict so the extension can extend it; set to None to disable redirect
+# generation entirely.
+rediraffe_redirects: dict[str, str] = {}
+
 ############################
 # sphinx-llm configuration #
 ############################
@@ -155,6 +169,7 @@ extensions = [
     "notfound.extension",
     "sphinx_design",
     "sphinx_reredirects",
+    "sphinx_rerediraffe",
     "sphinxcontrib.jquery",
     "sphinxext.opengraph",
     # Previously bundled as canonical-sphinx-extensions
