@@ -398,13 +398,15 @@
   {
     "name": "k8s-service",
     "version": "0",
-    "lib": "",
-    "lib_url": "",
+    "lib": "charms.mlops_libs.k8s_service_info",
+    "lib_url": "https://charmhub.io/mlops-libs/libraries/k8s_service_info",
     "lib_docs_url": "",
     "docs_url": "https://canonical.com/juju/docs/charmlibs/reference/interfaces/k8s-service/",
     "summary": "",
     "description": "",
-    "tags": [],
+    "tags": [
+      "networking"
+    ],
     "status": "published"
   },
   {
@@ -475,13 +477,15 @@
   {
     "name": "kubeflow_dashboard_links",
     "version": "0",
-    "lib": "",
-    "lib_url": "",
+    "lib": "charms.kubeflow_dashboard.kubeflow_dashboard_links",
+    "lib_url": "https://charmhub.io/kubeflow-dashboard/libraries/kubeflow_dashboard_links",
     "lib_docs_url": "",
     "docs_url": "https://canonical.com/juju/docs/charmlibs/reference/interfaces/kubeflow_dashboard_links/",
     "summary": "",
     "description": "",
-    "tags": [],
+    "tags": [
+      "operations"
+    ],
     "status": "draft"
   },
   {
