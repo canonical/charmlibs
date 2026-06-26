@@ -91,6 +91,41 @@ def test_rules_compression(otlp_requirer_ctx: testing.Context[ops.CharmBase]):
         assert set(_RulesModel.model_fields.keys()).issubset(decompressed.keys())
 
 
+def test_published_rules_are_byte_stable_across_hooks(
+    otlp_requirer_ctx: testing.Context[ops.CharmBase],
+):
+    # GIVEN a requirer that publishes rules (including Sigma rules with topology tags)
+    state = State(relations=[Relation(SEND)], leader=True)
+
+    # WHEN the publish event fires twice, as it would across two separate hooks
+    first = otlp_requirer_ctx.run(otlp_requirer_ctx.on.update_status(), state=state)
+    first_rules = next(iter(first.relations)).local_app_data.get('rules')
+
+    second = otlp_requirer_ctx.run(otlp_requirer_ctx.on.update_status(), state=first)
+    second_rules = next(iter(second.relations)).local_app_data.get('rules')
+
+    # THEN the serialized databag value is byte-identical, so Juju sees no change and
+    # does not fire a spurious relation-changed event.
+    assert first_rules is not None
+    assert first_rules == second_rules
+
+
+def test_sigma_rule_id_is_preserved_in_published_databag(
+    otlp_requirer_ctx: testing.Context[ops.CharmBase],
+):
+    # GIVEN a requirer publishing a Sigma rule that carries a fixed UUID
+    state = State(relations=[Relation(SEND)], leader=True)
+
+    # WHEN the rules are published
+    state_out = otlp_requirer_ctx.run(otlp_requirer_ctx.on.update_status(), state=state)
+    rules = next(iter(state_out.relations)).local_app_data.get('rules')
+    sigma_rules = _decompress(json.loads(rules))['sigma']['rules']
+
+    # THEN the original UUID survives untouched (it is never regenerated per hook)
+    ids = {r.get('id') for r in sigma_rules}
+    assert SINGLE_SIGMA_RULE['id'] in ids
+
+
 @pytest.mark.parametrize('subordinate', [True, False])
 def test_duplicate_rules_per_unit(subordinate: bool):
     # GIVEN the charm is (or is not) a subordinate
