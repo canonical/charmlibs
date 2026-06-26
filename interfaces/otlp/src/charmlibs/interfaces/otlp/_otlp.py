@@ -105,8 +105,20 @@ class _OtlpRequirerAppData(BaseModel):
 
     @field_serializer('rules')
     def _serialize_rules(self, rules: _RulesModel) -> str:
-        """LZMA-compress rules to reduce content size for larger deployments."""
-        return LZMABase64.compress(rules.model_dump_json())
+        """LZMA-compress rules to reduce content size for larger deployments.
+
+        Keys are sorted so the serialized payload is deterministic for a given logical
+        ruleset. Without this, nested mappings (e.g. a Sigma rule's ``detection`` block,
+        which is an arbitrary dict) could serialize in a different key order between hooks,
+        changing the databag bytes and triggering spurious ``relation-changed`` events.
+        Note: this normalizes *mapping key* order only; list ordering (e.g. Sigma ``tags``)
+        is made deterministic at the source in ``cosl.rules.SigmaRules``.
+
+        Pydantic performs the actual value encoding (via ``model_dump_json``); we only
+        re-serialize the resulting JSON with sorted keys to preserve that encoding fidelity.
+        """
+        normalized = json.dumps(json.loads(rules.model_dump_json()), sort_keys=True)
+        return LZMABase64.compress(normalized)
 
 
 class OtlpRequirer:
