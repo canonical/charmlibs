@@ -727,13 +727,15 @@
   {
     "name": "s3",
     "version": "1",
-    "lib": "",
-    "lib_url": "",
-    "lib_docs_url": "",
+    "lib": "object-storage-charmlib",
+    "lib_url": "https://pypi.org/project/object-storage-charmlib",
+    "lib_docs_url": "https://github.com/canonical/object-storage-integrator/blob/main/lib/README.md",
     "docs_url": "https://canonical.com/juju/docs/charmlibs/reference/interfaces/s3/",
     "summary": "",
     "description": "",
-    "tags": [],
+    "tags": [
+      "data"
+    ],
     "status": "draft"
   },
   {
