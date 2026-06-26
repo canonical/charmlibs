@@ -39,7 +39,7 @@ unit = [
 
 [package.metadata]
 requires-dist = [
-    { name = "cosl", git = "https://github.com/canonical/cos-lib?rev=feat%2Fsigma-rules-3" },
+    { name = "cosl", git = "https://github.com/canonical/cos-lib?rev=feat%2Fsigma-rules-2" },
     { name = "requests" },
 ]
 
@@ -152,8 +152,8 @@ wheels = [
 
 [[package]]
 name = "cosl"
-version = "1.9.1"
-source = { git = "https://github.com/canonical/cos-lib?rev=feat%2Fsigma-rules-3#b9dd4e92e4c36bbc6504ee76a9605f5714343d24" }
+version = "1.10.0"
+source = { git = "https://github.com/canonical/cos-lib?rev=feat%2Fsigma-rules-2#36a19f89d8843e8c25e096ac20c8413fec36b757" }
 dependencies = [
     { name = "ops" },
     { name = "pydantic" },
