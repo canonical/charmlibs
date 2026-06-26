@@ -1837,6 +1837,7 @@ class TLSCertificatesRequiresV4(Object):
                 "Invalid renewal relative time. Must be between 0.5 and 1.0"
             )
         self._private_key = private_key
+        self._private_key_cache: dict[Mode, PrivateKey | None] = {}
         self.renewal_relative_time = renewal_relative_time
         self.framework.observe(charm.on[relationship_name].relation_created, self._configure)
         self.framework.observe(charm.on[relationship_name].relation_changed, self._configure)
@@ -2010,13 +2011,17 @@ class TLSCertificatesRequiresV4(Object):
     def _get_private_key_for_mode(self, mode: Literal[Mode.APP, Mode.UNIT]) -> PrivateKey | None:
         if self._private_key:
             return self._private_key
+        if mode in self._private_key_cache:
+            return self._private_key_cache[mode]
         if mode == Mode.APP and not self.model.unit.is_leader():
             logger.warning("Only the leader can access the private key in APP mode")
             return None
         try:
             secret = self.charm.model.get_secret(label=self._get_private_key_secret_label(mode))
-            private_key = secret.get_content(refresh=True)["private-key"]
-            return PrivateKey.from_string(private_key)
+            private_key_str = secret.get_content(refresh=True)["private-key"]
+            private_key = PrivateKey.from_string(private_key_str)
+            self._private_key_cache[mode] = private_key
+            return private_key
         except (SecretNotFoundError, KeyError):
             return None
 
@@ -2398,6 +2403,7 @@ class TLSCertificatesRequiresV4(Object):
     def _store_private_key_in_secret(
         self, private_key: PrivateKey, mode: Literal[Mode.UNIT, Mode.APP]
     ) -> None:
+        self._private_key_cache.pop(mode, None)
         app_or_unit = self._get_app_or_unit_for_mode(mode)
         try:
             secret = self.charm.model.get_secret(label=self._get_private_key_secret_label(mode))
@@ -2411,6 +2417,7 @@ class TLSCertificatesRequiresV4(Object):
 
     def _remove_private_key_secret(self, mode: Literal[Mode.UNIT, Mode.APP]) -> None:
         """Remove the private key secret."""
+        self._private_key_cache.pop(mode, None)
         if mode == Mode.APP and not self.model.unit.is_leader():
             logger.debug("Not leader, cannot remove app owned private key secret")
             return
@@ -2516,6 +2523,9 @@ class TLSCertificatesRequiresV4(Object):
             provider_relation_data = _ProviderApplicationData.load(relation.data[relation.app])
         except DataValidationError:
             logger.warning("Invalid relation data")
+            return []
+        except ModelError:
+            logger.warning("Relation data not available")
             return []
         return [
             certificate.to_provider_certificate(relation_id=relation.id)

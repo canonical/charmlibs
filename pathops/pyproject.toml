@@ -6,9 +6,9 @@ requires-python = ">=3.10"
 authors = [
     {name="The Charm Tech team at Canonical Ltd."},
 ]
+license = "Apache-2.0"
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: Apache Software License",
     "Intended Audience :: Developers",
     "Operating System :: POSIX :: Linux",
     "Development Status :: 5 - Production/Stable",
@@ -29,8 +29,8 @@ integration = [
 ]
 
 [project.urls]
-"Documentation" = "https://documentation.ubuntu.com/charmlibs/reference/charmlibs/pathops/"
-"Repository" = "https://github.com/canonical/charmlibs"
+"Documentation" = "https://canonical.com/juju/docs/charmlibs/reference/charmlibs/pathops/"
+"Repository" = "https://github.com/canonical/charmlibs/tree/main/pathops"
 "Issues" = "https://github.com/canonical/charmlibs/issues"
 "Changelog" = "https://github.com/canonical/charmlibs/blob/main/pathops/CHANGELOG.md"
 

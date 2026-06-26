@@ -38,9 +38,9 @@ As all Juju relations, the `cos_agent` interface consists of a provider and a re
 
 ## Relation Data
 
-### Provider
+[\[Pydantic Schema\]](./schema.py)
 
-[\[JSON Schema\]]
+### Provider
 
 
 #### Unit data

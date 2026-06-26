@@ -32,7 +32,7 @@ just init
 :sync: interface
 
 ```bash
-just interface init
+just init --interface
 ```
 ````
 `````
@@ -80,7 +80,7 @@ If `init` fails because the directory already exists, take a look at the directo
 It may be that the interface definitions are already hosted in the repo under `interfaces/<interface name>/interface`.
 In this case:
 - Temporarily move the `<interface name>` directory.
-- Re-run `just interface init`.
+- Re-run `just init --interface`.
 - Then add the `interface` subdirectory to your newly generated project.
 
 You'll also want to check for any config files under the old `<interface name>` directory (for example, a `ruff.toml` file), and incorporate any applicable settings into your project's `pyproject.toml`.
@@ -123,7 +123,7 @@ Now follow these steps to migrate your library's source code:
 1. Copy the copyright header from `__init__.py` to `_<name>.py` to satisfy the linter.
 2. Move the docstring from `_<name>.py` to `__init__.py` so that it's included in your library's automatically built reference docs.
 3. Document in the `_<name>.py` docstring the API and patch version of the source code that you're migrating. This will be helpful for future maintainers and users if they need to debug issues.
-4. Delete `LIB_ID`, `LIB_API`, and `LIB_PATCH` from `_<name>.py` -- unless they're used internally by the library, then you'll need to keep them for now.
+4. Delete `LIBID`, `LIBAPI`, and `LIBPATCH` from `_<name>.py` -- unless they're used internally by the library, then you'll need to keep them for now.
 5. Move the contents of `PYDEPS` to the `dependencies` entry in your `pyproject.toml` (using `just add`), and delete the `PYDEPS` variable. You'll also need to add any additional dependencies that were assumed to be provided by the charm, like `ops` or `pydantic`. Consider adding version constraints to your dependencies too.
 6. Import the public API of your library to `__init__.py` and add the imported names to `__all__`, like this:
 ```python
@@ -175,7 +175,7 @@ This part is a bit trickier.
 With any luck, your library was previously developed in a placeholder charm that exists purely for library distribution.
 If your library's development and testing was tightly coupled to a real charm, this step will be more involved.
 You'll need to consider which tests can live alongside the library, and which only make sense with the charm.
-You might want to add a simplified dummy charm to run some of the tests against.
+You might want to add a simplified placeholder charm to run some of the tests against.
 
 ```{warning}
 Don't add `pytest` to your `pyproject.toml`.
@@ -191,7 +191,7 @@ If your library wasn't tightly coupled to a real charm, these steps should be su
 
 1. Add any unit test dependencies to the `unit` dependency group in your `pyproject.toml` (using `just add`).
 2. Copy any relevant contents of your `conftest.py` to `tests/unit/conftest.py`.
-3. Copy your library's existing unit test files to `tests/unit/`, along with any data files, dummy charms, and so on.
+3. Copy your library's existing unit test files to `tests/unit/`, along with any data files, placeholder charms, and so on.
 4. Correct the imports in those files.
 
 Replace imports like this:
@@ -234,13 +234,13 @@ They're intended for tests that interact with the real world, but don't require 
 
 The process for migrating them is exactly the same as for unit tests.
 
-> Read more: {ref}`tutorial-add-functional-tests`, {ref}`charmlibs-functional-tests`
+Read more: {ref}`tutorial-add-functional-tests`, {ref}`charmlibs-functional-tests`
 
 ### Integration tests
 
 Integration tests involve packing your library into a charm and deploying it on a real Juju model.
 
-> Read more: {ref}`tutorial-add-integration-tests`, {ref}`charmlibs-integration-tests`
+Read more: {ref}`tutorial-add-integration-tests`, {ref}`charmlibs-integration-tests`
 
 If you take a look at your `<library path>/tests/integration` directory, you'll see a `pack.sh` script.
 Currently it packs a simple `k8s` or `machine` charm, depending on the `CHARMLIBS_SUBSTRATE` variable that is set in CI.
@@ -258,26 +258,67 @@ The `charmlibs` CI is aware of two special `pytest` marks: `k8s_only` and `machi
 If there are no tests compatible with a substrate, then it's skipped completely.
 By default each test is treated as compatible with both substrates.
 
+(how-to-migrate-docs)=
 ## Migrate your library's docs
 
-Your library's reference documentation is automatically built from its docstrings and source code.
+Your library's reference documentation is automatically built from its docstrings and source code. On top of that, you can add tutorials, how-to guides, and explanations under `<library path>/docs`, and they'll be included in this documentation site under the respective categories.
 
-```{warning}
-🚧 Actually including the docs described below in this documentation site is coming soon™ 🚧
+Read more: {ref}`how-to-add-library-docs`
+
+```{note}
+There is no `reference` docs category -- reference documentation is generated from your library's docstrings. If your existing docs include hand-written reference material, fold the relevant content into your docstrings, or rework it into an explanation or how-to guide.
 ```
 
-Additional documentation may be placed under `<library path>/docs`, and will be included in this documentation site under the respective categories.
-The following files are consumed.
+If your library already has documentation hosted on Charmhub, here's how to bring it across.
+
+### Find the source topics
+
+Charmhub renders a charm's documentation from a set of topics on [Discourse](https://discourse.charmhub.io). To find them:
+
+1. Start from the charm's Charmhub page -- `https://charmhub.io/<charm>`.
+2. Follow the **Help improve this document in the forum** link at the bottom of the page. This link points to the Discourse *root topic* for the charm's docs.
+
+The root topic contains a table of contents linking each child topic. This usually already encodes a Diátaxis-like layout (tutorial / how-to / explanation / reference) that you can carry over.
+
+```{tip}
+Some charms host their docs on a Read the Docs / Sphinx site instead of Discourse. That content isn't available through the Discourse API, but it's straightforward to migrate by hand: copy the doc site's source files into your library's `docs/` directory and adapt them.
 ```
-docs
-├── explanation
-│   └── *.{md,rst}
-├── how-to
-│   └── *.{md,rst}
-├── reference
-│   └── *.{md,rst}
-└── tutorial.{md,rst}
+
+### Download the topics
+
+Download each Discourse topic into your library's `docs/` directory:
+
+```bash
+.scripts/import_discourse_docs.py <discourse-url> <library path>/docs/<category>/<page>.md
 ```
+
+For example:
+
+```bash
+.scripts/import_discourse_docs.py \
+    https://discourse.charmhub.io/t/tls-certificates-interface/15539 \
+    interfaces/tls-certificates/docs/explanation/tls-certificates-interface.md
+```
+
+
+The script downloads the topic, extracts its Markdown source, and resolves any embedded images.
+
+Repeat for each topic, choosing a Diátaxis category for each.
+
+### Finish up
+
+Edit the imported pages to follow the conventions described in {ref}`how-to-add-library-docs`: give each page a title and meta description, fix up cross-references, and confirm the categorisation.
+
+## Update the library metadata
+
+The {ref}`interface library listing <interface-libs-listing>` and {ref}`general library listing <general-libs-listing>` are generated from `.docs/reference/libs.yaml`.
+
+There should already be an entry for the old Charmhub-hosted library.
+If there isn't, add one with a `deprecated` status and a description noting it has been superseded by the new `charmlibs` package.
+
+Add a new entry for the `charmlibs` package with the new package name, source URL, status, description, and any relevant tags.
+See `.docs/reference/tags.yaml` for the full list of available tags and their assignment criteria.
+Don't invent new tags, only use tags defined in `tags.yaml`.
 
 ## Deprecate the old library
 

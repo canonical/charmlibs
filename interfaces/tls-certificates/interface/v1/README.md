@@ -43,6 +43,8 @@ compatible with the interface.
 
 ## Relation Data
 
+[\[Pydantic Schema\]](./schema.py)
+
 ### Requirer
 
 The requirer specifies a set of certificate signing requests (CSR's).
