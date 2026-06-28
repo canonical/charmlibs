@@ -2,7 +2,3 @@ name: resolute
 base: ubuntu@26.04
 sdks:
   - name: project-charmlibs
-actions:
-  functional: |
-    # Override Python with: workshop run --env PYTHON=python3.13 resolute -- functional ...
-    sudo just functional --python "${PYTHON:-python3}" "$@"

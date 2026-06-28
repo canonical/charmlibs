@@ -398,13 +398,15 @@
   {
     "name": "k8s-service",
     "version": "0",
-    "lib": "",
-    "lib_url": "",
+    "lib": "charms.mlops_libs.k8s_service_info",
+    "lib_url": "https://charmhub.io/mlops-libs/libraries/k8s_service_info",
     "lib_docs_url": "",
     "docs_url": "https://canonical.com/juju/docs/charmlibs/reference/interfaces/k8s-service/",
     "summary": "",
     "description": "",
-    "tags": [],
+    "tags": [
+      "networking"
+    ],
     "status": "published"
   },
   {
@@ -412,7 +414,7 @@
     "version": "0",
     "lib": "charmlibs.interfaces.k8s_backup_target",
     "lib_url": "",
-    "lib_docs_url": "",
+    "lib_docs_url": "https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/k8s-backup-target",
     "docs_url": "https://canonical.com/juju/docs/charmlibs/reference/interfaces/k8s_backup_target/",
     "summary": "Configure Kubernetes backup target specifications.",
     "description": "The `k8s_backup_target` interface allows client charms to specify Kubernetes backup requirements to a backup integrator charm.\nThe provider charm (client) provides backup specifications including namespaces, resource types, and retention policies, while the requirer charm (backup integrator) receives these specifications and forwards them to a backup operator.",
@@ -475,13 +477,15 @@
   {
     "name": "kubeflow_dashboard_links",
     "version": "0",
-    "lib": "",
-    "lib_url": "",
+    "lib": "charms.kubeflow_dashboard.kubeflow_dashboard_links",
+    "lib_url": "https://charmhub.io/kubeflow-dashboard/libraries/kubeflow_dashboard_links",
     "lib_docs_url": "",
     "docs_url": "https://canonical.com/juju/docs/charmlibs/reference/interfaces/kubeflow_dashboard_links/",
     "summary": "",
     "description": "",
-    "tags": [],
+    "tags": [
+      "operations"
+    ],
     "status": "draft"
   },
   {
@@ -723,13 +727,15 @@
   {
     "name": "s3",
     "version": "1",
-    "lib": "",
-    "lib_url": "",
-    "lib_docs_url": "",
+    "lib": "object-storage-charmlib",
+    "lib_url": "https://pypi.org/project/object-storage-charmlib",
+    "lib_docs_url": "https://github.com/canonical/object-storage-integrator/blob/main/lib/README.md",
     "docs_url": "https://canonical.com/juju/docs/charmlibs/reference/interfaces/s3/",
     "summary": "",
     "description": "",
-    "tags": [],
+    "tags": [
+      "data"
+    ],
     "status": "draft"
   },
   {
