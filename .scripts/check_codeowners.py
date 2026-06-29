@@ -56,7 +56,7 @@ def main() -> int:
     paths = build_paths(tracked_files(REPO_ROOT))
     problems = 0
     for path in find_unowned_dirs(entries, paths):
-        print(f'No explicit CODEOWNERS entry for: /{path}')
+        print(f'No explicit CODEOWNERS entry for: {path}')
         problems += 1
     for pattern in find_orphan_entries(entries, REPO_ROOT):
         print(f'CODEOWNERS entry points at a missing path: {pattern}')
@@ -76,9 +76,10 @@ class Entry(typing.NamedTuple):
 class Path(typing.NamedTuple):
     """A repo path to check, with its immediate children.
 
-    `path` is relative to the repo root; directory paths end with `/`. `child_paths` are the
-    immediate children (also repo-relative, directories ending with `/`), and is empty for
-    files and for directories with no tracked children.
+    `path` is anchored from the repo root, in CODEOWNERS form: a leading `/`, and a trailing `/`
+    for directories (e.g. `/apt/`, `/README.md`). `child_paths` are the immediate children in the
+    same form, and is empty for files and for directories with no tracked children. Matching this
+    form lets us compare CODEOWNERS entries verbatim.
     """
 
     path: str
@@ -116,9 +117,9 @@ def tracked_files(root: pathlib.Path) -> list[str]:
 def build_paths(files: Iterable[str]) -> list[Path]:
     """Build the `Path`s to check from a list of repo-relative tracked file paths.
 
-    Returns an item for every top-level entry and every immediate child of `interfaces/`. A
-    directory's `path` ends with `/` and its `child_paths` list its immediate children (also
-    with a trailing `/` for directories); files have an empty `child_paths`.
+    Returns an item for every top-level entry and every immediate child of `interfaces/`. Each
+    `path` is rendered in CODEOWNERS form (anchoring leading `/`, trailing `/` for directories)
+    so entries can be compared verbatim; files have an empty `child_paths`.
     """
     children: dict[str, set[str]] = {}  # parent prefix -> immediate child names
     is_dir: dict[str, bool] = {}  # path component prefix -> whether it has children
@@ -132,7 +133,7 @@ def build_paths(files: Iterable[str]) -> list[Path]:
 
     def render(prefix: str, name: str) -> str:
         path = f'{prefix}/{name}' if prefix else name
-        return f'{path}/' if is_dir[path] else path
+        return f'/{path}/' if is_dir[path] else f'/{path}'
 
     def child_paths(prefix: str, name: str) -> tuple[str, ...]:
         path = f'{prefix}/{name}' if prefix else name
@@ -155,7 +156,7 @@ def find_unowned_dirs(entries: Iterable[Entry], paths: Iterable[Path]) -> list[s
     recursive, so a grandchild entry never satisfies a child, and the catch-all `*` entry isn't a
     path entry, so it never stands in for an explicit one.
     """
-    entry_targets = {entry_target(entry.pattern) for entry in entries}
+    entry_targets = {entry.pattern for entry in entries}
 
     def has_entry(path: str) -> bool:
         return path in entry_targets
@@ -180,23 +181,11 @@ def find_orphan_entries(entries: Iterable[Entry], root: pathlib.Path) -> list[st
     """
     orphans: list[str] = []
     for entry in entries:
-        target = entry_target(entry.pattern)
-        path = root / target.rstrip('/')
-        is_dir_entry = target.endswith('/')
+        path = root / entry.pattern.strip('/')
+        is_dir_entry = entry.pattern.endswith('/')
         if not path.exists() or path.is_dir() != is_dir_entry:
             orphans.append(entry.pattern)
     return orphans
-
-
-def entry_target(pattern: str) -> str:
-    """Return the repo-relative path that an anchored CODEOWNERS pattern points to, verbatim.
-
-    Patterns are assumed to be wildcard-free (the parser drops wildcard patterns). Only the
-    anchoring leading slash is removed; the trailing slash is preserved, so a directory entry
-    `/apt/` becomes `apt/` and matches the tracked directory path verbatim, enforcing the
-    convention that directory entries end with `/`.
-    """
-    return pattern.removeprefix('/')
 
 
 if __name__ == '__main__':
