@@ -29,7 +29,7 @@ Two checks are performed against every top-level path and every immediate child 
    allowing a directory to be covered by per-child entries (such as an interface's `interface/`
    plus `ruff.toml`).
 2. Every path-based CODEOWNERS entry corresponds to a real path in the repository, so renaming
-   or removing a directory can't leave behind an orphan entry.
+   or removing a directory can't leave behind a bad entry.
 
 Exit with success (0) if both checks pass, otherwise print the problems to stdout
 and exit with failure (the number of problems found).
@@ -58,11 +58,11 @@ def main() -> int:
     for path in find_unowned_dirs(entries, paths):
         print(f'No explicit CODEOWNERS entry for: {path}')
         problems += 1
-    for pattern in find_orphan_entries(entries, REPO_ROOT):
+    for pattern in find_bad_entries(entries, REPO_ROOT):
         print(f'CODEOWNERS entry points at a missing path: {pattern}')
         problems += 1
     if problems == 0:
-        print('Every path has a CODEOWNERS owner, and no entries are orphaned.')
+        print('Every path has a CODEOWNERS owner, and no entries are bad.')
     return problems
 
 
@@ -167,20 +167,20 @@ def find_unowned_dirs(entries: Iterable[Entry], paths: Iterable[Path]) -> list[s
     return unowned
 
 
-def find_orphan_entries(entries: Iterable[Entry], root: pathlib.Path) -> list[str]:
+def find_bad_entries(entries: Iterable[Entry], root: pathlib.Path) -> list[str]:
     """Return the patterns of entries that don't point at an existing path of the right kind.
 
-    An entry is an orphan if its target doesn't exist, or if its trailing slash disagrees with
+    An entry is bad if its target doesn't exist, or if its trailing slash disagrees with
     reality: directory entries must end with `/` and file entries must not. This enforces the
     convention that every directory entry carries a trailing slash, so entries can be compared
     against tracked paths verbatim.
     """
-    orphans: list[str] = []
+    bad: list[str] = []
     for entry in entries:
         path = root / entry.pattern.strip('/')
         if not path.exists() or path.is_dir() != entry.pattern.endswith('/'):
-            orphans.append(entry.pattern)
-    return orphans
+            bad.append(entry.pattern)
+    return bad
 
 
 if __name__ == '__main__':

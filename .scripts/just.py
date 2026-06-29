@@ -466,7 +466,7 @@ def interfaces_json(argv: list[str]) -> int:
 
 @_register
 def check_codeowners(argv: list[str]) -> int:
-    """Check every package and interface has a CODEOWNERS entry, and no entries are orphaned."""
+    """Check every package and interface has a CODEOWNERS entry, and no entries are bad."""
     _parser(check_codeowners).parse_args(argv)  # supports `-h`
     return _run(['.scripts/check_codeowners.py'], check=False)
 

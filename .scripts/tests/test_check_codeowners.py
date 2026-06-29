@@ -54,8 +54,8 @@ class TestParseCodeowners:
         assert check_codeowners.parse_codeowners('') == []
 
 
-class TestFindOrphanEntries:
-    def test_existing_paths_are_not_orphans(self, tmp_path: pathlib.Path):
+class TestFindBadEntries:
+    def test_existing_paths_are_not_bad(self, tmp_path: pathlib.Path):
         (tmp_path / 'apt').mkdir()
         (tmp_path / 'interfaces' / 'foo').mkdir(parents=True)
         (tmp_path / 'interfaces' / 'foo' / 'ruff.toml').touch()
@@ -64,25 +64,25 @@ class TestFindOrphanEntries:
             Entry('/interfaces/foo/', ('@canonical/team',)),
             Entry('/interfaces/foo/ruff.toml', ('@canonical/team',)),
         ]
-        assert check_codeowners.find_orphan_entries(entries, tmp_path) == []
+        assert check_codeowners.find_bad_entries(entries, tmp_path) == []
 
-    def test_missing_path_is_orphan(self, tmp_path: pathlib.Path):
+    def test_missing_path_is_bad(self, tmp_path: pathlib.Path):
         (tmp_path / 'apt').mkdir()
         entries = [
             Entry('/apt/', ('@canonical/team',)),
             Entry('/gone/', ('@canonical/team',)),
         ]
-        assert check_codeowners.find_orphan_entries(entries, tmp_path) == ['/gone/']
+        assert check_codeowners.find_bad_entries(entries, tmp_path) == ['/gone/']
 
-    def test_directory_entry_without_trailing_slash_is_orphan(self, tmp_path: pathlib.Path):
+    def test_directory_entry_without_trailing_slash_is_bad(self, tmp_path: pathlib.Path):
         (tmp_path / 'apt').mkdir()
         entries = [Entry('/apt', ('@canonical/team',))]  # missing the trailing slash
-        assert check_codeowners.find_orphan_entries(entries, tmp_path) == ['/apt']
+        assert check_codeowners.find_bad_entries(entries, tmp_path) == ['/apt']
 
-    def test_file_entry_with_trailing_slash_is_orphan(self, tmp_path: pathlib.Path):
+    def test_file_entry_with_trailing_slash_is_bad(self, tmp_path: pathlib.Path):
         (tmp_path / 'README.md').touch()
         entries = [Entry('/README.md/', ('@canonical/team',))]  # stray trailing slash on a file
-        assert check_codeowners.find_orphan_entries(entries, tmp_path) == ['/README.md/']
+        assert check_codeowners.find_bad_entries(entries, tmp_path) == ['/README.md/']
 
 
 class TestBuildPaths:
