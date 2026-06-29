@@ -156,16 +156,12 @@ def find_unowned_dirs(entries: Iterable[Entry], paths: Iterable[Path]) -> list[s
     recursive, so a grandchild entry never satisfies a child, and the catch-all `*` entry isn't a
     path entry, so it never stands in for an explicit one.
     """
-    entry_targets = {entry.pattern for entry in entries}
-
-    def has_entry(path: str) -> bool:
-        return path in entry_targets
-
+    owned = {entry.pattern for entry in entries}
     unowned: list[str] = []
     for item in paths:
-        if has_entry(item.path):
+        if item.path in owned:
             continue
-        if item.child_paths and all(has_entry(child) for child in item.child_paths):
+        if item.child_paths and owned.issuperset(item.child_paths):
             continue
         unowned.append(item.path)
     return unowned
