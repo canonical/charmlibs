@@ -45,6 +45,13 @@ class TestParseCodeowners:
             Entry(pattern='/interfaces/index.json', owners=())
         ]
 
+    def test_drops_wildcard_patterns(self):
+        text = '* @canonical/team\n/*.md @canonical/team\n/foo/[abc] @t\n/apt/ @canonical/team\n'
+        # Only the anchored, wildcard-free entry survives.
+        assert check_codeowners.parse_codeowners(text) == [
+            Entry(pattern='/apt/', owners=('@canonical/team',))
+        ]
+
     def test_empty(self):
         assert check_codeowners.parse_codeowners('') == []
 
@@ -61,10 +68,6 @@ class TestEntryTarget:
     )
     def test_path_patterns(self, pattern: str, expected: str):
         assert check_codeowners.entry_target(pattern) == pathlib.PurePosixPath(expected)
-
-    @pytest.mark.parametrize('pattern', ['*', '/*.md', '/foo/*', '/foo/?ar', '/foo/[abc]'])
-    def test_glob_patterns_are_not_targets(self, pattern: str):
-        assert check_codeowners.entry_target(pattern) is None
 
 
 class TestFindOrphanEntries:
@@ -86,10 +89,6 @@ class TestFindOrphanEntries:
             Entry('/gone/', ('@canonical/team',)),
         ]
         assert check_codeowners.find_orphan_entries(entries, tmp_path) == ['/gone/']
-
-    def test_glob_entries_are_ignored(self, tmp_path: pathlib.Path):
-        entries = [Entry('*', ('@canonical/team',)), Entry('/*.md', ('@canonical/team',))]
-        assert check_codeowners.find_orphan_entries(entries, tmp_path) == []
 
 
 class TestBuildPaths:
@@ -163,10 +162,10 @@ class TestFindUnownedDirs:
         paths = [Path('interfaces/foo/', ('interfaces/foo/interface/',))]
         assert check_codeowners.find_unowned_dirs(entries, paths) == ['interfaces/foo/']
 
-    def test_catch_all_does_not_count(self):
-        entries = [Entry('*', ('@canonical/maintainers',))]
+    def test_no_entries_means_unowned(self):
+        # The catch-all `*` is dropped by the parser, so find_unowned_dirs never sees it.
         paths = [Path('apt/', ('apt/src/',))]
-        assert check_codeowners.find_unowned_dirs(entries, paths) == ['apt/']
+        assert check_codeowners.find_unowned_dirs([], paths) == ['apt/']
 
     def test_parent_dir_entry_does_not_own_child(self):
         # `/interfaces/` (the fallback) must not be treated as owning a specific interface.

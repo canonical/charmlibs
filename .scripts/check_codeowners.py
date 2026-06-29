@@ -86,13 +86,19 @@ class Path(typing.NamedTuple):
 
 
 def parse_codeowners(text: str) -> list[Entry]:
-    """Parse CODEOWNERS file contents into a list of `Entry`s, ignoring comments and blanks."""
+    """Parse CODEOWNERS file into `Entry`s, ignoring comments, blanks, and wildcard patterns.
+
+    Wildcard patterns (containing any of `*?[]`, such as the catch-all `*`) are dropped: they
+    aren't anchored paths, so this check neither validates nor counts them as ownership.
+    """
     entries: list[Entry] = []
     for line in text.splitlines():
         line = line.split('#', 1)[0].strip()
         if not line:
             continue
         pattern, *owners = line.split()
+        if any(char in pattern for char in '*?[]'):
+            continue
         entries.append(Entry(pattern=pattern, owners=tuple(owners)))
     return entries
 
@@ -149,7 +155,7 @@ def find_unowned_dirs(entries: Iterable[Entry], paths: Iterable[Path]) -> list[s
     recursive, so a grandchild entry never satisfies a child, and the catch-all `*` entry isn't a
     path entry, so it never stands in for an explicit one.
     """
-    entry_targets = {target for entry in entries if (target := entry_target(entry.pattern))}
+    entry_targets = {entry_target(entry.pattern) for entry in entries}
 
     def has_entry(path: str) -> bool:
         return pathlib.PurePosixPath(path) in entry_targets
@@ -165,27 +171,17 @@ def find_unowned_dirs(entries: Iterable[Entry], paths: Iterable[Path]) -> list[s
 
 
 def find_orphan_entries(entries: Iterable[Entry], root: pathlib.Path) -> list[str]:
-    """Return the patterns of path-based entries that don't point at an existing path."""
-    orphans: list[str] = []
-    for entry in entries:
-        target = entry_target(entry.pattern)
-        if target is None:
-            continue
-        if not (root / target).exists():
-            orphans.append(entry.pattern)
-    return orphans
+    """Return the patterns of entries that don't point at an existing path."""
+    return [e.pattern for e in entries if not (root / entry_target(e.pattern)).exists()]
 
 
-def entry_target(pattern: str) -> pathlib.PurePosixPath | None:
+def entry_target(pattern: str) -> pathlib.PurePosixPath:
     """Return the repo-relative path that an anchored CODEOWNERS path pattern points to.
 
-    Returns `None` for non-path patterns (those containing glob wildcards, or the
-    catch-all `*`), which aren't validated as real paths.
+    Patterns are assumed to be wildcard-free (the parser drops wildcard patterns). CODEOWNERS
+    paths are anchored to the repo root with a leading slash, and a trailing slash just means
+    "this is a directory"; neither affects the path.
     """
-    if any(char in pattern for char in '*?[]'):
-        return None
-    # CODEOWNERS paths are anchored to the repo root with a leading slash, and a
-    # trailing slash just means "this is a directory"; neither affects the path.
     return pathlib.PurePosixPath(pattern.strip('/'))
 
 
