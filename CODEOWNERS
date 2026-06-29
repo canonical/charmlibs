@@ -136,13 +136,13 @@
 /interfaces/forward_auth/ruff.toml @canonical/identity
 
 # /interfaces/gateway_metadata/
-/interfaces/gateway_metadata @canonical/service-mesh
+/interfaces/gateway_metadata/ @canonical/service-mesh
 
 # /interfaces/istio_ingress_route/
-/interfaces/istio_ingress_route @canonical/service-mesh
+/interfaces/istio_ingress_route/ @canonical/service-mesh
 
 # /interfaces/istio_metadata/
-/interfaces/istio_metadata @canonical/service-mesh
+/interfaces/istio_metadata/ @canonical/service-mesh
 
 # /interfaces/istio_request_auth/
 /interfaces/istio_request_auth/ @canonical/service-mesh
@@ -286,7 +286,7 @@
 /interfaces/sloth/ @canonical/tracing-and-profiling
 
 # /interfaces/service_mesh/
-/interfaces/service_mesh @canonical/service-mesh
+/interfaces/service_mesh/ @canonical/service-mesh
 
 # /interfaces/smtp/
 /interfaces/smtp/interface/ @canonical/platform-engineering

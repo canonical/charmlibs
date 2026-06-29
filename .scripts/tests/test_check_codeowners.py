@@ -60,14 +60,15 @@ class TestEntryTarget:
     @pytest.mark.parametrize(
         ('pattern', 'expected'),
         [
-            ('/apt/', 'apt'),
+            # The leading slash is stripped; the trailing slash is preserved verbatim.
+            ('/apt/', 'apt/'),
             ('/apt', 'apt'),
-            ('/interfaces/foo/interface/', 'interfaces/foo/interface'),
+            ('/interfaces/foo/interface/', 'interfaces/foo/interface/'),
             ('/interfaces/foo/ruff.toml', 'interfaces/foo/ruff.toml'),
         ],
     )
     def test_path_patterns(self, pattern: str, expected: str):
-        assert check_codeowners.entry_target(pattern) == pathlib.PurePosixPath(expected)
+        assert check_codeowners.entry_target(pattern) == expected
 
 
 class TestFindOrphanEntries:
@@ -89,6 +90,16 @@ class TestFindOrphanEntries:
             Entry('/gone/', ('@canonical/team',)),
         ]
         assert check_codeowners.find_orphan_entries(entries, tmp_path) == ['/gone/']
+
+    def test_directory_entry_without_trailing_slash_is_orphan(self, tmp_path: pathlib.Path):
+        (tmp_path / 'apt').mkdir()
+        entries = [Entry('/apt', ('@canonical/team',))]  # missing the trailing slash
+        assert check_codeowners.find_orphan_entries(entries, tmp_path) == ['/apt']
+
+    def test_file_entry_with_trailing_slash_is_orphan(self, tmp_path: pathlib.Path):
+        (tmp_path / 'README.md').touch()
+        entries = [Entry('/README.md/', ('@canonical/team',))]  # stray trailing slash on a file
+        assert check_codeowners.find_orphan_entries(entries, tmp_path) == ['/README.md/']
 
 
 class TestBuildPaths:
@@ -126,6 +137,12 @@ class TestFindUnownedDirs:
         entries = [Entry('/apt/', ('@canonical/team',))]
         paths = [Path('apt/', ('apt/src/',))]
         assert check_codeowners.find_unowned_dirs(entries, paths) == []
+
+    def test_directory_entry_must_match_trailing_slash(self):
+        # A directory entry without a trailing slash doesn't match the slashed path verbatim.
+        entries = [Entry('/apt', ('@canonical/team',))]
+        paths = [Path('apt/', ('apt/src/',))]
+        assert check_codeowners.find_unowned_dirs(entries, paths) == ['apt/']
 
     def test_all_children_owned_passes(self):
         # Split interface entries: the dir itself has no entry, but each child does.

@@ -158,7 +158,7 @@ def find_unowned_dirs(entries: Iterable[Entry], paths: Iterable[Path]) -> list[s
     entry_targets = {entry_target(entry.pattern) for entry in entries}
 
     def has_entry(path: str) -> bool:
-        return pathlib.PurePosixPath(path) in entry_targets
+        return path in entry_targets
 
     unowned: list[str] = []
     for item in paths:
@@ -171,18 +171,32 @@ def find_unowned_dirs(entries: Iterable[Entry], paths: Iterable[Path]) -> list[s
 
 
 def find_orphan_entries(entries: Iterable[Entry], root: pathlib.Path) -> list[str]:
-    """Return the patterns of entries that don't point at an existing path."""
-    return [e.pattern for e in entries if not (root / entry_target(e.pattern)).exists()]
+    """Return the patterns of entries that don't point at an existing path of the right kind.
 
-
-def entry_target(pattern: str) -> pathlib.PurePosixPath:
-    """Return the repo-relative path that an anchored CODEOWNERS path pattern points to.
-
-    Patterns are assumed to be wildcard-free (the parser drops wildcard patterns). CODEOWNERS
-    paths are anchored to the repo root with a leading slash, and a trailing slash just means
-    "this is a directory"; neither affects the path.
+    An entry is an orphan if its target doesn't exist, or if its trailing slash disagrees with
+    reality: directory entries must end with `/` and file entries must not. This enforces the
+    convention that every directory entry carries a trailing slash, so entries can be compared
+    against tracked paths verbatim.
     """
-    return pathlib.PurePosixPath(pattern.strip('/'))
+    orphans: list[str] = []
+    for entry in entries:
+        target = entry_target(entry.pattern)
+        path = root / target.rstrip('/')
+        is_dir_entry = target.endswith('/')
+        if not path.exists() or path.is_dir() != is_dir_entry:
+            orphans.append(entry.pattern)
+    return orphans
+
+
+def entry_target(pattern: str) -> str:
+    """Return the repo-relative path that an anchored CODEOWNERS pattern points to, verbatim.
+
+    Patterns are assumed to be wildcard-free (the parser drops wildcard patterns). Only the
+    anchoring leading slash is removed; the trailing slash is preserved, so a directory entry
+    `/apt/` becomes `apt/` and matches the tracked directory path verbatim, enforcing the
+    convention that directory entries end with `/`.
+    """
+    return pattern.removeprefix('/')
 
 
 if __name__ == '__main__':
