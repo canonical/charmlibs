@@ -23,6 +23,7 @@ import pytest
 
 check_codeowners = importlib.import_module('check_codeowners')
 Entry = check_codeowners.Entry
+Path = check_codeowners.Path
 
 
 class TestParseCodeowners:
@@ -91,33 +92,94 @@ class TestFindOrphanEntries:
         assert check_codeowners.find_orphan_entries(entries, tmp_path) == []
 
 
-class TestFindUnownedDirs:
-    def test_whole_dir_entry_is_owned(self):
-        entries = [Entry('/apt/', ('@canonical/team',))]
-        assert check_codeowners.find_unowned_dirs(['apt'], entries) == []
+class TestBuildPaths:
+    def test_top_level_and_interface_children(self):
+        files = [
+            'README.md',
+            'apt/pyproject.toml',
+            'apt/src/__init__.py',
+            'interfaces/index.json',
+            'interfaces/foo/ruff.toml',
+            'interfaces/foo/interface/v0/schema.py',
+        ]
+        assert check_codeowners.build_paths(files) == [
+            Path('README.md', ()),
+            Path('apt/', ('apt/pyproject.toml', 'apt/src/')),
+            Path('interfaces/', ('interfaces/foo/', 'interfaces/index.json')),
+            Path('interfaces/foo/', ('interfaces/foo/interface/', 'interfaces/foo/ruff.toml')),
+            Path('interfaces/index.json', ()),
+        ]
 
-    def test_entry_inside_dir_counts_as_owned(self):
-        # Split interface entries: the dir itself has no direct entry, but content does.
+    def test_directories_end_with_slash(self):
+        [apt] = check_codeowners.build_paths(['apt/x.py'])
+        assert apt.path == 'apt/'
+
+    def test_files_have_no_children(self):
+        [readme] = check_codeowners.build_paths(['README.md'])
+        assert readme == Path('README.md', ())
+
+    def test_empty(self):
+        assert check_codeowners.build_paths([]) == []
+
+
+class TestFindUnownedDirs:
+    def test_path_with_own_entry_passes(self):
+        entries = [Entry('/apt/', ('@canonical/team',))]
+        paths = [Path('apt/', ('apt/src/',))]
+        assert check_codeowners.find_unowned_dirs(entries, paths) == []
+
+    def test_all_children_owned_passes(self):
+        # Split interface entries: the dir itself has no entry, but each child does.
         entries = [
             Entry('/interfaces/foo/interface/', ('@canonical/team',)),
             Entry('/interfaces/foo/ruff.toml', ('@canonical/team',)),
         ]
-        assert check_codeowners.find_unowned_dirs(['interfaces/foo'], entries) == []
+        children = ('interfaces/foo/interface/', 'interfaces/foo/ruff.toml')
+        paths = [Path('interfaces/foo/', children)]
+        assert check_codeowners.find_unowned_dirs(entries, paths) == []
 
-    def test_catch_all_does_not_count_as_owned(self):
+    def test_all_children_disowned_passes(self):
+        # Children with ownerless entries are explicitly disowned, which satisfies the parent.
+        entries = [Entry('/foo/a', ()), Entry('/foo/b', ())]
+        paths = [Path('foo/', ('foo/a', 'foo/b'))]
+        assert check_codeowners.find_unowned_dirs(entries, paths) == []
+
+    def test_some_children_unowned_is_unowned(self):
+        entries = [Entry('/interfaces/foo/interface/', ('@canonical/team',))]
+        children = ('interfaces/foo/interface/', 'interfaces/foo/ruff.toml')
+        paths = [Path('interfaces/foo/', children)]
+        assert check_codeowners.find_unowned_dirs(entries, paths) == ['interfaces/foo/']
+
+    def test_disowned_path_passes(self):
+        # An ownerless entry for the path itself counts (e.g. interfaces/index.json).
+        entries = [Entry('/interfaces/index.json', ())]
+        paths = [Path('interfaces/index.json', ())]
+        assert check_codeowners.find_unowned_dirs(entries, paths) == []
+
+    def test_rule_is_not_recursive(self):
+        # A grandchild entry must NOT satisfy a child; `interfaces/foo/interface/` has no entry,
+        # only its own child does, so `interfaces/foo/` is not owned.
+        entries = [Entry('/interfaces/foo/interface/v0/', ('@canonical/team',))]
+        paths = [Path('interfaces/foo/', ('interfaces/foo/interface/',))]
+        assert check_codeowners.find_unowned_dirs(entries, paths) == ['interfaces/foo/']
+
+    def test_catch_all_does_not_count(self):
         entries = [Entry('*', ('@canonical/maintainers',))]
-        assert check_codeowners.find_unowned_dirs(['apt'], entries) == ['apt']
-
-    def test_entry_without_owner_does_not_count(self):
-        entries = [Entry('/apt/', ())]
-        assert check_codeowners.find_unowned_dirs(['apt'], entries) == ['apt']
+        paths = [Path('apt/', ('apt/src/',))]
+        assert check_codeowners.find_unowned_dirs(entries, paths) == ['apt/']
 
     def test_parent_dir_entry_does_not_own_child(self):
         # `/interfaces/` (the fallback) must not be treated as owning a specific interface.
         entries = [Entry('/interfaces/', ('@canonical/maintainers',))]
-        unowned = check_codeowners.find_unowned_dirs(['interfaces/foo'], entries)
-        assert unowned == ['interfaces/foo']
+        paths = [Path('interfaces/foo/', ('interfaces/foo/ruff.toml',))]
+        assert check_codeowners.find_unowned_dirs(entries, paths) == ['interfaces/foo/']
 
-    def test_trailing_slash_directory_argument(self):
-        entries = [Entry('/apt/', ('@canonical/team',))]
-        assert check_codeowners.find_unowned_dirs(['/apt/'], entries) == []
+    def test_file_needs_own_entry(self):
+        entries = [Entry('/other', ('@canonical/team',))]
+        paths = [Path('README.md', ())]
+        assert check_codeowners.find_unowned_dirs(entries, paths) == ['README.md']
+
+    def test_dir_with_no_children_needs_own_entry(self):
+        entries = [Entry('/other/', ('@canonical/team',))]
+        paths = [Path('apt/', ())]
+        assert check_codeowners.find_unowned_dirs(entries, paths) == ['apt/']

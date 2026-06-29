@@ -7,11 +7,20 @@
 
 # infra
 /.github/ @canonical/charmlibs-maintainers
+/.gitignore @canonical/charmlibs-maintainers
+/.scripts/ @canonical/charmlibs-maintainers
+/.template/ @canonical/charmlibs-maintainers
+/.workshop/ @canonical/charmlibs-maintainers
+/AGENTS.md @canonical/charmlibs-maintainers
+/CONTRIBUTING.md @canonical/charmlibs-maintainers
 /docs.just @canonical/charmlibs-maintainers
+/interface-test-requirements.txt @canonical/charmlibs-maintainers
 /justfile @canonical/charmlibs-maintainers
 /LICENSE @canonical/charmlibs-maintainers
 /pyproject.toml @canonical/charmlibs-maintainers
 /SECURITY.md @canonical/charmlibs-maintainers
+/test-requirements.txt @canonical/charmlibs-maintainers
+/uv.lock @canonical/charmlibs-maintainers
 
 # docs
 /.docs/ @canonical/charmlibs-maintainers
