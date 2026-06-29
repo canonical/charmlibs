@@ -178,8 +178,7 @@ def find_orphan_entries(entries: Iterable[Entry], root: pathlib.Path) -> list[st
     orphans: list[str] = []
     for entry in entries:
         path = root / entry.pattern.strip('/')
-        is_dir_entry = entry.pattern.endswith('/')
-        if not path.exists() or path.is_dir() != is_dir_entry:
+        if not path.exists() or path.is_dir() != entry.pattern.endswith('/'):
             orphans.append(entry.pattern)
     return orphans
 
