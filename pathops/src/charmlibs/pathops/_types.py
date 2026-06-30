@@ -587,10 +587,6 @@ class PathProtocol(typing.Protocol):
 # this will always return False with a PosixPath. Since we assume a Linux container
 # so let's just drop it from the protocol for now
 
-# full_match is in the protocol (added in the charmlibs#369 follow-up)
-# LocalPath polyfills on 3.10-3.12 via _compat.full_match; 3.13+ inherits.
-# ContainerPath implements via self._path.full_match on 3.13+; 3.10-3.12 uses _compat.full_match.
-
 # def relative_to(self, other: _StrPath, /) -> Self: ...
 # this produces relative paths, which we shouldn't be using in any code designed to
 # be compatible with both machines and containers, since pebble will error on any
