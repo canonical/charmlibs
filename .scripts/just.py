@@ -47,35 +47,75 @@ if typing.TYPE_CHECKING:
 # `.scripts/just.py` -> repo root is two parents up.
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 TEST_REQUIREMENTS = REPO_ROOT / 'test-requirements.txt'
-
+# The default Python version to use, and the minimum we'll run with.
 DEFAULT_PYTHON = '3.10'
 
-# ANSI escape codes for formatting the messages.
-BOLD = '\033[1m'
-NORMAL = '\033[0m'
-CYAN = '\033[36m'
-# Quick start message printed when called with no arguments.
-QUICK_START = f"""
-{BOLD}Charmlibs is Canonical's charm library monorepo{NORMAL}
 
-{BOLD}List all commands with {CYAN}just help{NORMAL}{BOLD}, or:{NORMAL}
-- Create a new package: {CYAN}just init{NORMAL} or {CYAN}just init --interface{NORMAL}
-- Add a dependency to a package: {CYAN}just add <package> <dependency>{NORMAL}
-- Lint, unit test, and build docs for a package: {CYAN}just check <package>{NORMAL}
-- Run {CYAN}ruff{NORMAL} for all packages: {CYAN}just fast-lint{NORMAL}
+class Colors:
+    """ANSI escape codes for formatting messages, empty strings when color is disabled."""
 
-{BOLD}Run individual checks for a package:{NORMAL}
-- {CYAN}just lint <package>{NORMAL} (fix errors with {CYAN}just format <package>{NORMAL})
-- {CYAN}just unit <package>{NORMAL}
-- {CYAN}just functional <package>{NORMAL} (may require extra software like {CYAN}pebble{NORMAL})
+    def __init__(self) -> None:
+        if self._enabled():
+            self.bold = '\033[1m'
+            self.normal = '\033[0m'
+            self.cyan = '\033[36m'
+        else:
+            self.bold = self.normal = self.cyan = ''
 
-{BOLD}Run integration tests{NORMAL} (requires a Juju controller and a cloud):
-- Pack: {CYAN}just pack-k8s <package>{NORMAL} or {CYAN}just pack-machine <package>{NORMAL}
-- Run: {CYAN}just integration-k8s <package>{NORMAL} or {CYAN}just integration-machine{NORMAL}
+    @staticmethod
+    def _enabled() -> bool:
+        """Return whether to emit ANSI color codes."""
+        if os.environ.get('NO_COLOR'):  # https://no-color.org/ (present and non-empty)
+            return False
+        if 'FORCE_COLOR' in os.environ:  # https://force-color.org/ (present, empty string ok)
+            return True
+        return sys.stdout.isatty()
 
-{BOLD}Build the docs: {CYAN}just docs{NORMAL}
-- For specific packages only: {CYAN}just docs html <packages>{NORMAL}
+
+def main(argv: list[str]) -> int:
+    """Dispatch `argv` to the named recipe, returning its exit code."""
+    if not argv or argv[0] in ('-h', '--help'):
+        print(_quick_start())
+        return 0
+    name, *args = argv
+    func = RECIPES.get(name)
+    if func is None:
+        print(f'Unknown recipe: {name!r}\n', file=sys.stderr)
+        print(_quick_start())
+        return 2
+    return func(args)
+
+
+# --- Main --------------------------------------------------------------------------------------
+
+
+def _quick_start() -> str:
+    c = Colors()
+    return f"""
+{c.bold}Charmlibs is Canonical's charm library monorepo{c.normal}
+
+{c.bold}List all commands with {c.cyan}just help{c.normal}{c.bold}, or:{c.normal}
+- Create a new package: {c.cyan}just init{c.normal} or {c.cyan}just init --interface{c.normal}
+- Add a dependency to a package: {c.cyan}just add <package> <dependency>{c.normal}
+- Lint, unit test, and build docs for a package: {c.cyan}just check <package>{c.normal}
+- Run {c.cyan}ruff{c.normal} for all packages: {c.cyan}just fast-lint{c.normal}
+
+{c.bold}Run individual checks for a package:{c.normal}
+- {c.cyan}just lint <package>{c.normal} (fix errors with {c.cyan}just format <package>{c.normal})
+- {c.cyan}just unit <package>{c.normal}
+- {c.cyan}just functional <package>{c.normal} (may need sudo and additional software installed)
+
+{c.bold}Run integration tests{c.normal} (requires a Juju controller and a cloud):
+- Pack: {c.cyan}just pack-k8s <package>{c.normal} or {c.cyan}just pack-machine <package>{c.normal}
+- Run (excluding machine_only tests): {c.cyan}just integration-k8s <package>{c.normal}
+- Run (excluding k8s_only tests): {c.cyan}just integration-machine <package>{c.normal}
+
+{c.bold}Build the docs: {c.cyan}just docs{c.normal}
+- For specific packages only: {c.cyan}just docs html <packages>{c.normal}
 """.strip()
+
+
+# --- Recipes -----------------------------------------------------------------------------------
 
 # Mapping of recipe names to their functions, populated by the `_register` decorator.
 # `just help` prints the recipes in registration order.
@@ -85,20 +125,6 @@ RECIPES: dict[str, Callable[[list[str]], int]] = {}
 def _register(fn: _F) -> _F:
     RECIPES[fn.__name__.removeprefix('_').replace('_', '-')] = fn
     return fn
-
-
-def main(argv: list[str]) -> int:
-    """Dispatch `argv` to the named recipe, returning its exit code."""
-    if not argv or argv[0] in ('-h', '--help'):
-        print(QUICK_START)
-        return 0
-    name, *args = argv
-    func = RECIPES.get(name)
-    if func is None:
-        print(f'Unknown recipe: {name!r}\n', file=sys.stderr)
-        print(QUICK_START)
-        return 2
-    return func(args)
 
 
 @_register
@@ -126,15 +152,16 @@ def init(argv: list[str]) -> int:
         help='Scaffold a charmlibs.interfaces package instead of a general charmlibs package.',
     )
     args, cookiecutter_args = parser.parse_known_args(argv)
+    c = Colors()
     if args.interface:
         print(
-            f'✨{BOLD}IMPORTANT{NORMAL}✨ The project name should be the canonical interface'
-            f' name, as used in {CYAN}charmcraft.yaml{NORMAL} files.'
+            f'✨{c.bold}IMPORTANT{c.normal}✨ The project name should be the canonical interface'
+            f' name, as used in {c.cyan}charmcraft.yaml{c.normal} files.'
         )
     else:
         print(
-            f'✨{BOLD}IMPORTANT{NORMAL}✨ The project name should be the import package name,'
-            f' without the {CYAN}charmlibs.{NORMAL} namespace.'
+            f'✨{c.bold}IMPORTANT{c.normal}✨ The project name should be the import package name,'
+            f' without the {c.cyan}charmlibs.{c.normal} namespace.'
         )
     print('You can press enter to accept the default, shown in brackets.')
     template = REPO_ROOT / '.template'
