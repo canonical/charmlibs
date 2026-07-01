@@ -40,7 +40,7 @@ jobs:
       integration-substrates: ${{ steps.integration-substrates.outputs.substrates }}
       integration-tags: ${{ steps.integration-tags.outputs.tags }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -131,7 +131,7 @@ jobs:
       matrix:
         python: ${{ fromJson(needs.init.outputs.python) }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -152,7 +152,7 @@ jobs:
       matrix:
         python: ${{ fromJson(needs.init.outputs.python) }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -172,7 +172,7 @@ jobs:
       matrix: ${{ fromJson(needs.init.outputs.functional-matrix) }}
     runs-on: ${{ matrix.ubuntu }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -211,7 +211,7 @@ jobs:
         tag: ${{ fromJson(needs.init.outputs.integration-tags) }}
         substrate: ${{ fromJson(needs.init.outputs.integration-substrates) }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
