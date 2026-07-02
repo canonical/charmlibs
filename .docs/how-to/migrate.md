@@ -85,6 +85,20 @@ In this case:
 
 You'll also want to check for any config files under the old `<interface name>` directory (for example, a `ruff.toml` file), and incorporate any applicable settings into your project's `pyproject.toml`.
 
+```{admonition} Committing as you go
+:class: important
+
+PRs into the monorepo are squash-merged, so the PR title becomes the final commit message on `main`.
+The commits on your branch are just for review, so the goal is simply to make the diff easy to follow.
+The most helpful pattern is to keep mechanical changes (copying files verbatim, fixing imports, running the formatter) in their own commits, separate from changes that need real thought.
+That way a reviewer can skip straight past the noise.
+
+A sequence that works well is: scaffolding, then a verbatim copy of the library, then import fixes, then linting and formatting.
+As you work through this guide we'll suggest good moments to commit, but treat these as a starting point -- split, reorder, or rename the commits however makes your change clearest (for example, you might give your docs their own copy-and-tidy commits).
+
+To start with, commit the output of `just init` now, before making any other changes.
+```
+
 ## Migrate your library's code
 
 This is the easy bit, since Charmhub-hosted libs are only a single module.
@@ -108,6 +122,16 @@ Download a copy of the latest release of your library, and add it to your new pa
 ````
 `````
 
+Copy the module across verbatim, without making any changes to it yet. This gives reviewers a clean baseline to compare against the original Charmhub-hosted library.
+
+```{admonition} Committing as you go
+:class: tip
+
+Now is a good moment to commit the verbatim copy, before you adapt anything.
+A reviewer can then confirm at a glance that the code matches the original release.
+If you copy tests and docs across verbatim too (covered later), you might fold them into this commit or give them their own.
+```
+
 ````{tip}
 Add dependencies with the `just add <library path> <args...>` command.
 This will automatically respect any repo-level version constraints imposed by the tool versions used in CI.
@@ -119,7 +143,7 @@ just add interfaces/tls-certificates --requirements my-requirements.txt
 ```
 ````
 
-Now follow these steps to migrate your library's source code:
+With the verbatim copy committed, now follow these steps to adapt your library's source code:
 1. Copy the copyright header from `__init__.py` to `_<name>.py` to satisfy the linter.
 2. Move the docstring from `_<name>.py` to `__init__.py` so that it's included in your library's automatically built reference docs.
 3. Document in the `_<name>.py` docstring the API and patch version of the source code that you're migrating. This will be helpful for future maintainers and users if they need to debug issues.
@@ -147,8 +171,11 @@ From anywhere in the repo, run the following command:
 just unit <library path>
 ```
 
-```{tip}
-Commit your code now if you haven't already!
+```{admonition} Committing as you go
+:class: tip
+
+Once your library builds and imports cleanly, this is a natural point to commit.
+These are the import and packaging changes that turn the verbatim copy into a working `charmlibs` package, so they sit well in a commit of their own.
 ```
 
 To be merged, your library will need to comply with the repo's linting and static type checking.
@@ -167,6 +194,13 @@ To speed things up, only build the reference docs for your library:
 
 ```bash
 just docs html <library path>
+```
+
+```{admonition} Committing as you go
+:class: tip
+
+Linting and formatting touch a lot of lines but rarely need careful review, so they're worth keeping in a commit of their own.
+Include any `pyproject.toml` config or lint ignores you added to avoid unwanted changes here too.
 ```
 
 ## Migrate your library's tests
