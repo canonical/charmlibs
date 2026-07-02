@@ -169,3 +169,40 @@ class TestGlobPattern:
 
         result = sorted(p.name for p in LocalPath(populated_dir).glob(_Pattern()))
         assert result == ['c.md']
+
+
+class TestFullMatch:
+    def test_str_pattern_match(self):
+        assert LocalPath('/foo/bar.txt').full_match('/foo/bar.txt')
+
+    def test_str_pattern_no_match(self):
+        assert not LocalPath('/foo/bar.txt').full_match('/foo/baz.txt')
+
+    def test_anchored_unlike_match(self):
+        # match('bar.txt') is right-anchored; full_match('bar.txt') requires the full path
+        assert LocalPath('/foo/bar.txt').match('bar.txt')
+        assert not LocalPath('/foo/bar.txt').full_match('bar.txt')
+
+    def test_relative_pattern_roots_from_filesystem(self):
+        # 'foo/bar.txt' anchors from '/' so it matches '/foo/bar.txt'
+        assert LocalPath('/foo/bar.txt').full_match('foo/bar.txt')
+        # but not '/other/bar.txt'
+        assert not LocalPath('/other/bar.txt').full_match('foo/bar.txt')
+
+    def test_double_star_wildcard(self):
+        assert LocalPath('/a/b/c.txt').full_match('**/c.txt')
+        assert not LocalPath('/a/b/c.txt').full_match('**/b.txt')
+
+    def test_pathlib_pattern(self):
+        assert LocalPath('/foo/bar.txt').full_match(pathlib.PurePosixPath('/foo/bar.txt'))
+
+    def test_custom_pathlike_pattern(self):
+        class _Pattern:
+            def __fspath__(self) -> str:
+                return '/foo/bar.txt'
+
+        assert LocalPath('/foo/bar.txt').full_match(_Pattern())
+
+    def test_empty_pattern_raises(self):
+        with pytest.raises(ValueError):
+            LocalPath('/foo/bar.txt').full_match('')

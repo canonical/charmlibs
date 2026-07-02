@@ -394,3 +394,38 @@ def test_methods_handle_or_reraise_pebble_errors(
 def test_not_provided(attr: str):
     assert hasattr(pathlib.Path, attr)
     assert not hasattr(ContainerPath, attr)
+
+
+class TestFullMatch:
+    def test_str_pattern_match(self, container: ops.Container):
+        assert ContainerPath('/foo/bar.txt', container=container).full_match('/foo/bar.txt')
+
+    def test_str_pattern_no_match(self, container: ops.Container):
+        assert not ContainerPath('/foo/bar.txt', container=container).full_match('/foo/baz.txt')
+
+    def test_anchored_unlike_match(self, container: ops.Container):
+        cp = ContainerPath('/foo/bar.txt', container=container)
+        assert cp.match('bar.txt')
+        assert not cp.full_match('bar.txt')
+
+    def test_relative_pattern_roots_from_filesystem(self, container: ops.Container):
+        assert ContainerPath('/foo/bar.txt', container=container).full_match('foo/bar.txt')
+        assert not ContainerPath('/other/bar.txt', container=container).full_match('foo/bar.txt')
+
+    def test_double_star_wildcard(self, container: ops.Container):
+        assert ContainerPath('/a/b/c.txt', container=container).full_match('**/c.txt')
+        assert not ContainerPath('/a/b/c.txt', container=container).full_match('**/b.txt')
+
+    def test_pathlib_pattern(self, container: ops.Container):
+        assert ContainerPath('/foo/bar.txt', container=container).full_match(
+            pathlib.PurePosixPath('/foo/bar.txt')
+        )
+
+    def test_pattern_cant_be_container_path(self, container: ops.Container):
+        cp = ContainerPath('/foo/bar.txt', container=container)
+        with pytest.raises(TypeError):
+            cp.full_match(cp)  # type: ignore
+
+    def test_empty_pattern_raises(self, container: ops.Container):
+        with pytest.raises(ValueError):
+            ContainerPath('/foo/bar.txt', container=container).full_match('')
