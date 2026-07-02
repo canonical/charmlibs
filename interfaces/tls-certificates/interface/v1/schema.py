@@ -31,7 +31,15 @@ Examples:
                         "endpoint": "https://acme-staging-v02.api.letsencrypt.org/directory"
                     }
                 }
-            ]
+            ],
+            "capabilities": {
+                "supports_ip_sans": false,
+                "supports_wildcard_dns": true,
+                "supports_subdomain": false,
+                "supports_ca_certificates": false,
+                "allowed_domains": ["mydomain.com"],
+                "provider_type": "acme"
+            }
         }
     RequirerSchema:
         unit: {
@@ -102,12 +110,45 @@ class RequestError(BaseModel):
     error: ProviderError = Field(description="Error details.")
 
 
+class Capabilities(BaseModel):
+    """Provider capabilities model.
+
+    Best-effort description of what the provider's certificate server supports. Every
+    attribute is independently optional; an omitted attribute means "unspecified /
+    unknown" and must not be treated as an assumed default.
+    """
+
+    supports_ip_sans: bool | None = Field(
+        default=None, description="Whether IP addresses are accepted in SANs."
+    )
+    supports_wildcard_dns: bool | None = Field(
+        default=None, description="Whether wildcard DNS entries are accepted."
+    )
+    supports_subdomain: bool | None = Field(
+        default=None, description="Whether subdomain certificates can be issued."
+    )
+    supports_ca_certificates: bool | None = Field(
+        default=None, description="Whether CA certificates can be issued."
+    )
+    allowed_domains: list[str] | None = Field(
+        default=None, description="Optional list of allowed DNS domains."
+    )
+    provider_type: str | None = Field(
+        default=None, description="Optional provider-type hint (e.g. 'acme', 'vault')."
+    )
+
+
 class ProviderApplicationData(BaseModel):
     """Provider application data model."""
 
-    certificates: Json[list[Certificate]] = Field(description="List of certificates.")
+    certificates: Json[list[Certificate]] | None = Field(
+        default=None, description="List of certificates."
+    )
     request_errors: Json[list[RequestError]] | None = Field(
         default=None, description="List of request errors."
+    )
+    capabilities: Json[Capabilities] | None = Field(
+        default=None, description="Best-effort provider capabilities."
     )
 
 

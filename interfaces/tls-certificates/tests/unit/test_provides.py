@@ -3,17 +3,24 @@
 
 import base64
 import json
+import logging
 from pathlib import Path
+from typing import Any
 
 import pytest
 import scenario
 import yaml
+from ops.charm import CharmBase
 
 from certificates import (
     generate_ca,
     generate_certificate,
     generate_csr,
     generate_private_key,
+)
+from charmlibs.interfaces.tls_certificates import (
+    ProviderCapabilities,
+    TLSCertificatesProvidesV4,
 )
 from provider_charm import DummyTLSCertificatesProviderCharm
 
@@ -1181,3 +1188,221 @@ class TestTLSCertificatesProvidesV4:
         assert request_errors[0]["error"]["name"] == "DOMAIN_NOT_ALLOWED"
         assert request_errors[0]["error"]["message"] == "Domain not allowed"
         assert request_errors[0]["error"]["reason"] == "This domain is restricted"
+
+
+CAPABILITY_PROVIDER_META = {
+    "name": "tls-certificates-capability-provider",
+    "provides": {"certificates": {"interface": "tls-certificates"}},
+}
+
+CAPABILITY_PROVIDER_CONFIG = {
+    "options": {
+        "advertise": {"type": "boolean", "default": True},
+        "provider-type": {"type": "string", "default": "acme"},
+        "supports-ip-sans": {"type": "boolean", "default": False},
+    }
+}
+
+
+class CapabilityProviderCharm(CharmBase):
+    def __init__(self, *args: Any):
+        super().__init__(*args)
+        capabilities = None
+        if self.config.get("advertise"):
+            capabilities = ProviderCapabilities(
+                supports_ip_sans=bool(self.config.get("supports-ip-sans")),
+                provider_type=str(self.config.get("provider-type")),
+            )
+        self.certificates = TLSCertificatesProvidesV4(
+            self, "certificates", provider_capabilities=capabilities
+        )
+
+
+class TestProviderCapabilityAdvertisement:
+    @pytest.fixture(autouse=True)
+    def context(self):
+        self.ctx = scenario.Context(
+            charm_type=CapabilityProviderCharm,
+            meta=CAPABILITY_PROVIDER_META,
+            config=CAPABILITY_PROVIDER_CONFIG,
+        )
+
+    def test_given_no_capabilities_when_relation_changed_then_no_capabilities_in_databag(self):
+        relation = scenario.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-requirer",
+        )
+        state_in = scenario.State(
+            relations={relation},
+            leader=True,
+            config={"advertise": False},
+        )
+
+        state_out = self.ctx.run(self.ctx.on.relation_changed(relation), state_in)
+
+        assert "capabilities" not in state_out.get_relation(relation.id).local_app_data
+
+    def test_given_capabilities_when_leader_then_capabilities_written_and_other_fields_preserved(
+        self,
+    ):
+        requirer_private_key = generate_private_key()
+        csr = generate_csr(private_key=requirer_private_key, common_name="example.com")
+        provider_private_key = generate_private_key()
+        provider_ca_certificate = generate_ca(
+            private_key=provider_private_key, common_name="example.com"
+        )
+        certificate = generate_certificate(
+            ca_key=provider_private_key, csr=csr, ca=provider_ca_certificate
+        )
+        existing_request_errors = [
+            {
+                "csr": "csr-pem",
+                "error": {"code": 102, "name": "DOMAIN_NOT_ALLOWED", "message": "nope"},
+            }
+        ]
+        relation = scenario.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-requirer",
+            local_app_data={
+                "certificates": json.dumps([
+                    {
+                        "certificate": certificate,
+                        "certificate_signing_request": csr,
+                        "ca": provider_ca_certificate,
+                    }
+                ]),
+                "request_errors": json.dumps(existing_request_errors),
+            },
+            remote_app_data={
+                "certificate_signing_requests": json.dumps([
+                    {"certificate_signing_request": csr, "ca": "false"}
+                ]),
+            },
+        )
+        state_in = scenario.State(
+            relations={relation},
+            leader=True,
+            config={"advertise": True, "provider-type": "acme", "supports-ip-sans": False},
+        )
+
+        state_out = self.ctx.run(self.ctx.on.relation_changed(relation), state_in)
+
+        local_app_data = state_out.get_relation(relation.id).local_app_data
+        capabilities = json.loads(local_app_data["capabilities"])
+        assert capabilities["provider_type"] == "acme"
+        assert capabilities["supports_ip_sans"] is False
+        preserved_certificates = json.loads(local_app_data["certificates"])
+        assert preserved_certificates[0]["certificate"] == certificate
+        preserved_errors = json.loads(local_app_data["request_errors"])
+        assert preserved_errors[0]["csr"] == "csr-pem"
+        assert preserved_errors[0]["error"]["code"] == 102
+
+    def test_given_capabilities_when_not_leader_then_no_application_data_written(self):
+        relation = scenario.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-requirer",
+        )
+        state_in = scenario.State(
+            relations={relation},
+            leader=False,
+            config={"advertise": True},
+        )
+
+        state_out = self.ctx.run(self.ctx.on.relation_changed(relation), state_in)
+
+        assert "capabilities" not in state_out.get_relation(relation.id).local_app_data
+
+    def test_given_updated_capabilities_when_relation_changed_then_new_values_reflected(self):
+        relation = scenario.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-requirer",
+        )
+        state_in = scenario.State(
+            relations={relation},
+            leader=True,
+            config={"advertise": True, "provider-type": "vault", "supports-ip-sans": True},
+        )
+
+        state_out = self.ctx.run(self.ctx.on.relation_changed(relation), state_in)
+
+        capabilities = json.loads(
+            state_out.get_relation(relation.id).local_app_data["capabilities"]
+        )
+        assert capabilities["provider_type"] == "vault"
+        assert capabilities["supports_ip_sans"] is True
+
+    def test_given_unchanged_capabilities_when_relation_changed_again_then_no_rewrite(
+        self, caplog: pytest.LogCaptureFixture
+    ):
+        relation = scenario.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-requirer",
+        )
+        config: dict[str, str | int | float | bool] = {
+            "advertise": True,
+            "provider-type": "acme",
+            "supports-ip-sans": False,
+        }
+        state_in = scenario.State(relations={relation}, leader=True, config=config)
+
+        # First publish writes the capabilities to the application databag.
+        with caplog.at_level(logging.INFO):
+            state_mid = self.ctx.run(self.ctx.on.relation_changed(relation), state_in)
+        published = dict(state_mid.get_relation(relation.id).local_app_data)
+        assert "capabilities" in published
+        assert "Provider capabilities relation data updated" in caplog.text
+
+        # Re-running with the already-published, unchanged data must be a no-op.
+        caplog.clear()
+        relation_unchanged = scenario.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-requirer",
+            local_app_data=published,
+        )
+        state_in_2 = scenario.State(relations={relation_unchanged}, leader=True, config=config)
+        with caplog.at_level(logging.INFO):
+            self.ctx.run(self.ctx.on.relation_changed(relation_unchanged), state_in_2)
+
+        assert "Provider capabilities relation data updated" not in caplog.text
+
+    def test_given_capabilities_when_relation_created_then_capabilities_written(self):
+        relation = scenario.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-requirer",
+        )
+        state_in = scenario.State(
+            relations={relation},
+            leader=True,
+            config={"advertise": True, "provider-type": "self-signed", "supports-ip-sans": True},
+        )
+
+        state_out = self.ctx.run(self.ctx.on.relation_created(relation), state_in)
+
+        local_app_data = state_out.get_relation(relation.id).local_app_data
+        assert "capabilities" in local_app_data
+        capabilities = json.loads(local_app_data["capabilities"])
+        assert capabilities["provider_type"] == "self-signed"
+        assert capabilities["supports_ip_sans"] is True
+
+    def test_given_no_capabilities_when_relation_created_then_no_capabilities_in_databag(self):
+        relation = scenario.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-requirer",
+        )
+        state_in = scenario.State(
+            relations={relation},
+            leader=True,
+            config={"advertise": False},
+        )
+
+        state_out = self.ctx.run(self.ctx.on.relation_created(relation), state_in)
+
+        assert "capabilities" not in state_out.get_relation(relation.id).local_app_data

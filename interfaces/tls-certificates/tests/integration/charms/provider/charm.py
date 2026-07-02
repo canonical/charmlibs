@@ -29,7 +29,10 @@ logger = logging.getLogger(__name__)
 class DummyTLSCertificatesProviderCharm(CharmBase):
     def __init__(self, *args: Any):
         super().__init__(*args)
-        self.certificates = TLSCertificatesProvidesV4(self, "certificates")
+        self.certificates = TLSCertificatesProvidesV4(
+            self,
+            "certificates",
+        )
         self.framework.observe(self.on.collect_unit_status, self._on_collect_unit_status)
         self.framework.observe(self.on.install, self._configure)
         self.framework.observe(self.on.update_status, self._configure)
