@@ -63,6 +63,11 @@ from ._functions import (
     ensure,
     ensure_revision,
 )
+from ._snapd_conf import (
+    get,
+    set,  # noqa: A004 (shadowing a Python builtin)
+    unset,
+)
 from ._snapd_logs import (
     LogEntry,
     logs,
@@ -96,11 +101,14 @@ __all__ = [
     'TimeoutError',
     'ensure',
     'ensure_revision',
+    'get',
     'hold',
     'info',
     'install',
     'logs',
     'refresh',
     'remove',
+    'set',
     'unhold',
+    'unset',
 ]
