@@ -63,6 +63,10 @@ from ._functions import (
     ensure,
     ensure_revision,
 )
+from ._snapd_aliases import (
+    alias,
+    unalias,
+)
 from ._snapd_logs import (
     LogEntry,
     logs,
@@ -94,6 +98,7 @@ __all__ = [
     'OptionNotFoundError',
     'RevisionNotAvailableError',
     'TimeoutError',
+    'alias',
     'ensure',
     'ensure_revision',
     'hold',
@@ -102,5 +107,6 @@ __all__ = [
     'logs',
     'refresh',
     'remove',
+    'unalias',
     'unhold',
 ]
