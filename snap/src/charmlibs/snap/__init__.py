@@ -63,6 +63,11 @@ from ._functions import (
     ensure,
     ensure_revision,
 )
+from ._snapd_apps import (
+    restart,
+    start,
+    stop,
+)
 from ._snapd_logs import (
     LogEntry,
     logs,
@@ -102,5 +107,8 @@ __all__ = [
     'logs',
     'refresh',
     'remove',
+    'restart',
+    'start',
+    'stop',
     'unhold',
 ]
