@@ -35,9 +35,10 @@ def full_match(path: str, pattern: str, *, case_sensitive: bool | None = None) -
     the OS default (case-sensitive on POSIX), ``True`` forces case-sensitive,
     and ``False`` forces case-insensitive matching.
     """
-    return _compile(pattern, case_sensitive is False).match(
-        str(pathlib.PurePosixPath(path))
-    ) is not None
+    return (
+        _compile(pattern, case_sensitive is False).match(str(pathlib.PurePosixPath(path)))
+        is not None
+    )
 
 
 @functools.lru_cache(maxsize=256)
@@ -73,13 +74,13 @@ def _translate(pattern: str) -> str:
                 out.append(any_last_segments)
         else:
             if part:
-                out.extend(_translate_segment(part, f'{not_sep}*', not_sep))
+                out.extend(_translate_segment(part, star=f'{not_sep}*', question=not_sep))
             if i < last:
                 out.append(sep)
     return rf'(?s:{"".join(out)})\Z'
 
 
-def _translate_segment(pattern: str, STAR: str, QUESTION_MARK: str) -> list[str]:
+def _translate_segment(pattern: str, *, star: str, question: str) -> list[str]:
     """Translate a single glob segment. Ported from CPython's ``fnmatch._translate``."""
     res: list[str] = []
     add = res.append
@@ -88,10 +89,10 @@ def _translate_segment(pattern: str, STAR: str, QUESTION_MARK: str) -> list[str]
         c = pattern[i]
         i = i + 1
         if c == '*':
-            if (not res) or res[-1] is not STAR:
-                add(STAR)
+            if (not res) or res[-1] is not star:
+                add(star)
         elif c == '?':
-            add(QUESTION_MARK)
+            add(question)
         elif c == '[':
             j = i
             if j < n and pattern[j] == '!':
@@ -125,9 +126,7 @@ def _translate_segment(pattern: str, STAR: str, QUESTION_MARK: str) -> list[str]
                         if chunks[k - 1][-1] > chunks[k][0]:
                             chunks[k - 1] = chunks[k - 1][:-1] + chunks[k][1:]
                             del chunks[k]
-                    stuff = '-'.join(
-                        s.replace('\\', r'\\').replace('-', r'\-') for s in chunks
-                    )
+                    stuff = '-'.join(s.replace('\\', r'\\').replace('-', r'\-') for s in chunks)
                 stuff = re.sub(r'([&~|])', r'\\\1', stuff)
                 i = j + 1
                 if not stuff:
