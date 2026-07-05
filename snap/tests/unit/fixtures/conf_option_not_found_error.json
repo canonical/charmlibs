@@ -1,0 +1,13 @@
+{
+    "type": "error",
+    "status-code": 400,
+    "status": "Bad Request",
+    "result": {
+        "message": "snap \"lxd\" has no \"keydoesnotexist01\" configuration option",
+        "kind": "option-not-found",
+        "value": {
+            "SnapName": "lxd",
+            "Key": "keydoesnotexist01"
+        }
+    }
+}
