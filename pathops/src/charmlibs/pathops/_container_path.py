@@ -187,7 +187,7 @@ class ContainerPath:
                 f'ContainerPath is not a valid pattern for ContainerPath.full_match: {pattern!r}'
             )
         if sys.version_info >= (3, 13):
-            return self._path.full_match(pattern, case_sensitive=case_sensitive)  # type: ignore[attr-defined]
+            return self._path.full_match(pattern, case_sensitive=case_sensitive)
         return _compat.full_match(
             str(self._path), os.fspath(pattern), case_sensitive=case_sensitive
         )

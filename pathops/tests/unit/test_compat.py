@@ -23,10 +23,9 @@ import pytest
 
 from charmlibs.pathops import _compat
 
-pytestmark = pytest.mark.skipif(
-    sys.version_info < (3, 13),
-    reason='pathlib.PurePath.full_match added in Python 3.13',
-)
+if sys.version_info < (3, 13):
+    pytest.skip('pathlib.PurePath.full_match added in Python 3.13', allow_module_level=True)
+assert sys.version_info >= (3, 13)  # narrow for pyright
 
 
 @pytest.mark.parametrize(
@@ -80,7 +79,7 @@ pytestmark = pytest.mark.skipif(
     ],
 )
 def test_full_match_matches_pathlib(path: str, pattern: str):
-    expected = pathlib.PurePosixPath(path).full_match(pattern)  # type: ignore[attr-defined]
+    expected = pathlib.PurePosixPath(path).full_match(pattern)
     assert _compat.full_match(path, pattern) == expected
 
 
@@ -100,7 +99,5 @@ def test_full_match_matches_pathlib(path: str, pattern: str):
 def test_full_match_case_sensitive_matches_pathlib(
     path: str, pattern: str, case_sensitive: bool | None
 ):
-    expected = pathlib.PurePosixPath(path).full_match(  # type: ignore[attr-defined]
-        pattern, case_sensitive=case_sensitive
-    )
+    expected = pathlib.PurePosixPath(path).full_match(pattern, case_sensitive=case_sensitive)
     assert _compat.full_match(path, pattern, case_sensitive=case_sensitive) == expected

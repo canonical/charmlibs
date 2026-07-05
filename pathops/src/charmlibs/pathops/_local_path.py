@@ -179,7 +179,7 @@ class LocalPath(pathlib.PosixPath):
         case_sensitive: bool | None = None,
     ) -> bool:
         if sys.version_info >= (3, 13):
-            return super().full_match(pattern, case_sensitive=case_sensitive)  # type: ignore[attr-defined]
+            return super().full_match(pattern, case_sensitive=case_sensitive)
         return _compat.full_match(str(self), os.fspath(pattern), case_sensitive=case_sensitive)
 
     def mkdir(
