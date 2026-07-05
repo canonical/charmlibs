@@ -172,12 +172,15 @@ class LocalPath(pathlib.PosixPath):
         # ContainerPath.glob accepts str | os.PathLike[str], so we normalise here to match.
         return super().glob(os.fspath(pattern))
 
-    def full_match(self, pattern: str | os.PathLike[str]) -> bool:
-        # Normalise via os.fspath for consistent behaviour across Python versions.
-        pat_str = os.fspath(pattern)
+    def full_match(
+        self,
+        pattern: str | os.PathLike[str],
+        *,
+        case_sensitive: bool | None = None,
+    ) -> bool:
         if sys.version_info >= (3, 13):
-            return super().full_match(pat_str)  # type: ignore[attr-defined]
-        return _compat.full_match(str(self), pat_str)
+            return super().full_match(pattern, case_sensitive=case_sensitive)  # type: ignore[attr-defined]
+        return _compat.full_match(str(self), os.fspath(pattern), case_sensitive=case_sensitive)
 
     def mkdir(
         self,

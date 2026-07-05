@@ -397,24 +397,26 @@ def test_not_provided(attr: str):
 
 
 class TestFullMatch:
-    def test_str_pattern_match(self, container: ops.Container):
-        assert ContainerPath('/foo/bar.txt', container=container).full_match('/foo/bar.txt')
-
-    def test_str_pattern_no_match(self, container: ops.Container):
-        assert not ContainerPath('/foo/bar.txt', container=container).full_match('/foo/baz.txt')
-
-    def test_anchored_unlike_match(self, container: ops.Container):
-        cp = ContainerPath('/foo/bar.txt', container=container)
-        assert cp.match('bar.txt')
-        assert not cp.full_match('bar.txt')
-
-    def test_relative_pattern_roots_from_filesystem(self, container: ops.Container):
-        assert ContainerPath('/foo/bar.txt', container=container).full_match('foo/bar.txt')
-        assert not ContainerPath('/other/bar.txt', container=container).full_match('foo/bar.txt')
-
-    def test_double_star_wildcard(self, container: ops.Container):
-        assert ContainerPath('/a/b/c.txt', container=container).full_match('**/c.txt')
-        assert not ContainerPath('/a/b/c.txt', container=container).full_match('**/b.txt')
+    # ContainerPath only accepts absolute paths, so we can only exercise absolute-path cases
+    # against ContainerPath. Each row asserts ContainerPath and LocalPath agree.
+    @pytest.mark.parametrize(
+        ('path', 'pattern', 'expected'),
+        [
+            ('/foo/bar.txt', '/foo/bar.txt', True),
+            ('/foo/bar.txt', '/foo/baz.txt', False),
+            ('/foo/bar.txt', 'bar.txt', False),
+            ('/foo/bar.txt', 'foo/bar.txt', False),
+            ('/other/bar.txt', 'foo/bar.txt', False),
+            ('/a/b/c.txt', '**/c.txt', True),
+            ('/a/b/c.txt', '**/b.txt', False),
+        ],
+    )
+    def test_matches_local_path(
+        self, container: ops.Container, path: str, pattern: str, expected: bool
+    ):
+        container_result = ContainerPath(path, container=container).full_match(pattern)
+        local_result = LocalPath(path).full_match(pattern)
+        assert container_result == local_result == expected
 
     def test_pathlib_pattern(self, container: ops.Container):
         assert ContainerPath('/foo/bar.txt', container=container).full_match(
@@ -422,10 +424,33 @@ class TestFullMatch:
         )
 
     def test_pattern_cant_be_container_path(self, container: ops.Container):
-        cp = ContainerPath('/foo/bar.txt', container=container)
+        container_path = ContainerPath('/foo/bar.txt', container=container)
         with pytest.raises(TypeError):
-            cp.full_match(cp)  # type: ignore
+            container_path.full_match(container_path)  # type: ignore
 
-    def test_empty_pattern_raises(self, container: ops.Container):
-        with pytest.raises(ValueError):
-            ContainerPath('/foo/bar.txt', container=container).full_match('')
+    def test_empty_pattern_no_match(self, container: ops.Container):
+        # Python 3.13's pathlib returns False (rather than raising) for an empty pattern.
+        assert not ContainerPath('/foo/bar.txt', container=container).full_match('')
+
+    @pytest.mark.parametrize(
+        ('path', 'pattern', 'case_sensitive', 'expected'),
+        [
+            ('/FOO/bar.txt', '/foo/bar.txt', None, False),
+            ('/FOO/bar.txt', '/foo/bar.txt', True, False),
+            ('/FOO/bar.txt', '/foo/bar.txt', False, True),
+            ('/a/B/c.TXT', '**/c.txt', False, True),
+            ('/foo/bar.txt', '/foo/bar.txt', True, True),
+        ],
+    )
+    def test_case_sensitive(
+        self,
+        container: ops.Container,
+        path: str,
+        pattern: str,
+        case_sensitive: bool | None,
+        expected: bool,
+    ):
+        result = ContainerPath(path, container=container).full_match(
+            pattern, case_sensitive=case_sensitive
+        )
+        assert result == expected

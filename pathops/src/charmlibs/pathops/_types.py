@@ -125,15 +125,22 @@ class PathProtocol(typing.Protocol):
         """
         ...
 
-    def full_match(self, pattern: str | os.PathLike[str]) -> bool:
+    def full_match(
+        self,
+        pattern: str | os.PathLike[str],
+        *,
+        case_sensitive: bool | None = None,
+    ) -> bool:
         """Return whether this path fully matches the given pattern.
 
-        Unlike :meth:`match`, always anchors the pattern against the entire path. A relative
-        pattern is anchored from the filesystem root, so it must describe the full path. Supports
-        the ``'**'`` wildcard, which matches zero or more path components.
+        Unlike :meth:`match`, always anchors the pattern against the entire path. Supports the
+        ``'**'`` wildcard, which matches zero or more path components.
 
         Args:
             pattern: A :class:`str` or :class:`os.PathLike` object.
+            case_sensitive: If ``True``, matching is case-sensitive; if ``False``, matching is
+                case-insensitive. The default (``None``) matches with the OS default, which is
+                case-sensitive on POSIX.
 
         .. warning::
             :class:`ContainerPath` is not :class:`os.PathLike`. A :class:`ContainerPath` instance

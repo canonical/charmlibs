@@ -172,26 +172,26 @@ class TestGlobPattern:
 
 
 class TestFullMatch:
-    def test_str_pattern_match(self):
-        assert LocalPath('/foo/bar.txt').full_match('/foo/bar.txt')
-
-    def test_str_pattern_no_match(self):
-        assert not LocalPath('/foo/bar.txt').full_match('/foo/baz.txt')
-
-    def test_anchored_unlike_match(self):
-        # match('bar.txt') is right-anchored; full_match('bar.txt') requires the full path
-        assert LocalPath('/foo/bar.txt').match('bar.txt')
-        assert not LocalPath('/foo/bar.txt').full_match('bar.txt')
-
-    def test_relative_pattern_roots_from_filesystem(self):
-        # 'foo/bar.txt' anchors from '/' so it matches '/foo/bar.txt'
-        assert LocalPath('/foo/bar.txt').full_match('foo/bar.txt')
-        # but not '/other/bar.txt'
-        assert not LocalPath('/other/bar.txt').full_match('foo/bar.txt')
-
-    def test_double_star_wildcard(self):
-        assert LocalPath('/a/b/c.txt').full_match('**/c.txt')
-        assert not LocalPath('/a/b/c.txt').full_match('**/b.txt')
+    # Expected values are hardcoded (not compared to pathlib) because the polyfill
+    # runs on Python < 3.13. Cross-check against real pathlib lives in test_compat.py.
+    @pytest.mark.parametrize(
+        ('path', 'pattern', 'expected'),
+        [
+            ('/foo/bar.txt', '/foo/bar.txt', True),
+            ('/foo/bar.txt', '/foo/baz.txt', False),
+            ('/foo/bar.txt', 'bar.txt', False),
+            ('/foo/bar.txt', 'foo/bar.txt', False),
+            ('/other/bar.txt', 'foo/bar.txt', False),
+            ('/a/b/c.txt', '**/c.txt', True),
+            ('/a/b/c.txt', '**/b.txt', False),
+            ('foo/bar.txt', 'foo/bar.txt', True),
+            ('foo/bar.txt', '/foo/bar.txt', False),
+            ('/x.txt', '**', True),
+            ('/foo', '**/foo', False),
+        ],
+    )
+    def test_str_pattern(self, path: str, pattern: str, expected: bool):
+        assert LocalPath(path).full_match(pattern) == expected
 
     def test_pathlib_pattern(self):
         assert LocalPath('/foo/bar.txt').full_match(pathlib.PurePosixPath('/foo/bar.txt'))
@@ -203,6 +203,21 @@ class TestFullMatch:
 
         assert LocalPath('/foo/bar.txt').full_match(_Pattern())
 
-    def test_empty_pattern_raises(self):
-        with pytest.raises(ValueError):
-            LocalPath('/foo/bar.txt').full_match('')
+    def test_empty_pattern_no_match(self):
+        # Python 3.13's pathlib returns False (rather than raising) for an empty pattern.
+        assert not LocalPath('/foo/bar.txt').full_match('')
+
+    @pytest.mark.parametrize(
+        ('path', 'pattern', 'case_sensitive', 'expected'),
+        [
+            ('/FOO/bar.txt', '/foo/bar.txt', None, False),
+            ('/FOO/bar.txt', '/foo/bar.txt', True, False),
+            ('/FOO/bar.txt', '/foo/bar.txt', False, True),
+            ('/a/B/c.TXT', '**/c.txt', False, True),
+            ('/foo/bar.txt', '/foo/bar.txt', True, True),
+        ],
+    )
+    def test_case_sensitive(
+        self, path: str, pattern: str, case_sensitive: bool | None, expected: bool
+    ):
+        assert LocalPath(path).full_match(pattern, case_sensitive=case_sensitive) == expected

@@ -161,7 +161,12 @@ class ContainerPath:
         """
         return self._path.match(path_pattern)
 
-    def full_match(self, pattern: str | os.PathLike[str]) -> bool:
+    def full_match(
+        self,
+        pattern: str | os.PathLike[str],
+        *,
+        case_sensitive: bool | None = None,
+    ) -> bool:
         """Return whether this path fully matches the given pattern.
 
         Unlike :meth:`match`, always anchors the pattern against the entire path. Supports the
@@ -169,6 +174,9 @@ class ContainerPath:
 
         Args:
             pattern: A :class:`str` or :class:`os.PathLike` object.
+            case_sensitive: If ``True``, matching is case-sensitive; if ``False``, matching is
+                case-insensitive. The default (``None``) matches with the OS default, which is
+                case-sensitive on POSIX.
 
         .. warning::
             :class:`ContainerPath` is not :class:`os.PathLike`. A :class:`ContainerPath` instance
@@ -178,10 +186,11 @@ class ContainerPath:
             raise TypeError(
                 f'ContainerPath is not a valid pattern for ContainerPath.full_match: {pattern!r}'
             )
-        pat_str = os.fspath(pattern)
         if sys.version_info >= (3, 13):
-            return self._path.full_match(pat_str)  # type: ignore[attr-defined]
-        return _compat.full_match(str(self._path), pat_str)
+            return self._path.full_match(pattern, case_sensitive=case_sensitive)  # type: ignore[attr-defined]
+        return _compat.full_match(
+            str(self._path), os.fspath(pattern), case_sensitive=case_sensitive
+        )
 
     def with_name(self, name: str) -> Self:
         """Return a new ContainerPath, with the same container, but with the path name replaced.

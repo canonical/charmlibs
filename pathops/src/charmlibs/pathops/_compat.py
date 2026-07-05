@@ -16,36 +16,130 @@
 
 from __future__ import annotations
 
-import fnmatch
+import functools
 import pathlib
+import re
+
+_SEP = '/'
 
 
-def full_match(path_str: str, pattern_str: str) -> bool:
+def full_match(path: str, pattern: str, *, case_sensitive: bool | None = None) -> bool:
     """Polyfill for pathlib.PurePath.full_match (Python 3.13+).
 
-    Unlike PurePath.match, always anchors the pattern against the entire path.
-    Relative patterns are anchored to the filesystem root.
-    Supports ``**`` wildcards that match zero or more path components.
+    Matches ``str(PurePosixPath(path))`` against a regex built from
+    ``str(PurePosixPath(pattern))``, mirroring pathlib's regex-based semantics
+    with ``recursive=True, include_hidden=True``. ``**`` matches zero or more
+    path components.
+
+    ``case_sensitive`` mirrors pathlib's parameter: ``None`` (the default) uses
+    the OS default (case-sensitive on POSIX), ``True`` forces case-sensitive,
+    and ``False`` forces case-insensitive matching.
     """
-    if not pattern_str:
-        raise ValueError('empty pattern')
-    pat = pathlib.PurePosixPath(pattern_str)
-    path = pathlib.PurePosixPath(path_str)
-    pat_parts = pat.parts if pat.is_absolute() else ('/', *pat.parts)
-    return _match_parts(path.parts, pat_parts)
+    return _compile(pattern, case_sensitive is False).match(
+        str(pathlib.PurePosixPath(path))
+    ) is not None
 
 
-def _match_parts(path_parts: tuple[str, ...], pat_parts: tuple[str, ...]) -> bool:
-    if not pat_parts:
-        return not path_parts
-    if not path_parts:
-        # Remaining pattern matches only if it consists entirely of **
-        return all(p == '**' for p in pat_parts)
-    first = pat_parts[0]
-    if first == '**':
-        rest = pat_parts[1:]
-        # ** matches zero or more path components
-        return any(_match_parts(path_parts[i:], rest) for i in range(len(path_parts) + 1))
-    if not fnmatch.fnmatchcase(path_parts[0], first):
-        return False
-    return _match_parts(path_parts[1:], pat_parts[1:])
+@functools.lru_cache(maxsize=256)
+def _compile(pattern: str, ignore_case: bool) -> re.Pattern[str]:
+    flags = re.IGNORECASE if ignore_case else 0
+    return re.compile(_translate(str(pathlib.PurePosixPath(pattern))), flags)
+
+
+def _translate(pattern: str) -> str:
+    """Translate a glob-style pattern to a regex.
+
+    Ported from ``glob.translate`` (added in Python 3.13), specialised to
+    ``recursive=True, include_hidden=True`` with a single POSIX separator.
+    """
+    sep = re.escape(_SEP)
+    not_sep = f'[^{sep}]'
+    one_last_segment = f'{not_sep}+'
+    one_segment = f'{one_last_segment}{sep}'
+    any_segments = f'(?:.+{sep})?'
+    any_last_segments = '.*'
+
+    parts = pattern.split(_SEP)
+    last = len(parts) - 1
+    out: list[str] = []
+    for i, part in enumerate(parts):
+        if part == '*':
+            out.append(one_segment if i < last else one_last_segment)
+        elif part == '**':
+            if i < last:
+                if parts[i + 1] != '**':
+                    out.append(any_segments)
+            else:
+                out.append(any_last_segments)
+        else:
+            if part:
+                out.extend(_translate_segment(part, f'{not_sep}*', not_sep))
+            if i < last:
+                out.append(sep)
+    return rf'(?s:{"".join(out)})\Z'
+
+
+def _translate_segment(pattern: str, STAR: str, QUESTION_MARK: str) -> list[str]:
+    """Translate a single glob segment. Ported from CPython's ``fnmatch._translate``."""
+    res: list[str] = []
+    add = res.append
+    i, n = 0, len(pattern)
+    while i < n:
+        c = pattern[i]
+        i = i + 1
+        if c == '*':
+            if (not res) or res[-1] is not STAR:
+                add(STAR)
+        elif c == '?':
+            add(QUESTION_MARK)
+        elif c == '[':
+            j = i
+            if j < n and pattern[j] == '!':
+                j = j + 1
+            if j < n and pattern[j] == ']':
+                j = j + 1
+            while j < n and pattern[j] != ']':
+                j = j + 1
+            if j >= n:
+                add(r'\[')
+            else:
+                stuff = pattern[i:j]
+                if '-' not in stuff:
+                    stuff = stuff.replace('\\', r'\\')
+                else:
+                    chunks: list[str] = []
+                    k = i + 2 if pattern[i] == '!' else i + 1
+                    while True:
+                        k = pattern.find('-', k, j)
+                        if k < 0:
+                            break
+                        chunks.append(pattern[i:k])
+                        i = k + 1
+                        k = k + 3
+                    chunk = pattern[i:j]
+                    if chunk:
+                        chunks.append(chunk)
+                    else:
+                        chunks[-1] += '-'
+                    for k in range(len(chunks) - 1, 0, -1):
+                        if chunks[k - 1][-1] > chunks[k][0]:
+                            chunks[k - 1] = chunks[k - 1][:-1] + chunks[k][1:]
+                            del chunks[k]
+                    stuff = '-'.join(
+                        s.replace('\\', r'\\').replace('-', r'\-') for s in chunks
+                    )
+                stuff = re.sub(r'([&~|])', r'\\\1', stuff)
+                i = j + 1
+                if not stuff:
+                    add('(?!)')
+                elif stuff == '!':
+                    add('.')
+                else:
+                    if stuff[0] == '!':
+                        stuff = '^' + stuff[1:]
+                    elif stuff[0] in ('^', '['):
+                        stuff = '\\' + stuff
+                    add(f'[{stuff}]')
+        else:
+            add(re.escape(c))
+    return res
