@@ -118,6 +118,17 @@ def test_get_all_keys():
     _cleanup(_KEY2)
 
 
+def test_get_mixed_dotted_and_non_dotted_keys():
+    # Requesting an option and a dotted sub-key of it returns both as separate entries:
+    # the plain key yields the full subtree, the dotted key yields the leaf, keyed by the
+    # literal dotted string. The two do not merge or collide.
+    ensure_installed(_SNAP)
+    _snapd_conf.set(_SNAP, {_KEY: {'nested': 'value'}})
+    result = _snapd_conf.get(_SNAP, _KEY, f'{_KEY}.nested')
+    assert result == {_KEY: {'nested': 'value'}, f'{_KEY}.nested': 'value'}
+    _cleanup()
+
+
 def test_get_specific_keys_returns_subset():
     ensure_installed(_SNAP)
     _snapd_conf.set(_SNAP, {_KEY: 'alpha', _KEY2: 'beta'})
