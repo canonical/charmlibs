@@ -93,8 +93,14 @@ The commits on your branch are just for review, so the goal is simply to make th
 The most helpful pattern is to keep mechanical changes (copying files verbatim, fixing imports, running the formatter) in their own commits, separate from changes that need real thought.
 That way a reviewer can skip straight past the noise.
 
-A sequence that works well is: scaffolding, then a verbatim copy of the library, then import fixes, then linting and formatting.
-As you work through this guide we'll suggest good moments to commit, but treat these as a starting point -- split, reorder, or rename the commits however makes your change clearest (for example, you might give your docs their own copy-and-tidy commits).
+A sequence that works well:
+
+1. Scaffolding
+2. Verbatim copy of the library
+3. Fix imports
+4. Linting and formatting
+
+As you work through this guide we'll suggest good moments to commit, but treat these as a starting point -- split, reorder, or rename the commits however makes your change clearest. For example, you might give your docs their own copy-and-tidy commits.
 
 To start with, commit the output of `just init` now, before making any other changes.
 ```
