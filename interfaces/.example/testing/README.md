@@ -8,4 +8,4 @@ To install, add `charmlibs-interfaces-example-interface-testing` to your Python 
 from charmlibs.interfaces import example_interface_testing
 ```
 
-See the [library reference documentation](https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/example_interface) for more.
+See the [library reference documentation](https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/example_interface) for more.

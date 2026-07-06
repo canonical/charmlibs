@@ -104,10 +104,10 @@ def test_layer_commands(
     pexp_command = (
         state_out.get_container('nginx-pexp').plan.services['nginx-prometheus-exporter'].command
     )
-    scheme = 'http' if nginx_insecure else 'https'
     assert (
         pexp_command == f'nginx-prometheus-exporter '
-        f'--no-nginx.ssl-verify '
         f'--web.listen-address=:{nginx_pexp_port} '
-        f'--nginx.scrape-uri={scheme}://127.0.0.1:{nginx_port}/status'
+        f'--nginx.scrape-uri=http://127.0.0.1:{nginx_port}/status '
+        f'--no-nginx.ssl-verify '
+        f'--web.config.file=/etc/exporter/web-config.yaml'
     )

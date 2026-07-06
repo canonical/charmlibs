@@ -2,7 +2,3 @@ name: jammy
 base: ubuntu@22.04
 sdks:
   - name: project-charmlibs
-actions:
-  functional: |
-    # Override Python with: workshop run --env PYTHON=python3.12 jammy -- functional ...
-    sudo just python="${PYTHON:-python3}" functional "$@"

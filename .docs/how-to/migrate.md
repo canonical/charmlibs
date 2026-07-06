@@ -32,7 +32,7 @@ just init
 :sync: interface
 
 ```bash
-just interface init
+just init --interface
 ```
 ````
 `````
@@ -80,7 +80,7 @@ If `init` fails because the directory already exists, take a look at the directo
 It may be that the interface definitions are already hosted in the repo under `interfaces/<interface name>/interface`.
 In this case:
 - Temporarily move the `<interface name>` directory.
-- Re-run `just interface init`.
+- Re-run `just init --interface`.
 - Then add the `interface` subdirectory to your newly generated project.
 
 You'll also want to check for any config files under the old `<interface name>` directory (for example, a `ruff.toml` file), and incorporate any applicable settings into your project's `pyproject.toml`.
@@ -123,7 +123,7 @@ Now follow these steps to migrate your library's source code:
 1. Copy the copyright header from `__init__.py` to `_<name>.py` to satisfy the linter.
 2. Move the docstring from `_<name>.py` to `__init__.py` so that it's included in your library's automatically built reference docs.
 3. Document in the `_<name>.py` docstring the API and patch version of the source code that you're migrating. This will be helpful for future maintainers and users if they need to debug issues.
-4. Delete `LIB_ID`, `LIB_API`, and `LIB_PATCH` from `_<name>.py` -- unless they're used internally by the library, then you'll need to keep them for now.
+4. Delete `LIBID`, `LIBAPI`, and `LIBPATCH` from `_<name>.py` -- unless they're used internally by the library, then you'll need to keep them for now.
 5. Move the contents of `PYDEPS` to the `dependencies` entry in your `pyproject.toml` (using `just add`), and delete the `PYDEPS` variable. You'll also need to add any additional dependencies that were assumed to be provided by the charm, like `ops` or `pydantic`. Consider adding version constraints to your dependencies too.
 6. Import the public API of your library to `__init__.py` and add the imported names to `__all__`, like this:
 ```python
@@ -175,7 +175,7 @@ This part is a bit trickier.
 With any luck, your library was previously developed in a placeholder charm that exists purely for library distribution.
 If your library's development and testing was tightly coupled to a real charm, this step will be more involved.
 You'll need to consider which tests can live alongside the library, and which only make sense with the charm.
-You might want to add a simplified dummy charm to run some of the tests against.
+You might want to add a simplified placeholder charm to run some of the tests against.
 
 ```{warning}
 Don't add `pytest` to your `pyproject.toml`.
@@ -191,7 +191,7 @@ If your library wasn't tightly coupled to a real charm, these steps should be su
 
 1. Add any unit test dependencies to the `unit` dependency group in your `pyproject.toml` (using `just add`).
 2. Copy any relevant contents of your `conftest.py` to `tests/unit/conftest.py`.
-3. Copy your library's existing unit test files to `tests/unit/`, along with any data files, dummy charms, and so on.
+3. Copy your library's existing unit test files to `tests/unit/`, along with any data files, placeholder charms, and so on.
 4. Correct the imports in those files.
 
 Replace imports like this:

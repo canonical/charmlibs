@@ -8,4 +8,4 @@ To install, add `charmlibs-systemd` to your Python dependencies. Then in your Py
 from charmlibs import systemd
 ```
 
-See the [reference documentation](https://documentation.ubuntu.com/charmlibs/reference/charmlibs/systemd) for more.
+See the [reference documentation](https://canonical.com/juju/docs/charmlibs/reference/charmlibs/systemd) for more.

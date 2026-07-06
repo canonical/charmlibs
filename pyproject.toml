@@ -57,7 +57,7 @@ exclude = [
     "__pycache__",
     "*.egg_info",
     "htmlcov",
-    ".docs/.sphinx",
+    ".docs/_dev",
     ".docs/conf.py",
     ".template/\\{\\{ cookiecutter.project_slug \\}\\}",
 ]

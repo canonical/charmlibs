@@ -36,8 +36,10 @@ integration = [  # installed for `just integration interfaces/tls_certificates`
 ]
 
 [project.urls]
-"Repository" = "https://github.com/canonical/charmlibs"
+"Documentation" = "https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/tls-certificates"
+"Repository" = "https://github.com/canonical/charmlibs/tree/main/interfaces/tls-certificates"
 "Issues" = "https://github.com/canonical/charmlibs/issues"
+"Changelog" = "https://github.com/canonical/charmlibs/blob/main/interfaces/tls-certificates/CHANGELOG.md"
 
 [build-system]
 requires = ["hatchling"]

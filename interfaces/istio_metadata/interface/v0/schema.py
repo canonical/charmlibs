@@ -1,0 +1,1 @@
+../../src/charmlibs/interfaces/istio_metadata/_schema.py

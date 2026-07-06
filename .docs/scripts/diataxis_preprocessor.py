@@ -149,7 +149,7 @@ def _build_sphinx_map(packages: list[dict[str, Any]]) -> dict[pathlib.PurePath, 
     m: dict[pathlib.PurePath, str] = {}
 
     # Static .docs/ pages — walk all .md/.rst files (excluding build artifacts).
-    skip_dirs = {'_build', '.sphinx', '.save', 'scripts', 'tests', 'extensions'}
+    skip_dirs = {'_build', '_dev', '.save', 'scripts', 'tests', 'extensions'}
     for path in _DOCS_DIR.rglob('*'):
         if path.suffix not in ('.md', '.rst'):
             continue

@@ -3,6 +3,7 @@ internal: true
 
 version: 0
 status: draft
+lib: charms.kubeflow_dashboard.kubeflow_dashboard_links
 
 providers:
   - name: kubeflow-dashboard

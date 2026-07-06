@@ -1,3 +1,7 @@
+# 1.0.1.post0 - 16 June 2026
+
+Update project URLs.
+
 # 1.0.1 - 17 March 2026
 
 Fix the `TypeError` messages generated when an invalid type of user/group was used.

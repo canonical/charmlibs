@@ -97,7 +97,7 @@ jobs:
           substrates=()
           for substrate in k8s machine; do
             set +e  # don't abort if the next process has a non-zero exit code
-            uvx --from rust-just just python="$PYTHON" integration-$substrate "$PACKAGE" --collect-only -q
+            uvx --from rust-just just integration-$substrate --python "$PYTHON" "$PACKAGE" --collect-only -q
             case $? in
                 0) substrates+=($substrate);;
                 5) echo "No tests for $substrate";;
@@ -141,7 +141,7 @@ jobs:
       - name: Run static analysis and other checks
         env:
           PYTHON: ${{ matrix.python }}
-        run: uvx --from rust-just just python="$PYTHON" lint "$PACKAGE"
+        run: uvx --from rust-just just lint --python "$PYTHON" "$PACKAGE"
 
   unit:
     needs: init
@@ -162,7 +162,7 @@ jobs:
       - name: Run unit tests
         env:
           PYTHON: ${{ matrix.python }}
-        run: uvx --from rust-just just python="$PYTHON" unit "$PACKAGE"
+        run: uvx --from rust-just just unit --python "$PYTHON" "$PACKAGE"
 
   functional:
     needs: init
@@ -195,11 +195,11 @@ jobs:
 
       - name: Run functional tests
         if: matrix.sudo == 'no-sudo'
-        run: uvx --from rust-just just python=python3 functional "$PACKAGE"
+        run: uvx --from rust-just just functional --python python3 "$PACKAGE"
 
       - name: Run functional tests with sudo
         if: matrix.sudo != 'no-sudo'
-        run: sudo env "PATH=$PATH" uvx --from rust-just just python=python3 functional "$PACKAGE"
+        run: sudo env "PATH=$PATH" uvx --from rust-just just functional --python python3 "$PACKAGE"
 
   integration:
     needs: init
@@ -235,7 +235,7 @@ jobs:
         env:
           TAG: ${{ matrix.tag }}
           SUBSTRATE: ${{ matrix.substrate }}
-        run: uvx --from rust-just just tag="$TAG" "pack-$SUBSTRATE" "$PACKAGE"
+        run: uvx --from rust-just just "pack-$SUBSTRATE" --tag "$TAG" "$PACKAGE"
 
       - name: Run Juju integration tests
         id: integration
@@ -243,7 +243,7 @@ jobs:
           PYTHON: ${{ needs.init.outputs.min_python_version }}
           RECIPE: integration-${{ matrix.substrate }}
           TAG: ${{ matrix.tag }}
-        run: uvx --from rust-just just python="$PYTHON" tag="$TAG" "$RECIPE" "$PACKAGE"
+        run: uvx --from rust-just just "$RECIPE" --python "$PYTHON" --tag "$TAG" "$PACKAGE"
 
       - name: Upload Charmcraft logs
         if: ${{ !cancelled() && (steps.pack.conclusion != 'skipped' || steps.integration.conclusion != 'skipped') }}

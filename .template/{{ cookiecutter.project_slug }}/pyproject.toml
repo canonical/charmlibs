@@ -45,7 +45,7 @@ integration = [  # installed for `just integration {{ cookiecutter.__path_prefix
 ]
 
 [project.urls]
-"Documentation" = "https://documentation.ubuntu.com/charmlibs/reference/charmlibs/{{ cookiecutter.__path_prefix }}{{ cookiecutter.__canonical_name }}"
+"Documentation" = "https://canonical.com/juju/docs/charmlibs/reference/charmlibs/{{ cookiecutter.__path_prefix }}{{ cookiecutter.__canonical_name }}"
 "Repository" = "https://github.com/canonical/charmlibs/tree/main/{{ cookiecutter.__path_prefix }}{{ cookiecutter.project_slug }}"
 "Issues" = "https://github.com/canonical/charmlibs/issues"
 "Changelog" = "https://github.com/canonical/charmlibs/blob/main/{{ cookiecutter.__path_prefix }}{{ cookiecutter.project_slug }}/CHANGELOG.md"

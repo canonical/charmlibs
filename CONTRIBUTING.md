@@ -17,9 +17,9 @@ Then run `just` or `just help` from anywhere in the repository for usage.
 
 # Adding a new library
 
-Run `just init` to create a new general library, or `just interface init` for a new interface library.
-We recommend following the [tutorial](https://documentation.ubuntu.com/charmlibs/tutorial) to learn how to add your library to the `charmlibs` monorepo.
-If you're migrating a library that was published elsewhere, read the [how-to guide for migrating an existing library to this repository](https://documentation.ubuntu.com/charmlibs/how-to/migrate/).
+Run `just init` to create a new general library, or `just init --interface` for a new interface library.
+We recommend following the [tutorial](https://canonical.com/juju/docs/charmlibs/tutorial) to learn how to add your library to the `charmlibs` monorepo.
+If you're migrating a library that was published elsewhere, read the [how-to guide for migrating an existing library to this repository](https://canonical.com/juju/docs/charmlibs/how-to/migrate/).
 
 # Working on an existing library
 
@@ -48,16 +48,16 @@ just add pathops 'pydantic>=2'
 - `just functional <package>` runs functional tests, which interact with real external processes (but not Juju itself). Some functional test suites may require `sudo` access and may be destructive to the local environment (e.g. installing or removing system packages). Use [Workshop](https://snapcraft.io/workshop) to run them in an isolated container instead of running them directly on your host:
 
   ```bash
-  workshop run resolute -- functional <package>    # Ubuntu 26.04
-  workshop run noble -- functional <package>       # Ubuntu 24.04
-  workshop run jammy -- functional <package>       # Ubuntu 22.04
+  workshop exec resolute -- sudo just functional <package>    # Ubuntu 26.04
+  workshop exec noble -- sudo just functional <package>       # Ubuntu 24.04
+  workshop exec jammy -- sudo just functional <package>       # Ubuntu 22.04
   ```
 
-  Extra pytest flags are passed through, e.g. `workshop run noble -- functional snap -x -k test_install`. Workshop configs are in `.workshop/`.
+  Extra pytest flags are passed through, e.g. `workshop exec noble -- sudo just functional snap -x -k test_install`. Workshop configs are in `.workshop/`.
 
 - Integration tests involve packing real test charms and deploying them on a Juju cloud. Pack first with `just pack-k8s <package>` or `just pack-machine <package>`, then run `just integration-k8s <package>` or `just integration-machine <package>`.
 
-Read more: [the different types of tests](https://documentation.ubuntu.com/charmlibs/explanation/charmlibs-tests/).
+Read more: [the different types of tests](https://canonical.com/juju/docs/charmlibs/explanation/charmlibs-tests/).
 
 # Pull requests
 
@@ -76,4 +76,4 @@ Libraries are automatically published to PyPI when a merged PR bumps the version
 
 Any PR that would trigger a release must also update the library's `CHANGELOG.md` — CI will block the merge otherwise.
 
-Read more: [publishing packages from the monorepo](https://documentation.ubuntu.com/charmlibs/explanation/charmlibs-publishing/).
+Read more: [publishing packages from the monorepo](https://canonical.com/juju/docs/charmlibs/explanation/charmlibs-publishing/).

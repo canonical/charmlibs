@@ -29,7 +29,7 @@
 
 # charmlibs packages (alphabetical)
 /apt/ @canonical/charmlibs-maintainers
-/nginx_k8s/ @canonical/tracing-and-profiling
+/nginx_k8s/ @canonical/observability
 /passwd/ @canonical/charmlibs-maintainers
 /pathops/ @canonical/charmlibs-maintainers
 /rollingops/ @canonical/data
@@ -86,14 +86,17 @@
 /interfaces/forward_auth/interface/ @canonical/identity
 /interfaces/forward_auth/ruff.toml @canonical/identity
 
-# /interfaces/gateway-metadata/
-/interfaces/gateway-metadata @canonical/service-mesh
+# /interfaces/gateway_metadata/
+/interfaces/gateway_metadata @canonical/service-mesh
 
-# /interfaces/istio-ingress-route/
-/interfaces/istio-ingress-route @canonical/service-mesh
+# /interfaces/istio_ingress_route/
+/interfaces/istio_ingress_route @canonical/service-mesh
 
-# /interfaces/istio-request-auth/
-/interfaces/istio-request-auth/ @canonical/service-mesh
+# /interfaces/istio_metadata/
+/interfaces/istio_metadata @canonical/service-mesh
+
+# /interfaces/istio_request_auth/
+/interfaces/istio_request_auth/ @canonical/service-mesh
 
 # /interfaces/grafana_auth/
 /interfaces/grafana_auth/interface/ @canonical/observability
@@ -221,8 +224,8 @@
 # /interfaces/sloth/
 /interfaces/sloth/ @canonical/tracing-and-profiling
 
-# /interfaces/service-mesh/
-/interfaces/service-mesh @canonical/service-mesh
+# /interfaces/service_mesh/
+/interfaces/service_mesh @canonical/service-mesh
 
 # /interfaces/smtp/
 /interfaces/smtp/interface/ @canonical/platform-engineering
