@@ -176,7 +176,9 @@ class TestColors:
             assert just.Colors._enabled() is True
 
     @pytest.mark.parametrize('force_color', ['', '0'])
-    def test_falsy_force_color_does_not_enable(self, monkeypatch: pytest.MonkeyPatch, force_color: str):
+    def test_falsy_force_color_does_not_enable(
+        self, monkeypatch: pytest.MonkeyPatch, force_color: str
+    ):
         monkeypatch.delenv('NO_COLOR', raising=False)
         monkeypatch.setenv('FORCE_COLOR', force_color)
         with patch('sys.stdout.isatty', return_value=False):
@@ -184,7 +186,9 @@ class TestColors:
 
     @pytest.mark.parametrize('force_color', ['1', ''])
     @pytest.mark.parametrize('no_color', ['1', ''])
-    def test_force_color_overrides_no_color(self, monkeypatch: pytest.MonkeyPatch, force_color: str, no_color: str):
+    def test_force_color_overrides_no_color(
+        self, monkeypatch: pytest.MonkeyPatch, force_color: str, no_color: str
+    ):
         monkeypatch.setenv('NO_COLOR', no_color)
         monkeypatch.setenv('FORCE_COLOR', force_color)
         with patch('sys.stdout.isatty', return_value=False):
