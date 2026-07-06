@@ -37,9 +37,14 @@ def get(snap: str, /, *keys: str) -> dict[str, Any]:
             for example ``server.port``. If omitted, all top-level configuration is returned.
 
     Returns:
-        A dict mapping each requested key to its configured value. When no keys are given,
-        the dict contains every top-level configuration option. A dotted key is returned as a
-        single entry keyed by the dotted string.
+        A dict mapping each requested key to its configured value. When no keys are given, the
+        entire configuration is returned as a nested dict. Dotted keys are returned as entries
+        keyed by the dotted string. For example, if a snap ``s`` has a configuration option
+        ``server.port`` set to 8080, and another option ``client.timeout`` set to 30, then
+        ``get(s)`` returns ``{'server': {'port': 8080}, 'client': {'timeout': 30}}``, while
+        ``get(s, 'client.timeout')`` returns ``{'client.timeout': 30}``, and a mixture like
+        ``get(s, 'server', 'server.port')`` returns both the nested dict and the dotted key, like
+        ``{'server': {'port': 8080}, 'server.port': 8080}``.
 
     Raises:
         OptionNotFoundError: if the snap is not installed, or if a requested key is not set.
