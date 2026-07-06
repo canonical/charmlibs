@@ -1,0 +1,39 @@
+{
+    "type": "sync",
+    "status-code": 200,
+    "status": "OK",
+    "result": [
+        {
+            "name": "lxd-support",
+            "summary": "allows operating as the LXD service",
+            "plugs": [
+                {
+                    "snap": "lxd",
+                    "plug": "lxd-support"
+                }
+            ],
+            "slots": [
+                {
+                    "snap": "snapd",
+                    "slot": "lxd-support"
+                }
+            ]
+        },
+        {
+            "name": "mount-observe",
+            "summary": "allows reading mount table and quota information",
+            "plugs": [
+                {
+                    "snap": "vlc",
+                    "plug": "mount-observe"
+                }
+            ],
+            "slots": [
+                {
+                    "snap": "snapd",
+                    "slot": "mount-observe"
+                }
+            ]
+        }
+    ]
+}

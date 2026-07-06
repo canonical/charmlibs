@@ -64,5 +64,5 @@ To make review easier, this PR begins with a series of mechanical commits that c
 
 1. **Scaffolding** — output of `just init` or `just init --interface`.
 2. **Lift and shift** — the existing Charmhub library source, tests, and docs copied to their new locations verbatim, providing a baseline for comparison with the original.
-4. **Fix imports** — update import paths from `charms.<charm>.v<n>` to `charmlibs.<name>` (or `charmlibs.interfaces.<name>`) in code, tests and docs.
-3. **Lint and format** — result of `just format` and `just lint`, with any necessary `pyproject.toml` config or ignores to avoid unwanted changes.
+3. **Fix imports** — update import paths from `charms.<charm>.v<n>` to `charmlibs.<name>` (or `charmlibs.interfaces.<name>`) in code, tests and docs.
+4. **Lint and format** — result of `just format` and `just lint`, with any necessary `pyproject.toml` config or ignores to avoid unwanted changes.

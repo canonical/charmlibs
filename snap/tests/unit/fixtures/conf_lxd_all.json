@@ -1,0 +1,38 @@
+{
+    "type": "sync",
+    "status-code": 200,
+    "status": "OK",
+    "result": {
+        "ceph": {
+            "external": "false"
+        },
+        "criu": {
+            "enable": "true"
+        },
+        "dict": {
+            "false": false,
+            "float": 2.0,
+            "integer": 1,
+            "list": [
+                1,
+                2.0,
+                true,
+                false,
+                null
+            ],
+            "true": true
+        },
+        "false": false,
+        "float": 2.0,
+        "integer": 1,
+        "keythatdoesntexist01": "true",
+        "list": [
+            1,
+            2.0,
+            true,
+            false,
+            null
+        ],
+        "true": true
+    }
+}
