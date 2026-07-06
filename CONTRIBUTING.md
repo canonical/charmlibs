@@ -86,6 +86,12 @@ The documentation site published at [canonical.com/juju/docs/charmlibs](https://
 - **Reference docs** generated automatically from your library's docstrings via Sphinx [autodoc](https://www.sphinx-doc.org/en/master/usage/extensions/autodoc.html). The module docstring in your package's `__init__.py` becomes the top-level description for that library's reference page.
 - **Interface specification docs** generated from the `README.md` files in each interface's `interface/` directory. These describe the relation interface contract itself (separately from the `charmlibs.interfaces` Python package reference, which is generated from docstrings like any other library).
 
+## Writing library docs
+
+Reference docs are generated from docstrings, so anything you write in your public API's docstrings appears verbatim in the published reference. Keep them informative for library users rather than implementation notes.
+
+For adding tutorials, how-to guides, and explanations specific to your library, see the [how-to guide for adding docs to a library](https://canonical.com/juju/docs/charmlibs/how-to/add-library-docs/).
+
 ## Building the docs
 
 All docs commands are exposed under the `docs` module of `just`. Run `just docs help` to list them.
@@ -111,12 +117,6 @@ The logic for steps 2 and 3 lives in the local Sphinx extensions under `.docs/ex
 
 - `package_docs.py` drives the per-package autodoc passes and saves/restores each library's reference doctree.
 - `interface_docs.py` generates the interface specification pages. During the final pass it reads the interface `README.md` files, rewrites relative links to point at the repo on GitHub, and writes the pages under `reference/interfaces/`. (During the per-package passes it only writes a placeholder so the toctree glob doesn't fail.)
-
-## Writing library docs
-
-Reference docs are generated from docstrings, so anything you write in your public API's docstrings appears verbatim in the published reference. Keep them informative for library users rather than implementation notes.
-
-For adding tutorials, how-to guides, and explanations specific to your library, see the [how-to guide for adding docs to a library](https://canonical.com/juju/docs/charmlibs/how-to/add-library-docs/).
 
 ## Working on the docs extensions
 
