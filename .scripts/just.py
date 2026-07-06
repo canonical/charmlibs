@@ -72,6 +72,9 @@ class Colors:
         return sys.stdout.isatty()
 
 
+# --- Main --------------------------------------------------------------------------------------
+
+
 def main(argv: list[str]) -> int:
     """Dispatch `argv` to the named recipe, returning its exit code."""
     if not argv or argv[0] in ('-h', '--help'):
@@ -84,9 +87,6 @@ def main(argv: list[str]) -> int:
         print(_quick_start())
         return 2
     return func(args)
-
-
-# --- Main --------------------------------------------------------------------------------------
 
 
 def _quick_start() -> str:
