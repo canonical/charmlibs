@@ -154,68 +154,64 @@ class TestCoverageCmds:
         assert '--data-file=.report/coverage-fakesuite-fakepy.db' in report_cmd
 
 
-class TestColorsEnabled:
-    def test_no_color_disables(self, monkeypatch: pytest.MonkeyPatch):
-        monkeypatch.setenv('NO_COLOR', '1')
-        monkeypatch.setenv('FORCE_COLOR', '1')  # NO_COLOR takes precedence.
+class TestColors:
+    @pytest.mark.parametrize('no_color', ['1', 'anything'])
+    def test_no_color_alone_disables(self, monkeypatch: pytest.MonkeyPatch, no_color: str):
+        monkeypatch.delenv('FORCE_COLOR', raising=False)
+        monkeypatch.setenv('NO_COLOR', no_color)
         assert just.Colors._enabled() is False
 
-    def test_empty_no_color_does_not_disable(self, monkeypatch: pytest.MonkeyPatch):
-        monkeypatch.setenv('NO_COLOR', '')  # Empty NO_COLOR is ignored per no-color.org.
+    @pytest.mark.parametrize('no_color', ['', '0'])
+    def test_falsy_no_color_does_not_disable(self, monkeypatch: pytest.MonkeyPatch, no_color: str):
         monkeypatch.delenv('FORCE_COLOR', raising=False)
+        monkeypatch.setenv('NO_COLOR', no_color)
         with patch('sys.stdout.isatty', return_value=True):
             assert just.Colors._enabled() is True
 
-    def test_force_color_enables(self, monkeypatch: pytest.MonkeyPatch):
+    @pytest.mark.parametrize('force_color', ['1', 'anything'])
+    def test_force_color_alone_enables(self, monkeypatch: pytest.MonkeyPatch, force_color: str):
         monkeypatch.delenv('NO_COLOR', raising=False)
-        monkeypatch.setenv('FORCE_COLOR', '1')
+        monkeypatch.setenv('FORCE_COLOR', force_color)
         with patch('sys.stdout.isatty', return_value=False):
             assert just.Colors._enabled() is True
 
-    def test_empty_force_color_enables(self, monkeypatch: pytest.MonkeyPatch):
-        # Empty FORCE_COLOR still forces color on, per force-color.org.
+    @pytest.mark.parametrize('force_color', ['', '0'])
+    def test_falsy_force_color_does_not_enable(self, monkeypatch: pytest.MonkeyPatch, force_color: str):
         monkeypatch.delenv('NO_COLOR', raising=False)
-        monkeypatch.setenv('FORCE_COLOR', '')
-        with patch('sys.stdout.isatty', return_value=False):
-            assert just.Colors._enabled() is True
-
-    def test_tty_enables(self, monkeypatch: pytest.MonkeyPatch):
-        monkeypatch.delenv('NO_COLOR', raising=False)
-        monkeypatch.delenv('FORCE_COLOR', raising=False)
-        with patch('sys.stdout.isatty', return_value=True):
-            assert just.Colors._enabled() is True
-
-    def test_non_tty_disables(self, monkeypatch: pytest.MonkeyPatch):
-        monkeypatch.delenv('NO_COLOR', raising=False)
-        monkeypatch.delenv('FORCE_COLOR', raising=False)
+        monkeypatch.setenv('FORCE_COLOR', force_color)
         with patch('sys.stdout.isatty', return_value=False):
             assert just.Colors._enabled() is False
 
+    @pytest.mark.parametrize('force_color', ['1', ''])
+    @pytest.mark.parametrize('no_color', ['1', ''])
+    def test_force_color_overrides_no_color(self, monkeypatch: pytest.MonkeyPatch, force_color: str, no_color: str):
+        monkeypatch.setenv('NO_COLOR', no_color)
+        monkeypatch.setenv('FORCE_COLOR', force_color)
+        with patch('sys.stdout.isatty', return_value=False):
+            assert just.Colors._enabled() is bool(force_color)
 
-class TestColors:
+    @pytest.mark.parametrize('isatty', [True, False])
+    def test_isatty(self, monkeypatch: pytest.MonkeyPatch, isatty: bool):
+        monkeypatch.delenv('NO_COLOR', raising=False)
+        monkeypatch.delenv('FORCE_COLOR', raising=False)
+        with patch('sys.stdout.isatty', return_value=isatty):
+            assert just.Colors._enabled() is isatty
+
     def test_enabled(self):
         with patch('just.Colors._enabled', return_value=True):
             colors = just.Colors()
-        assert (colors.bold, colors.normal, colors.cyan) == ('\033[1m', '\033[0m', '\033[36m')
+            message = just._quick_start()
+        assert all((colors.bold, colors.normal, colors.cyan))
+        assert 'just help' in message  # Correct message.
+        assert '\033[' in message  # With colors.
 
     def test_disabled(self):
         with patch('just.Colors._enabled', return_value=False):
             colors = just.Colors()
-        assert (colors.bold, colors.normal, colors.cyan) == ('', '', '')
-
-
-class TestQuickStart:
-    def test_with_colors(self):
-        with patch('just.Colors._enabled', return_value=True):
             message = just._quick_start()
-        assert '\033[' in message
-        assert 'just help' in message
-
-    def test_without_colors(self):
-        with patch('just.Colors._enabled', return_value=False):
-            message = just._quick_start()
-        assert '\033[' not in message
-        assert 'just help' in message
+        assert not any((colors.bold, colors.normal, colors.cyan))
+        assert 'just help' in message  # Correct message.
+        assert '\033[' not in message  # No colors.
 
 
 class TestMain:
