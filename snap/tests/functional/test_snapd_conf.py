@@ -107,13 +107,14 @@ def test_set_null_unsets_key():
 
 
 def test_get_all_keys():
-    # get() with no keys returns all config as a dict.
+    # get() with no keys returns all config as a dict. Nested values are returned in full:
+    # the returned dict is keyed by top-level option, and each value keeps its full structure.
     ensure_installed(_SNAP)
-    _snapd_conf.set(_SNAP, {_KEY: 'value', _KEY2: 'value2'})
+    _snapd_conf.set(_SNAP, {_KEY: 'value', _KEY2: {'nested': {'deep': 1}}})
     config = _snapd_conf.get(_SNAP)
     assert isinstance(config, dict)
     assert config.get(_KEY) == 'value'
-    assert config.get(_KEY2) == 'value2'
+    assert config.get(_KEY2) == {'nested': {'deep': 1}}
     _cleanup(_KEY2)
 
 
