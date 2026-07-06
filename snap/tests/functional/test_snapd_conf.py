@@ -235,10 +235,14 @@ def test_set_multiple_keys_at_once():
     _cleanup(_KEY2)
 
 
-def test_set_empty_dict_no_error():
-    # set({}) is a no-op — the API accepts an empty body without error.
+def test_set_empty_dict_is_noop():
+    # set(snap, {}) is a no-op — the API accepts an empty body without error, and existing
+    # configuration is left untouched (an empty body does NOT unset all keys).
     ensure_installed(_SNAP)
-    _snapd_conf.set(_SNAP, {})  # Should not raise.
+    _snapd_conf.set(_SNAP, {_KEY: 'before-empty-set'})
+    _snapd_conf.set(_SNAP, {})
+    assert _get_one(_SNAP, _KEY) == 'before-empty-set'
+    _cleanup()
 
 
 def test_get_mixed_keys_raises_option_not_found():
