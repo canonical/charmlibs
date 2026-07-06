@@ -80,11 +80,11 @@ Read more: [publishing packages from the monorepo](https://canonical.com/juju/do
 
 # Documentation
 
-The documentation site published at [canonical.com/juju/docs/charmlibs](https://canonical.com/juju/docs/charmlibs) is built with [Sphinx](https://www.sphinx-doc.org/) from the source in the `.docs/` directory. It combines three kinds of content:
+The documentation site published at [canonical.com/juju/docs/charmlibs](https://canonical.com/juju/docs/charmlibs) uses a custom build process on top of [canonical/sphinx-stack]( https://github.com/canonical/sphinx-stack). It combines three kinds of content:
 
-- **Hand-written diataxis pages** (tutorials, how-to guides, and explanations) authored in `.docs/`, plus per-library pages that live in each library's own `docs/` directory.
+- **Hand-written Diataxis pages** (tutorials, how-to guides, and explanations) authored in `.docs/`, plus per-library pages that live in each library's own `docs/` directory.
 - **Reference docs** generated automatically from your library's docstrings via Sphinx [autodoc](https://www.sphinx-doc.org/en/master/usage/extensions/autodoc.html). The module docstring in your package's `__init__.py` becomes the top-level description for that library's reference page.
-- **Interface specification docs** generated from the versioned `README.md` files in each interface's `interface/` directory. These describe the relation interface contract itself (separately from the `charmlibs.interfaces` Python package reference, which is generated from docstrings like any other library).
+- **Interface specification docs** generated from the `README.md` files in each interface's `interface/` directory. These describe the relation interface contract itself (separately from the `charmlibs.interfaces` Python package reference, which is generated from docstrings like any other library).
 
 ## Building the docs
 
@@ -94,7 +94,7 @@ All docs commands are exposed under the `docs` module of `just`. Run `just docs 
 just docs html <package>   # build docs, generating reference docs for <package> only (fast)
 just docs html             # build everything, including reference docs for all packages
 just docs                  # alias for `just docs html`
-just docs html -           # build the site with no package reference docs (fastest; for editing prose only)
+just docs html -           # build the site with no package reference docs (fastest; for Diataxis docs only)
 ```
 
 `just docs html <package>` is also run as part of `just check <package>`, so building the reference docs for your library happens automatically when you run the standard pre-commit check.
@@ -124,6 +124,6 @@ The local Sphinx extensions are covered by linting, and have their own tests and
 
 ```bash
 just fast-lint .docs   # run ruff for content under .docs/
-just docs ext-unit     # run unit tests under .docs/tests
+just docs ext-unit     # run unit tests under .docs/tests/
 just docs ext-static   # run pyright over the local Sphinx extensions and tests
 ```
