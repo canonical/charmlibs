@@ -28,6 +28,8 @@ logger = logging.getLogger(__name__)
 # /v2/snaps/{snap}/conf
 
 
+# Getting one config value looks like get(s, k)[k]. In future we could add a get_one(s) helper.
+# Get with no keys returns the entire config, following the CLI (get_all is unnecessary).
 def get(snap: str, /, *keys: str) -> dict[str, Any]:
     """Get snap configuration.
 
@@ -59,6 +61,8 @@ def get(snap: str, /, *keys: str) -> dict[str, Any]:
     return typing.cast('dict[str, Any]', config)
 
 
+# Unset with no keys is a meaningless no-op, indistinguishable from set with an empty dict.
+# We forbid it at the signature level to minimise confusion.
 def unset(snap: str, key: str, /, *keys: str) -> None:
     """Unset snap configuration keys.
 
