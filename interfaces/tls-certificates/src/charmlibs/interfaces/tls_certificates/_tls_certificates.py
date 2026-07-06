@@ -46,6 +46,8 @@ from ops.model import (
     Unit,
 )
 
+from . import _backwards_compatibility
+
 if TYPE_CHECKING:
     from collections.abc import Collection, Mapping, MutableMapping
 
@@ -2034,7 +2036,22 @@ class TLSCertificatesRequiresV4(Object):
         if mode == Mode.APP and not self.model.unit.is_leader():
             logger.debug("Not leader, skipping private key generation in APP mode")
             return
+        if mode == Mode.APP and self._migrate_legacy_app_private_key():
+            return
         self._generate_private_key(mode)
+
+    def _migrate_legacy_app_private_key(self) -> bool:
+        """Adopt an APP private key stored under the legacy label by an older version."""
+
+        def store(private_key: str) -> None:
+            self._store_private_key_in_secret(PrivateKey.from_string(private_key), Mode.APP)
+
+        return _backwards_compatibility.migrate_legacy_app_private_key(
+            model=self.model,
+            libid=LIBID,
+            relationship_name=self.relationship_name,
+            store_app_private_key=store,
+        )
 
     def _validate_secret_exists(self, secret: Secret) -> None:
         secret.get_info()  # Will raise `SecretNotFoundError` if the secret does not exist
@@ -2426,6 +2443,10 @@ class TLSCertificatesRequiresV4(Object):
             secret.remove_all_revisions()
         except SecretNotFoundError:
             logger.warning("Private key secret not found, nothing to remove")
+        if mode == Mode.APP:
+            _backwards_compatibility.remove_legacy_app_private_key(
+                self.model, LIBID, self.relationship_name
+            )
 
     def _csr_matches_certificate_request(
         self, certificate_signing_request: CertificateSigningRequest, is_ca: bool
@@ -2921,7 +2942,10 @@ class TLSCertificatesRequiresV4(Object):
         if mode == Mode.UNIT:
             return f"{LIBID}-private-key-{self._get_unit_number()}-{self.relationship_name}"
         elif mode == Mode.APP:
-            return f"{LIBID}-private-key-{self.relationship_name}"
+            # the "-app-" infix distinguishes this label from the one used by older
+            # versions, which may refer to a unit-owned secret
+            # (see _backwards_compatibility.legacy_app_private_key_secret_label)
+            return f"{LIBID}-private-key-app-{self.relationship_name}"
 
     def _get_csr_secret_label(
         self, csr: CertificateSigningRequest, mode: Literal[Mode.UNIT, Mode.APP]
@@ -2932,20 +2956,6 @@ class TLSCertificatesRequiresV4(Object):
             return f"{LIBID}-certificate-{unit_num}-{self.relationship_name}-{csr_in_sha256_hex}"
         elif mode == Mode.APP:
             return f"{LIBID}-certificate-{self.relationship_name}-{csr_in_sha256_hex}"
-
-    def _get_csr_secret_label_without_relation_name(
-        self, csr: CertificateSigningRequest, mode: Literal[Mode.UNIT, Mode.APP]
-    ) -> str:
-        """Get the old certificate secret label format (without relation name).
-
-        This method provides backward compatibility for secrets created
-        before the relation name was added to the label.
-        """
-        csr_in_sha256_hex = csr.get_sha256_hex()
-        if mode == Mode.UNIT:
-            return f"{LIBID}-certificate-{self._get_unit_number()}-{csr_in_sha256_hex}"
-        elif mode == Mode.APP:
-            return f"{LIBID}-certificate-{csr_in_sha256_hex}"
 
     def _get_certificate_secret(
         self, csr: CertificateSigningRequest, mode: Literal[Mode.UNIT, Mode.APP]
@@ -2968,7 +2978,11 @@ class TLSCertificatesRequiresV4(Object):
         except SecretNotFoundError:
             pass
 
-        old_secret_label = self._get_csr_secret_label_without_relation_name(csr, mode)
+        old_secret_label = _backwards_compatibility.certificate_secret_label_without_relation_name(
+            libid=LIBID,
+            csr_sha256_hex=csr.get_sha256_hex(),
+            unit_number=self._get_unit_number() if mode == Mode.UNIT else None,
+        )
         try:
             return self.model.get_secret(label=old_secret_label)
         except SecretNotFoundError:

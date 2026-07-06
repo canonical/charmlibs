@@ -312,7 +312,7 @@ class TestTLSCertificatesRequiresV4:
             state_out.secrets, f"{LIBID}-private-key-0-{certificates_relation.endpoint}"
         )
         assert self.private_key_secret_exists(
-            state_out.secrets, f"{LIBID}-private-key-{certificates_relation.endpoint}"
+            state_out.secrets, f"{LIBID}-private-key-app-{certificates_relation.endpoint}"
         )
 
     def test_given_app_and_unit_mode_when_relation_created_and_not_leader_then_only_unit_private_key_is_generated(
@@ -340,7 +340,7 @@ class TestTLSCertificatesRequiresV4:
             state_out.secrets, f"{LIBID}-private-key-0-{certificates_relation.endpoint}"
         )
         assert not self.private_key_secret_exists(
-            state_out.secrets, f"{LIBID}-private-key-{certificates_relation.endpoint}"
+            state_out.secrets, f"{LIBID}-private-key-app-{certificates_relation.endpoint}"
         )
 
     def test_given_app_and_unit_mode_with_private_key_when_relation_created_then_no_private_key_secrets_are_created(
@@ -370,6 +370,173 @@ class TestTLSCertificatesRequiresV4:
         assert not self.private_key_secret_exists(
             state_out.secrets, f"{LIBID}-private-key-0-{certificates_relation.endpoint}"
         )
+        assert not self.private_key_secret_exists(
+            state_out.secrets, f"{LIBID}-private-key-app-{certificates_relation.endpoint}"
+        )
+
+    @patch(BASE_CHARM_DIR + "._app_or_unit", MagicMock(return_value=Mode.APP))
+    def test_given_legacy_unit_owned_app_private_key_when_relation_changed_then_key_is_migrated_to_app_owned_secret(
+        self,
+    ):
+        private_key = generate_private_key()
+        certificates_relation = testing.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-provider",
+        )
+        legacy_secret = Secret(
+            {"private-key": private_key},
+            label=f"{LIBID}-private-key-{certificates_relation.endpoint}",
+            owner="unit",
+        )
+        state_in = testing.State(
+            leader=True,
+            relations={certificates_relation},
+            config={"common_name": "example.com", "is_ca": False},
+            secrets={legacy_secret},
+        )
+
+        state_out = self.ctx.run(self.ctx.on.relation_changed(certificates_relation), state_in)
+
+        migrated_secret = state_out.get_secret(
+            label=f"{LIBID}-private-key-app-{certificates_relation.endpoint}"
+        )
+        assert migrated_secret.owner == "app"
+        assert migrated_secret.latest_content == {"private-key": private_key}
+        assert not self.private_key_secret_exists(
+            state_out.secrets, f"{LIBID}-private-key-{certificates_relation.endpoint}"
+        )
+
+    @patch(BASE_CHARM_DIR + "._app_or_unit", MagicMock(return_value=Mode.APP))
+    def test_given_legacy_app_owned_private_key_when_relation_changed_then_key_is_migrated_to_new_label(
+        self,
+    ):
+        private_key = generate_private_key()
+        certificates_relation = testing.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-provider",
+        )
+        legacy_secret = Secret(
+            {"private-key": private_key},
+            label=f"{LIBID}-private-key-{certificates_relation.endpoint}",
+            owner="app",
+        )
+        state_in = testing.State(
+            leader=True,
+            relations={certificates_relation},
+            config={"common_name": "example.com", "is_ca": False},
+            secrets={legacy_secret},
+        )
+
+        state_out = self.ctx.run(self.ctx.on.relation_changed(certificates_relation), state_in)
+
+        migrated_secret = state_out.get_secret(
+            label=f"{LIBID}-private-key-app-{certificates_relation.endpoint}"
+        )
+        assert migrated_secret.owner == "app"
+        assert migrated_secret.latest_content == {"private-key": private_key}
+        assert not self.private_key_secret_exists(
+            state_out.secrets, f"{LIBID}-private-key-{certificates_relation.endpoint}"
+        )
+
+    @patch(BASE_CHARM_DIR + "._app_or_unit", MagicMock(return_value=Mode.APP))
+    def test_given_legacy_app_private_key_and_matching_csr_when_relation_changed_then_csr_is_not_regenerated(
+        self,
+    ):
+        private_key = generate_private_key()
+        csr = generate_csr(
+            private_key=private_key,
+            common_name="example.com",
+        )
+        app_data = {
+            "certificate_signing_requests": json.dumps([
+                {
+                    "certificate_signing_request": csr,
+                    "ca": False,
+                }
+            ])
+        }
+        certificates_relation = testing.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-provider",
+            local_app_data=app_data,
+        )
+        legacy_secret = Secret(
+            {"private-key": private_key},
+            label=f"{LIBID}-private-key-{certificates_relation.endpoint}",
+            owner="unit",
+        )
+        state_in = testing.State(
+            leader=True,
+            relations={certificates_relation},
+            config={"common_name": "example.com", "is_ca": False},
+            secrets={legacy_secret},
+        )
+
+        state_out = self.ctx.run(self.ctx.on.relation_changed(certificates_relation), state_in)
+
+        relation = state_out.get_relation(certificates_relation.id)
+        assert relation.local_app_data == app_data
+
+    @patch(BASE_CHARM_DIR + "._app_or_unit", MagicMock(return_value=Mode.APP))
+    def test_given_legacy_app_private_key_when_relation_changed_and_not_leader_then_key_is_not_migrated(
+        self,
+    ):
+        private_key = generate_private_key()
+        certificates_relation = testing.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-provider",
+        )
+        legacy_secret = Secret(
+            {"private-key": private_key},
+            label=f"{LIBID}-private-key-{certificates_relation.endpoint}",
+            owner="unit",
+        )
+        state_in = testing.State(
+            leader=False,
+            relations={certificates_relation},
+            config={"common_name": "example.com", "is_ca": False},
+            secrets={legacy_secret},
+        )
+
+        state_out = self.ctx.run(self.ctx.on.relation_changed(certificates_relation), state_in)
+
+        assert self.private_key_secret_exists(
+            state_out.secrets, f"{LIBID}-private-key-{certificates_relation.endpoint}"
+        )
+        assert not self.private_key_secret_exists(
+            state_out.secrets, f"{LIBID}-private-key-app-{certificates_relation.endpoint}"
+        )
+
+    def test_given_legacy_app_private_key_when_relation_broken_then_legacy_secret_is_removed(
+        self,
+    ):
+        private_key = generate_private_key()
+        certificates_relation = testing.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-provider",
+        )
+        legacy_secret = Secret(
+            {"private-key": private_key},
+            label=f"{LIBID}-private-key-{certificates_relation.endpoint}",
+            owner="unit",
+        )
+        state_in = testing.State(
+            leader=True,
+            relations={certificates_relation},
+            config={"common_name": "example.com", "is_ca": False},
+            secrets={legacy_secret},
+        )
+
+        with patch.object(
+            DummyTLSCertificatesRequirerCharm, "_app_or_unit", return_value=Mode.APP
+        ):
+            state_out = self.ctx.run(self.ctx.on.relation_broken(certificates_relation), state_in)
+
         assert not self.private_key_secret_exists(
             state_out.secrets, f"{LIBID}-private-key-{certificates_relation.endpoint}"
         )
@@ -2056,7 +2223,7 @@ class TestTLSCertificatesRequiresV4:
         )
         private_key_secret = Secret(
             {"private-key": str(private_key)},
-            label=f"{LIBID}-private-key-{certificates_relation.endpoint}",
+            label=f"{LIBID}-private-key-app-{certificates_relation.endpoint}",
             owner="app",
         )
         state_in = testing.State(
@@ -2279,7 +2446,7 @@ class TestTLSCertificatesRequiresV4:
 
         private_key_secret = Secret(
             {"private-key": str(private_key)},
-            label=f"{LIBID}-private-key-{certificates_relation.endpoint}",
+            label=f"{LIBID}-private-key-app-{certificates_relation.endpoint}",
             owner="app",
         )
 
@@ -2297,7 +2464,7 @@ class TestTLSCertificatesRequiresV4:
 
         assert not self.private_key_secret_exists(
             state_out.secrets,
-            f"{LIBID}-private-key-{certificates_relation.endpoint}",
+            f"{LIBID}-private-key-app-{certificates_relation.endpoint}",
         )
 
     def test_given_non_leader_unit_when_relation_broken_then_app_secrets_are_not_cleaned_up(self):
@@ -2318,7 +2485,7 @@ class TestTLSCertificatesRequiresV4:
 
         private_key_secret = Secret(
             {"private-key": str(private_key)},
-            label=f"{LIBID}-private-key-{certificates_relation.endpoint}",
+            label=f"{LIBID}-private-key-app-{certificates_relation.endpoint}",
             owner="app",
         )
 
@@ -2336,7 +2503,7 @@ class TestTLSCertificatesRequiresV4:
 
         assert self.private_key_secret_exists(
             state_out.secrets,
-            f"{LIBID}-private-key-{certificates_relation.endpoint}",
+            f"{LIBID}-private-key-app-{certificates_relation.endpoint}",
         )
 
     def test_given_certificate_secrets_when_relation_broken_then_secrets_are_cleaned_up(self):

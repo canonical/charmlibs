@@ -1,3 +1,7 @@
+# 1.9.0 - 6 July 2026
+
+Store the `Mode.APP` private key under a new secret label and automatically migrate keys created by older versions (including pre-existing unit-owned keys) to an app-owned secret. The key material is preserved, so certificates are not regenerated on upgrade.
+
 # 1.8.3 - 5 June 2026
 
 Add a safety net to ensure expiring certificates are renewed even if the charm fails to trigger the renewal process.
