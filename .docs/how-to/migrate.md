@@ -85,8 +85,7 @@ In this case:
 
 You'll also want to check for any config files under the old `<interface name>` directory (for example, a `ruff.toml` file), and incorporate any applicable settings into your project's `pyproject.toml`.
 
-```{admonition} Committing as you go
-:class: important
+## Commit as you go
 
 PRs into the monorepo are squash-merged, so the PR title becomes the final commit message on `main`.
 The commits on your branch are just for review, so the goal is simply to make the diff easy to follow.
@@ -103,7 +102,6 @@ A sequence that works well:
 As you work through this guide we'll suggest good moments to commit, but treat these as a starting point -- split, reorder, or rename the commits however makes your change clearest. For example, you might give your docs their own copy-and-tidy commits.
 
 To start with, commit the output of `just init` now, before making any other changes.
-```
 
 ## Migrate your library's code
 
@@ -130,7 +128,7 @@ Download a copy of the latest release of your library, and add it to your new pa
 
 Copy the module across verbatim, without making any changes to it yet. This gives reviewers a clean baseline to compare against the original Charmhub-hosted library.
 
-```{admonition} Committing as you go
+```{admonition} Commit as you go
 :class: tip
 
 Now is a good moment to commit the verbatim copy, before you adapt anything.
@@ -138,37 +136,36 @@ A reviewer can then confirm at a glance that the code matches the original relea
 If you copy tests and docs across verbatim too (covered later), you might fold them into this commit or give them their own.
 ```
 
-````{tip}
-Add dependencies with the `just add <library path> <args...>` command.
-This will automatically respect any repo-level version constraints imposed by the tool versions used in CI.
-This uses [uv add](https://docs.astral.sh/uv/reference/cli/#uv-add) under the hood -- any arguments after `<library path>` are passed to it.
-For example:
-```bash
-just add pathops 'pydantic>=2' 'requests~=2.3'
-just add interfaces/tls-certificates --requirements my-requirements.txt
-```
-````
-
 With the verbatim copy committed, now follow these steps to adapt your library's source code:
 1. Copy the copyright header from `__init__.py` to `_<name>.py` to satisfy the linter.
 2. Move the docstring from `_<name>.py` to `__init__.py` so that it's included in your library's automatically built reference docs.
 3. Document in the `_<name>.py` docstring the API and patch version of the source code that you're migrating. This will be helpful for future maintainers and users if they need to debug issues.
 4. Delete `LIBID`, `LIBAPI`, and `LIBPATCH` from `_<name>.py` -- unless they're used internally by the library, then you'll need to keep them for now.
 5. Move the contents of `PYDEPS` to the `dependencies` entry in your `pyproject.toml` (using `just add`), and delete the `PYDEPS` variable. You'll also need to add any additional dependencies that were assumed to be provided by the charm, like `ops` or `pydantic`. Consider adding version constraints to your dependencies too.
+    ````{tip}
+    Add dependencies with the `just add <library path> <args...>` command.
+    This will automatically respect any repo-level version constraints imposed by the tool versions used in CI.
+    This uses [uv add](https://docs.astral.sh/uv/reference/cli/#uv-add) under the hood -- any arguments after `<library path>` are passed to it.
+    For example:
+    ```bash
+    just add pathops 'pydantic>=2' 'requests~=2.3'
+    just add interfaces/tls-certificates --requirements my-requirements.txt
+    ```
+    ````
 6. Import the public API of your library to `__init__.py` and add the imported names to `__all__`, like this:
-```python
-# immediately before or after from ._version
-# (imports are sorted alphabetically)
-from ._<name> import (
-    # your library's public API
-)
+    ```python
+    # immediately before or after from ._version
+    # (imports are sorted alphabetically)
+    from ._<name> import (
+        # your library's public API
+    )
 
-...
+    ...
 
-__all__ = [
-    # the names we imported, as strings
-]
-```
+    __all__ = [
+        # the names we imported, as strings
+    ]
+    ```
 
 You can now test that your library can be built and imported by running the simple unit tests that your project was initialized with.
 From anywhere in the repo, run the following command:
@@ -177,7 +174,7 @@ From anywhere in the repo, run the following command:
 just unit <library path>
 ```
 
-```{admonition} Committing as you go
+```{admonition} Commit as you go
 :class: tip
 
 Once your library builds and imports cleanly, this is a natural point to commit.
@@ -202,7 +199,7 @@ To speed things up, only build the reference docs for your library:
 just docs html <library path>
 ```
 
-```{admonition} Committing as you go
+```{admonition} Commit as you go
 :class: tip
 
 Linting and formatting touch a lot of lines but rarely need careful review, so they're worth keeping in a commit of their own.
