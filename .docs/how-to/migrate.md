@@ -206,7 +206,7 @@ just docs html <library path>
 :class: tip
 
 Linting and formatting touch a lot of lines but rarely need careful review, so they're worth keeping in a commit of their own.
-Include any `pyproject.toml` config or lint ignores you added to avoid unwanted changes here too.
+Include any `pyproject.toml` config changes or lint ignores.
 ```
 
 ## Migrate your library's tests
