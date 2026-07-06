@@ -78,14 +78,6 @@ def unset(snap: str, key: str, /, *keys: str) -> None:
     _client.put(f'/v2/snaps/{snap}/conf', body=dict.fromkeys((key, *keys)))
 
 
-# `unset` with no keys specified unsets all keys (!).
-# This is intentionally not exposed in our unset function for safety.
-# If we wanted to add this functionality, we would do so with a separate function, like this:
-# def unset_all(snap: str) -> None:
-#     """Unset all snap configuration keys."""
-#     _client.put(f'/v2/snaps/{snap}/conf', body={})
-
-
 # Defined last to minimise the chance of meaningfully shadowing the built-in set type.
 def set(snap: str, config: dict[str, Any], /) -> None:  # noqa: A001 (shadowing a Python builtin)
     """Set snap configuration.
