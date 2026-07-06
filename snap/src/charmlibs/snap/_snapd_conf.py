@@ -47,7 +47,11 @@ def get(snap: str, /, *keys: str) -> dict[str, Any]:
         ``{'server': {'port': 8080}, 'server.port': 8080}``.
 
     Raises:
-        OptionNotFoundError: if the snap is not installed, or if a requested key is not set.
+        OptionNotFoundError: if the snap is not installed, or if a requested key has no value
+            stored in the snap's configuration. Snap configuration is schemaless, so snapd does
+            not distinguish between a key the snap doesn't recognise, a key that was never set,
+            and a key that was unset. Any defaults a snap applies internally are invisible here
+            unless its configure hook has stored them with ``snapctl set``.
     """
     params = {'keys': ','.join(keys)} if keys else None
     config = _client.get(f'/v2/snaps/{snap}/conf', query=params)
