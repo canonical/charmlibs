@@ -31,8 +31,8 @@ logger = logging.getLogger(__name__)
 # snapd's conf endpoints treat 'system' as an alias for 'core' and serve system configuration
 # whether or not the core snap is installed.
 # Note that /v2/snaps/system always 404s (it's a hardcoded alias, not a real snap), and
-# /v2/snaps/core 404s when the core snap is absent (typical when no classic snaps are installed).
-# For the purposes of this module, we can skip installed snap checks for both names.
+# /v2/snaps/core 404s when the core snap is absent (typical when no other snaps depend on it).
+# For the purposes of this module, we can skip snap installed checks for both names.
 _SYSTEM_NAMES = ('core', 'system')
 
 
