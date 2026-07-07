@@ -104,7 +104,8 @@ def unset(snap: str, key: str, /, *keys: str) -> None:
     Raises:
         NotFoundError: if the snap is not installed.
         ChangeError: if the snap's configure hook fails. This includes unsetting any
-            configuration on a snap that does not define a configure hook.
+            configuration on a snap that does not define a configure hook. A failed change
+            is rolled back: no key from the request is unset.
     """
     # NOTE: snap-not-found is returned for a missing snap, but not for system or core,
     # even if the core snap isn't installed -- configuration changes are still applied.
@@ -125,7 +126,9 @@ def set(snap: str, config: dict[str, Any], /) -> None:  # noqa: A001 (shadowing 
     Raises:
         NotFoundError: if the snap is not installed.
         ChangeError: if the snap's configure hook fails. This includes setting any
-            configuration on a snap that does not define a configure hook.
+            configuration on a snap that does not define a configure hook, and configuration
+            rejected by a validating configure hook. A failed change is rolled back: no key
+            from the request is applied.
     """
     # NOTE: snap-not-found is returned for a missing snap, but not for system or core,
     # even if the core snap isn't installed -- configuration changes are still applied.
