@@ -20,12 +20,20 @@ import logging
 import typing
 from typing import Any
 
-from . import _client
+from . import _client, _errors, _snapd_snaps
 
 logger = logging.getLogger(__name__)
 
 
 # /v2/snaps/{snap}/conf
+
+
+# snapd's conf endpoints treat 'system' as an alias for 'core' and serve system configuration
+# whether or not the core snap is installed.
+# Note that /v2/snaps/system always 404s (it's a hardcoded alias, not a real snap), and
+# /v2/snaps/core 404s when the core snap is absent (typical when no classic snaps are installed).
+# For the purposes of this module, we can skip installed snap checks for both names.
+_SYSTEM_NAMES = ('core', 'system')
 
 
 # Getting one config value looks like get(s, k)[k]. In future we could add a get_one(s) helper.
@@ -40,24 +48,43 @@ def get(snap: str, /, *keys: str) -> dict[str, Any]:
 
     Returns:
         A dict mapping each requested key to its configured value. When no keys are given, the
-        entire configuration is returned as a nested dict. Dotted keys are returned as entries
-        keyed by the dotted string. For example, if a snap ``s`` has a configuration option
-        ``server.port`` set to 8080, and another option ``client.timeout`` set to 30, then
-        ``get(s)`` returns ``{'server': {'port': 8080}, 'client': {'timeout': 30}}``, while
-        ``get(s, 'client.timeout')`` returns ``{'client.timeout': 30}``, and a mixture like
-        ``get(s, 'server', 'server.port')`` returns both the nested dict and the dotted key, like
-        ``{'server': {'port': 8080}, 'server.port': 8080}``.
+        entire config is returned as a nested dict, empty if the snap has no configuration.
+        Each dotted key queried is returned as a top-level entry. For example, if snap ``foo``
+        has a config option ``server.port=8080``, and another option ``client.timeout=30``, then
+        ``get('foo')`` returns ``{'server': {'port': 8080}, 'client': {'timeout': 30}}``, while
+        ``get('foo', 'client.timeout')`` returns ``{'client.timeout': 30}``, and a mixture like
+        ``get('foo', 'server', 'server.port')`` returns both a nested entry for ``server`` and a
+        dotted entry for ``server.port``, like ``{'server': {'port': 8080}, 'server.port': 8080}``.
 
     Raises:
-        OptionNotFoundError: if the snap is not installed, or if any requested key has no value
-            stored in the snap's configuration. Snap configuration is schemaless, so snapd does
-            not distinguish between a key the snap doesn't recognise, a key that was never set,
-            and a key that was unset. Any defaults a snap applies internally are invisible here
-            unless its configure hook has stored them with ``snapctl set``.
+        NotFoundError: if the snap is not installed. Never raised for ``system`` or ``core``,
+            whose configuration is served whether or not the core snap is installed.
+        OptionNotFoundError: if a requested key has no value stored in the snap's configuration.
+            Snap configuration is schemaless, so snapd does not distinguish between a key the
+            snap doesn't recognise, a key that was never set, and a key that was unset. Any
+            defaults a snap applies internally are invisible here unless its configure hook has
+            stored them with ``snapctl set``.
     """
     params = {'keys': ','.join(keys)} if keys else None
-    config = _client.get(f'/v2/snaps/{snap}/conf', query=params)
+    try:
+        config = _client.get(f'/v2/snaps/{snap}/conf', query=params)
+    except _errors.OptionNotFoundError:
+        # NOTE: snapd reports option-not-found both for a missing key and for a missing snap.
+        # The CLI returns 'error: snap "foo" has no "bar" configuration' in both cases,
+        # but we can distinguish them here for symmetry with this endpoint's PUT behaviour.
+        # Following PUT, NotFoundError isn't raised for system/core,
+        # even if the core snap isn't installed.
+        if snap not in _SYSTEM_NAMES:
+            _snapd_snaps.info(snap)  # Raise NotFoundError if the snap is not installed.
+        raise
     assert isinstance(config, dict)
+    # NOTE: A query with no specific keys for a non-installed snap returns {},
+    # indistinguishable from an installed snap with no configuration.
+    # The CLI reports 'error: snap "foo" has no configuration' in both cases.
+    # We adapt this to raise NotFoundError for a missing snap (except system/core),
+    # and return the empty result for an installed snap with no configuration.
+    if not keys and not config and snap not in _SYSTEM_NAMES:
+        _snapd_snaps.info(snap)  # Raise NotFoundError if the snap is not installed.
     return typing.cast('dict[str, Any]', config)
 
 
@@ -79,6 +106,8 @@ def unset(snap: str, key: str, /, *keys: str) -> None:
         ChangeError: if the snap's configure hook fails. This includes unsetting any
             configuration on a snap that does not define a configure hook.
     """
+    # NOTE: snap-not-found is returned for a missing snap, but not for system or core,
+    # even if the core snap isn't installed -- configuration changes are still applied.
     _client.put(f'/v2/snaps/{snap}/conf', body=dict.fromkeys((key, *keys)))
 
 
@@ -98,4 +127,6 @@ def set(snap: str, config: dict[str, Any], /) -> None:  # noqa: A001 (shadowing 
         ChangeError: if the snap's configure hook fails. This includes setting any
             configuration on a snap that does not define a configure hook.
     """
+    # NOTE: snap-not-found is returned for a missing snap, but not for system or core,
+    # even if the core snap isn't installed -- configuration changes are still applied.
     _client.put(f'/v2/snaps/{snap}/conf', body=config)

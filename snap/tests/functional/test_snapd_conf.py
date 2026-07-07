@@ -6,12 +6,16 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
 from charmlibs.snap import _errors, _snapd_conf
-from conftest import ensure_installed
+from conftest import ensure_installed, ensure_removed
+from test_snapd_local import SNAPS_DIR, install_local
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 _SNAP = 'lxd'
 # A key prefix we use to avoid colliding with real lxd configuration.
@@ -166,11 +170,94 @@ def test_get_option_not_found_value_contains_snap_and_key():
     assert 'key-that-should-not-exist' in value
 
 
-def test_get_not_installed_snap_raises_option_not_found():
-    # Config GET for a non-installed snap returns option-not-found (not snap-not-found).
-    with pytest.raises(_errors.OptionNotFoundError) as ctx:
+def test_get_not_installed_snap_raises_not_found():
+    # Config GET for a non-installed snap returns option-not-found (not snap-not-found), so
+    # get() probes /v2/snaps/{snap} and raises NotFoundError, consistent with set and unset.
+    with pytest.raises(_errors.NotFoundError) as ctx:
         _snapd_conf.get(_ABSENT_SNAP, 'any-key')
+    assert ctx.value.kind == 'snap-not-found'
+
+
+def test_get_all_not_installed_snap_raises_not_found():
+    # Config GET with no keys for a non-installed snap is a 200 with an empty result,
+    # indistinguishable from an installed snap with no configuration, so get() probes
+    # /v2/snaps/{snap} and raises NotFoundError instead of returning {}.
+    with pytest.raises(_errors.NotFoundError) as ctx:
+        _snapd_conf.get(_ABSENT_SNAP)
+    assert ctx.value.kind == 'snap-not-found'
+
+
+def test_get_all_installed_snap_with_no_config_returns_empty_dict():
+    # hello-world has no configure hook, so it can never have configuration. Unlike the CLI
+    # (`snap get hello-world` errors with 'has no configuration'), get() returns an empty dict.
+    ensure_installed('hello-world')
+    assert _snapd_conf.get('hello-world') == {}
+
+
+# ---------------------------------------------------------------------------
+# system configuration ('system' is snapd's alias for 'core')
+# ---------------------------------------------------------------------------
+# The conf endpoints serve system configuration whether or not the core snap is installed,
+# while /v2/snaps/system always 404s, so get() must not probe for these names. These tests run
+# on any system; test_zz_conf_coreless.py covers the same paths on a system without the core
+# snap, where /v2/snaps/core also 404s.
+
+# A validated system option (documented range 2-20) that is unset by default.
+_SYSTEM_OPTION = 'refresh.retain'
+
+
+@pytest.mark.parametrize('name', ['system', 'core'])
+def test_get_system_conf(name: str):
+    config = _snapd_conf.get(name)
+    assert isinstance(config, dict)
+    # Computed live by snapd (hostname, timezone, and so on). Stored options like seed.loaded
+    # can't be relied on here: removing the core snap (test_zz_conf_coreless.py) deletes them.
+    assert 'system' in config
+
+
+def test_get_system_and_core_are_aliases():
+    assert _snapd_conf.get('system') == _snapd_conf.get('core')
+
+
+@pytest.mark.parametrize('name', ['system', 'core'])
+def test_get_system_missing_key_raises_option_not_found(name: str):
+    with pytest.raises(_errors.OptionNotFoundError) as ctx:
+        _snapd_conf.get(name, 'key-that-does-not-exist-xyz')
     assert ctx.value.kind == 'option-not-found'
+    # snapd resolves the alias in the error details: SnapName is always reported as 'core'.
+    assert 'core' in str(ctx.value.value)
+
+
+@pytest.mark.parametrize('name', ['system', 'core'])
+def test_set_system_unknown_option_raises_change_error(name: str):
+    # Unlike schemaless snap configuration, system configuration is validated: snapd's internal
+    # configure handler rejects unknown options and the failed change surfaces as ChangeError.
+    with pytest.raises(_errors.ChangeError) as ctx:
+        _snapd_conf.set(name, {'test-unknown-key-xyz': 'value'})
+    assert 'unsupported system option' in ctx.value.message
+    # The failed change is rolled back: nothing was stored.
+    with pytest.raises(_errors.OptionNotFoundError):
+        _snapd_conf.get(name, 'test-unknown-key-xyz')
+
+
+@pytest.mark.parametrize('name', ['system', 'core'])
+def test_set_get_unset_system_option(name: str):
+    # System set/unset are handled internally by snapd (no configure hook or snap required).
+    try:
+        original = _snapd_conf.get(name, _SYSTEM_OPTION)[_SYSTEM_OPTION]
+    except _errors.OptionNotFoundError:
+        original = None
+    try:
+        _snapd_conf.set(name, {_SYSTEM_OPTION: 3})
+        assert _snapd_conf.get(name, _SYSTEM_OPTION) == {_SYSTEM_OPTION: 3}
+    finally:
+        if original is None:
+            _snapd_conf.unset(name, _SYSTEM_OPTION)
+        else:
+            _snapd_conf.set(name, {_SYSTEM_OPTION: original})
+    if original is None:
+        with pytest.raises(_errors.OptionNotFoundError):
+            _snapd_conf.get(name, _SYSTEM_OPTION)
 
 
 # ---------------------------------------------------------------------------
@@ -281,3 +368,44 @@ def test_unset_no_configure_hook_raises_change_error():
     ensure_installed('hello-world')
     with pytest.raises(_errors.ChangeError):
         _snapd_conf.unset('hello-world', 'any-key')
+
+
+# ---------------------------------------------------------------------------
+# configure hook validation -> ChangeError
+# ---------------------------------------------------------------------------
+# A snap's configure hook can validate incoming configuration (read via snapctl get) and
+# reject it by exiting non-zero. test-configure-snap (tests/functional/snaps) rejects any
+# value for 'bad-key' and accepts everything else.
+
+
+@pytest.fixture(scope='module')
+def configure_snap() -> Iterator[None]:
+    install_local(SNAPS_DIR / 'test-configure-snap_1.0.snap', dangerous=True)
+    yield
+    ensure_removed('test-configure-snap')
+
+
+def test_set_rejected_by_configure_hook_raises_change_error(configure_snap: None):
+    with pytest.raises(_errors.ChangeError) as ctx:
+        _snapd_conf.set('test-configure-snap', {'bad-key': 'x'})
+    # The hook's stderr is embedded in the change error message.
+    assert 'bad-key is not allowed' in ctx.value.message
+    # The rejected change is rolled back: nothing was stored.
+    with pytest.raises(_errors.OptionNotFoundError):
+        _snapd_conf.get('test-configure-snap', 'bad-key')
+
+
+def test_set_accepted_by_configure_hook(configure_snap: None):
+    _snapd_conf.set('test-configure-snap', {'good-key': 'hello'})
+    assert _snapd_conf.get('test-configure-snap', 'good-key') == {'good-key': 'hello'}
+    _snapd_conf.unset('test-configure-snap', 'good-key')
+
+
+def test_rejected_set_rolls_back_entire_transaction(configure_snap: None):
+    # Configuration changes are transactional: if the hook rejects any key, no key in the
+    # request is applied, and previously stored values are preserved.
+    _snapd_conf.set('test-configure-snap', {'good-key': 'before'})
+    with pytest.raises(_errors.ChangeError):
+        _snapd_conf.set('test-configure-snap', {'good-key': 'after', 'bad-key': 'x'})
+    assert _snapd_conf.get('test-configure-snap', 'good-key') == {'good-key': 'before'}
+    _snapd_conf.unset('test-configure-snap', 'good-key')

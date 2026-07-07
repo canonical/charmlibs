@@ -127,7 +127,11 @@ class AppNotFoundError(APIError):
 
 
 class NotFoundError(APIError):
-    """Raised via the API when a snap is not found in the store."""
+    """Raised via the API when a snap is not found.
+
+    Depending on the operation, this means not found in the store (for example install),
+    or not installed on the system (for example configuration operations).
+    """
 
 
 class NotInstalledError(APIError):
