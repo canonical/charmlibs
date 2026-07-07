@@ -1,0 +1,5 @@
+name: test-configure-snap
+version: "1.0"
+summary: Snap with a validating configure hook for charmlibs.snap functional tests
+confinement: strict
+base: core24

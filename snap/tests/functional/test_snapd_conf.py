@@ -243,6 +243,8 @@ def test_set_system_unknown_option_raises_change_error(name: str):
 @pytest.mark.parametrize('name', ['system', 'core'])
 def test_set_get_unset_system_option(name: str):
     # System set/unset are handled internally by snapd (no configure hook or snap required).
+    # Unlike the test_zz_conf_coreless.py version, this preserves any pre-existing value:
+    # this module runs on arbitrary systems and shouldn't clobber real system configuration.
     try:
         original = _snapd_conf.get(name, _SYSTEM_OPTION)[_SYSTEM_OPTION]
     except _errors.OptionNotFoundError:
