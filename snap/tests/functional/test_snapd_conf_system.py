@@ -107,6 +107,18 @@ def test_set_get_unset_system_option(core_snap: str, name: str):
         _snapd_conf.get(name, _OPTION)
 
 
+@pytest.mark.parametrize('name', ['system', 'core'])
+def test_set_empty_dict_is_noop(core_snap: str, name: str):
+    # set(name, {}) sends an empty body, accepted as a no-op that leaves existing configuration
+    # untouched (it does NOT unset everything), whether or not the core snap is installed.
+    try:
+        _snapd_conf.set(name, {_OPTION: 3})
+        _snapd_conf.set(name, {})
+        assert _snapd_conf.get(name, _OPTION) == {_OPTION: 3}
+    finally:
+        _snapd_conf.unset(name, _OPTION)
+
+
 def test_removing_core_snap_deletes_stored_system_config():
     # Stored system options live in snapd state under the snap name 'core'. Removing the core
     # snap deletes them like any other snap's config, while options computed live by snapd

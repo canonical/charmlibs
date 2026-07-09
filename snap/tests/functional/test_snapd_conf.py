@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from charmlibs.snap import _errors, _snapd_conf
+from charmlibs.snap import _client, _errors, _snapd_conf
 from conftest import ensure_installed, ensure_removed
 from test_snapd_local import SNAPS_DIR, install_local
 
@@ -187,6 +187,16 @@ def test_get_all_not_installed_snap_raises_not_found():
     assert ctx.value.kind == 'snap-not-found'
 
 
+def test_raw_get_all_not_installed_snap_returns_empty_dict():
+    # Pin the raw snapd behaviour that get()'s empty-config probe relies on: a bare conf GET (no
+    # keys) for a non-installed snap is a 200 with an empty result, NOT an error. This is what
+    # makes an absent snap indistinguishable from an installed snap with no configuration, and
+    # hence why get() must probe. Asserted at the _client level because get() converts it to
+    # NotFoundError; if snapd ever reported the absent snap directly here, this fails loudly
+    # rather than leaving get()'s probe branch as untested dead code.
+    assert _client.get(f'/v2/snaps/{_ABSENT_SNAP}/conf') == {}
+
+
 def test_get_all_installed_snap_with_no_config_returns_empty_dict():
     # hello-world has no configure hook, so it can never have configuration. Unlike the CLI
     # (`snap get hello-world` errors with 'has no configuration'), get() returns an empty dict.
@@ -229,9 +239,12 @@ def test_unset_multiple_keys():
 # ---------------------------------------------------------------------------
 
 
-def test_set_not_installed_snap_raises_snap_not_found():
+# An empty body is checked alongside a non-empty one: snapd validates that the snap is
+# installed regardless of the patch contents, so both raise the same error.
+@pytest.mark.parametrize('config', [{'test-key': 'value'}, {}])
+def test_set_not_installed_snap_raises_snap_not_found(config: dict[str, Any]):
     with pytest.raises(_errors.NotFoundError) as ctx:
-        _snapd_conf.set(_ABSENT_SNAP, {'test-key': 'value'})
+        _snapd_conf.set(_ABSENT_SNAP, config)
     assert ctx.value.kind == 'snap-not-found'
 
 
@@ -302,6 +315,15 @@ def test_unset_no_configure_hook_raises_change_error():
     ensure_installed('hello-world')
     with pytest.raises(_errors.ChangeError):
         _snapd_conf.unset('hello-world', 'any-key')
+
+
+def test_set_empty_dict_no_configure_hook_is_noop():
+    # An empty patch is the exception to the rule above: snapd marks the configure hook optional
+    # when there is nothing to set (Optional: len(patch) == 0), so a missing hook is not an
+    # error and the change completes as a no-op. Contrast test_set_no_configure_hook_*, where a
+    # non-empty patch on the same hook-less snap does raise.
+    ensure_installed('hello-world')
+    _snapd_conf.set('hello-world', {})  # Should not raise.
 
 
 # ---------------------------------------------------------------------------
