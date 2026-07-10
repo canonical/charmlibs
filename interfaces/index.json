@@ -258,9 +258,9 @@
   {
     "name": "forward_auth",
     "version": "0",
-    "lib": "charms.oathkeeper.forward_auth",
-    "lib_url": "https://charmhub.io/oathkeeper/libraries/forward_auth",
-    "lib_docs_url": "",
+    "lib": "charmlibs.interfaces.forward_auth",
+    "lib_url": "https://pypi.org/project/charmlibs-interfaces-forward-auth",
+    "lib_docs_url": "https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/forward-auth",
     "docs_url": "https://canonical.com/juju/docs/charmlibs/reference/interfaces/forward_auth/",
     "summary": "",
     "description": "",
