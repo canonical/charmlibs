@@ -12,6 +12,7 @@
 /.template/ @canonical/charmlibs-maintainers
 /.workshop/ @canonical/charmlibs-maintainers
 /AGENTS.md @canonical/charmlibs-maintainers
+/CODE_OF_CONDUCT.md @canonical/charmlibs-maintainers
 /CONTRIBUTING.md @canonical/charmlibs-maintainers
 /docs.just @canonical/charmlibs-maintainers
 /interface-test-requirements.txt @canonical/charmlibs-maintainers
