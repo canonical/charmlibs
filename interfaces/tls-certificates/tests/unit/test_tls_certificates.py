@@ -104,10 +104,10 @@ def test_given_subject_and_private_key_when_generate_csr_then_csr_is_generated_w
     csr = generate_csr(private_key=private_key, common_name=common_name)
 
     csr_object = x509.load_pem_x509_csr(data=str(csr).encode())
-    subject_list = list(csr_object.subject)
-    assert len(subject_list) == 2
-    assert common_name == subject_list[0].value
-    uuid.UUID(str(subject_list[1].value))
+    subject_list = list(csr_object.subject)  # type: ignore[reportUnknownVariableType]
+    assert len(subject_list) == 2  # type: ignore[reportUnknownArgumentType]
+    assert common_name == subject_list[0].value  # type: ignore[reportUnknownMemberType]
+    uuid.UUID(str(subject_list[1].value))  # type: ignore[reportUnknownMemberType,reportUnknownArgumentType]
 
 
 def test_given_unique_id_set_to_false_when_generate_csr_then_csr_is_generated_without_unique_id():
@@ -119,8 +119,8 @@ def test_given_unique_id_set_to_false_when_generate_csr_then_csr_is_generated_wi
     )
 
     csr_object = x509.load_pem_x509_csr(data=str(csr).encode())
-    subject_list = list(csr_object.subject)
-    assert common_name == subject_list[0].value
+    subject_list = list(csr_object.subject)  # type: ignore[reportUnknownVariableType]
+    assert common_name == subject_list[0].value  # type: ignore[reportUnknownMemberType]
 
 
 def test_given_localization_is_specified_when_generate_csr_then_csr_contains_localization():

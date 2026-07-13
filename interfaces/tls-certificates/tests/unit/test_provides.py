@@ -35,6 +35,7 @@ class TestTLSCertificatesProvidesV4:
         self.ctx = scenario.Context(
             charm_type=DummyTLSCertificatesProviderCharm,
             meta=METADATA,
+            actions=METADATA["actions"],
         )
 
     def test_given_no_certificate_requests_when_get_requirer_csrs_then_no_csrs_are_returned(
@@ -1369,3 +1370,39 @@ class TestProviderCapabilityAdvertisement:
             self.ctx.run(self.ctx.on.relation_changed(relation_unchanged), state_in_2)
 
         assert "Provider capabilities relation data updated" not in caplog.text
+
+    def test_given_capabilities_when_relation_created_then_capabilities_written(self):
+        relation = scenario.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-requirer",
+        )
+        state_in = scenario.State(
+            relations={relation},
+            leader=True,
+            config={"advertise": True, "provider-type": "self-signed", "supports-ip-sans": True},
+        )
+
+        state_out = self.ctx.run(self.ctx.on.relation_created(relation), state_in)
+
+        local_app_data = state_out.get_relation(relation.id).local_app_data
+        assert "capabilities" in local_app_data
+        capabilities = json.loads(local_app_data["capabilities"])
+        assert capabilities["provider_type"] == "self-signed"
+        assert capabilities["supports_ip_sans"] is True
+
+    def test_given_no_capabilities_when_relation_created_then_no_capabilities_in_databag(self):
+        relation = scenario.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-requirer",
+        )
+        state_in = scenario.State(
+            relations={relation},
+            leader=True,
+            config={"advertise": False},
+        )
+
+        state_out = self.ctx.run(self.ctx.on.relation_created(relation), state_in)
+
+        assert "capabilities" not in state_out.get_relation(relation.id).local_app_data

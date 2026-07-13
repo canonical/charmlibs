@@ -16,7 +16,6 @@ from self_signed_certificates import (
 
 from charmlibs.interfaces.tls_certificates import (
     Certificate,
-    ProviderCapabilities,
     ProviderCertificate,
     TLSCertificatesProvidesV4,
 )
@@ -33,14 +32,6 @@ class DummyTLSCertificatesProviderCharm(CharmBase):
         self.certificates = TLSCertificatesProvidesV4(
             self,
             "certificates",
-            provider_capabilities=ProviderCapabilities(
-                supports_ip_sans=True,
-                supports_wildcard_dns=True,
-                supports_subdomain=False,
-                supports_ca_certificates=True,
-                allowed_domains=["example.com"],
-                provider_type="self-signed",
-            ),
         )
         self.framework.observe(self.on.collect_unit_status, self._on_collect_unit_status)
         self.framework.observe(self.on.install, self._configure)
