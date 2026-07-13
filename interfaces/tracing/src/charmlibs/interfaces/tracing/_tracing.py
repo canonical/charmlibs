@@ -855,12 +855,12 @@ class TracingEndpointRequirer(Object):
         """Receiver endpoint for the given protocol.
 
         It could happen that this function gets called before the provider publishes the endpoints.
-        In such a scenario, if a non-leader unit calls this function, a permission denied exception will be raised due to
-        restricted access. To prevent this, this function needs to be guarded by the `is_ready` check.
+        In such a scenario, if a non-leader unit calls this function, a permission denied exception
+        will be raised due to restricted access. To prevent this, this function needs to be guarded
+        by the ``is_ready`` check.
 
         Raises:
-        ProtocolNotRequestedError:
-            If the charm unit is the leader unit and attempts to obtain an endpoint for a protocol it did not request.
+            ProtocolNotRequestedError: If the charm unit is the leader unit and attempts to obtain an endpoint for a protocol it did not request.
         """
         endpoint = self._get_endpoint(relation or self._relation, protocol=protocol)
         if not endpoint:
@@ -888,25 +888,22 @@ def charm_tracing_config(
 ) -> Tuple[Optional[str], Optional[str]]:
     """Return the charm_tracing config you likely want.
 
-    If no endpoint is provided:
-     disable charm tracing.
-    If https endpoint is provided but cert_path is not found on disk:
-     disable charm tracing.
-    If https endpoint is provided and cert_path is None:
-     ERROR
-    Else:
-     proceed with charm tracing (with or without tls, as appropriate)
+    - If no endpoint is provided: disable charm tracing.
+    - If https endpoint is provided but cert_path is not found on disk: disable charm tracing.
+    - If https endpoint is provided and cert_path is None: ERROR
+    - Else: proceed with charm tracing (with or without tls, as appropriate)
 
-    Usage:
-    >>> from lib.charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
-    >>> from lib.charms.tempo_coordinator_k8s.v0.tracing import charm_tracing_config
-    >>> @trace_charm(tracing_endpoint="my_endpoint", cert_path="cert_path")
-    >>> class MyCharm(...):
-    >>>     _cert_path = "/path/to/cert/on/charm/container.crt"
-    >>>     def __init__(self, ...):
-    >>>         self.tracing = TracingEndpointRequirer(...)
-    >>>         self.my_endpoint, self.cert_path = charm_tracing_config(
-    ...             self.tracing, self._cert_path)
+    Usage::
+
+        >>> from lib.charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
+        >>> from charmlibs.interfaces.tracing import charm_tracing_config
+        >>> @trace_charm(tracing_endpoint="my_endpoint", cert_path="cert_path")
+        >>> class MyCharm(...):
+        >>>     _cert_path = "/path/to/cert/on/charm/container.crt"
+        >>>     def __init__(self, ...):
+        >>>         self.tracing = TracingEndpointRequirer(...)
+        >>>         self.my_endpoint, self.cert_path = charm_tracing_config(
+        ...             self.tracing, self._cert_path)
     """
     if not endpoint_requirer.is_ready():
         return None, None
