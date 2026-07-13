@@ -74,11 +74,17 @@ def parse_codeowners(text: str) -> dict[pathlib.Path, str]:
 
 
 def get_tracked_files(root: pathlib.Path | str) -> list[pathlib.Path]:
+    """Return the repo-relative paths of all files tracked by git in `root`."""
     output = subprocess.check_output(['git', 'ls-files', '-z'], cwd=root, text=True)
     return [pathlib.Path(file) for file in output.split('\0') if file]
 
 
 def map_children(files: list[pathlib.Path]) -> dict[pathlib.Path, list[pathlib.Path]]:
+    """Map each tracked directory to its sorted immediate children (files and subdirectories).
+
+    The repository root is keyed as `pathlib.Path()` (i.e. `.`). A path is a directory iff it
+    appears as a key; the tracked files are the paths that never appear as keys.
+    """
     children: dict[pathlib.Path, set[pathlib.Path]] = {}
     for path in files:
         for p in (path, *path.parents[:-1]):  # Don't include the root as a child ('.').
@@ -86,22 +92,35 @@ def map_children(files: list[pathlib.Path]) -> dict[pathlib.Path, list[pathlib.P
     return {k: sorted(v) for k, v in children.items()}
 
 
-def check(entries: dict[pathlib.Path, str], children: dict[pathlib.Path, list[pathlib.Path]]) -> list[str]:
+def check(
+    entries: dict[pathlib.Path, str], children: dict[pathlib.Path, list[pathlib.Path]]
+) -> list[str]:
+    """Return a list of problems found between the CODEOWNERS `entries` and the tracked tree.
+
+    Everything is checked against the tracked tree (`children`) rather than the filesystem, so
+    untracked and ignored paths are irrelevant. A path is a tracked directory iff it's a key in
+    `children`; `all_paths` is every tracked file and directory.
+    """
     problems: list[str] = []
-    # Check tracked files against CODEOWNERS entries.
+    # Check that each top-level path and immediate child of interfaces/ is owned.
     for path in *children[pathlib.Path()], *children[pathlib.Path('interfaces')]:
-        if path not in entries:
-            if not path.is_dir():
-                problems.append(f'No explicit CODEOWNERS for: /{path}')
-            elif not all(p in entries for p in children[path]):
-                problems.append(f"No explicit CODEOWNERS for: /{path}/ (and its children aren't all owned)")
-    # Check CODEOWNERS entries.
+        if path in entries:
+            continue
+        if path not in children:  # a file: it needs its own entry
+            problems.append(f'No explicit CODEOWNERS for: /{path}')
+        elif not all(child in entries for child in children[path]):
+            problems.append(
+                f"No explicit CODEOWNERS for: /{path}/ (and its children aren't all owned)"
+            )
+    # Check that each entry points at a tracked path of the matching kind.
+    all_paths = {child for siblings in children.values() for child in siblings}
     for target, pattern in entries.items():
-        path = REPO_ROOT / target
-        if not path.exists():
+        if target not in all_paths:
             problems.append(f'CODEOWNERS entry points at a missing path: {pattern}')
-        elif path.is_dir() != pattern.endswith('/'):
-            problems.append(f'CODEOWNERS entry must have a trailing slash iff it is a dir: {pattern}')
+        elif (target in children) != pattern.endswith('/'):
+            problems.append(
+                f'CODEOWNERS entry must have a trailing slash iff it is a dir: {pattern}'
+            )
         if not pattern.startswith('/'):
             problems.append(f'CODEOWNERS entry must be anchored with a leading /: {pattern}')
     return problems
