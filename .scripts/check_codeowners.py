@@ -24,11 +24,8 @@
 Two checks are performed against every top-level path and every immediate child of `interfaces/`:
 
 1. Each path is owned, meaning either the path itself has a CODEOWNERS entry with an owner, or
-   (for a directory) every one of its immediate children is owned. This ensures ownership isn't
-   left to fall through to the repository maintainers via the catch-all `*` entry, while still
-   allowing a directory to be covered by per-child entries (such as an interface's `interface/`
-   plus `ruff.toml`).
-2. Every path-based CODEOWNERS entry corresponds to a real path in the repository, so renaming
+   (for a directory) every one of its immediate children has a direct entry.
+2. Every concrete CODEOWNERS entry corresponds to a real path in the repository, so renaming
    or removing a directory can't leave behind a bad entry.
 
 Exit with success (0) if both checks pass, otherwise print the problems to stdout
@@ -46,32 +43,20 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 
 class TrackedFiles:
-    def __init__(self, root: pathlib.Path, max_depth: int = 4):
-        self._root = root
-        self._files = self._get_tracked_files(root)
-        # Build efficient lookup for children().
-        self._lookup: set[pathlib.Path] = set()
-        self._max_depth = max_depth
-        for i in range(1, max_depth + 1):
-            self._lookup.update(pathlib.Path(*p.parts[:i]) for p in self._files)
+    def __init__(self, root: pathlib.Path | str):
+        self._children: dict[pathlib.Path, set[pathlib.Path]] = {}
+        for path in self._get_tracked_files(root):
+            for p in (path, *path.parents[:-1]):  # Don't include the root as a child ('.').
+                self._children.setdefault(p.parent, set()).add(p)
 
-    def _get_tracked_files(self, root: pathlib.Path) -> list[pathlib.Path]:
+    @staticmethod
+    def _get_tracked_files(root: pathlib.Path | str) -> list[pathlib.Path]:
         output = subprocess.check_output(['git', 'ls-files', '-z'], cwd=root, text=True)
         return [pathlib.Path(file) for file in output.split('\0') if file]
 
-    def children(self, path: pathlib.Path | str | None = None) -> list[pathlib.Path]:
+    def children(self, path: pathlib.Path | str = '.') -> list[pathlib.Path]:
         """Return the immediate children of `path` that are tracked files or directories."""
-        path = self._root / path if path is not None else self._root
-        assert path.is_dir()
-        if len(path.relative_to(self._root).parts) >= self._max_depth - 1:
-            raise ValueError(
-                f'{path.relative_to(self._root)} is too deep, initialise with higher max_depth (now {self._max_depth})'
-            )
-        return sorted(
-            rel_path
-            for p in path.iterdir()
-            if (rel_path := p.relative_to(self._root)) in self._lookup
-        )
+        return sorted(self._children[pathlib.Path(path)])
 
 
 def main() -> int:
@@ -89,9 +74,7 @@ def main() -> int:
 def parse_codeowners(text: str) -> dict[pathlib.Path, str]:
     """Parse CODEOWNERS into a `{target: pattern}` dict, keyed by the repo-relative path it covers.
 
-    Comments, blanks, and wildcard patterns (containing any of `*?[]`, such as the catch-all `*`)
-    are ignored: wildcards aren't anchored paths, so this check neither validates nor counts them.
-    Keys are `pathlib.Path`s, so a trailing slash on a directory entry doesn't affect lookups.
+    Comments, blanks, and wildcard patterns (containing any of `*?[]`) are ignored.
     """
     entries: dict[pathlib.Path, str] = {}
     for line in text.splitlines():
