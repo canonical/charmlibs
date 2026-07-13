@@ -2,9 +2,9 @@
   {
     "name": "auth_proxy",
     "version": "0",
-    "lib": "charms.oathkeeper.auth_proxy",
-    "lib_url": "https://charmhub.io/oathkeeper/libraries/auth_proxy",
-    "lib_docs_url": "",
+    "lib": "charmlibs.interfaces.auth_proxy",
+    "lib_url": "https://pypi.org/project/charmlibs-interfaces-auth-proxy",
+    "lib_docs_url": "https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/auth-proxy",
     "docs_url": "https://canonical.com/juju/docs/charmlibs/reference/interfaces/auth_proxy/",
     "summary": "Configure an Identity and Access Proxy.",
     "description": "The `auth_proxy` interface allows charms to configure an Identity and Access Proxy.\nThe requirer supplies the configuration, such as protected URLs, allowed endpoints, and headers.\nThe provider is responsible for transforming the configuration into access rules and forwarding relevant configuration to the proxy.",
