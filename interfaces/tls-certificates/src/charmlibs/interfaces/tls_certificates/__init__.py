@@ -19,10 +19,10 @@ in the :class:`TLSCertificatesRequiresV4` and :class:`TLSCertificatesProvidesV4`
 
 Read more:
 
-- `Tutorial <https://documentation.ubuntu.com/charmlibs/tutorials/charmlibs/interfaces/tls-certificates/tutorial/>`_
-- `Library reference <https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/tls-certificates/>`_
-- `How to configure certificate requests <https://documentation.ubuntu.com/charmlibs/how-to/charmlibs/interfaces/tls-certificates/configure-certificate-requests/>`_
-- `Explanation of the library design <https://documentation.ubuntu.com/charmlibs/explanation/charmlibs/interfaces/tls-certificates/design/>`_
+- `Tutorial <https://canonical.com/juju/docs/charmlibs/tutorials/charmlibs/interfaces/tls-certificates/tutorial/>`_
+- `Library reference <https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/tls-certificates/>`_
+- `How to configure certificate requests <https://canonical.com/juju/docs/charmlibs/how-to/charmlibs/interfaces/tls-certificates/configure-certificate-requests/>`_
+- `Explanation of the library design <https://canonical.com/juju/docs/charmlibs/explanation/charmlibs/interfaces/tls-certificates/design/>`_
 """
 
 from ._tls_certificates import (
