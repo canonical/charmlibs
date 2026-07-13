@@ -12,31 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Populate ``rediraffe_redirects`` with underscore/hyphen separator variants.
-
-All hand-written docs pages use hyphens in their slugs (for example
-``how-to/manage-libraries``). This extension makes the underscore versions
-(``how_to/manage_libraries``) resolve too, by generating redirects from the
-separator-swapped variant of every page to the page itself.
-
-The mapping is populated into the ``rediraffe_redirects`` config value, which
-is consumed by the ``sphinx-rerediraffe`` extension (enabled in ``conf.py``)
-to write the actual redirect HTML during the build. rediraffe also validates
-that every redirect target exists, so a misconfigured redirect fails the
-build rather than silently 404ing.
-
-The mapping is symmetric: for each existing page, the variant with ``-`` and
-``_`` swapped in every path segment is computed. If that variant is not
-already a real page, a redirect is added from the variant to the page. This
-means hyphenated pages get underscore aliases *and* underscored pages (for
-example, interface reference pages like
-``reference/interfaces/fiveg_core_gnb/v1``) get hyphen aliases. When both
-separators are already real pages, no redirect is generated for either.
-
-Only the final combined docs pass populates the mapping. Per-package
-reference passes (where ``package`` is set) are skipped, because those passes
-only build a subset of pages and most redirect targets would not exist.
-"""
+"""Populate ``rediraffe_redirects`` with underscore/hyphen separator variants."""
 
 from __future__ import annotations
 
