@@ -46,11 +46,14 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 
 class TrackedFiles:
-    def __init__(self, root: pathlib.Path):
+    def __init__(self, root: pathlib.Path, max_depth: int = 4):
         self._root = root
         self._files = self._get_tracked_files(root)
+        # Build efficient lookup for children().
         self._lookup: set[pathlib.Path] = set()
-        self._highest_lookup_depth = 0
+        self._max_depth = max_depth
+        for i in range(1, max_depth + 1):
+            self._lookup.update(pathlib.Path(*p.parts[:i]) for p in self._files)
 
     def _get_tracked_files(self, root: pathlib.Path) -> list[pathlib.Path]:
         output = subprocess.check_output(['git', 'ls-files', '-z'], cwd=root, text=True)
@@ -60,11 +63,10 @@ class TrackedFiles:
         """Return the immediate children of `path` that are tracked files or directories."""
         path = self._root / path if path is not None else self._root
         assert path.is_dir()
-        for i in range(
-            self._highest_lookup_depth + 1, len(path.relative_to(self._root).parts) + 2
-        ):
-            self._lookup.update(pathlib.Path(*p.parts[:i]) for p in self._files)
-            self._highest_lookup_depth = i
+        if len(path.relative_to(self._root).parts) >= self._max_depth - 1:
+            raise ValueError(
+                f'{path.relative_to(self._root)} is too deep, initialise with higher max_depth (now {self._max_depth})'
+            )
         return sorted(
             rel_path
             for p in path.iterdir()
