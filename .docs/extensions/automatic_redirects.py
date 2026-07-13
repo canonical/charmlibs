@@ -59,10 +59,32 @@ def _automatic_redirects(
     # Don't create redirects during the per-package passes.
     if app.config.package is not None:
         return
-    target = typing.cast('dict[str, str]', app.config.rediraffe_redirects)
-    assert isinstance(target, dict)
     redirects = _build_redirects(set(env.found_docs))
-    assert set(target).isdisjoint(redirects)
+    target = typing.cast('dict[str, str]', app.config.rediraffe_redirects)
+    assert isinstance(target, dict), f'rediraffe_redirects must be a dict, not {target}'
+    if not set(target).isdisjoint(redirects.keys()):
+        lines = ['Manually configured redirects would be clobbered by automatic redirects:']
+        lines.extend(
+            f'{k} -> {target[k]} would be overwritten by {k} -> {v}'
+            for k, v in redirects.items()
+            if k in target
+        )
+        raise ValueError('\n - '.join(lines))
+    if not set(target.values()).isdisjoint(redirects.keys()):
+        lines = [
+            'The following manually configured redirects would chain with automatic redirects:'
+        ]
+        lines.extend(
+            f'{k} -> {v} should point to {redirects[v]}'
+            for k, v in target.items()
+            if v in redirects
+        )
+        raise ValueError('\n - '.join(lines))
+    if not set(target).isdisjoint(redirects.values()):
+        # This is probably safe in practice, but we'd like to notice the first time it happens.
+        lines = ['The following automatic redirects chain with manually configured redirects:']
+        lines.extend(f'{k} -> {v} -> {target[v]}' for k, v in redirects.items() if v in target)
+        raise ValueError('\n - '.join(lines))
     target.update(redirects)
 
 
@@ -81,13 +103,19 @@ def _build_redirects(found_docs: set[str]) -> dict[str, str]:
             category.replace('_', '').replace('-', ''),  # e.g. howto
         }
         for category_variant in sorted(category_variants):
-            doc_variant = _separator_variant(doc)
-            if (category_variant, doc_variant) == (category, doc):
-                continue
-            alias = f'{category_variant}/{doc_variant}'
-            assert alias not in found_docs, f'Alias {alias} is a real page!'
-            assert alias not in redirects, f'Alias {alias} already redirects to {redirects[alias]}'
-            redirects[alias] = docname.removesuffix('index.html')
+            for doc_variant in sorted({doc, _separator_variant(doc)}):
+                if (category_variant, doc_variant) == (category, doc):
+                    continue
+                alias = f'{category_variant}/{doc_variant}'
+                assert alias not in found_docs, f'Alias {alias} is a real page!'
+                assert alias not in redirects, (
+                    f'Alias {alias} already redirects to {redirects[alias]}'
+                )
+                if docname.endswith('/index.html'):
+                    # Remove 'index.html', preserve trailing '/'.
+                    redirects[alias] = docname.removesuffix('index.html')
+                else:
+                    redirects[alias] = docname
     return redirects
 
 
