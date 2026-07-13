@@ -74,9 +74,9 @@ def _build_redirects(found_docs: set[str]) -> dict[str, str]:
         category, _, doc = docname.partition('/')
         category_variants = {
             category,
-            category.replace('-', '_'),  # e.g. how_to
-            category.replace('_', '-'),  # e.g. how-to
-            category.replace('_', '').replace('-', ''),  # e.g. howto
+            category.replace('-', '_'),  # how_to
+            category.replace('_', '-'),  # how-to
+            category.replace('_', '').replace('-', ''),  # howto
         }
         for category_variant in sorted(category_variants):
             for doc_variant in sorted({doc, _separator_variant(doc)}):

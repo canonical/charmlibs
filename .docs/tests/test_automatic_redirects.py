@@ -92,9 +92,6 @@ class TestBuildRedirects:
             automatic_redirects._build_redirects(found)
 
 
-# --- _automatic_redirects (integration with config) ---
-
-
 class TestAutomaticRedirects:
     @staticmethod
     def fake_app(
