@@ -42,24 +42,24 @@ import subprocess
 import sys
 import typing
 
-if typing.TYPE_CHECKING:
-    from collections.abc import Iterable
-
 # `.scripts/check_codeowners.py` -> repo root is two parents up.
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 CODEOWNERS = REPO_ROOT / 'CODEOWNERS'
 
 
+ROOT = pathlib.PurePosixPath()  # the repository root, as a relative path
+
+
 def main() -> int:
     """Run both CODEOWNERS checks, printing any problems and returning the problem count."""
     entries = parse_codeowners(CODEOWNERS.read_text())
-    paths = build_paths(tracked_files(REPO_ROOT))
+    files = [pathlib.PurePosixPath(f) for f in tracked_files(REPO_ROOT)]
     problems = 0
-    for path in find_unowned_dirs(entries, paths):
-        print(f'No explicit CODEOWNERS entry for: {path}')
+    for path in find_unowned_dirs(entries, files):
+        print(f'No explicit CODEOWNERS entry for: {render(path, files)}')
         problems += 1
-    for pattern in find_bad_entries(entries, REPO_ROOT):
-        print(f'CODEOWNERS entry points at a missing path: {pattern}')
+    for entry in find_bad_entries(entries, REPO_ROOT):
+        print(f'CODEOWNERS entry points at a missing path: {entry.pattern}')
         problems += 1
     if problems == 0:
         print('Every path has a CODEOWNERS owner, and no entries are bad.')
@@ -67,32 +67,20 @@ def main() -> int:
 
 
 class Entry(typing.NamedTuple):
-    """A single CODEOWNERS entry: a path pattern and its owners."""
+    """A single CODEOWNERS entry: the raw `pattern` and its `owners`."""
 
     pattern: str
     owners: tuple[str, ...]
 
 
-class Path(typing.NamedTuple):
-    """A repo path to check, with its immediate children.
+def parse_codeowners(text: str) -> dict[pathlib.PurePosixPath, Entry]:
+    """Parse CODEOWNERS into a `{target: entry}` dict, keyed by the repo-relative path it covers.
 
-    `path` is anchored from the repo root, in CODEOWNERS form: a leading `/`, and a trailing `/`
-    for directories (e.g. `/apt/`, `/README.md`). `child_paths` are the immediate children in the
-    same form, and is empty for files and for directories with no tracked children. Matching this
-    form lets us compare CODEOWNERS entries verbatim.
+    Comments, blanks, and wildcard patterns (containing any of `*?[]`, such as the catch-all `*`)
+    are ignored: wildcards aren't anchored paths, so this check neither validates nor counts them.
+    Keys are `PurePosixPath`s, so a trailing slash on a directory entry doesn't affect lookups.
     """
-
-    path: str
-    child_paths: tuple[str, ...]
-
-
-def parse_codeowners(text: str) -> list[Entry]:
-    """Parse CODEOWNERS file into `Entry`s, ignoring comments, blanks, and wildcard patterns.
-
-    Wildcard patterns (containing any of `*?[]`, such as the catch-all `*`) are dropped: they
-    aren't anchored paths, so this check neither validates nor counts them as ownership.
-    """
-    entries: list[Entry] = []
+    entries: dict[pathlib.PurePosixPath, Entry] = {}
     for line in text.splitlines():
         line = line.split('#', 1)[0].strip()
         if not line:
@@ -100,7 +88,8 @@ def parse_codeowners(text: str) -> list[Entry]:
         pattern, *owners = line.split()
         if any(char in pattern for char in '*?[]'):
             continue
-        entries.append(Entry(pattern=pattern, owners=tuple(owners)))
+        target = pathlib.PurePosixPath(pattern.strip('/'))  # repo-relative; ignores leading slash
+        entries[target] = Entry(pattern=pattern, owners=tuple(owners))
     return entries
 
 
@@ -114,72 +103,62 @@ def tracked_files(root: pathlib.Path) -> list[str]:
     return [file for file in output.split('\0') if file]
 
 
-def build_paths(files: Iterable[str]) -> list[Path]:
-    """Build the `Path`s to check from a list of repo-relative tracked file paths.
+def find_unowned_dirs(
+    entries: dict[pathlib.PurePosixPath, Entry], files: list[pathlib.PurePosixPath]
+) -> list[pathlib.PurePosixPath]:
+    """Return the paths to check that have no CODEOWNERS entry, directly or via all their children.
 
-    Returns an item for every top-level entry and every immediate child of `interfaces/`. Each
-    `path` is rendered in CODEOWNERS form (anchoring leading `/`, trailing `/` for directories)
-    so entries can be compared verbatim; files have an empty `child_paths`.
+    The paths to check are every top-level path and every immediate child of `interfaces/`. A
+    path passes if it has its own entry, or (for a directory) every one of its immediate children
+    has its own entry. An entry without an owner still counts: such a path is explicitly disowned
+    (like `interfaces/index.json`), which is a deliberate decision. This check is not recursive,
+    so a grandchild entry never satisfies a child, and the catch-all `*` entry was dropped by the
+    parser, so it never stands in for an explicit one.
     """
-    children: dict[str, set[str]] = {}  # parent prefix -> immediate child names
-    is_dir: dict[str, bool] = {}  # path component prefix -> whether it has children
-    for file in files:
-        parts = file.split('/')
-        for depth in range(len(parts)):
-            parent = '/'.join(parts[:depth])
-            name = parts[depth]
-            children.setdefault(parent, set()).add(name)
-            is_dir[f'{parent}/{name}' if parent else name] = depth < len(parts) - 1
-
-    def render(prefix: str, name: str) -> str:
-        path = f'{prefix}/{name}' if prefix else name
-        return f'/{path}/' if is_dir[path] else f'/{path}'
-
-    def child_paths(prefix: str, name: str) -> tuple[str, ...]:
-        path = f'{prefix}/{name}' if prefix else name
-        return tuple(sorted(render(path, child) for child in children.get(path, ())))
-
-    paths = [Path(render('', name), child_paths('', name)) for name in children.get('', ())]
-    paths += [
-        Path(render('interfaces', name), child_paths('interfaces', name))
-        for name in children.get('interfaces', ())
-    ]
-    return sorted(paths)
+    targets = [*children_of(ROOT, files), *children_of(pathlib.PurePosixPath('interfaces'), files)]
+    unowned: list[pathlib.PurePosixPath] = []
+    for path in targets:
+        children = children_of(path, files)
+        if path not in entries and not (children and entries.keys() >= set(children)):
+            unowned.append(path)
+    return sorted(unowned)
 
 
-def find_unowned_dirs(entries: Iterable[Entry], paths: Iterable[Path]) -> list[str]:
-    """Return the paths without a CODEOWNERS entry, directly or via all their children.
+def children_of(
+    directory: pathlib.PurePosixPath, files: list[pathlib.PurePosixPath]
+) -> list[pathlib.PurePosixPath]:
+    """Return the immediate children (files and subdirectories) of `directory` tracked in `files`.
 
-    A path passes if it has its own entry, or (for a directory) every one of its immediate
-    children has its own entry. An entry without an owner counts: such a path is explicitly
-    disowned (like `interfaces/index.json`), which is a deliberate decision. This check is not
-    recursive, so a grandchild entry never satisfies a child, and the catch-all `*` entry isn't a
-    path entry, so it never stands in for an explicit one.
+    `directory` may be `ROOT` (the repository root). A child is the path one level below
+    `directory` on the way to a tracked file.
     """
-    owned = {entry.pattern for entry in entries}
-    unowned: list[str] = []
-    for item in paths:
-        if item.path in owned:
-            continue
-        if item.child_paths and owned.issuperset(item.child_paths):
-            continue
-        unowned.append(item.path)
-    return unowned
+    children = {
+        directory / file.relative_to(directory).parts[0]
+        for file in files
+        if directory == ROOT or directory in file.parents
+    }
+    return sorted(children)
 
 
-def find_bad_entries(entries: Iterable[Entry], root: pathlib.Path) -> list[str]:
-    """Return the patterns of entries that don't point at an existing path of the right kind.
+def render(path: pathlib.PurePosixPath, files: list[pathlib.PurePosixPath]) -> str:
+    """Render `path` in CODEOWNERS form: a leading `/`, plus a trailing `/` if it's a directory."""
+    return f'/{path}/' if children_of(path, files) else f'/{path}'
+
+
+def find_bad_entries(
+    entries: dict[pathlib.PurePosixPath, Entry], root: pathlib.Path
+) -> list[Entry]:
+    """Return the entries that don't point at an existing path of the right kind.
 
     An entry is bad if its target doesn't exist, or if its trailing slash disagrees with
     reality: directory entries must end with `/` and file entries must not. This enforces the
-    convention that every directory entry carries a trailing slash, so entries can be compared
-    against tracked paths verbatim.
+    convention that every directory entry carries a trailing slash.
     """
-    bad: list[str] = []
-    for entry in entries:
-        path = root / entry.pattern.strip('/')
+    bad: list[Entry] = []
+    for target, entry in entries.items():
+        path = root / target
         if not path.exists() or path.is_dir() != entry.pattern.endswith('/'):
-            bad.append(entry.pattern)
+            bad.append(entry)
     return bad
 
 
