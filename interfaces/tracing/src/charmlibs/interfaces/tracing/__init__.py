@@ -92,14 +92,14 @@ follows::
 
 
 
-"""  # noqa: W505
+"""
 
 from ._tracing import (
     AmbiguousRelationUsageError,
     BrokenEvent,
     DataAccessPermissionError,
-    DataValidationError,
     DatabagModel,
+    DataValidationError,
     EndpointChangedEvent,
     EndpointRemovedEvent,
     NotReadyError,

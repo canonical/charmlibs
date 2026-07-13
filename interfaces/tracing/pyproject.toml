@@ -71,8 +71,14 @@ quote-style = "preserve"
     "D",  # docs
     "E501",  # line too long
 ]
+"src/charmlibs/interfaces/tracing/_tracing.py" = [
+    "B904",  # FIXME: use raise ... from
+    "PERF203",  # FIXME: try-except within loop
+    "RUF012",  # FIXME: mutable class attribute
+    "SIM102",  # FIXME: nested if
+]
 "tests/**/*" = [
-    # "E501",  # line too long
+    "E501",  # line too long
 ]
 
 [tool.pyright]

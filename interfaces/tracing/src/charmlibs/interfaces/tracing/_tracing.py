@@ -21,18 +21,12 @@ Migrated from the Charmhub-hosted ``charms.tempo_coordinator_k8s.v0.tracing`` li
 import enum
 import json
 import logging
+from collections.abc import MutableMapping, Sequence
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    Dict,
-    List,
     Literal,
-    MutableMapping,
-    Optional,
-    Sequence,
-    Tuple,
-    Union,
     cast,
 )
 
@@ -62,7 +56,7 @@ ReceiverProtocol = Literal[
     "jaeger_thrift_http",
 ]
 
-RawReceiver = Tuple[ReceiverProtocol, str]
+RawReceiver = tuple[ReceiverProtocol, str]
 # Helper type. A raw receiver is defined as a tuple consisting of the protocol name,
 # and the (external, if available), (secured, if available) resolvable server url.
 
@@ -77,7 +71,7 @@ class TransportProtocolType(str, enum.Enum):
     grpc = "grpc"
 
 
-receiver_protocol_to_transport_protocol: Dict[ReceiverProtocol, TransportProtocolType] = {
+receiver_protocol_to_transport_protocol: dict[ReceiverProtocol, TransportProtocolType] = {
     "zipkin": TransportProtocolType.http,
     "otlp_grpc": TransportProtocolType.grpc,
     "otlp_http": TransportProtocolType.http,
@@ -152,7 +146,7 @@ if int(pydantic.version.VERSION.split(".")[0]) < 2:
                 logger.debug(msg, exc_info=True)
                 raise DataValidationError(msg) from e
 
-        def dump(self, databag: Optional[MutableMapping] = None, clear: bool = True):
+        def dump(self, databag: MutableMapping | None = None, clear: bool = True):
             """Write the contents of this model to Juju databag.
 
             :param databag: the databag to write the data to.
@@ -218,7 +212,7 @@ else:
                 logger.debug(msg, exc_info=True)
                 raise DataValidationError(msg) from e
 
-        def dump(self, databag: Optional[MutableMapping] = None, clear: bool = True):
+        def dump(self, databag: MutableMapping | None = None, clear: bool = True):
             """Write the contents of this model to Juju databag.
 
             :param databag: the databag to write the data to.
@@ -318,25 +312,25 @@ class Receiver(BaseModel):
     )
 
 
-class TracingProviderAppData(DatabagModel):  # noqa: D101 # type: ignore
+class TracingProviderAppData(DatabagModel):  # type: ignore
     """Application databag model for the tracing provider."""
 
-    receivers: List[Receiver] = Field(
+    receivers: list[Receiver] = Field(
         ...,
         description="List of all receivers enabled on the tracing provider.",
     )
 
 
-class TracingRequirerAppData(DatabagModel):  # noqa: D101 # type: ignore
+class TracingRequirerAppData(DatabagModel):  # type: ignore
     """Application databag model for the tracing requirer."""
 
-    receivers: List[ReceiverProtocol]
+    receivers: list[ReceiverProtocol]
     """Requested receivers."""
 
 
 class _AutoSnapshotEvent(RelationEvent):
-    __args__: Tuple[str, ...] = ()
-    __optional_kwargs__: Dict[str, Any] = {}
+    __args__: tuple[str, ...] = ()
+    __optional_kwargs__: dict[str, Any] = {}
 
     @classmethod
     def __attrs__(cls):
@@ -346,9 +340,9 @@ class _AutoSnapshotEvent(RelationEvent):
         super().__init__(handle, relation)
 
         if not len(self.__args__) == len(args):
-            raise TypeError("expected {} args, got {}".format(len(self.__args__), len(args)))
+            raise TypeError(f"expected {len(self.__args__)} args, got {len(args)}")
 
-        for attr, obj in zip(self.__args__, args):
+        for attr, obj in zip(self.__args__, args, strict=False):
             setattr(self, attr, obj)
         for attr, default in self.__optional_kwargs__.items():
             obj = kwargs.get(attr, default)
@@ -362,9 +356,9 @@ class _AutoSnapshotEvent(RelationEvent):
                 dct[attr] = obj
             except ValueError as e:
                 raise ValueError(
-                    "cannot automagically serialize {}: "
+                    f"cannot automagically serialize {obj}: "
                     "override this method and do it "
-                    "manually.".format(obj)
+                    "manually."
                 ) from e
 
         return dct
@@ -380,7 +374,7 @@ class RelationNotFoundError(Exception):
 
     def __init__(self, relation_name: str):
         self.relation_name = relation_name
-        self.message = "No relation named '{}' found".format(relation_name)
+        self.message = f"No relation named '{relation_name}' found"
         super().__init__(self.message)
 
 
@@ -397,9 +391,8 @@ class RelationInterfaceMismatchError(Exception):
         self.expected_relation_interface = expected_relation_interface
         self.actual_relation_interface = actual_relation_interface
         self.message = (
-            "The '{}' relation has '{}' as interface rather than the expected '{}'".format(
-                relation_name, actual_relation_interface, expected_relation_interface
-            )
+            f"The '{relation_name}' relation has '{actual_relation_interface}'"
+            f" as interface rather than the expected '{expected_relation_interface}'"
         )
 
         super().__init__(self.message)
@@ -417,8 +410,9 @@ class RelationRoleMismatchError(Exception):
         self.relation_name = relation_name
         self.expected_relation_interface = expected_relation_role
         self.actual_relation_role = actual_relation_role
-        self.message = "The '{}' relation has role '{}' rather than the expected '{}'".format(
-            relation_name, repr(actual_relation_role), repr(expected_relation_role)
+        self.message = (
+            f"The '{relation_name}' relation has role '{actual_relation_role!r}'"
+            f" rather than the expected '{expected_relation_role!r}'"
         )
 
         super().__init__(self.message)
@@ -461,7 +455,7 @@ def _validate_relation_by_interface_and_direction(
     relation = charm.meta.relations[relation_name]
 
     # fixme: why do we need to cast here?
-    actual_relation_interface = cast(str, relation.interface_name)
+    actual_relation_interface = cast("str", relation.interface_name)
 
     if actual_relation_interface != expected_relation_interface:
         raise RelationInterfaceMismatchError(
@@ -479,14 +473,14 @@ def _validate_relation_by_interface_and_direction(
                 relation_name, RelationRole.requires, RelationRole.provides
             )
     else:
-        raise TypeError("Unexpected RelationDirection: {}".format(expected_relation_role))
+        raise TypeError(f"Unexpected RelationDirection: {expected_relation_role}")
 
 
 class RequestEvent(RelationEvent):
     """Event emitted when a remote requests a tracing endpoint."""
 
     @property
-    def requested_receivers(self) -> List[ReceiverProtocol]:
+    def requested_receivers(self) -> list[ReceiverProtocol]:
         """List of receiver protocols that have been requested."""
         relation = self.relation
         app = relation.app
@@ -515,7 +509,7 @@ class TracingEndpointProvider(Object):
     def __init__(
         self,
         charm: CharmBase,
-        external_url: Optional[str] = None,
+        external_url: str | None = None,
         relation_name: str = DEFAULT_RELATION_NAME,
     ):
         """Initialize.
@@ -601,7 +595,7 @@ class TracingEndpointProvider(Object):
         return requested_protocols
 
     @property
-    def relations(self) -> List[Relation]:
+    def relations(self) -> list[Relation]:
         """All relations active on this endpoint."""
         return self._charm.model.relations[self._relation_name]
 
@@ -654,7 +648,7 @@ class EndpointChangedEvent(_AutoSnapshotEvent):
         _receivers = []  # type: List[dict]
 
     @property
-    def receivers(self) -> List[Receiver]:
+    def receivers(self) -> list[Receiver]:
         """Cast receivers back from dict."""
         return [Receiver(**i) for i in self._receivers]
 
@@ -675,7 +669,7 @@ class TracingEndpointRequirer(Object):
         self,
         charm: CharmBase,
         relation_name: str = DEFAULT_RELATION_NAME,
-        protocols: Optional[List[ReceiverProtocol]] = None,
+        protocols: list[ReceiverProtocol] | None = None,
     ):
         """Construct a tracing requirer for a Tempo charm.
 
@@ -735,7 +729,7 @@ class TracingEndpointRequirer(Object):
                 pass
 
     def request_protocols(
-        self, protocols: Sequence[ReceiverProtocol], relation: Optional[Relation] = None
+        self, protocols: Sequence[ReceiverProtocol], relation: Relation | None = None
     ):
         """Publish the list of protocols which the provider should activate."""
         # todo: should we check if _is_single_endpoint and len(self.relations) > 1 and raise, here?
@@ -756,12 +750,12 @@ class TracingEndpointRequirer(Object):
             raise DataAccessPermissionError("only leaders can request_protocols")
 
     @property
-    def relations(self) -> List[Relation]:
+    def relations(self) -> list[Relation]:
         """The tracing relations associated with this endpoint."""
         return self._charm.model.relations[self._relation_name]
 
     @property
-    def _relation(self) -> Optional[Relation]:
+    def _relation(self) -> Relation | None:
         """If this wraps a single endpoint, the relation bound to it, if any."""
         if not self._is_single_endpoint:
             objname = type(self).__name__
@@ -774,7 +768,7 @@ class TracingEndpointRequirer(Object):
         relations = self.relations
         return relations[0] if relations else None
 
-    def is_ready(self, relation: Optional[Relation] = None):
+    def is_ready(self, relation: Relation | None = None):
         """Is this endpoint ready?"""
         relation = relation or self._relation
         if not relation:
@@ -810,22 +804,18 @@ class TracingEndpointRequirer(Object):
         relation = event.relation
         self.on.endpoint_removed.emit(relation)  # type: ignore
 
-    def get_all_endpoints(
-        self, relation: Optional[Relation] = None
-    ) -> Optional[TracingProviderAppData]:
+    def get_all_endpoints(self, relation: Relation | None = None) -> TracingProviderAppData | None:
         """Unmarshalled relation data."""
         relation = relation or self._relation
         if not self.is_ready(relation):
             return
         return TracingProviderAppData.load(relation.data[relation.app])  # type: ignore
 
-    def _get_endpoint(
-        self, relation: Optional[Relation], protocol: ReceiverProtocol
-    ) -> Optional[str]:
+    def _get_endpoint(self, relation: Relation | None, protocol: ReceiverProtocol) -> str | None:
         app_data = self.get_all_endpoints(relation)
         if not app_data:
             return None
-        receivers: List[Receiver] = list(
+        receivers: list[Receiver] = list(
             filter(lambda i: i.protocol.name == protocol, app_data.receivers)
         )
         if not receivers:
@@ -847,8 +837,8 @@ class TracingEndpointRequirer(Object):
         return receiver.url
 
     def get_endpoint(
-        self, protocol: ReceiverProtocol, relation: Optional[Relation] = None
-    ) -> Optional[str]:
+        self, protocol: ReceiverProtocol, relation: Relation | None = None
+    ) -> str | None:
         """Receiver endpoint for the given protocol.
 
         It could happen that this function gets called before the provider publishes the endpoints.
@@ -880,8 +870,8 @@ class TracingEndpointRequirer(Object):
 
 
 def charm_tracing_config(
-    endpoint_requirer: TracingEndpointRequirer, cert_path: Optional[Union[Path, str]]
-) -> Tuple[Optional[str], Optional[str]]:
+    endpoint_requirer: TracingEndpointRequirer, cert_path: Path | str | None
+) -> tuple[str | None, str | None]:
     """Return the charm_tracing config you likely want.
 
     - If no endpoint is provided: disable charm tracing.
