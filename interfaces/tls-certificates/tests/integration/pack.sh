@@ -39,4 +39,27 @@ for charm in 'provider' 'requirer'; do
     done
 done
 
+: pack requirer variants built on the Charmhub-hosted v4 lib, used by the upgrade tests
+: 'fetch-lib-latest' uses the newest v4 libpatch, 'fetch-lib-pre-fix' is pinned to
+: libpatch 26, from before APP mode private keys were stored as app-owned secrets
+for variant_and_lib in 'fetch-lib-latest=4' 'fetch-lib-pre-fix=4.26'; do
+    variant="${variant_and_lib%%=*}"
+    lib_version="${variant_and_lib##*=}"
+    charm_tmp_dir="$TMP_DIR/requirer-$variant"
+
+    rm -rf "$charm_tmp_dir"
+    cp --recursive --dereference "charms/requirer/$variant" "$charm_tmp_dir"
+
+    : declare the Charmhub lib at the pinned version, then fetch and pack
+    printf '\ncharm-libs:\n  - lib: tls_certificates_interface.tls_certificates\n    version: "%s"\n' \
+        "$lib_version" >> "$charm_tmp_dir/charmcraft.yaml"
+    cd "$charm_tmp_dir"
+    charmcraft fetch-libs
+    uv lock
+    charmcraft pack
+    cd -
+
+    mv "$charm_tmp_dir"/*.charm "$PACKED_DIR/requirer-$variant.charm"  # read by integration tests
+done
+
 ls "$PACKED_DIR"
