@@ -23,6 +23,8 @@ dependencies = [
     # - https://github.com/canonical/operator/blob/main/CHANGES.md
     # Set the dependency bounds according to the features and fixes your library needs.
     # "ops>=2.23.1,<4",
+    "ops>=2.23.1,<4",
+    "pydantic>=2",
 ]
 
 [dependency-groups]
