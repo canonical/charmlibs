@@ -46,57 +46,39 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 
 class TrackedFiles:
-    def __init__(self):
-        self._files = self._get_tracked_files()
+    def __init__(self, root: pathlib.Path):
+        self._root = root
+        self._files = self._get_tracked_files(root)
         self._lookup: set[pathlib.Path] = set()
         self._highest_lookup_depth = 0
 
-    def _get_tracked_files(self) -> list[pathlib.Path]:
-        output = subprocess.check_output(['git', 'ls-files', '-z'], cwd=REPO_ROOT, text=True)
+    def _get_tracked_files(self, root: pathlib.Path) -> list[pathlib.Path]:
+        output = subprocess.check_output(['git', 'ls-files', '-z'], cwd=root, text=True)
         return [pathlib.Path(file) for file in output.split('\0') if file]
 
-    def children(self, path: pathlib.Path) -> list[pathlib.Path]:
+    def children(self, path: pathlib.Path | str | None = None) -> list[pathlib.Path]:
         """Return the immediate children of `path` that are tracked files or directories."""
+        path = self._root / path if path is not None else self._root
         for i in range(self._highest_lookup_depth + 1, len(path.parts) + 2):
             self._lookup.update(pathlib.Path(*p.parts[:i]) for p in self._files)
             self._highest_lookup_depth = i
         return sorted(
             rel_path
             for p in path.iterdir()
-            if (rel_path := p.relative_to(REPO_ROOT)) in self._lookup
+            if (rel_path := p.relative_to(self._root)) in self._lookup
         )
 
 
 def main() -> int:
     """Run both CODEOWNERS checks, printing any problems and returning the problem count."""
     entries = parse_codeowners((REPO_ROOT / 'CODEOWNERS').read_text())
-    tracked = TrackedFiles()
-    owner_required = [*tracked.children(REPO_ROOT), *tracked.children(REPO_ROOT / 'interfaces')]
-    problems = 0
-    # Check tracked files against CODEOWNERS entries.
-    for path in owner_required:
-        if path not in entries:
-            if not path.is_dir():
-                print(f'No explicit CODEOWNERS for: /{path}')
-                problems += 1
-            elif not all(p in entries for p in tracked.children(REPO_ROOT / path)):
-                print(f"No explicit CODEOWNERS for: /{path}/ (and its children aren't all owned)")
-                problems += 1
-    # Check CODEOWNERS entries.
-    for target, pattern in entries.items():
-        path = REPO_ROOT / target
-        if not path.exists():
-            print(f'CODEOWNERS entry points at a missing path: {pattern}')
-            problems += 1
-        if path.is_dir() != pattern.endswith('/'):
-            print(f'CODEOWNERS entry must have a trailing slash iff it is a dir: {pattern}')
-            problems += 1
-        if not pattern.startswith('/'):
-            print(f'CODEOWNERS entry must be anchored with a leading /: {pattern}')
-            problems += 1
-    if not problems:
-        print('No problems found in CODEOWNERS :)')
-    return problems
+    tracked = TrackedFiles(REPO_ROOT)
+    problems = check(entries, tracked)
+    if problems:
+        print('\n'.join(problems))
+    else:
+        print('No problems found with CODEOWNERS :)')
+    return len(problems)
 
 
 def parse_codeowners(text: str) -> dict[pathlib.Path, str]:
@@ -118,6 +100,27 @@ def parse_codeowners(text: str) -> dict[pathlib.Path, str]:
         target = pathlib.Path(pattern.strip('/'))  # to be interpreted relative to REPO_ROOT
         entries[target] = pattern
     return entries
+
+
+def check(entries: dict[pathlib.Path, str], tracked: TrackedFiles) -> list[str]:
+    problems: list[str] = []
+    # Check tracked files against CODEOWNERS entries.
+    for path in *tracked.children(), *tracked.children('interfaces'):
+        if path not in entries:
+            if not path.is_dir():
+                problems.append(f'No explicit CODEOWNERS for: /{path}')
+            elif not all(p in entries for p in tracked.children(path)):
+                problems.append(f"No explicit CODEOWNERS for: /{path}/ (and its children aren't all owned)")
+    # Check CODEOWNERS entries.
+    for target, pattern in entries.items():
+        path = REPO_ROOT / target
+        if not path.exists():
+            problems.append(f'CODEOWNERS entry points at a missing path: {pattern}')
+        if path.is_dir() != pattern.endswith('/'):
+            problems.append(f'CODEOWNERS entry must have a trailing slash iff it is a dir: {pattern}')
+        if not pattern.startswith('/'):
+            problems.append(f'CODEOWNERS entry must be anchored with a leading /: {pattern}')
+    return problems
 
 
 if __name__ == '__main__':
