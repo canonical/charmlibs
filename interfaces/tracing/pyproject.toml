@@ -85,6 +85,9 @@ quote-style = "preserve"
 extends = "../../pyproject.toml"
 include = ["src", "tests"]
 pythonVersion = "3.10"  # check no python > 3.10 features are used
+ignore = [
+    "src/charmlibs/interfaces/tracing/_tracing.py",  # FIXME: ~200 errors
+]
 
 [tool.charmlibs.functional]
 ubuntu = []  # ubuntu versions to run functional tests with, e.g. "24.04" (defaults to just "latest")
