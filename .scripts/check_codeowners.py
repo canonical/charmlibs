@@ -59,7 +59,10 @@ class TrackedFiles:
     def children(self, path: pathlib.Path | str | None = None) -> list[pathlib.Path]:
         """Return the immediate children of `path` that are tracked files or directories."""
         path = self._root / path if path is not None else self._root
-        for i in range(self._highest_lookup_depth + 1, len(path.parts) + 2):
+        assert path.is_dir()
+        for i in range(
+            self._highest_lookup_depth + 1, len(path.relative_to(self._root).parts) + 2
+        ):
             self._lookup.update(pathlib.Path(*p.parts[:i]) for p in self._files)
             self._highest_lookup_depth = i
         return sorted(
@@ -90,7 +93,7 @@ def parse_codeowners(text: str) -> dict[pathlib.Path, str]:
     """
     entries: dict[pathlib.Path, str] = {}
     for line in text.splitlines():
-        entry, _, *_ = line.partition('#')  # drop trailing comment
+        entry, _, _ = line.partition('#')  # drop trailing comments
         entry = entry.strip()
         if not entry:
             continue
@@ -116,7 +119,7 @@ def check(entries: dict[pathlib.Path, str], tracked: TrackedFiles) -> list[str]:
         path = REPO_ROOT / target
         if not path.exists():
             problems.append(f'CODEOWNERS entry points at a missing path: {pattern}')
-        if path.is_dir() != pattern.endswith('/'):
+        elif path.is_dir() != pattern.endswith('/'):
             problems.append(f'CODEOWNERS entry must have a trailing slash iff it is a dir: {pattern}')
         if not pattern.startswith('/'):
             problems.append(f'CODEOWNERS entry must be anchored with a leading /: {pattern}')
