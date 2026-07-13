@@ -1,7 +1,7 @@
 name: auth_proxy
 version: 0
 status: draft
-lib: charms.oathkeeper.auth_proxy
+lib: charmlibs.interfaces.auth_proxy
 summary: Configure an Identity and Access Proxy.
 description: |
   The `auth_proxy` interface allows charms to configure an Identity and Access Proxy.
@@ -9,8 +9,8 @@ description: |
   The provider is responsible for transforming the configuration into access rules and forwarding relevant configuration to the proxy.
 
 providers:
-  - name: oathkeeper-operator
-    url: https://www.github.com/canonical/oathkeeper-operator
+  - name: oauth2-proxy-k8s-operator
+    url: https://www.github.com/canonical/oauth2-proxy-k8s-operator
 
 requirers:
   []
