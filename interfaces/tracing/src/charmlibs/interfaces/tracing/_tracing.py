@@ -14,7 +14,8 @@
 
 """Private implementation of the :mod:`charmlibs.interfaces.tracing` package.
 
-Migrated from the Charmhub-hosted ``charms.tempo_coordinator_k8s.v0.tracing`` library (LIBAPI 0, LIBPATCH 11).
+Migrated from the Charmhub-hosted ``charms.tempo_coordinator_k8s.v0.tracing`` library
+(LIBAPI 0, LIBPATCH 11).
 """
 
 import enum
@@ -62,8 +63,8 @@ ReceiverProtocol = Literal[
 ]
 
 RawReceiver = Tuple[ReceiverProtocol, str]
-# Helper type. A raw receiver is defined as a tuple consisting of the protocol name, and the (external, if available),
-# (secured, if available) resolvable server url.
+# Helper type. A raw receiver is defined as a tuple consisting of the protocol name,
+# and the (external, if available), (secured, if available) resolvable server url.
 
 
 BUILTIN_JUJU_KEYS = {"ingress-address", "private-address", "egress-subnets"}
@@ -263,8 +264,8 @@ if int(pydantic.version.VERSION.split(".")[0]) < 2:
 
         name: str = Field(
             ...,
-            description="Receiver protocol name. What protocols are supported (and what they are called) "
-            "may differ per provider.",
+            description="Receiver protocol name. What protocols are supported "
+            "(and what they are called) may differ per provider.",
             examples=["otlp_grpc", "otlp_http", "tempo_http"],
         )
 
@@ -287,8 +288,8 @@ else:
 
         name: str = Field(
             ...,
-            description="Receiver protocol name. What protocols are supported (and what they are called) "
-            "may differ per provider.",
+            description="Receiver protocol name. What protocols are supported "
+            "(and what they are called) may differ per provider.",
             examples=["otlp_grpc", "otlp_http", "tempo_http"],
         )
 
@@ -305,7 +306,8 @@ class Receiver(BaseModel):
     protocol: ProtocolType = Field(..., description="Receiver protocol name and type.")
     url: str = Field(
         ...,
-        description="""URL at which the receiver is reachable. If there's an ingress, it would be the external URL.
+        description="""URL at which the receiver is reachable. If there's an ingress,
+        it would be the external URL.
         Otherwise, it would be the service's fqdn or internal IP.
         If the protocol type is grpc, the url will not contain a scheme.""",
         examples=[
@@ -398,8 +400,9 @@ class RelationInterfaceMismatchError(Exception):
         self.relation_name = relation_name
         self.expected_relation_interface = expected_relation_interface
         self.actual_relation_interface = actual_relation_interface
-        self.message = "The '{}' relation has '{}' as interface rather than the expected '{}'".format(
-            relation_name, actual_relation_interface, expected_relation_interface
+        self.message = (
+            "The '{}' relation has '{}' as interface rather than the expected '{}'"
+            .format(relation_name, actual_relation_interface, expected_relation_interface)
         )
 
         super().__init__(self.message)
@@ -727,8 +730,9 @@ class TracingEndpointRequirer(Object):
         self.framework.observe(events.relation_broken, self._on_tracing_relation_broken)
 
         if protocols and self._charm.unit.is_leader():
-            # we can't be sure that the current event context supports read/writing relation data for this relation,
-            # so we catch ModelErrors. This is because we're doing this in init.
+            # we can't be sure that the current event context supports read/writing
+            # relation data for this relation, so we catch ModelErrors.
+            # This is because we're doing this in init.
             try:
                 self.request_protocols(protocols)
             except ModelError as e:
@@ -834,12 +838,14 @@ class TracingEndpointRequirer(Object):
             filter(lambda i: i.protocol.name == protocol, app_data.receivers)
         )
         if not receivers:
-            # it can happen if the charm requests tracing protocols, but the relay (such as grafana-agent) isn't yet
-            # connected to the tracing backend. In this case, it's not an error the charm author can do anything about
+            # it can happen if the charm requests tracing protocols, but the relay
+            # (such as grafana-agent) isn't yet connected to the tracing backend. In this case,
+            # it's not an error the charm author can do anything about
             logger.warning("no receiver found with protocol=%r.", protocol)
             return
         if len(receivers) > 1:
-            # if we have more than 1 receiver that matches, it shouldn't matter which receiver we'll be using.
+            # if we have more than 1 receiver that matches, it shouldn't matter
+            # which receiver we'll be using.
             logger.warning(
                 "too many receivers with protocol=%r; using first one. Found: %s",
                 protocol,
@@ -860,7 +866,8 @@ class TracingEndpointRequirer(Object):
         by the ``is_ready`` check.
 
         Raises:
-            ProtocolNotRequestedError: If the charm unit is the leader unit and attempts to obtain an endpoint for a protocol it did not request.
+            ProtocolNotRequestedError: If the charm unit is the leader unit and attempts to
+                obtain an endpoint for a protocol it did not request.
         """
         endpoint = self._get_endpoint(relation or self._relation, protocol=protocol)
         if not endpoint:
