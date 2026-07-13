@@ -1,77 +1,21 @@
-# Copyright 2024 Canonical Ltd.
-# See LICENSE file for licensing details.
-"""## Overview.
+# Copyright 2026 Canonical Ltd.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
-This document explains how to integrate with the Tempo charm for the purpose of pushing traces to a
-tracing endpoint provided by Tempo. It also explains how alternative implementations of the Tempo charm
-may maintain the same interface and be backward compatible with all currently integrated charms.
+"""Private implementation of the :mod:`charmlibs.interfaces.tracing` package.
 
-## Requirer Library Usage
-
-Charms seeking to push traces to Tempo, must do so using the `TracingEndpointRequirer`
-object from this charm library. For the simplest use cases, using the `TracingEndpointRequirer`
-object only requires instantiating it, typically in the constructor of your charm. The
-`TracingEndpointRequirer` constructor requires the name of the relation over which a tracing endpoint
- is exposed by the Tempo charm, and a list of protocols it intends to send traces with.
- This relation must use the `tracing` interface.
- The `TracingEndpointRequirer` object may be instantiated as follows
-
-    from charms.tempo_coordinator_k8s.v0.tracing import TracingEndpointRequirer
-
-    def __init__(self, *args):
-        super().__init__(*args)
-        # ...
-        self.tracing = TracingEndpointRequirer(self,
-            protocols=['otlp_grpc', 'otlp_http', 'jaeger_http_thrift']
-        )
-        # ...
-
-Note that the first argument (`self`) to `TracingEndpointRequirer` is always a reference to the
-parent charm.
-
-Alternatively to providing the list of requested protocols at init time, the charm can do it at
-any point in time by calling the
-`TracingEndpointRequirer.request_protocols(*protocol:str, relation:Optional[Relation])` method.
-Using this method also allows you to use per-relation protocols.
-
-Units of requirer charms obtain the tempo endpoint to which they will push their traces by calling
-`TracingEndpointRequirer.get_endpoint(protocol: str)`, where `protocol` is, for example:
-- `otlp_grpc`
-- `otlp_http`
-- `zipkin`
-- `tempo`
-
-If the `protocol` is not in the list of protocols that the charm requested at endpoint set-up time,
-the library will raise an error.
-
-We recommend that you scale up your tracing provider and relate it to an ingress so that your tracing requests
-go through the ingress and get load balanced across all units. Otherwise, if the provider's leader goes down, your tracing goes down.
-
-## Provider Library Usage
-
-The `TracingEndpointProvider` object may be used by charms to manage relations with their
-trace sources. For this purposes a Tempo-like charm needs to do two things
-
-1. Instantiate the `TracingEndpointProvider` object by providing it a
-reference to the parent (Tempo) charm and optionally the name of the relation that the Tempo charm
-uses to interact with its trace sources. This relation must conform to the `tracing` interface
-and it is strongly recommended that this relation be named `tracing` which is its
-default value.
-
-For example a Tempo charm may instantiate the `TracingEndpointProvider` in its constructor as
-follows
-
-    from charms.tempo_coordinator_k8s.v0.tracing import TracingEndpointProvider
-
-    def __init__(self, *args):
-        super().__init__(*args)
-        # ...
-        self.tracing = TracingEndpointProvider(self)
-        # ...
-
-
-
-"""  # noqa: W505
+Migrated from the Charmhub-hosted ``charms.tempo_coordinator_k8s.v0.tracing`` library (LIBAPI 0, LIBPATCH 11).
+"""
 
 import enum
 import json
@@ -102,18 +46,6 @@ from ops.charm import (
 from ops.framework import EventSource, Object
 from ops.model import ModelError, Relation
 from pydantic import BaseModel, Field
-
-# The unique Charmhub library identifier, never change it
-LIBID = "d2f02b1f8d1244b5989fd55bc3a28943"
-
-# Increment this major API version when introducing breaking changes
-LIBAPI = 0
-
-# Increment this PATCH version before using `charmcraft publish-lib` or reset
-# to 0 if you are raising the major API version
-LIBPATCH = 11
-
-PYDEPS = ["pydantic"]
 
 logger = logging.getLogger(__name__)
 
