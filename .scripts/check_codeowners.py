@@ -42,28 +42,11 @@ import sys
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 
-class TrackedFiles:
-    def __init__(self, root: pathlib.Path | str):
-        self._children: dict[pathlib.Path, set[pathlib.Path]] = {}
-        for path in self._get_tracked_files(root):
-            for p in (path, *path.parents[:-1]):  # Don't include the root as a child ('.').
-                self._children.setdefault(p.parent, set()).add(p)
-
-    @staticmethod
-    def _get_tracked_files(root: pathlib.Path | str) -> list[pathlib.Path]:
-        output = subprocess.check_output(['git', 'ls-files', '-z'], cwd=root, text=True)
-        return [pathlib.Path(file) for file in output.split('\0') if file]
-
-    def children(self, path: pathlib.Path | str = '.') -> list[pathlib.Path]:
-        """Return the immediate children of `path` that are tracked files or directories."""
-        return sorted(self._children[pathlib.Path(path)])
-
-
 def main() -> int:
     """Run both CODEOWNERS checks, printing any problems and returning the problem count."""
     entries = parse_codeowners((REPO_ROOT / 'CODEOWNERS').read_text())
-    tracked = TrackedFiles(REPO_ROOT)
-    problems = check(entries, tracked)
+    children = map_children(get_tracked_files(REPO_ROOT))
+    problems = check(entries, children)
     if problems:
         print('\n'.join(problems))
     else:
@@ -90,14 +73,27 @@ def parse_codeowners(text: str) -> dict[pathlib.Path, str]:
     return entries
 
 
-def check(entries: dict[pathlib.Path, str], tracked: TrackedFiles) -> list[str]:
+def get_tracked_files(root: pathlib.Path | str) -> list[pathlib.Path]:
+    output = subprocess.check_output(['git', 'ls-files', '-z'], cwd=root, text=True)
+    return [pathlib.Path(file) for file in output.split('\0') if file]
+
+
+def map_children(files: list[pathlib.Path]) -> dict[pathlib.Path, list[pathlib.Path]]:
+    children: dict[pathlib.Path, set[pathlib.Path]] = {}
+    for path in files:
+        for p in (path, *path.parents[:-1]):  # Don't include the root as a child ('.').
+            children.setdefault(p.parent, set()).add(p)
+    return {k: sorted(v) for k, v in children.items()}
+
+
+def check(entries: dict[pathlib.Path, str], children: dict[pathlib.Path, list[pathlib.Path]]) -> list[str]:
     problems: list[str] = []
     # Check tracked files against CODEOWNERS entries.
-    for path in *tracked.children(), *tracked.children('interfaces'):
+    for path in *children[pathlib.Path()], *children[pathlib.Path('interfaces')]:
         if path not in entries:
             if not path.is_dir():
                 problems.append(f'No explicit CODEOWNERS for: /{path}')
-            elif not all(p in entries for p in tracked.children(path)):
+            elif not all(p in entries for p in children[path]):
                 problems.append(f"No explicit CODEOWNERS for: /{path}/ (and its children aren't all owned)")
     # Check CODEOWNERS entries.
     for target, pattern in entries.items():
