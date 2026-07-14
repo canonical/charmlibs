@@ -1107,7 +1107,7 @@ interfaces:
   tags:
   - identity-auth
 - name: charms.oauth2_proxy_k8s.forward_auth
-  status: ''
+  status: legacy
   url: https://charmhub.io/oauth2-proxy-k8s/libraries/forward_auth
   docs: ''
   src: https://github.com/canonical/oauth2-proxy-k8s-operator
@@ -1115,7 +1115,19 @@ interfaces:
   rel_name: forward_auth
   rel_url_charmhub: https://charmhub.io/integrations/forward_auth
   rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/forward_auth/v0
-  description: ''
+  description: 'Interface library for providing API Gateways with Identity and Access Proxy information. Superseded by charmlibs-interfaces-forward-auth.'
+  tags:
+  - identity-auth
+- name: charmlibs.interfaces.forward_auth
+  status: recommended
+  url: https://pypi.org/project/charmlibs-interfaces-forward-auth
+  docs: https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/forward-auth
+  src: https://github.com/canonical/oauth2-proxy-k8s-operator
+  kind: PyPI
+  rel_name: forward_auth
+  rel_url_charmhub: https://charmhub.io/integrations/forward_auth
+  rel_url_schema: ''
+  description: 'Interface library for providing API Gateways with Identity and Access Proxy information.'
   tags:
   - identity-auth
 - name: charms.glauth_utils.glauth_auxiliary
