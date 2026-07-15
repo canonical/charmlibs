@@ -182,8 +182,7 @@
 /interfaces/opencti_connector/ruff.toml @canonical/platform-engineering
 
 # /interfaces/openfga/
-/interfaces/openfga/interface/ @canonical/identity
-/interfaces/openfga/ruff.toml @canonical/identity
+/interfaces/openfga/ @canonical/identity
 
 # /interfaces/opensearch_client/
 /interfaces/opensearch_client/interface/ @canonical/data-nosql
