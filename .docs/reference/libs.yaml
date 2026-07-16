@@ -1428,11 +1428,11 @@ interfaces:
   status: recommended
   url: https://pypi.org/project/charmlibs-interfaces-oauth
   docs: https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/oauth
-  src: https://github.com/canonical/hydra-operator
+  src: https://github.com/canonical/charmlibs/tree/main/interfaces/oauth
   kind: PyPI
   rel_name: oauth
   rel_url_charmhub: https://charmhub.io/integrations/oauth
-  rel_url_schema: ''
+  rel_url_schema: https://github.com/canonical/charmlibs/tree/main/interfaces/oauth/interface/v0
   description: 'Register OAuth2/OIDC clients with an OIDC Provider.'
   tags:
   - identity-auth
