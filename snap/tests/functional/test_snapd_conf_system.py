@@ -76,7 +76,7 @@ def test_get_system_missing_key_raises_option_not_found(core_snap: str, name: st
     # The case get()'s probe would break: /v2/snaps/{name} 404s while the configuration is
     # served, so the probe must be skipped for these names.
     with pytest.raises(_errors.OptionNotFoundError) as ctx:
-        _snapd_conf.get(name, 'key-that-does-not-exist-xyz')
+        _snapd_conf.get(name, ['key-that-does-not-exist-xyz'])
     assert ctx.value.kind == 'option-not-found'
     # snapd resolves the alias in the error details: SnapName is always reported as 'core'.
     assert 'core' in str(ctx.value.value)
@@ -91,7 +91,7 @@ def test_set_system_unknown_option_raises_change_error(core_snap: str, name: str
     assert 'unsupported system option' in ctx.value.message
     # The failed change is rolled back: nothing was stored.
     with pytest.raises(_errors.OptionNotFoundError):
-        _snapd_conf.get(name, 'test-unknown-key-xyz')
+        _snapd_conf.get(name, ['test-unknown-key-xyz'])
 
 
 @pytest.mark.parametrize('name', ['system', 'core'])
@@ -100,11 +100,11 @@ def test_set_get_unset_system_option(core_snap: str, name: str):
     # This module treats stored system options as expendable, so we don't preserve/restore.
     try:
         _snapd_conf.set(name, {_OPTION: 3})
-        assert _snapd_conf.get(name, _OPTION) == {_OPTION: 3}
+        assert _snapd_conf.get(name, [_OPTION]) == {_OPTION: 3}
     finally:
-        _snapd_conf.unset(name, _OPTION)
+        _snapd_conf.unset(name, [_OPTION])
     with pytest.raises(_errors.OptionNotFoundError):
-        _snapd_conf.get(name, _OPTION)
+        _snapd_conf.get(name, [_OPTION])
 
 
 @pytest.mark.parametrize('name', ['system', 'core'])
@@ -114,9 +114,9 @@ def test_set_empty_dict_is_noop(core_snap: str, name: str):
     try:
         _snapd_conf.set(name, {_OPTION: 3})
         _snapd_conf.set(name, {})
-        assert _snapd_conf.get(name, _OPTION) == {_OPTION: 3}
+        assert _snapd_conf.get(name, [_OPTION]) == {_OPTION: 3}
     finally:
-        _snapd_conf.unset(name, _OPTION)
+        _snapd_conf.unset(name, [_OPTION])
 
 
 def test_removing_core_snap_deletes_stored_system_config():
@@ -126,15 +126,15 @@ def test_removing_core_snap_deletes_stored_system_config():
     # not use the core_snap fixture.
     snap.install('core')  # Ensure installed, so its removal actually deletes stored config.
     _snapd_conf.set('system', {_OPTION: 3})
-    assert _snapd_conf.get('system', _OPTION) == {_OPTION: 3}
+    assert _snapd_conf.get('system', [_OPTION]) == {_OPTION: 3}
     ensure_removed('hello-world')  # Base-less; would otherwise block core removal.
     snap.remove('core')
     try:
         # Removal deleted the stored option...
         with pytest.raises(_errors.OptionNotFoundError):
-            _snapd_conf.get('system', _OPTION)
+            _snapd_conf.get('system', [_OPTION])
         # ...while computed configuration remains, so bare get is not empty.
         assert 'system' in _snapd_conf.get('system')
     finally:
         snap.install('core')  # Restore the core snap for other tests.
-        _snapd_conf.unset('system', _OPTION)  # A no-op if the removal already wiped it.
+        _snapd_conf.unset('system', [_OPTION])  # A no-op if the removal already wiped it.

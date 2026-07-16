@@ -30,13 +30,13 @@ _ABSENT_SNAP = 'this-snap-does-not-exist-xyz-abc-123'
 # Test helper and possible future candidate for library public API.
 def _get_one(snap: str, key: str, /) -> Any:
     """Get a single snap configuration key."""
-    config = _snapd_conf.get(snap, key)
+    config = _snapd_conf.get(snap, [key])
     return config[key]
 
 
 def _cleanup(*keys: str) -> None:
     """Unset test keys to avoid contaminating other tests."""
-    _snapd_conf.unset(_SNAP, _KEY, *keys)
+    _snapd_conf.unset(_SNAP, [_KEY, *keys])
 
 
 # ---------------------------------------------------------------------------
@@ -99,10 +99,10 @@ def test_set_null_unsets_key():
     # Setting a key to None (JSON null) unsets it at the top level.
     ensure_installed(_SNAP)
     _snapd_conf.set(_SNAP, {_KEY: 'hello'})
-    assert _snapd_conf.get(_SNAP, _KEY).get(_KEY) == 'hello'
+    assert _snapd_conf.get(_SNAP, [_KEY]).get(_KEY) == 'hello'
     _snapd_conf.set(_SNAP, {_KEY: None})
     with pytest.raises(_errors.OptionNotFoundError):
-        _snapd_conf.get(_SNAP, _KEY)
+        _snapd_conf.get(_SNAP, [_KEY])
 
 
 # ---------------------------------------------------------------------------
@@ -128,7 +128,7 @@ def test_get_mixed_dotted_and_non_dotted_keys():
     # literal dotted string. The two do not merge or collide.
     ensure_installed(_SNAP)
     _snapd_conf.set(_SNAP, {_KEY: {'nested': 'value'}})
-    result = _snapd_conf.get(_SNAP, _KEY, f'{_KEY}.nested')
+    result = _snapd_conf.get(_SNAP, [_KEY, f'{_KEY}.nested'])
     assert result == {_KEY: {'nested': 'value'}, f'{_KEY}.nested': 'value'}
     _cleanup()
 
@@ -136,7 +136,7 @@ def test_get_mixed_dotted_and_non_dotted_keys():
 def test_get_specific_keys_returns_subset():
     ensure_installed(_SNAP)
     _snapd_conf.set(_SNAP, {_KEY: 'alpha', _KEY2: 'beta'})
-    subset = _snapd_conf.get(_SNAP, _KEY)
+    subset = _snapd_conf.get(_SNAP, [_KEY])
     assert _KEY in subset
     assert _KEY2 not in subset
     _cleanup(_KEY2)
@@ -145,7 +145,7 @@ def test_get_specific_keys_returns_subset():
 def test_get_multiple_specific_keys():
     ensure_installed(_SNAP)
     _snapd_conf.set(_SNAP, {_KEY: 'alpha', _KEY2: 'beta'})
-    result = _snapd_conf.get(_SNAP, _KEY, _KEY2)
+    result = _snapd_conf.get(_SNAP, [_KEY, _KEY2])
     assert result[_KEY] == 'alpha'
     assert result[_KEY2] == 'beta'
     _cleanup(_KEY2)
@@ -154,7 +154,7 @@ def test_get_multiple_specific_keys():
 def test_get_option_not_found_raises():
     ensure_installed(_SNAP)
     with pytest.raises(_errors.OptionNotFoundError) as ctx:
-        _snapd_conf.get(_SNAP, 'key-that-should-not-exist')
+        _snapd_conf.get(_SNAP, ['key-that-should-not-exist'])
     assert ctx.value.kind == 'option-not-found'
     assert ctx.value.message
 
@@ -162,7 +162,7 @@ def test_get_option_not_found_raises():
 def test_get_option_not_found_value_contains_snap_and_key():
     ensure_installed(_SNAP)
     with pytest.raises(_errors.OptionNotFoundError) as ctx:
-        _snapd_conf.get(_SNAP, 'key-that-should-not-exist')
+        _snapd_conf.get(_SNAP, ['key-that-should-not-exist'])
     value = str(ctx.value.value)
     assert 'SnapName' in value
     assert 'Key' in value
@@ -174,7 +174,7 @@ def test_get_not_installed_snap_raises_not_found():
     # Config GET for a non-installed snap returns option-not-found (not snap-not-found), so
     # get() probes /v2/snaps/{snap} and raises NotFoundError, consistent with set and unset.
     with pytest.raises(_errors.NotFoundError) as ctx:
-        _snapd_conf.get(_ABSENT_SNAP, 'any-key')
+        _snapd_conf.get(_ABSENT_SNAP, ['any-key'])
     assert ctx.value.kind == 'snap-not-found'
 
 
@@ -205,6 +205,44 @@ def test_get_all_installed_snap_with_no_config_returns_empty_dict():
 
 
 # ---------------------------------------------------------------------------
+# get: keys=[] ("give me nothing") vs keys=None ("give me everything")
+# ---------------------------------------------------------------------------
+
+
+def test_get_empty_keys_returns_empty_dict():
+    # keys=[] is a deliberate "no keys requested" query, distinct from the CLI-following
+    # default of keys=None ("give me everything"). It never reaches the conf endpoint, but
+    # still confirms the snap is installed before returning {}.
+    ensure_installed(_SNAP)
+    _snapd_conf.set(_SNAP, {_KEY: 'value'})
+    assert _snapd_conf.get(_SNAP, []) == {}
+    _cleanup()
+
+
+def test_get_empty_keys_not_installed_snap_raises_not_found():
+    with pytest.raises(_errors.NotFoundError) as ctx:
+        _snapd_conf.get(_ABSENT_SNAP, [])
+    assert ctx.value.kind == 'snap-not-found'
+
+
+def test_get_keys_of_only_empty_strings_returns_full_config():
+    # Undocumented snapd quirk, not a decision this library makes: keys=[''] and
+    # keys=['', ''] are NOT the same as our own keys=[] contract above. keys=[] is caught
+    # by our own `keys == []` check before any network call is made, but a list containing
+    # only empty strings doesn't match that check, so it falls through to being joined into
+    # the 'keys' query parameter -- '' and ',' respectively. snapd's own parsing of that
+    # query string treats both the same as no 'keys' param at all, so the full config comes
+    # back, equivalent to keys=None rather than keys=[].
+    ensure_installed(_SNAP)
+    _snapd_conf.set(_SNAP, {_KEY: 'value'})
+    full_config = _snapd_conf.get(_SNAP)
+    assert full_config != {}
+    assert _snapd_conf.get(_SNAP, ['']) == full_config
+    assert _snapd_conf.get(_SNAP, ['', '']) == full_config
+    _cleanup()
+
+
+# ---------------------------------------------------------------------------
 # unset
 # ---------------------------------------------------------------------------
 
@@ -212,26 +250,34 @@ def test_get_all_installed_snap_with_no_config_returns_empty_dict():
 def test_unset_key():
     ensure_installed(_SNAP)
     _snapd_conf.set(_SNAP, {_KEY: 'hello'})
-    assert _snapd_conf.get(_SNAP, _KEY).get(_KEY) == 'hello'
-    _snapd_conf.unset(_SNAP, _KEY)
+    assert _snapd_conf.get(_SNAP, [_KEY]).get(_KEY) == 'hello'
+    _snapd_conf.unset(_SNAP, [_KEY])
     with pytest.raises(_errors.OptionNotFoundError):
-        _snapd_conf.get(_SNAP, _KEY)
+        _snapd_conf.get(_SNAP, [_KEY])
 
 
 def test_unset_nonexistent_key_no_error():
     # Unsetting a key that doesn't exist should not raise.
     ensure_installed(_SNAP)
-    _snapd_conf.unset(_SNAP, 'key-that-does-not-exist')
+    _snapd_conf.unset(_SNAP, ['key-that-does-not-exist'])
 
 
 def test_unset_multiple_keys():
     ensure_installed(_SNAP)
     _snapd_conf.set(_SNAP, {_KEY: 'val1', _KEY2: 'val2'})
-    _snapd_conf.unset(_SNAP, _KEY, _KEY2)
+    _snapd_conf.unset(_SNAP, [_KEY, _KEY2])
     with pytest.raises(_errors.OptionNotFoundError):
-        _snapd_conf.get(_SNAP, _KEY)
+        _snapd_conf.get(_SNAP, [_KEY])
     with pytest.raises(_errors.OptionNotFoundError):
-        _snapd_conf.get(_SNAP, _KEY2)
+        _snapd_conf.get(_SNAP, [_KEY2])
+
+
+def test_unset_empty_keys_is_noop():
+    ensure_installed(_SNAP)
+    _snapd_conf.set(_SNAP, {_KEY: 'value'})
+    _snapd_conf.unset(_SNAP, [])  # Should not raise, and should not touch existing config.
+    assert _get_one(_SNAP, _KEY) == 'value'
+    _cleanup()
 
 
 # ---------------------------------------------------------------------------
@@ -250,7 +296,7 @@ def test_set_not_installed_snap_raises_snap_not_found(config: dict[str, Any]):
 
 def test_unset_not_installed_snap_raises_snap_not_found():
     with pytest.raises(_errors.NotFoundError) as ctx:
-        _snapd_conf.unset(_ABSENT_SNAP, 'test-key')
+        _snapd_conf.unset(_ABSENT_SNAP, ['test-key'])
     assert ctx.value.kind == 'snap-not-found'
 
 
@@ -263,7 +309,7 @@ def test_set_multiple_keys_at_once():
     ensure_installed(_SNAP)
     values: dict[str, Any] = {_KEY: 'v1', _KEY2: 'v2'}
     _snapd_conf.set(_SNAP, values)
-    result = _snapd_conf.get(_SNAP, _KEY, _KEY2)
+    result = _snapd_conf.get(_SNAP, [_KEY, _KEY2])
     assert result[_KEY] == 'v1'
     assert result[_KEY2] == 'v2'
     _cleanup(_KEY2)
@@ -285,7 +331,7 @@ def test_get_mixed_keys_raises_option_not_found():
     ensure_installed(_SNAP)
     _snapd_conf.set(_SNAP, {_KEY: 'exists'})
     with pytest.raises(_errors.OptionNotFoundError) as ctx:
-        _snapd_conf.get(_SNAP, _KEY, 'key-that-does-not-exist-xyz')
+        _snapd_conf.get(_SNAP, [_KEY, 'key-that-does-not-exist-xyz'])
     assert ctx.value.kind == 'option-not-found'
     _cleanup()
 
@@ -294,7 +340,7 @@ def test_unset_dotted_path_no_error():
     # unset() accepts dotted-path keys and the API handles them without error.
     ensure_installed(_SNAP)
     _snapd_conf.set(_SNAP, {_KEY: {'nested': 'value'}})
-    _snapd_conf.unset(_SNAP, f'{_KEY}.nested')  # Should not raise.
+    _snapd_conf.unset(_SNAP, [f'{_KEY}.nested'])  # Should not raise.
     _cleanup()
 
 
@@ -314,7 +360,7 @@ def test_set_no_configure_hook_raises_change_error():
 def test_unset_no_configure_hook_raises_change_error():
     ensure_installed('hello-world')
     with pytest.raises(_errors.ChangeError):
-        _snapd_conf.unset('hello-world', 'any-key')
+        _snapd_conf.unset('hello-world', ['any-key'])
 
 
 def test_set_empty_dict_no_configure_hook_is_noop():
@@ -348,13 +394,13 @@ def test_set_rejected_by_configure_hook_raises_change_error(configure_snap: None
     assert 'bad-key is not allowed' in ctx.value.message
     # The rejected change is rolled back: nothing was stored.
     with pytest.raises(_errors.OptionNotFoundError):
-        _snapd_conf.get('test-configure-snap', 'bad-key')
+        _snapd_conf.get('test-configure-snap', ['bad-key'])
 
 
 def test_set_accepted_by_configure_hook(configure_snap: None):
     _snapd_conf.set('test-configure-snap', {'good-key': 'hello'})
-    assert _snapd_conf.get('test-configure-snap', 'good-key') == {'good-key': 'hello'}
-    _snapd_conf.unset('test-configure-snap', 'good-key')
+    assert _snapd_conf.get('test-configure-snap', ['good-key']) == {'good-key': 'hello'}
+    _snapd_conf.unset('test-configure-snap', ['good-key'])
 
 
 def test_rejected_set_rolls_back_entire_transaction(configure_snap: None):
@@ -363,5 +409,5 @@ def test_rejected_set_rolls_back_entire_transaction(configure_snap: None):
     _snapd_conf.set('test-configure-snap', {'good-key': 'before'})
     with pytest.raises(_errors.ChangeError):
         _snapd_conf.set('test-configure-snap', {'good-key': 'after', 'bad-key': 'x'})
-    assert _snapd_conf.get('test-configure-snap', 'good-key') == {'good-key': 'before'}
-    _snapd_conf.unset('test-configure-snap', 'good-key')
+    assert _snapd_conf.get('test-configure-snap', ['good-key']) == {'good-key': 'before'}
+    _snapd_conf.unset('test-configure-snap', ['good-key'])
