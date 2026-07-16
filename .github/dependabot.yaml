@@ -35,3 +35,5 @@ updates:
     open-pull-requests-limit: 0  # Security updates only
     labels:
       - "dependencies"
+    cooldown:
+      default-days: 7
