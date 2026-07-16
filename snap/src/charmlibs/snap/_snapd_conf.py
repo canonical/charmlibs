@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 # /v2/snaps/{snap}/conf
 
 
-# Getting one config value looks like get(s, k)[k]. In future we could add a get_one(s) helper.
+# Getting one config value looks like get(s, [k])[k]. In future we could add a get_one(s) helper.
 # Get with keys=None returns the entire config, following the CLI (get_all is unnecessary).
 def get(snap: str, keys: Iterable[str] | None = None) -> dict[str, Any]:
     """Get snap configuration.
