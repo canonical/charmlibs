@@ -265,6 +265,12 @@ def test_unset_nonexistent_key_no_error():
     _snapd_conf.unset(_SNAP, ['key-that-does-not-exist'])
 
 
+def test_unset_nonexistent_key_deeply_dotted_no_error():
+    # Unsetting a dotted-path key that doesn't exist should not raise.
+    ensure_installed(_SNAP, channel='latest/edge')
+    _snapd_conf.unset(_SNAP, ['key-that-does-not-exist.nested.deep'])
+
+
 def test_unset_multiple_keys():
     ensure_installed(_SNAP, channel='latest/edge')
     _snapd_conf.set(_SNAP, {_KEY: 'val1', _KEY2: 'val2'})
