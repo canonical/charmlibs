@@ -631,9 +631,9 @@
   {
     "name": "openfga",
     "version": "1",
-    "lib": "charms.openfga_k8s.openfga",
-    "lib_url": "https://charmhub.io/openfga-k8s/libraries/openfga",
-    "lib_docs_url": "",
+    "lib": "charmlibs.interfaces.openfga",
+    "lib_url": "https://pypi.org/project/charmlibs-interfaces-openfga",
+    "lib_docs_url": "https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/openfga",
     "docs_url": "https://canonical.com/juju/docs/charmlibs/reference/interfaces/openfga/",
     "summary": "Set up and connect to an OpenFGA store.",
     "description": "The `openfga` interface supports setting up an OpenFGA store and connecting to it.\nThe requirer specifies the store name, while the provider creates the store and shares the data needed to connect.",
