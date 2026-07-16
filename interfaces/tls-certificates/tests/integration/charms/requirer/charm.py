@@ -58,6 +58,24 @@ class DummyTLSCertificatesRequirerCharm(CharmBase):
             self.on.get_unit_certificate_action, self._on_get_unit_certificate_action
         )
         self.framework.observe(self.on.renew_certificate_action, self._on_renew_certificate_action)
+        self.framework.observe(
+            self.on.get_provider_capabilities_action, self._on_get_provider_capabilities_action
+        )
+
+    def _on_get_provider_capabilities_action(self, event: ActionEvent) -> None:
+        capabilities = self.certificates.get_provider_capabilities()
+        if capabilities is None:
+            event.set_results({"available": "false"})
+            return
+        event.set_results({
+            "available": "true",
+            "supports-ip-sans": str(capabilities.supports_ip_sans),
+            "supports-wildcard-dns": str(capabilities.supports_wildcard_dns),
+            "supports-subdomain": str(capabilities.supports_subdomain),
+            "supports-ca-certificates": str(capabilities.supports_ca_certificates),
+            "allowed-domains": str(capabilities.allowed_domains),
+            "provider-type": str(capabilities.provider_type),
+        })
 
     def _on_renew_certificate_action(self, event: ActionEvent) -> None:
         if self._certificate_request is None:

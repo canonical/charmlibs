@@ -83,8 +83,7 @@
 /interfaces/filesystem_info/ruff.toml @canonical/hpc-team
 
 # /interfaces/forward_auth/
-/interfaces/forward_auth/interface/ @canonical/identity
-/interfaces/forward_auth/ruff.toml @canonical/identity
+/interfaces/forward_auth @canonical/identity
 
 # /interfaces/gateway_metadata/
 /interfaces/gateway_metadata @canonical/service-mesh

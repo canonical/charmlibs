@@ -1,3 +1,11 @@
+# 1.10.0 - 13 July 2026
+
+Allow providers to advertise their certificate server's capabilities (`ProviderCapabilities`) in relation data, and let requirers read them via `get_provider_capabilities()` or by passing a callable `certificate_requests` that shapes requests from the advertised capabilities. Additive and backwards compatible.
+
+# 1.9.0 - 6 July 2026
+
+Store the `Mode.APP` private key under a new secret label and automatically migrate keys created by older versions (including pre-existing unit-owned keys) to an app-owned secret. The key material is preserved, so certificates are not regenerated on upgrade.
+
 # 1.8.3 - 5 June 2026
 
 Add a safety net to ensure expiring certificates are renewed even if the charm fails to trigger the renewal process.
