@@ -46,12 +46,13 @@ def core_snap(request: pytest.FixtureRequest) -> Iterator[str]:
     flipped at most once per state, not once per test.
 
     In the 'absent' state we remove the core snap after removing any snap that has it as a base
-    (a base-less snap like hello-world, installed by other modules, otherwise blocks removal).
-    A failed removal is deliberately left to error loudly rather than skip: if a base-less snap
-    we don't manage is installed, that's worth surfacing so we can handle it explicitly.
+    (a base-less snap like hello-world or test-snapd-with-configure, installed by other modules,
+    otherwise blocks removal). A failed removal is deliberately left to error loudly rather than
+    skip: if a base-less snap we don't manage is installed, that's worth surfacing so we can
+    handle it explicitly.
     """
     if request.param == 'absent':
-        ensure_removed('hello-world')
+        ensure_removed('hello-world', 'test-snapd-with-configure')
         snap.remove('core')  # Errors loudly if an unmanaged snap still depends on core.
         yield request.param
         snap.install('core')
