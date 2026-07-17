@@ -23,7 +23,7 @@ Also manage:
 
 - Automatic refreshes with :func:`hold` and :func:`unhold`.
 - Services with :func:`start`, :func:`stop`, and :func:`restart`.
-- Config with :func:`config_get`, :func:`config_set`, and :func:`config_unset`.
+- Config with :func:`get`, :func:`set`, and :func:`unset`.
 - Connections between snaps with :func:`connect` and :func:`disconnect`.
 - Application aliases with :func:`alias` and :func:`unalias`.
 
@@ -68,6 +68,11 @@ from ._snapd_apps import (
     start,
     stop,
 )
+from ._snapd_conf import (
+    get,
+    set,  # noqa: A004 (shadowing a Python builtin)
+    unset,
+)
 from ._snapd_logs import (
     LogEntry,
     logs,
@@ -101,6 +106,7 @@ __all__ = [
     'TimeoutError',
     'ensure',
     'ensure_revision',
+    'get',
     'hold',
     'info',
     'install',
@@ -108,7 +114,9 @@ __all__ = [
     'refresh',
     'remove',
     'restart',
+    'set',
     'start',
     'stop',
     'unhold',
+    'unset',
 ]
