@@ -1107,7 +1107,7 @@ interfaces:
   tags:
   - identity-auth
 - name: charms.oauth2_proxy_k8s.forward_auth
-  status: ''
+  status: legacy
   url: https://charmhub.io/oauth2-proxy-k8s/libraries/forward_auth
   docs: ''
   src: https://github.com/canonical/oauth2-proxy-k8s-operator
@@ -1115,7 +1115,19 @@ interfaces:
   rel_name: forward_auth
   rel_url_charmhub: https://charmhub.io/integrations/forward_auth
   rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/forward_auth/v0
-  description: ''
+  description: 'Interface library for providing API Gateways with Identity and Access Proxy information. Superseded by charmlibs-interfaces-forward-auth.'
+  tags:
+  - identity-auth
+- name: charmlibs.interfaces.forward_auth
+  status: recommended
+  url: https://pypi.org/project/charmlibs-interfaces-forward-auth
+  docs: https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/forward-auth
+  src: https://github.com/canonical/oauth2-proxy-k8s-operator
+  kind: PyPI
+  rel_name: forward_auth
+  rel_url_charmhub: https://charmhub.io/integrations/forward_auth
+  rel_url_schema: ''
+  description: 'Interface library for providing API Gateways with Identity and Access Proxy information.'
   tags:
   - identity-auth
 - name: charms.glauth_utils.glauth_auxiliary
@@ -1424,8 +1436,20 @@ interfaces:
   description: ''
   tags:
   - identity-auth
+- name: charmlibs.interfaces.oauth
+  status: recommended
+  url: https://pypi.org/project/charmlibs-interfaces-oauth
+  docs: https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/oauth
+  src: https://github.com/canonical/charmlibs/tree/main/interfaces/oauth
+  kind: PyPI
+  rel_name: oauth
+  rel_url_charmhub: https://charmhub.io/integrations/oauth
+  rel_url_schema: https://github.com/canonical/charmlibs/tree/main/interfaces/oauth/interface/v0
+  description: 'Register OAuth2/OIDC clients with an OIDC Provider.'
+  tags:
+  - identity-auth
 - name: charms.hydra.oauth
-  status: ''
+  status: legacy
   url: https://charmhub.io/hydra/libraries/oauth
   docs: ''
   src: https://github.com/canonical/hydra-operator
@@ -1433,7 +1457,7 @@ interfaces:
   rel_name: oauth
   rel_url_charmhub: https://charmhub.io/integrations/oauth
   rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/oauth/v0
-  description: ''
+  description: 'Register OAuth2/OIDC clients with an OIDC Provider. Superseded by charmlibs-interfaces-oauth.'
   tags:
   - identity-auth
 - name: charms.s3proxy_k8s.object_storage
@@ -1449,7 +1473,7 @@ interfaces:
   tags:
   - data
 - name: charms.openfga_k8s.openfga
-  status: ''
+  status: legacy
   url: https://charmhub.io/openfga-k8s/libraries/openfga
   docs: ''
   src: https://github.com/canonical/openfga-operator
@@ -1457,7 +1481,19 @@ interfaces:
   rel_name: openfga
   rel_url_charmhub: https://charmhub.io/integrations/openfga
   rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/openfga/v1
-  description: ''
+  description: 'Library for requesting OpenFGA authorization model stores to be created. Superseded by charmlibs-interfaces-openfga.'
+  tags:
+  - identity-auth
+- name: charmlibs.interfaces.openfga
+  status: recommended
+  url: https://pypi.org/project/charmlibs-interfaces-openfga
+  docs: https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/openfga
+  src: https://github.com/canonical/openfga-operator
+  kind: PyPI
+  rel_name: openfga
+  rel_url_charmhub: https://charmhub.io/integrations/openfga
+  rel_url_schema: https://github.com/canonical/charmlibs/tree/main/interfaces/openfga/interface/v1
+  description: 'Library for requesting OpenFGA authorization model stores to be created.'
   tags:
   - identity-auth
 - name: ops-lib-mysql
