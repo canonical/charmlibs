@@ -14,6 +14,7 @@
 #
 # Learn more about testing at: https://juju.is/docs/sdk/testing
 
+import logging
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -501,7 +502,16 @@ def test_is_waiting_returns_false_when_no_operations_in_unit(
 
 def test_sync_lock_request_failed_critical_path_using_etcd_lock(
     ctx: Context[RollingOpsCharm],
+    caplog: pytest.LogCaptureFixture,
 ):
+    # The `failed-sync-restart` action deliberately raises a ValueError inside
+    # the lock-protected block. RollingOpsManager.acquire_sync_lock then logs
+    # the traceback via `logger.exception()`, which is correct production
+    # behaviour but, in CI, the captured traceback's `File "…", line N`
+    # frame gets turned into a GitHub Actions error annotation (see #520).
+    # Silence the manager's logger for the duration of this test.
+    caplog.set_level(logging.CRITICAL, logger='charmlibs.rollingops._rollingops_manager')
+
     peer = PeerRelation(endpoint='restart')
     etcd_relation = Relation(
         endpoint='etcd',
@@ -574,7 +584,13 @@ def test_sync_lock_fallbacks_to_peer_backend_on_etcd_error(
 
 def test_sync_lock_peer_backend_and_failure_on_critical_path_is_propagated(
     ctx: Context[RollingOpsCharm],
+    caplog: pytest.LogCaptureFixture,
 ):
+    # See note on test_sync_lock_request_failed_critical_path_using_etcd_lock
+    # — the `failed-sync-restart` action's ValueError is logged by the
+    # manager and would otherwise surface as a spurious CI annotation (#520).
+    caplog.set_level(logging.CRITICAL, logger='charmlibs.rollingops._rollingops_manager')
+
     peer = PeerRelation(endpoint='restart')
     etcd_relation = Relation(
         endpoint='etcd',
