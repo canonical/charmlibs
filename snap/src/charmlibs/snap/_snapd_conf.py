@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Snap operations implemented as direct calls to the snapd REST API."""
+"""Snap config operations implemented as direct calls to the snapd REST API."""
 
 from __future__ import annotations
 
@@ -77,27 +77,27 @@ def get(snap: str, keys: Iterable[str] | None = None) -> dict[str, Any]:
         raise TypeError('keys must be an iterable of strings, or None (not a string)')
     if keys is not None:
         keys = list(keys)
-    if keys == []:
-        # NOTE: snapd returns the full configuration if no keys are specified.
-        # We pass this behaviour through for keys=None, but for keys=[] we return
-        # an empty dict, since the caller explicitly requested no keys.
-        _raise_if_snap_not_installed_or_system(snap)
-        return {}
-    params = {'keys': ','.join(keys)} if keys is not None else None
+        if not keys:
+            # NOTE: snapd returns the full configuration if no keys are specified.
+            # We pass this behaviour through for keys=None, but for keys=[] we return
+            # an empty dict, since the caller explicitly requested no keys.
+            _raise_if_snap_not_installed_or_system(snap)
+            return {}
+        params = {'keys': ','.join(keys)}
+    else:
+        params = None
     try:
         config = _client.get(f'/v2/snaps/{snap}/conf', query=params)
     except _errors.OptionNotFoundError:
         # NOTE: snapd reports option-not-found both for a missing key and for a missing snap.
         # The CLI returns 'error: snap "foo" has no "bar" configuration' in both cases.
         # For symmetry with PUT (set/unset), we raise NotFoundError here for a missing snap.
-        # Following PUT, NotFoundError isn't raised for system/core (installed or not).
         _raise_if_snap_not_installed_or_system(snap)
         raise
     if keys is None and not config:
         # NOTE: snapd returns {} for an installed snap with no config and for a missing snap.
         # The CLI returns 'error: snap "foo" has no configuration' for a missing snap.
         # For symmetry with PUT (set/unset), we raise NotFoundError here for a missing snap.
-        # Following PUT, NotFoundError isn't raised for system/core (installed or not).
         _raise_if_snap_not_installed_or_system(snap)
     assert isinstance(config, dict)
     return typing.cast('dict[str, Any]', config)
@@ -110,8 +110,9 @@ def _raise_if_snap_not_installed_or_system(snap: str) -> None:
     # /v2/snaps/system always 404s (it's a hardcoded alias, not a real snap).
     # /v2/snaps/core 404s when the core snap is absent (typical when no other snaps depend on it).
     # For the purposes of this module, we can skip snap installed checks for both names.
-    if snap not in ('system', 'core'):
-        _client.get(f'/v2/snaps/{snap}')
+    if snap in ('system', 'core'):
+        return
+    _client.get(f'/v2/snaps/{snap}')  # Raise NotFoundError if the snap isn't installed.
 
 
 def unset(snap: str, keys: Iterable[str]) -> None:
