@@ -20,7 +20,6 @@ from ops import Object, Relation
 from ops.charm import (
     CharmBase,
     RelationCreatedEvent,
-    RelationDepartedEvent,
 )
 
 from charmlibs import pathops
@@ -130,9 +129,6 @@ class _EtcdRollingOpsBackend(Object):  # pyright: ignore[reportUnusedClass]
         )
 
         self.framework.observe(
-            charm.on[self.peer_relation_name].relation_departed, self._on_peer_relation_departed
-        )
-        self.framework.observe(
             charm.on[self.etcd_relation_name].relation_created, self._on_etcd_relation_created
         )
 
@@ -213,19 +209,6 @@ class _EtcdRollingOpsBackend(Object):  # pyright: ignore[reportUnusedClass]
         """
         if not self.etcdctl.is_etcdctl_installed():
             logger.error('%s is not installed.', ETCDCTL_CMD)
-
-    def _on_peer_relation_departed(self, event: RelationDepartedEvent) -> None:
-        """Handle removal of a unit from the peer relation.
-
-        If the current unit is departing, the etcd worker process is stopped
-        to ensure a clean shutdown and avoid leaving a stale worker running.
-
-        Args:
-            event: The peer relation departed event.
-        """
-        unit = event.departing_unit
-        if unit == self.model.unit:
-            self.worker.stop()
 
     def request_async_lock(
         self,

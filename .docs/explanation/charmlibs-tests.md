@@ -49,7 +49,7 @@ Before running `pytest`, `just functional <LIBRARY>` will first source `<LIBRARY
 After the tests complete, regardless of whether they passed or failed, `<LIBRARY>/tests/functional/teardown.sh` is sourced.
 Finally, the recipe exits with the return code of the `pytest` run.
 
-> Read more: {ref}`how-to-customize-functional-tests`
+Read more: {ref}`how-to-customize-functional-tests`
 
 (charmlibs-integration-tests)=
 ## Integration tests
@@ -68,4 +68,4 @@ These will run the tests under `<LIBRARY>/tests/integration`, selecting either a
 You'll need to have a Juju controller set up locally to run your integration tests.
 In CI, Juju is set up for you by [concierge](https://github.com/canonical/concierge).
 
-> Read more: {ref}`how-to-customize-integration-tests`
+Read more: {ref}`how-to-customize-integration-tests`

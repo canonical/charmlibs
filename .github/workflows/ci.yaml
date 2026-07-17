@@ -27,7 +27,7 @@ jobs:
       interfaces: ${{ steps.interfaces.outputs.result }}
       publish: ${{ steps.publish.outputs.result }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -39,7 +39,7 @@ jobs:
         run: |
           set -xueo pipefail
           echo "result=$(git merge-base origin/$BASE_REF HEAD)" >> "$GITHUB_OUTPUT"
-      - uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78  # v7.6.0
       - name: Collect changed packages
         id: packages
         env:
@@ -116,22 +116,34 @@ jobs:
   interfaces-json-up-to-date:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78  # v7.6.0
       - name: Was `just interfaces-json` run if interfaces were updated?
         run: |
           uvx --from rust-just just interfaces-json
           git diff --exit-code
 
+  meta:  # tests for the repository's own CI tooling and helper scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78  # v7.6.0
+      - name: Run unit tests for the repository tooling scripts
+        run: uvx --from rust-just just _scripts-unit
+      - name: Run static analysis for the repository tooling scripts
+        run: uvx --from rust-just just _scripts-static
+
   template-and-example-in-sync:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78  # v7.6.0
       - run: |
           uvx --from rust-just just init --no-input
           rm -rf .example
@@ -145,13 +157,13 @@ jobs:
   template-and-interface-example-in-sync:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78  # v7.6.0
       - working-directory: interfaces
         run: |
-          uvx --from rust-just just interface init --no-input project_slug=example-interface
+          uvx --from rust-just just init --interface --no-input project_slug=example-interface
           rm -rf .example
           mv example-interface .example
           # check if tracked files changed, or any new files were added
@@ -169,7 +181,7 @@ jobs:
       matrix:
         package: ${{ fromJson(needs.init.outputs.publish) }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -204,11 +216,11 @@ jobs:
     if: ${{ needs.init.outputs.packages != '[]' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
           fetch-depth: 0
           persist-credentials: false
-      - uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78  # v7.6.0
       - name: Ensure testing versions matches package versions
         run: |
           set -xueo pipefail
@@ -224,14 +236,14 @@ jobs:
     permissions:
       security-events: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78  # v7.6.0
       - run: uvx zizmor@v1.11.0 --format=sarif . > results.sarif
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - uses: github/codeql-action/upload-sarif@v4
+      - uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e  # v4.36.2
         with:
           sarif_file: results.sarif
           category: zizmor
@@ -239,9 +251,9 @@ jobs:
   local-docs-build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
           fetch-depth: 0  # We need the git history for 'Last updated on ...'
           persist-credentials: false
-      - uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78  # v7.6.0
       - run: uvx --from rust-just just docs html

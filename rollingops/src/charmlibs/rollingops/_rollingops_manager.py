@@ -18,7 +18,7 @@ import logging
 from contextlib import contextmanager
 from typing import Any
 
-from ops import CharmBase, Object, Relation, RelationBrokenEvent
+from ops import CharmBase, Object, Relation, Unit
 from ops.framework import EventBase
 
 from charmlibs import pathops
@@ -40,7 +40,7 @@ from charmlibs.rollingops._common._models import (
 from charmlibs.rollingops._common._utils import ETCD_FAILED_HOOK_NAME, LOCK_GRANTED_HOOK_NAME
 from charmlibs.rollingops._etcd._backend import _EtcdRollingOpsBackend
 from charmlibs.rollingops._peer._backend import _PeerRollingOpsBackend
-from charmlibs.rollingops._peer._models import PeerUnitOperations
+from charmlibs.rollingops._peer._models import PeerUnitOperations, iter_peer_units
 
 logger = logging.getLogger(__name__)
 
@@ -78,8 +78,12 @@ class RollingOpsManager(Object):
         sync_lock_targets: Optional mapping of sync lock backend
             identifiers to backend implementations used when acquiring
             synchronous locks through the peer backend.
-        base_dir: base directory where all files related to rollingops will be written.
-            Written to ``/var/lib/rollingops`` by default.
+        base_dir: Base directory used by rollingops to store runtime files, including
+            etcd connection information and logs from background processes.
+            Defaults to ``/var/lib/rollingops``, which will be created if missing.
+            The process running rollingops must have permission to create and write to
+            this directory. For Kubernetes charms, this path must exist within the
+            charm container filesystem.
     """
 
     def __init__(
@@ -164,10 +168,7 @@ class RollingOpsManager(Object):
                 callback_targets=callback_targets,
                 base_dir=base_dir,
             )
-            self.framework.observe(
-                charm.on[etcd_relation_name].relation_broken,
-                self._on_etcd_relation_broken,
-            )
+            self._etcd_backend.shared_certificates.create_and_share_certificate()
 
         self.framework.observe(charm.on.rollingops_lock_granted, self._on_rollingops_lock_granted)
         self.framework.observe(charm.on.rollingops_etcd_failed, self._on_rollingops_etcd_failed)
@@ -187,14 +188,6 @@ class RollingOpsManager(Object):
         recovery decisions.
         """
         return _UnitBackendState(self.model, self.peer_relation_name, self.model.unit)
-
-    def _on_etcd_relation_broken(self, event: RelationBrokenEvent) -> None:
-        """Handle the etcd relation being fully removed.
-
-        This method stops the etcd worker process since the required
-        relation is no longer available.
-        """
-        self._fallback_current_unit_to_peer()
 
     def _select_processing_backend(self) -> ProcessingBackend:
         """Choose which backend should handle new operations for this unit.
@@ -382,6 +375,14 @@ class RollingOpsManager(Object):
             self._peer_backend.ensure_processing()
             logger.info('Fell back to peer backend.')
 
+    def _get_peer_unit(self, unit_name: str) -> Unit:
+        """Return the peer unit having the provided name."""
+        for peer_unit in iter_peer_units(self.model, self.peer_relation_name):
+            if peer_unit.name == unit_name:
+                return peer_unit
+
+        raise ValueError('unit_name provided does not belong to the peer relation.')
+
     def _get_sync_lock_backend(self, backend_id: str) -> SyncLockBackend:
         """Instantiate the configured peer sync lock backend.
 
@@ -430,13 +431,13 @@ class RollingOpsManager(Object):
             TimeoutError: If lock acquisition through etcd or the peer backend
                 times out.
             RollingOpsSyncLockError: if there is an error when acquiring the lock.
+            Any exception raised within the protected block is propagated, and the
+            lock is released before propagation.
         """
         if self._etcd_backend is not None and self._etcd_backend.is_available():
             logger.info('Acquiring sync lock on etcd.')
             try:
                 self._etcd_backend.acquire_sync_lock(timeout)
-                yield
-                return
             except TimeoutError:
                 raise
             except Exception as e:
@@ -445,12 +446,20 @@ class RollingOpsManager(Object):
                     'Failed to request etcd sync lock; falling back to peer: %s',
                     e,
                 )
-            finally:
+            else:
                 try:
-                    self._etcd_backend.release_sync_lock()
-                    logger.info('etcd lock released.')
+                    # Separate lock acquisition errors from errors raised while holding the lock.
+                    yield
                 except Exception as e:
-                    logger.exception('Failed to release sync lock: %s', e)
+                    logger.exception('Error while holding etcd sync lock: %s', e)
+                    raise
+                finally:
+                    try:
+                        self._etcd_backend.release_sync_lock()
+                        logger.info('etcd lock released.')
+                    except Exception as e:
+                        logger.exception('Failed to release sync lock: %s', e)
+                return
 
         backend = self._get_sync_lock_backend(backend_id)
         logger.info('Acquiring sync lock backend %s.', backend_id)
@@ -463,6 +472,9 @@ class RollingOpsManager(Object):
 
         try:
             yield
+        except Exception as e:
+            logger.exception('Error while holding sync lock backend %s: %s', backend_id, e)
+            raise
         finally:
             try:
                 backend.release()
@@ -507,28 +519,51 @@ class RollingOpsManager(Object):
             processing_backend=self._backend_state.backend,
         )
 
-    def is_waiting_callback(self, callback_id: str) -> bool:
-        """Return whether the current unit has a pending operation matching callback."""
+    def is_waiting_callback(self, callback_id: str, unit_name: str | None = None) -> bool:
+        """Return whether the desired unit has a pending operation matching callback.
+
+        Args:
+            callback_id: callback ID to search for in the unit list of operations.
+            unit_name: name of the unit to search for specific callback ID operations.
+                If not specified, defaults to this unit.
+
+        Raises:
+            ValueError: If the unit name is not found within the peer relation units.
+        """
         if self._peer_relation is None:
             return False
+
+        if unit_name is None:
+            unit_name = self.model.unit.name
 
         operations = PeerUnitOperations(
             self.model,
             self.peer_relation_name,
-            self.model.unit,
+            self._get_peer_unit(unit_name),
         ).queue.operations
 
         return any(op.callback_id == callback_id for op in operations)
 
-    def is_waiting(self) -> bool:
-        """Return whether the current unit has a pending operations."""
+    def is_waiting(self, unit_name: str | None = None) -> bool:
+        """Return whether the desired unit has pending operations.
+
+        Args:
+            unit_name: name of the unit to search for operations.
+                If not specified, defaults to this unit.
+
+        Raises:
+            ValueError: If the unit name is not found within the peer relation units.
+        """
         if self._peer_relation is None:
             return False
+
+        if unit_name is None:
+            unit_name = self.model.unit.name
 
         operations = PeerUnitOperations(
             self.model,
             self.peer_relation_name,
-            self.model.unit,
+            self._get_peer_unit(unit_name),
         ).queue.operations
 
         return bool(operations)

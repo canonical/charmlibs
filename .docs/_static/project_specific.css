@@ -1,0 +1,78 @@
+/**
+ * Increase the width of the right hand table of contents.
+ *
+ * The default width is 15em.
+ */
+.toc-drawer {
+  width: 16em;
+}
+
+/**
+ * Show emoji-tooltip as floating text when hovering over emoji-div.
+ *
+ * These classes are used in `non-relation-libs-table.rst`.
+ */
+.emoji-div {
+  position: relative;
+  display: inline-block;
+}
+.emoji-tooltip {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  background-color: #EBEBEB;
+  color: #000000;
+  padding: 5px;
+  border-radius: 5px;
+  white-space: nowrap;
+}
+.emoji-div:hover .emoji-tooltip {
+  display: block;
+  z-index: 9999;
+}
+
+/**
+ * Show tag-tooltip as floating text when hovering over tag-div.
+ */
+.tag-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.5em;
+}
+.tag-div {
+  position: relative;
+  display: inline-block;
+  cursor: pointer;
+}
+.tag-div:visited,
+.tag-div:visited:hover {
+  color: var(--color-link);
+}
+.tag-tooltip {
+  display: none;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background-color: #EBEBEB;
+  color: #000000;
+  padding: 5px;
+  border-radius: 5px;
+  width: max-content;
+  max-width: 20em;
+}
+.tag-div:hover .tag-tooltip {
+  display: block;
+  z-index: 9999;
+}
+
+/**
+ * Style interface names as subtle chips.
+ */
+td .chip {
+  background-color: #F2F1F0;
+  border: 1px solid #C6C1BB;
+  border-radius: 2px;
+  padding: 0.3em 0.6em;
+  white-space: nowrap;
+}

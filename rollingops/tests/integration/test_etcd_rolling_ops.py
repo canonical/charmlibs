@@ -205,6 +205,7 @@ def test_retry_hold_operation_two_units_single_app(juju: jubilant.Juju, app_name
     unit_b = units[3]
 
     juju.run(unit_a, 'deferred-restart', {'delay': 15, 'max-retry': 2}, wait=TIMEOUT)
+    time.sleep(2)
     juju.run(unit_b, 'restart', {'delay': 2}, wait=TIMEOUT)
 
     juju.wait(
@@ -253,9 +254,8 @@ def test_retry_release_two_units_single_app(juju: jubilant.Juju, app_name: str):
     juju.run(unit_a, 'failed-restart', {'delay': 10, 'max-retry': 2}, wait=TIMEOUT)
     juju.run(unit_b, 'failed-restart', {'delay': 15, 'max-retry': 2}, wait=TIMEOUT)
 
-    time.sleep(
-        60 * 3
-    )  # wait for operation execution. TODO: in charm use lock state to clear status.
+    # TODO: in charm use lock state to clear status.
+    time.sleep(60 * 3)
 
     all_events: list[dict[str, str]] = []
     all_events.extend(get_unit_events(juju, unit_a))

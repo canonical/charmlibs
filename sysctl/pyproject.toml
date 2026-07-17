@@ -6,9 +6,9 @@ requires-python = ">=3.10"
 authors = [
     {name="The Charm Tech team at Canonical"},
 ]
+license = "Apache-2.0"
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: Apache Software License",
     "Intended Audience :: Developers",
     "Operating System :: POSIX :: Linux",
     "Development Status :: 5 - Production/Stable",
@@ -32,8 +32,10 @@ integration = [  # installed for `just integration sysctl`
 ]
 
 [project.urls]
-"Repository" = "https://github.com/canonical/charmlibs"
+"Documentation" = "https://canonical.com/juju/docs/charmlibs/reference/charmlibs/sysctl/"
+"Repository" = "https://github.com/canonical/charmlibs/tree/main/sysctl"
 "Issues" = "https://github.com/canonical/charmlibs/issues"
+"Changelog" = "https://github.com/canonical/charmlibs/blob/main/sysctl/CHANGELOG.md"
 
 [build-system]
 requires = ["hatchling"]

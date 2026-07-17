@@ -1,10 +1,12 @@
 import datetime
+import os
 import pathlib
 import sys
+import textwrap
 
 # local extensions
 sys.path.insert(0, str(pathlib.Path(__file__).parent / 'extensions'))
-local_extensions = ['generate_tables', 'interface_docs', 'package_docs']
+local_extensions = ['generate_tables', 'interface_docs', 'package_docs', 'diataxis_docs_fallback']
 
 # So that sphinx.ext.autodoc can find charmlibs code
 root = pathlib.Path(__file__).parent.parent
@@ -36,12 +38,12 @@ sys.path[0:0] = [
 # Project name
 project = "Charmlibs"
 author = "Canonical Ltd."
-slug = 'charmlibs'  # https://meta.discourse.org/t/what-is-category-slug/87897
+slug = 'juju/docs/charmlibs'  # Set to the path after https://canonical.com/
 html_title = f"{project} documentation"  # sidebar documentation title
 copyright = f"{datetime.date.today().year} CC-BY-SA, {author}"  # shown at the bottom of the page
 
 # Documentation website URL
-ogp_site_url = "https://documentation.ubuntu.com/charmlibs/"
+ogp_site_url = "https://canonical.com/juju/docs/charmlibs/"
 # Preview name of the documentation website
 ogp_site_name = project
 # Preview image URL
@@ -60,14 +62,22 @@ html_context = {
     "repo_folder": "/.docs/",
     "display_contributors": False,
     'github_issues': 'enabled',  # Required for feedback button
+    # Passes the top-level 'author' value to the theme
+    "author": author,
+    # Documentation license information
+    "license": {
+        "name": "CC-BY-SA 4.0",
+        "url": "https://creativecommons.org/licenses/by-sa/4.0/",
+    },
 }
 # Template and asset locations
-html_static_path = [".sphinx/_static"]
-templates_path = [".sphinx/_templates"]
+html_static_path = ["_static"]
+templates_path = ["_templates"]
 
 # Sitemap configuration: https://sphinx-sitemap.readthedocs.io/
-html_baseurl = 'https://documentation.ubuntu.com/charmlibs/'
+html_baseurl = 'https://canonical.com/juju/docs/charmlibs/'
 sitemap_url_scheme = '{link}'  # URL scheme. Add language and version scheme elements.
+sitemap_filename = 'doc-sitemap.xml'
 sitemap_show_lastmod = True  # Include `lastmod` dates in the sitemap:
 sitemap_excludes = [  # Exclude generated pages from the sitemap:
     '404/',
@@ -91,6 +101,24 @@ sitemap_excludes = [  # Exclude generated pages from the sitemap:
 #       the sphinx_reredirects extension will be disabled.
 
 redirects = {}
+
+############################
+# sphinx-llm configuration #
+############################
+
+# This description is included in llms.txt to provide some initial context for the
+# documentation.
+llms_txt_description = textwrap.dedent(
+    """\
+    This is the documentation for charmlibs, the home of Canonical's charm libraries:
+    reusable Python packages for Juju charms, published on PyPI from the charmlibs
+    monorepo.
+    """
+)
+
+# The base URL for references built by sphinx-markdown-builder.
+if os.environ.get("READTHEDOCS"):
+    markdown_http_base = html_baseurl
 
 ###########################
 # Link checker exceptions #
@@ -116,21 +144,24 @@ linkcheck_retries = 3
 ########################
 
 # NOTE: The canonical_sphinx extension is required for the starter pack.
-#       It automatically enables the following extensions:
-#       - custom-rst-roles
-#       - myst_parser
-#       - notfound.extension
-#       - related-links
-#       - sphinx_copybutton
-#       - sphinx_design
-#       - sphinx_reredirects
-#       - sphinx_tabs.tabs
-#       - sphinxcontrib.jquery
-#       - sphinxext.opengraph
-#       - terminal-output
-#       - youtube-links
+#       Since Sphinx Stack 2.0 (canonical-sphinx ~=0.6), it no longer bundles the
+#       extensions that were previously auto-enabled by canonical-sphinx[full];
+#       only myst_parser is still activated automatically. Every other extension
+#       must now be declared explicitly below (and installed via
+#       _dev/requirements.txt).
 extensions = [
     "canonical_sphinx",
+    # Previously auto-enabled by canonical-sphinx[full]
+    "notfound.extension",
+    "sphinx_design",
+    "sphinx_reredirects",
+    "sphinxcontrib.jquery",
+    "sphinxext.opengraph",
+    # Previously bundled as canonical-sphinx-extensions
+    "sphinx_related_links",
+    # llms.txt generation (Sphinx Stack 2.0)
+    "sphinx_llm.txt",
+    # charmlibs-specific extensions
     "sphinxcontrib.cairosvgconverter",
     "sphinxcontrib.mermaid",
     "sphinx_last_updated_by_git",
@@ -149,7 +180,7 @@ extensions = [
 # myst_enable_extensions = set()
 
 intersphinx_mapping = {
-    'ops': ('https://documentation.ubuntu.com/ops/latest', None),
+    'ops': ('https://canonical.com/juju/docs/ops/latest', None),
     'python': ('https://docs.python.org/3', None),
     'juju': ('https://documentation.ubuntu.com/juju/3.6', None),
     'charmcraft': ('https://documentation.ubuntu.com/charmcraft/latest', None),
@@ -162,15 +193,21 @@ add_function_parentheses = False  # don't automatically add parentheses after fu
 # Excludes files or directories from processing
 exclude_patterns = [
     "doc-cheat-sheet*",
+    "**/_lib-*.md",
 ]
 
 # Adds custom CSS files, located under 'html_static_path'
 html_css_files = [
+    "https://assets.ubuntu.com/v1/d86746ef-cookie_banner.css",
     "project_specific.css",
 ]
 
 # Adds custom JavaScript files, located under 'html_static_path'
-# html_js_files = []
+html_js_files = [
+    "https://assets.ubuntu.com/v1/287a5e8f-bundle.js",
+    "tag_click_search.js",
+    "overwrite_links.js",
+]
 
 # Specifies a reST snippet to be prepended to each .rst file
 # This defines a :center: role that centers table cell content.

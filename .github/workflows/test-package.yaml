@@ -32,6 +32,7 @@ jobs:
   init:
     runs-on: ubuntu-latest
     outputs:
+      package-name: ${{ steps.package-info.outputs.name }}
       tests: ${{ steps.tests.outputs.tests }}
       python: ${{ steps.python.outputs.versions }}
       min_python_version: ${{ steps.python.outputs.min_version }}
@@ -39,13 +40,13 @@ jobs:
       integration-substrates: ${{ steps.integration-substrates.outputs.substrates }}
       integration-tags: ${{ steps.integration-tags.outputs.tags }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
           fetch-depth: 0
           persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78  # v7.6.0
 
       - name: Ensure package uv.lock is up-to-date
         working-directory: ${{ inputs.package }}
@@ -54,6 +55,14 @@ jobs:
             */.example|*/.example/testing|*/.tutorial) echo "Examples don't have a uv.lock file, skipping ..." ;;
             *) uv lock --check ;;
           esac
+
+      - name: Get package info
+        id: package-info
+        run: |
+          set -xueo pipefail
+          NAME=$(.scripts/ls.py packages --no-json --exclude-testing --output-only name --regex "$PACKAGE")
+          echo "name=$NAME"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
 
       - name: Check which Python versions this package supports
         id: python
@@ -88,7 +97,7 @@ jobs:
           substrates=()
           for substrate in k8s machine; do
             set +e  # don't abort if the next process has a non-zero exit code
-            uvx --from rust-just just python="$PYTHON" integration-$substrate "$PACKAGE" --collect-only -q
+            uvx --from rust-just just integration-$substrate --python "$PYTHON" "$PACKAGE" --collect-only -q
             case $? in
                 0) substrates+=($substrate);;
                 5) echo "No tests for $substrate";;
@@ -122,17 +131,17 @@ jobs:
       matrix:
         python: ${{ fromJson(needs.init.outputs.python) }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
           persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78  # v7.6.0
 
       - name: Run static analysis and other checks
         env:
           PYTHON: ${{ matrix.python }}
-        run: uvx --from rust-just just python="$PYTHON" lint "$PACKAGE"
+        run: uvx --from rust-just just lint --python "$PYTHON" "$PACKAGE"
 
   unit:
     needs: init
@@ -143,17 +152,17 @@ jobs:
       matrix:
         python: ${{ fromJson(needs.init.outputs.python) }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
           persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78  # v7.6.0
 
       - name: Run unit tests
         env:
           PYTHON: ${{ matrix.python }}
-        run: uvx --from rust-just just python="$PYTHON" unit "$PACKAGE"
+        run: uvx --from rust-just just unit --python "$PYTHON" "$PACKAGE"
 
   functional:
     needs: init
@@ -163,12 +172,12 @@ jobs:
       matrix: ${{ fromJson(needs.init.outputs.functional-matrix) }}
     runs-on: ${{ matrix.ubuntu }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
           persist-credentials: false
 
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16  # v6.5.0
         with:
           go-version: '1.24'
           # To suppress the "Restore cache failed" error, since there is no go.sum file here.
@@ -182,15 +191,15 @@ jobs:
         run: go install "github.com/canonical/pebble/cmd/$PEBBLE"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78  # v7.6.0
 
       - name: Run functional tests
         if: matrix.sudo == 'no-sudo'
-        run: uvx --from rust-just just python=python3 functional "$PACKAGE"
+        run: uvx --from rust-just just functional --python python3 "$PACKAGE"
 
       - name: Run functional tests with sudo
         if: matrix.sudo != 'no-sudo'
-        run: sudo env "PATH=$PATH" uvx --from rust-just just python=python3 functional "$PACKAGE"
+        run: sudo env "PATH=$PATH" uvx --from rust-just just functional --python python3 "$PACKAGE"
 
   integration:
     needs: init
@@ -202,7 +211,7 @@ jobs:
         tag: ${{ fromJson(needs.init.outputs.integration-tags) }}
         substrate: ${{ fromJson(needs.init.outputs.integration-substrates) }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
           persist-credentials: false
 
@@ -211,25 +220,35 @@ jobs:
 
       - name: Prepare Juju for microk8s
         if: ${{ matrix.substrate == 'k8s' }}
-        run: sudo concierge prepare --verbose --juju-channel=3/stable --charmcraft-channel=3.x/stable -p microk8s
+        run: sudo concierge prepare --verbose --juju-channel=3/stable -p microk8s
 
       - name: Prepare Juju for machine
         if: ${{ matrix.substrate == 'machine' }}
-        run: sudo concierge prepare --verbose --juju-channel=3/stable --charmcraft-channel=3.x/stable -p machine
+        run: sudo concierge prepare --verbose --juju-channel=3/stable -p machine
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78  # v7.6.0
 
       - name: Pack charms
         if: ${{ hashFiles(format('{0}/tests/integration/pack.sh', inputs.package)) != '' }}
+        id: pack
         env:
           TAG: ${{ matrix.tag }}
           SUBSTRATE: ${{ matrix.substrate }}
-        run: uvx --from rust-just just tag="$TAG" "pack-$SUBSTRATE" "$PACKAGE"
+        run: uvx --from rust-just just "pack-$SUBSTRATE" --tag "$TAG" "$PACKAGE"
 
       - name: Run Juju integration tests
+        id: integration
         env:
           PYTHON: ${{ needs.init.outputs.min_python_version }}
           RECIPE: integration-${{ matrix.substrate }}
           TAG: ${{ matrix.tag }}
-        run: uvx --from rust-just just python="$PYTHON" tag="$TAG" "$RECIPE" "$PACKAGE"
+        run: uvx --from rust-just just "$RECIPE" --python "$PYTHON" --tag "$TAG" "$PACKAGE"
+
+      - name: Upload Charmcraft logs
+        if: ${{ !cancelled() && (steps.pack.conclusion != 'skipped' || steps.integration.conclusion != 'skipped') }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: ${{ needs.init.outputs.package-name }}-charmcraft-logs-${{ matrix.substrate }}-${{ matrix.tag }}
+          path: /home/runner/.local/state/charmcraft/log/charmcraft-*.log
+          if-no-files-found: warn  # pack.sh scripts aren't required to produce charmcraft logs (though they do currently)

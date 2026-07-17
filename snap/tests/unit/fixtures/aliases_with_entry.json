@@ -1,0 +1,31 @@
+{
+    "type": "sync",
+    "status-code": 200,
+    "status": "OK",
+    "result": {
+        "astral-uv": {
+            "uv": {
+                "command": "astral-uv.uv",
+                "status": "auto",
+                "auto": "uv"
+            },
+            "uvx": {
+                "command": "astral-uv.uvx",
+                "status": "auto",
+                "auto": "uvx"
+            }
+        },
+        "lxd": {
+            "lxc": {
+                "command": "lxd.lxc",
+                "status": "auto",
+                "auto": "lxc"
+            },
+            "testlxc": {
+                "command": "lxd.lxc",
+                "status": "manual",
+                "manual": "lxc"
+            }
+        }
+    }
+}
