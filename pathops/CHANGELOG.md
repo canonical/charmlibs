@@ -1,3 +1,11 @@
+# 1.3.0.post0 - 16 June 2026
+
+Update project URLs.
+
+# 1.3.0 - 2 June 2026
+
+`PathProtocol.glob` and `LocalPath.glob` now accept a `str | os.PathLike[str]` pattern, matching `ContainerPath.glob` and `pathlib.Path.glob` on Python 3.13+.
+
 # 1.2.1 - 6 February 2026
 
 `PathProtocol` `iterdir` and `glob` now only promise to return an `Iterator` rather than a `Generator`.

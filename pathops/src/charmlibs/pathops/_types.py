@@ -259,9 +259,8 @@ class PathProtocol(typing.Protocol):
         ...
 
     # NOTE: Not supported -- (Python 3.12) ``case_sensitive`` argument
-    # NOTE: Not supported -- (Python 3.13) ``pattern`` can be path-like
     # NOTE: Not supported -- (Python 3.13) ``recurse_symlinks``
-    def glob(self, pattern: str) -> Iterator[Self]:
+    def glob(self, pattern: str | os.PathLike[str]) -> Iterator[Self]:
         r"""Iterate over this directory and yield all paths matching the provided pattern.
 
         For example, ``path.glob('*.txt')``, ``path.glob('*/foo.txt')``.
@@ -271,8 +270,8 @@ class PathProtocol(typing.Protocol):
             :meth:`ContainerPath.glob`.
 
         Args:
-            pattern: Must be relative, meaning it cannot begin with ``'/'``.
-                Matching is case-sensitive.
+            pattern: A :class:`str` or :class:`os.PathLike` object. The pattern must be relative,
+                meaning it cannot begin with ``'/'``. Matching is case-sensitive.
 
         Returns:
             A generator yielding objects of the same type as this path, corresponding to those

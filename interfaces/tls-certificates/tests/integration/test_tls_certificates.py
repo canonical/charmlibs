@@ -2,19 +2,18 @@
 # Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-# pyright: reportAttributeAccessIssue=false
-# pyright: reportUnknownArgumentType=false
-# pyright: reportUnknownMemberType=false
-# pyright: reportUnknownVariableType=false
-
+import base64
+import json
 import logging
 import pathlib
 import time
+from datetime import timedelta
 
+import jubilant
 import pytest
-from pytest_operator.plugin import OpsTest
 
 from certificates import Certificate
+from charmlibs.interfaces import tls_certificates
 
 logger = logging.getLogger(__name__)
 
@@ -22,304 +21,369 @@ logger = logging.getLogger(__name__)
 PACKED_DIR = pathlib.Path(__file__).parent / ".packed"
 REQUIRER_LOCAL = PACKED_DIR / "requirer-local.charm"
 REQUIRER_PUBLISHED = PACKED_DIR / "requirer-published.charm"
+REQUIRER_FETCH_LIB_LATEST = PACKED_DIR / "requirer-fetch-lib-latest.charm"
+REQUIRER_FETCH_LIB_PRE_FIX = PACKED_DIR / "requirer-fetch-lib-pre-fix.charm"
 PROVIDER_LOCAL = PACKED_DIR / "provider-local.charm"
 PROVIDER_PUBLISHED = PACKED_DIR / "provider-published.charm"
 TLS_CERTIFICATES_PROVIDER_APP_NAME = "tls-certificates-provider"
 TLS_CERTIFICATES_REQUIRER_APP_NAME = "tls-certificates-requirer"
 
 
+def _assert_certificate_fields(task: jubilant.Task):
+    """Assert that the action task contains valid certificate fields."""
+    assert "ca" in task.results and task.results["ca"] is not None
+    assert "certificate" in task.results and task.results["certificate"] is not None
+    assert "chain" in task.results and task.results["chain"] is not None
+
+
+def _base64(pem: str) -> str:
+    return base64.b64encode(pem.encode()).decode()
+
+
+def _get_outstanding_csrs(juju: jubilant.Juju, manual_tls_unit: str) -> list[str]:
+    """Return the CSRs the manual-tls-certificates charm has not signed yet."""
+    try:
+        task = juju.run(manual_tls_unit, "get-outstanding-certificate-requests")
+    except jubilant.TaskError:
+        return []
+    return [request["csr"] for request in json.loads(task.results.get("result", "[]"))]
+
+
+def _wait_for_outstanding_csr(juju: jubilant.Juju, manual_tls_unit: str) -> str:
+    timeout = time.time() + 600
+    while time.time() < timeout:
+        csrs = _get_outstanding_csrs(juju, manual_tls_unit)
+        if csrs:
+            return csrs[0]
+        time.sleep(10)
+    raise TimeoutError(f"No outstanding certificate request appeared on {manual_tls_unit}")
+
+
+def _sign_csr(csr_str: str) -> tuple[str, str]:
+    """Sign a CSR with a locally generated CA, returning (certificate, ca_certificate) PEMs."""
+    ca_private_key = tls_certificates.PrivateKey.generate()
+    ca = tls_certificates.Certificate.generate_self_signed_ca(
+        attributes=tls_certificates.CertificateRequestAttributes(
+            common_name="integration-test-ca", is_ca=True
+        ),
+        private_key=ca_private_key,
+        validity=timedelta(days=365),
+    )
+    certificate = tls_certificates.Certificate.generate(
+        csr=tls_certificates.CertificateSigningRequest.from_string(csr_str),
+        ca=ca,
+        ca_private_key=ca_private_key,
+        validity=timedelta(days=365),
+    )
+    return str(certificate), str(ca)
+
+
 class TestIntegration:
     @pytest.mark.upgrade
-    async def test_given_main_deployed_when_upgraded_then_certs_are_retrieved(
-        self, ops_test: OpsTest
-    ):
-        assert ops_test.model
+    def test_given_main_deployed_when_upgraded_then_certs_are_retrieved(self, juju: jubilant.Juju):
         requirer_app_name = f"{TLS_CERTIFICATES_REQUIRER_APP_NAME}-upgrade"
         provider_app_name = f"{TLS_CERTIFICATES_PROVIDER_APP_NAME}-upgrade"
 
-        await ops_test.model.deploy(
+        juju.deploy(
             REQUIRER_PUBLISHED,
-            application_name=requirer_app_name,
-            series="jammy",
+            app=requirer_app_name,
+            base="ubuntu@22.04",
         )
-        await ops_test.model.deploy(
+        juju.deploy(
             PROVIDER_PUBLISHED,
-            application_name=provider_app_name,
-            series="jammy",
+            app=provider_app_name,
+            base="ubuntu@22.04",
         )
-        # create a relation to requests certs
-        await ops_test.model.add_relation(
-            relation1=requirer_app_name,
-            relation2=provider_app_name,
-        )
+        # create a relation to request certs
+        juju.integrate(requirer_app_name, provider_app_name)
 
-        await ops_test.model.wait_for_idle(
-            apps=[requirer_app_name, provider_app_name],
-            status="active",
+        juju.wait(
+            lambda status: jubilant.all_active(status, requirer_app_name, provider_app_name),
             timeout=1000,
         )
         # retrieve certs and validate
-        requirer_unit = ops_test.model.units[f"{requirer_app_name}/0"]
-        assert requirer_unit
-
-        action = await requirer_unit.run_action(action_name="get-certificate")
-
-        action_output = await ops_test.model.get_action_output(
-            action_uuid=action.entity_id, wait=60
-        )
-        assert action_output["return-code"] == 0
-        assert "ca" in action_output and action_output["ca"] is not None
-        assert "certificate" in action_output and action_output["certificate"] is not None
-        assert "chain" in action_output and action_output["chain"] is not None
+        task = juju.run(f"{requirer_app_name}/0", "get-certificate")
+        _assert_certificate_fields(task)
 
         # upgrade to the new version of the lib
-        await ops_test.model.applications[requirer_app_name].refresh(
-            path=REQUIRER_LOCAL,
-        )
-
-        await ops_test.model.applications[provider_app_name].refresh(
-            path=PROVIDER_LOCAL,
-        )
-        await ops_test.model.wait_for_idle(
-            apps=[requirer_app_name, provider_app_name],
-            status="active",
+        juju.refresh(requirer_app_name, path=REQUIRER_LOCAL)
+        juju.refresh(provider_app_name, path=PROVIDER_LOCAL)
+        juju.wait(
+            lambda status: jubilant.all_active(status, requirer_app_name, provider_app_name),
             timeout=1000,
         )
 
         # renew the certificate
-        action = await requirer_unit.run_action(action_name="renew-certificate")
-        action_output = await ops_test.model.get_action_output(
-            action_uuid=action.entity_id, wait=60
-        )
-        assert action_output["return-code"] == 0
-        await ops_test.model.wait_for_idle(
-            apps=[requirer_app_name, provider_app_name],
-            status="active",
+        juju.run(f"{requirer_app_name}/0", "renew-certificate")
+        juju.wait(
+            lambda status: jubilant.all_active(status, requirer_app_name, provider_app_name),
             timeout=1000,
         )
         # retrieve certs and validate
-        requirer_unit = ops_test.model.units[f"{requirer_app_name}/0"]
-        assert requirer_unit
-
-        action = await requirer_unit.run_action(action_name="get-certificate")
-
-        action_output = await ops_test.model.get_action_output(
-            action_uuid=action.entity_id, wait=60
-        )
-        assert action_output["return-code"] == 0
-        assert "ca" in action_output and action_output["ca"] is not None
-        assert "certificate" in action_output and action_output["certificate"] is not None
-        assert "chain" in action_output and action_output["chain"] is not None
+        task = juju.run(f"{requirer_app_name}/0", "get-certificate")
+        _assert_certificate_fields(task)
 
         # tear down so that the rest of the tests can run as normal
-        await ops_test.model.applications[requirer_app_name].remove()
-        await ops_test.model.applications[provider_app_name].remove()
+        juju.remove_application(requirer_app_name, provider_app_name)
 
-    async def test_given_charms_packed_when_deploy_charm_then_status_is_blocked(
-        self, ops_test: OpsTest
+    @pytest.mark.upgrade
+    @pytest.mark.parametrize(
+        "legacy_charm",
+        [
+            pytest.param(REQUIRER_FETCH_LIB_PRE_FIX, id="pre-app-owned-key-fix"),
+            pytest.param(REQUIRER_FETCH_LIB_LATEST, id="latest-charmhub-lib"),
+        ],
+    )
+    def test_given_charmhub_lib_app_mode_deployment_when_upgraded_then_certificate_is_preserved(
+        self, juju: jubilant.Juju, legacy_charm: pathlib.Path
     ):
-        assert ops_test.model
-        await ops_test.model.deploy(
+        """Upgrading an APP mode deployment must not regenerate the key, CSR, or certificate.
+
+        Deployments made with the Charmhub v4 lib store the APP mode private key
+        under a label this library treats as legacy, either unit-owned (before
+        the fix in https://github.com/canonical/charmlibs/pull/267) or app-owned
+        (after it). On refresh, the library must migrate that key instead of
+        generating a new one (https://github.com/canonical/charmlibs/issues/565).
+
+        The provider is manual-tls-certificates, which only signs CSRs through
+        operator actions. If the refresh regenerated the key, its CSR would be
+        replaced and never signed, so the requirer could not be active with its
+        original certificate afterwards.
+        """
+        requirer_app_name = legacy_charm.stem
+        provider_app_name = f"{requirer_app_name}-provider"
+        requirer_unit = f"{requirer_app_name}/0"
+        provider_unit = f"{provider_app_name}/0"
+
+        juju.deploy(
+            legacy_charm,
+            app=requirer_app_name,
+            base="ubuntu@22.04",
+            config={"mode": "app"},
+        )
+        juju.deploy(
+            "manual-tls-certificates",
+            app=provider_app_name,
+            channel="1/stable",
+            base="ubuntu@24.04",
+        )
+        juju.integrate(requirer_app_name, provider_app_name)
+        juju.wait(
+            lambda status: jubilant.all_agents_idle(status, requirer_app_name, provider_app_name),
+            timeout=1000,
+        )
+
+        # sign the requirer's CSR and provide the certificate manually
+        csr = _wait_for_outstanding_csr(juju, provider_unit)
+        certificate, ca_certificate = _sign_csr(csr)
+        juju.run(
+            provider_unit,
+            "provide-certificate",
+            {
+                "certificate-signing-request": _base64(csr),
+                "certificate": _base64(certificate),
+                "ca-certificate": _base64(ca_certificate),
+                "ca-chain": _base64(ca_certificate),
+            },
+        )
+        juju.wait(
+            lambda status: (
+                jubilant.all_active(status, requirer_app_name, provider_app_name)
+                and jubilant.all_agents_idle(status, requirer_app_name, provider_app_name)
+            ),
+            timeout=1000,
+        )
+        task = juju.run(requirer_unit, "get-certificate")
+        _assert_certificate_fields(task)
+        certificate_before_upgrade = task.results["certificate"]
+
+        # upgrade to the local charm built on the current library
+        juju.refresh(requirer_app_name, path=REQUIRER_LOCAL)
+        juju.wait(
+            lambda status: (
+                jubilant.all_active(status, requirer_app_name)
+                and jubilant.all_agents_idle(status, requirer_app_name)
+            ),
+            timeout=1000,
+        )
+
+        # the certificate survived the upgrade and no new CSR was requested
+        task = juju.run(requirer_unit, "get-certificate")
+        _assert_certificate_fields(task)
+        assert task.results["certificate"] == certificate_before_upgrade
+        assert not _get_outstanding_csrs(juju, provider_unit)
+
+        # tear down so that the rest of the tests can run as normal
+        juju.remove_application(requirer_app_name, provider_app_name)
+
+    def test_given_charms_packed_when_deploy_charm_then_status_is_blocked(
+        self, juju: jubilant.Juju
+    ):
+        juju.deploy(
             REQUIRER_LOCAL,
-            application_name=TLS_CERTIFICATES_REQUIRER_APP_NAME,
-            series="jammy",
+            app=TLS_CERTIFICATES_REQUIRER_APP_NAME,
+            base="ubuntu@22.04",
         )
-        await ops_test.model.deploy(
+        juju.deploy(
             PROVIDER_LOCAL,
-            application_name=TLS_CERTIFICATES_PROVIDER_APP_NAME,
-            series="jammy",
+            app=TLS_CERTIFICATES_PROVIDER_APP_NAME,
+            base="ubuntu@22.04",
         )
 
-        await ops_test.model.wait_for_idle(
-            apps=[TLS_CERTIFICATES_REQUIRER_APP_NAME, TLS_CERTIFICATES_PROVIDER_APP_NAME],
-            status="blocked",
+        juju.wait(
+            lambda status: jubilant.all_blocked(
+                status, TLS_CERTIFICATES_REQUIRER_APP_NAME, TLS_CERTIFICATES_PROVIDER_APP_NAME
+            ),
             timeout=1000,
         )
 
-    async def test_given_charms_deployed_when_relate_then_status_is_active(
-        self, ops_test: OpsTest
-    ):
-        assert ops_test.model
-        await ops_test.model.add_relation(
-            relation1=TLS_CERTIFICATES_REQUIRER_APP_NAME,
-            relation2=TLS_CERTIFICATES_PROVIDER_APP_NAME,
+    def test_given_charms_deployed_when_relate_then_status_is_active(self, juju: jubilant.Juju):
+        juju.integrate(
+            TLS_CERTIFICATES_REQUIRER_APP_NAME,
+            TLS_CERTIFICATES_PROVIDER_APP_NAME,
         )
 
-        await ops_test.model.wait_for_idle(
-            apps=[TLS_CERTIFICATES_REQUIRER_APP_NAME, TLS_CERTIFICATES_PROVIDER_APP_NAME],
-            status="active",
+        juju.wait(
+            lambda status: jubilant.all_active(
+                status, TLS_CERTIFICATES_REQUIRER_APP_NAME, TLS_CERTIFICATES_PROVIDER_APP_NAME
+            ),
             timeout=1000,
         )
 
-    async def test_given_charms_deployed_when_relate_then_requirer_received_certs(
-        self, ops_test: OpsTest
+    def test_given_charms_deployed_when_relate_then_requirer_received_certs(
+        self, juju: jubilant.Juju
     ):
-        assert ops_test.model
-        requirer_unit = ops_test.model.units[f"{TLS_CERTIFICATES_REQUIRER_APP_NAME}/0"]
-        assert requirer_unit
+        task = juju.run(f"{TLS_CERTIFICATES_REQUIRER_APP_NAME}/0", "get-certificate")
+        _assert_certificate_fields(task)
 
-        action = await requirer_unit.run_action(action_name="get-certificate")
-
-        action_output = await ops_test.model.get_action_output(
-            action_uuid=action.entity_id, wait=60
-        )
-        assert action_output["return-code"] == 0
-        assert "ca" in action_output and action_output["ca"] is not None
-        assert "certificate" in action_output and action_output["certificate"] is not None
-        assert "chain" in action_output and action_output["chain"] is not None
-
-    async def test_given_additional_requirer_charm_deployed_when_relate_then_requirer_received_certs(
-        self, ops_test: OpsTest
+    def test_given_additional_requirer_charm_deployed_when_relate_then_requirer_received_certs(
+        self, juju: jubilant.Juju
     ):
-        assert ops_test.model
         new_requirer_app_name = "new-tls-requirer"
-        await ops_test.model.deploy(
-            REQUIRER_LOCAL, application_name=new_requirer_app_name, series="jammy"
-        )
-        await ops_test.model.add_relation(
-            relation1=new_requirer_app_name,
-            relation2=TLS_CERTIFICATES_PROVIDER_APP_NAME,
-        )
-        await ops_test.model.wait_for_idle(
-            apps=[
-                TLS_CERTIFICATES_PROVIDER_APP_NAME,
-                new_requirer_app_name,
-            ],
-            status="active",
+        juju.deploy(REQUIRER_LOCAL, app=new_requirer_app_name, base="ubuntu@22.04")
+        juju.integrate(new_requirer_app_name, TLS_CERTIFICATES_PROVIDER_APP_NAME)
+        juju.wait(
+            lambda status: jubilant.all_active(
+                status, TLS_CERTIFICATES_PROVIDER_APP_NAME, new_requirer_app_name
+            ),
             timeout=1000,
         )
-        requirer_unit = ops_test.model.units[f"{new_requirer_app_name}/0"]
-        assert requirer_unit
 
-        action = await requirer_unit.run_action(action_name="get-certificate")
+        task = juju.run(f"{new_requirer_app_name}/0", "get-certificate")
+        _assert_certificate_fields(task)
 
-        action_output = await ops_test.model.get_action_output(
-            action_uuid=action.entity_id, wait=60
-        )
-        assert action_output["return-code"] == 0
-        assert "ca" in action_output and action_output["ca"] is not None
-        assert "certificate" in action_output and action_output["certificate"] is not None
-        assert "chain" in action_output and action_output["chain"] is not None
-
-    async def test_given_4_min_certificate_validity_when_certificate_expires_then_certificate_is_automatically_renewed(
-        self, ops_test: OpsTest
+    def test_given_4_min_certificate_validity_when_certificate_expires_then_certificate_is_automatically_renewed(
+        self, juju: jubilant.Juju
     ):
-        assert ops_test.model
-        requirer_unit = ops_test.model.units[f"{TLS_CERTIFICATES_REQUIRER_APP_NAME}/0"]
-        assert requirer_unit
-
-        action = await requirer_unit.run_action(action_name="get-certificate")
-
-        action_output = await ops_test.model.get_action_output(
-            action_uuid=action.entity_id, wait=60
-        )
-
-        assert "certificate" in action_output and action_output["certificate"] is not None
-        initial_certificate = Certificate(action_output["certificate"])
+        task = juju.run(f"{TLS_CERTIFICATES_REQUIRER_APP_NAME}/0", "get-certificate")
+        assert "certificate" in task.results and task.results["certificate"] is not None
+        initial_certificate = Certificate(task.results["certificate"])
 
         time.sleep(300)  # Wait 5 minutes for certificate to expire
 
-        action = await requirer_unit.run_action(action_name="get-certificate")
-
-        action_output = await ops_test.model.get_action_output(
-            action_uuid=action.entity_id, wait=60
-        )
-
-        assert "certificate" in action_output and action_output["certificate"] is not None
-        renewed_certificate = Certificate(action_output["certificate"])
+        task = juju.run(f"{TLS_CERTIFICATES_REQUIRER_APP_NAME}/0", "get-certificate")
+        assert "certificate" in task.results and task.results["certificate"] is not None
+        renewed_certificate = Certificate(task.results["certificate"])
 
         assert initial_certificate.expiry != renewed_certificate.expiry
 
-    async def test_given_app_and_unit_mode_when_relate_then_both_certificates_received(
-        self, ops_test: OpsTest
+    def test_given_app_and_unit_mode_when_relate_then_both_certificates_received(
+        self, juju: jubilant.Juju
     ):
-        assert ops_test.model
         app_and_unit_requirer_app_name = "app-and-unit-requirer"
-        await ops_test.model.deploy(
+        juju.deploy(
             REQUIRER_LOCAL,
-            application_name=app_and_unit_requirer_app_name,
-            series="jammy",
+            app=app_and_unit_requirer_app_name,
+            base="ubuntu@22.04",
             config={"mode": "app_and_unit"},
         )
-        await ops_test.model.add_relation(
-            relation1=app_and_unit_requirer_app_name,
-            relation2=TLS_CERTIFICATES_PROVIDER_APP_NAME,
-        )
-        await ops_test.model.wait_for_idle(
-            apps=[
-                TLS_CERTIFICATES_PROVIDER_APP_NAME,
-                app_and_unit_requirer_app_name,
-            ],
-            status="active",
+        juju.integrate(app_and_unit_requirer_app_name, TLS_CERTIFICATES_PROVIDER_APP_NAME)
+        juju.wait(
+            lambda status: jubilant.all_active(
+                status, TLS_CERTIFICATES_PROVIDER_APP_NAME, app_and_unit_requirer_app_name
+            ),
             timeout=1000,
         )
 
-        requirer_unit = ops_test.model.units[f"{app_and_unit_requirer_app_name}/0"]
-        assert requirer_unit
+        task = juju.run(f"{app_and_unit_requirer_app_name}/0", "get-app-certificate")
+        _assert_certificate_fields(task)
+        app_certificate_str = task.results["certificate"]
 
-        action = await requirer_unit.run_action(action_name="get-app-certificate")
-        action_output = await ops_test.model.get_action_output(
-            action_uuid=action.entity_id, wait=60
-        )
-        assert action_output["return-code"] == 0
-        assert "ca" in action_output and action_output["ca"] is not None
-        assert "certificate" in action_output and action_output["certificate"] is not None
-        assert "chain" in action_output and action_output["chain"] is not None
-        app_certificate_str = action_output["certificate"]
-
-        action = await requirer_unit.run_action(action_name="get-unit-certificate")
-        action_output = await ops_test.model.get_action_output(
-            action_uuid=action.entity_id, wait=60
-        )
-        assert action_output["return-code"] == 0
-        assert "ca" in action_output and action_output["ca"] is not None
-        assert "certificate" in action_output and action_output["certificate"] is not None
-        assert "chain" in action_output and action_output["chain"] is not None
-        unit_certificate_str = action_output["certificate"]
+        task = juju.run(f"{app_and_unit_requirer_app_name}/0", "get-unit-certificate")
+        _assert_certificate_fields(task)
+        unit_certificate_str = task.results["certificate"]
 
         assert app_certificate_str != unit_certificate_str
 
-    async def test_given_additional_app_and_unit_requirer_when_related_then_certificates_received(
-        self, ops_test: OpsTest
+    def test_given_additional_app_and_unit_requirer_when_related_then_certificates_received(
+        self, juju: jubilant.Juju
     ):
-        assert ops_test.model
         new_app_and_unit_requirer_app_name = "new-app-and-unit-requirer"
-        await ops_test.model.deploy(
+        juju.deploy(
             REQUIRER_LOCAL,
-            application_name=new_app_and_unit_requirer_app_name,
-            series="jammy",
+            app=new_app_and_unit_requirer_app_name,
+            base="ubuntu@22.04",
             config={"mode": "app_and_unit"},
         )
-        await ops_test.model.add_relation(
-            relation1=new_app_and_unit_requirer_app_name,
-            relation2=TLS_CERTIFICATES_PROVIDER_APP_NAME,
-        )
-        await ops_test.model.wait_for_idle(
-            apps=[
-                TLS_CERTIFICATES_PROVIDER_APP_NAME,
-                new_app_and_unit_requirer_app_name,
-            ],
-            status="active",
+        juju.integrate(new_app_and_unit_requirer_app_name, TLS_CERTIFICATES_PROVIDER_APP_NAME)
+        juju.wait(
+            lambda status: jubilant.all_active(
+                status, TLS_CERTIFICATES_PROVIDER_APP_NAME, new_app_and_unit_requirer_app_name
+            ),
             timeout=1000,
         )
 
-        requirer_unit = ops_test.model.units[f"{new_app_and_unit_requirer_app_name}/0"]
-        assert requirer_unit
+        task = juju.run(f"{new_app_and_unit_requirer_app_name}/0", "get-app-certificate")
+        _assert_certificate_fields(task)
 
-        action = await requirer_unit.run_action(action_name="get-app-certificate")
-        action_output = await ops_test.model.get_action_output(
-            action_uuid=action.entity_id, wait=60
-        )
-        assert action_output["return-code"] == 0
-        assert "ca" in action_output and action_output["ca"] is not None
-        assert "certificate" in action_output and action_output["certificate"] is not None
-        assert "chain" in action_output and action_output["chain"] is not None
+        task = juju.run(f"{new_app_and_unit_requirer_app_name}/0", "get-unit-certificate")
+        _assert_certificate_fields(task)
 
-        action = await requirer_unit.run_action(action_name="get-unit-certificate")
-        action_output = await ops_test.model.get_action_output(
-            action_uuid=action.entity_id, wait=60
+
+class TestProviderCapabilitiesUpgrade:
+    """Verify capability advertisement does not break cross-version compatibility."""
+
+    @pytest.mark.upgrade
+    def test_given_provider_supports_capabilities_and_requirer_does_not_when_related_then_requirer_gets_certs(
+        self, juju: jubilant.Juju
+    ):
+        """A capability-advertising provider works with a legacy requirer (no capability key)."""
+        requirer_app_name = "old-requirer-new-provider-req"
+        provider_app_name = "old-requirer-new-provider-prov"
+
+        juju.deploy(REQUIRER_PUBLISHED, app=requirer_app_name, base="ubuntu@22.04")
+        juju.deploy(PROVIDER_LOCAL, app=provider_app_name, base="ubuntu@22.04")
+        juju.integrate(requirer_app_name, provider_app_name)
+        juju.wait(
+            lambda status: jubilant.all_active(status, requirer_app_name, provider_app_name),
+            timeout=1000,
         )
-        assert action_output["return-code"] == 0
-        assert "ca" in action_output and action_output["ca"] is not None
-        assert "certificate" in action_output and action_output["certificate"] is not None
-        assert "chain" in action_output and action_output["chain"] is not None
+
+        task = juju.run(f"{requirer_app_name}/0", "get-certificate")
+        _assert_certificate_fields(task)
+
+        juju.remove_application(requirer_app_name, provider_app_name)
+
+    @pytest.mark.upgrade
+    def test_given_requirer_supports_capabilities_and_provider_does_not_when_related_then_capabilities_unavailable(
+        self, juju: jubilant.Juju
+    ):
+        """A new requirer reports capabilities unavailable for a legacy provider but still works."""
+        requirer_app_name = "new-requirer-old-provider-req"
+        provider_app_name = "new-requirer-old-provider-prov"
+
+        juju.deploy(REQUIRER_LOCAL, app=requirer_app_name, base="ubuntu@22.04")
+        juju.deploy(PROVIDER_PUBLISHED, app=provider_app_name, base="ubuntu@22.04")
+        juju.integrate(requirer_app_name, provider_app_name)
+        juju.wait(
+            lambda status: jubilant.all_active(status, requirer_app_name, provider_app_name),
+            timeout=1000,
+        )
+
+        task = juju.run(f"{requirer_app_name}/0", "get-certificate")
+        _assert_certificate_fields(task)
+
+        task = juju.run(f"{requirer_app_name}/0", "get-provider-capabilities")
+        assert task.results.get("available") == "false"
+
+        juju.remove_application(requirer_app_name, provider_app_name)

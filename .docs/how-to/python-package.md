@@ -58,7 +58,7 @@ It's also very useful when developing a new library or porting a Charmhub-hosted
 
 You don't need to do anything special to make your Python package installable with `git` -- just commit it and push to your repository as usual.
 
-> Read more: {ref}`manage-git-dependencies`
+Read more: {ref}`manage-git-dependencies`
 
 (python-package-distribution-local)=
 ### Local files

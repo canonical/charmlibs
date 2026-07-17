@@ -8,21 +8,22 @@ from typing import Any
 
 import ops
 import pytest
+from cosl.cos_tool import CosTool
 from cosl.juju_topology import JujuTopology
 from cosl.rules import HOST_METRICS_MISSING_RULE_NAME
 from cosl.utils import LZMABase64
 from ops import testing
 from ops.testing import Model, PeerRelation, Relation, State
 
-from charmlibs.interfaces.otlp._otlp import DEFAULT_PROVIDER_RELATION_NAME as RECEIVE
-from charmlibs.interfaces.otlp._otlp import DEFAULT_REQUIRER_RELATION_NAME as SEND
+from charmlibs.interfaces.otlp import OtlpProvider, RuleStore
 from charmlibs.interfaces.otlp._otlp import (
-    OtlpProvider,
-    OtlpRequirer,
-    RuleStore,
-    _OtlpRequirerAppData,
-    _RulesModel,
+    DEFAULT_PROVIDER_RELATION_NAME as RECEIVE,
 )
+from charmlibs.interfaces.otlp._otlp import (
+    DEFAULT_REQUIRER_RELATION_NAME as SEND,
+)
+from charmlibs.interfaces.otlp._otlp import _OtlpRequirerAppData
+from charmlibs.interfaces.otlp._rules import _RulesModel, duplicate_rules_per_unit
 from conftest import (
     PEERS_ENDPOINT,
     SINGLE_LOGQL_ALERT,
@@ -89,60 +90,59 @@ def test_rules_compression(otlp_requirer_ctx: testing.Context[ops.CharmBase]):
 
 
 @pytest.mark.parametrize('subordinate', [True, False])
-def test_duplicate_rules_per_unit(
-    otlp_requirer_ctx: testing.Context[ops.CharmBase], subordinate: bool
-):
-    with otlp_requirer_ctx(otlp_requirer_ctx.on.update_status(), state=State(leader=True)) as mgr:
-        # GIVEN any charm
-        # WHEN the OtlpRequirer is initialized
-        # * generic aggregator rules are desired
-        # * no peer relation name is provided
-        result = OtlpRequirer(mgr.charm)._duplicate_rules_per_unit(
-            alert_rules={
-                'groups': [
-                    {
-                        'name': 'AggregatorHostHealth',
-                        'rules': [
-                            {
-                                'alert': HOST_METRICS_MISSING_RULE_NAME,
-                                'expr': 'absent(up)',
-                                'labels': {'severity': 'warning'},
-                            },
-                            {
-                                'alert': 'AggregatorMetricsMissing',
-                                'expr': 'absent(up)',
-                                'labels': {'severity': 'critical'},
-                            },
-                        ],
-                    }
-                ]
-            },
-            peer_unit_names={'unit/0', 'unit/1'},
-            rule_names_to_duplicate=[HOST_METRICS_MISSING_RULE_NAME],
-            is_subordinate=subordinate,
-        )
-        # THEN the rules are duplicated per unit, with juju_unit in the expr and labels
-        groups = result.get('groups', [])
-        for group in groups:
-            rules = group.get('rules', [])
-            severity = 'critical' if subordinate else 'warning'
-            assert rules == [
+def test_duplicate_rules_per_unit(subordinate: bool):
+    # GIVEN the charm is (or is not) a subordinate
+    # * there are rules to duplicate with %%juju_unit%% in the expr
+    # * there are 2 peer units to duplicate for
+    cos_tool = CosTool('promql')
+    # WHEN the rules are duplicated per unit
+    result = duplicate_rules_per_unit(
+        alert_rules={
+            'groups': [
                 {
-                    'alert': HOST_METRICS_MISSING_RULE_NAME,
-                    'expr': 'absent(up{juju_unit="unit/0"})',
-                    'labels': {'severity': severity, 'juju_unit': 'unit/0'},
-                },
-                {
-                    'alert': HOST_METRICS_MISSING_RULE_NAME,
-                    'expr': 'absent(up{juju_unit="unit/1"})',
-                    'labels': {'severity': severity, 'juju_unit': 'unit/1'},
-                },
-                {
-                    'alert': 'AggregatorMetricsMissing',
-                    'expr': 'absent(up)',
-                    'labels': {'severity': 'critical'},
-                },
+                    'name': 'AggregatorHostHealth',
+                    'rules': [
+                        {
+                            'alert': HOST_METRICS_MISSING_RULE_NAME,
+                            'expr': 'absent(up)',
+                            'labels': {'severity': 'warning'},
+                        },
+                        {
+                            'alert': 'AggregatorMetricsMissing',
+                            'expr': 'absent(up)',
+                            'labels': {'severity': 'critical'},
+                        },
+                    ],
+                }
             ]
+        },
+        rule_names_to_duplicate=[HOST_METRICS_MISSING_RULE_NAME],
+        peer_unit_names={'unit/0', 'unit/1'},
+        rules_tool=cos_tool,
+        is_subordinate=subordinate,
+    )
+    # THEN the rules are duplicated per unit, with juju_unit in the expr and labels
+    groups = result.get('groups', [])
+    for group in groups:
+        rules = group.get('rules', [])
+        severity = 'critical' if subordinate else 'warning'
+        assert rules == [
+            {
+                'alert': HOST_METRICS_MISSING_RULE_NAME,
+                'expr': 'absent(up{juju_unit="unit/0"})',
+                'labels': {'severity': severity, 'juju_unit': 'unit/0'},
+            },
+            {
+                'alert': HOST_METRICS_MISSING_RULE_NAME,
+                'expr': 'absent(up{juju_unit="unit/1"})',
+                'labels': {'severity': severity, 'juju_unit': 'unit/1'},
+            },
+            {
+                'alert': 'AggregatorMetricsMissing',
+                'expr': 'absent(up)',
+                'labels': {'severity': 'critical'},
+            },
+        ]
 
 
 @pytest.mark.parametrize(
@@ -185,6 +185,59 @@ def test_generic_rule_injection(
         else:
             assert app_rule in promql_group_names
             assert agg_rule not in promql_group_names
+
+
+@pytest.mark.parametrize(
+    'otlp_requirer_ctx,expected_labels',
+    [
+        pytest.param(
+            {'aggregator': True, 'extra_alert_labels': {}},
+            {},
+            id='no-labels',
+        ),
+        pytest.param(
+            {'aggregator': True, 'extra_alert_labels': {'env': 'prod'}},
+            {'env': 'prod'},
+            id='single-label',
+        ),
+        pytest.param(
+            {'aggregator': True, 'extra_alert_labels': {'env': 'prod', 'team': 'core'}},
+            {'env': 'prod', 'team': 'core'},
+            id='multiple-labels',
+        ),
+    ],
+    indirect=['otlp_requirer_ctx'],
+)
+def test_extra_alert_labels_injection(
+    otlp_requirer_ctx: testing.Context[ops.CharmBase], expected_labels: dict[str, str]
+):
+    # GIVEN a send-otlp relation
+    # * a peers relation
+    peers = PeerRelation(endpoint=PEERS_ENDPOINT)
+    state = State(relations=[peers, Relation(SEND)], leader=True, model=MODEL)
+
+    # WHEN the update_status event is fired
+    state_out = otlp_requirer_ctx.run(otlp_requirer_ctx.on.update_status(), state=state)
+    for relation in list(state_out.relations):
+        if relation.endpoint != SEND:
+            continue
+
+        # THEN if the charm is an aggregator, generic rules are injected into the databag
+        # AND the rules in the databag are decompressed
+        decompressed = _decompress(relation.local_app_data.get('rules'))
+        assert decompressed
+        logql_groups = decompressed.get('logql', {}).get('groups', [])
+        promql_groups = decompressed.get('promql', {}).get('groups', [])
+        assert logql_groups
+        assert promql_groups
+
+        # THEN all rules have the extra alert labels injected
+        for groups in promql_groups, logql_groups:
+            for group in groups:
+                for rule in group.get('rules', []):
+                    labels = rule.get('labels', {})
+                    for k, v in expected_labels.items():
+                        assert labels.get(k) == v
 
 
 def test_metadata(otlp_requirer_ctx: testing.Context[ops.CharmBase]):

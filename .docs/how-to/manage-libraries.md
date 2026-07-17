@@ -125,6 +125,4 @@ charm-libs:
     version: "0"
 ```
 
-> Read more:
-> - {ref}`charm-libs-charmhub-hosted`
-> - {ref}`Charmcraft | Manage libraries <charmcraft:manage-libraries>`
+Read more: {ref}`charm-libs-charmhub-hosted`, {ref}`Charmcraft | Manage libraries <charmcraft:manage-libraries>`
