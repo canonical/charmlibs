@@ -491,9 +491,9 @@
   {
     "name": "ldap",
     "version": "0",
-    "lib": "charms.glauth_k8s.ldap",
-    "lib_url": "https://charmhub.io/glauth-k8s/libraries/ldap",
-    "lib_docs_url": "",
+    "lib": "charmlibs.interfaces.ldap",
+    "lib_url": "https://pypi.org/project/charmlibs-interfaces-ldap",
+    "lib_docs_url": "https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/ldap",
     "docs_url": "https://canonical.com/juju/docs/charmlibs/reference/interfaces/ldap/",
     "summary": "Configure and connect to a Lightweight Directory Access Protocol (LDAP) server.",
     "description": "The `ldap` interface supports sharing configuration and connection information for a Lightweight Directory Access Protocol (LDAP) server.\nThe provider is responsible for sharing the LDAP URL and other information needed for the requirer to connect and perform LDAP operations.",

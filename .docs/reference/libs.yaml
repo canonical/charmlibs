@@ -1339,7 +1339,7 @@ interfaces:
   tags:
   - operations
 - name: charms.glauth_k8s.ldap
-  status: ''
+  status: legacy
   url: https://charmhub.io/glauth-k8s/libraries/ldap
   docs: ''
   src: https://github.com/canonical/glauth-k8s-operator
@@ -1347,7 +1347,19 @@ interfaces:
   rel_name: ldap
   rel_url_charmhub: https://charmhub.io/integrations/ldap
   rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/ldap/v0
-  description: ''
+  description: 'Library for configuring and connecting to a Lightweight Directory Access Protocol (LDAP) server. Superseded by charmlibs-interfaces-ldap.'
+  tags:
+  - identity-auth
+- name: charmlibs.interfaces.ldap
+  status: recommended
+  url: https://pypi.org/project/charmlibs-interfaces-ldap
+  docs: https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/ldap
+  src: https://github.com/canonical/glauth-k8s-operator
+  kind: PyPI
+  rel_name: ldap
+  rel_url_charmhub: https://charmhub.io/integrations/ldap
+  rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/ldap/v0
+  description: 'Library for configuring and connecting to a Lightweight Directory Access Protocol (LDAP) server.'
   tags:
   - identity-auth
 - name: charms.lego_base_k8s.lego_client
