@@ -36,8 +36,10 @@ integration = [  # installed for `just integration interfaces/tls_certificates`
 ]
 
 [project.urls]
-"Repository" = "https://github.com/canonical/charmlibs"
+"Documentation" = "https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/tls-certificates"
+"Repository" = "https://github.com/canonical/charmlibs/tree/main/interfaces/tls-certificates"
 "Issues" = "https://github.com/canonical/charmlibs/issues"
+"Changelog" = "https://github.com/canonical/charmlibs/blob/main/interfaces/tls-certificates/CHANGELOG.md"
 
 [build-system]
 requires = ["hatchling"]
@@ -79,9 +81,13 @@ include = ["src", "tests", "interface"]
 pythonVersion = "3.10"  # check no python > 3.10 features are used
 ignore = [
     "tests/integration/charms/*/published/src/charmlibs",
+    # imports the Charmhub-hosted lib, which is only present in the packed charm
+    "tests/integration/charms/requirer/fetch_lib_charm.py",
+    "tests/integration/charms/requirer/fetch-lib-*",
 ]
 
 [tool.pytest.ini_options]
+addopts = ["-x"]
 markers = [
     "upgrade: test that refreshes the chamr with the new library version",
 ]

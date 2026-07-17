@@ -1,0 +1,18 @@
+name: istio_metadata
+version: 0
+status: draft
+lib: charmlibs.interfaces.istio_metadata
+summary: Share Istio installation metadata between charms.
+description: |
+  The `istio_metadata` interface allows an Istio control plane charm to share information about its installation (such as the root namespace) with other charms that need to interoperate with Istio.
+  The provider charm (the Istio control plane) publishes the metadata, and requirer charms read it to configure their own integration with Istio.
+
+requirers:
+  - name: kiali-k8s-operator
+    url: https://github.com/canonical/kiali-k8s-operator
+
+providers:
+  - name: istio-k8s-operator
+    url: https://github.com/canonical/istio-k8s-operator
+
+maintainer: service-mesh

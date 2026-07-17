@@ -25,15 +25,15 @@ jobs:
     outputs:
       include: ${{ steps.include.outputs.result }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78  # v7.6.0
       - name: Find schema path
         id: schema
         run: |
           set -xueo pipefail
-          SCHEMA=$(.scripts/ls.py interfaces --regex "interfaces/$INTERFACE" --output schema_path | jq -r '.[].schema_path')
+          SCHEMA=$(.scripts/ls.py interfaces --regex "interfaces/$INTERFACE" --output-only schema_path --no-json)
           echo "result=$SCHEMA" >> "$GITHUB_OUTPUT"
       - name: Check schema can be run if it exists
         if: steps.schema.outputs.result
@@ -57,10 +57,10 @@ jobs:
         include: ${{ fromJSON(needs.init.outputs.include) }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78  # v7.6.0
       - name: Run interface tests
         env:
           VERSION: ${{ matrix.version }}

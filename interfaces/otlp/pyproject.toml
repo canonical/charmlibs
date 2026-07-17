@@ -35,8 +35,10 @@ integration = [  # installed for `just integration otlp`
 ]
 
 [project.urls]
-"Repository" = "https://github.com/canonical/charmlibs"
+"Documentation" = "https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/otlp"
+"Repository" = "https://github.com/canonical/charmlibs/tree/main/interfaces/otlp"
 "Issues" = "https://github.com/canonical/charmlibs/issues"
+"Changelog" = "https://github.com/canonical/charmlibs/blob/main/interfaces/otlp/CHANGELOG.md"
 
 [build-system]
 requires = ["hatchling"]

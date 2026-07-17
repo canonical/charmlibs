@@ -1,0 +1,44 @@
+# common actions.yaml file symlinked by these charms
+# consider adding an action for each thing you want to test
+
+restart:
+  description: Restarts the example service
+  params:
+    delay:
+      description: "Introduce an artificial delay (for testing)."
+      type: integer
+      default: 0
+
+failed-restart:
+  description: Example restart with a custom callback function. Used in testing
+  params:
+    delay:
+      description: "Introduce an artificial delay (for testing)."
+      type: integer
+      default: 0
+    max-retry:
+      description: "Number of times the operation should be retried."
+      type: integer
+
+deferred-restart:
+  description: Example restart with a custom callback function. Used in testing
+  params:
+    delay:
+      description: "Introduce an artificial delay (for testing)."
+      type: integer
+      default: 0
+    max-retry:
+      description: "Number of times the operation should be retried."
+      type: integer
+
+sync-restart:
+  description: Example restart with a custom callback function. Used in testing
+  params:
+    delay:
+      description: "Introduce an artificial delay (for testing)."
+      type: integer
+      default: 0
+    timeout:
+      description: "Time (seconds) to wait before giving up."
+      type: integer
+      default: 60

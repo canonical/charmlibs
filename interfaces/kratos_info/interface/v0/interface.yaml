@@ -3,6 +3,7 @@ internal: true
 
 version: 0
 status: published
+lib: charms.kratos.kratos_info
 
 providers:
   - name: kratos-operator

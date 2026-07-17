@@ -8,4 +8,4 @@ To install, add `charmlibs-uptime` to your Python dependencies. Then in your Pyt
 from charmlibs import uptime
 ```
 
-See the [reference documentation](https://documentation.ubuntu.com/charmlibs/reference/charmlibs/uptime) for more.
+See the [reference documentation](https://canonical.com/juju/docs/charmlibs/reference/charmlibs/uptime) for more.

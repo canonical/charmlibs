@@ -3,13 +3,17 @@ internal: true
 
 version: 0
 status: draft
+lib: charmlibs.interfaces.forward_auth
 
 providers:
-  - name: oathkeeper-operator
-    url: https://www.github.com/canonical/oathkeeper-operator
+  - name: oauth2-proxy-k8s-operator
+    url: https://github.com/canonical/oauth2-proxy-k8s-operator
 
 requirers:
   - name: traefik-k8s-operator
-    url: https://www.github.com/canonical/traefik-k8s-operator
+    url: https://github.com/canonical/traefik-k8s-operator
+  - name: istio-ingress-k8s-operator
+    url: https://github.com/canonical/istio-ingress-k8s-operator
+
 
 maintainer: identity

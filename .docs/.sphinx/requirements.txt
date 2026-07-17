@@ -1,7 +1,0 @@
-canonical-sphinx[full]
-sphinx-autobuild
-sphinxcontrib-mermaid
-sphinxcontrib-svg2pdfconverter[CairoSVG]
-sphinx-last-updated-by-git
-sphinx-datatables>=0.3
-sphinx-sitemap~=2.8

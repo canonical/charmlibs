@@ -1,4 +1,4 @@
-# Tutorial
+# charmlibs: Write your first charm library
 
 In this tutorial you'll add a new library to the `charmlibs` monorepo.
 
@@ -40,10 +40,11 @@ If you want to run the Juju integration tests locally, you'll also need `charmcr
 In CI, these are installed and set up for you using [concierge](https://github.com/canonical/concierge?tab=readme-ov-file#presets), with the `microk8s` and `machine` presets.
 The `dev` preset is suitable for local development and testing of both K8s and machine charms, but you may find it easier to run the Juju integration tests in CI when following this tutorial.
 
-> See more:
-> - {ref}`Charmcraft | Install charmcraft <charmcraft:manage-charmcraft>`
-> - {ref}`Juju | Set up your Juju deployment <juju:set-up-your-deployment>`
-> - {ref}`Juju | Set up an isolated environment <juju:set-things-up>`
+Read more:
+
+- {ref}`Charmcraft | Install charmcraft <charmcraft:manage-charmcraft>`
+- {ref}`Juju | Set up your Juju deployment <juju:set-up-your-deployment>`
+- {ref}`Juju | Set up an isolated environment <juju:set-things-up>`
 
 If you're not already using some alternative authentication for `git push`, you'll also want to [make sure you've set up your Github account with your SSH key](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/adding-a-new-ssh-key-to-your-github-account).
 
@@ -67,7 +68,7 @@ Get started by running `just init`, and provide the requested information intera
 - The author information to display on PyPI (e.g. `The <YOUR TEAM NAME> team at Canonical`).
 
 ````{tip}
-If you're working on an interface library, run `just interface init` instead.
+If you're working on an interface library, run `just init --interface` instead.
 This will create the library directory under the `interfaces/` directory and set it up to use the `charmlibs.interfaces` namespace.
 ````
 
@@ -121,7 +122,7 @@ In principle we can put all our library code here, but it's good practice to use
 
 In Python, names prefixed with a single underscore are private.
 This isn't enforced technically (a user who knows your library layout can import private symbols), but semantically there are no stability guarantees when using private variables.
-`charmlibs` follow semantic verisoning, so if we expose something publicly, we're promising to support it until at least our next major verson.
+`charmlibs` follow semantic versioning, so if we expose something publicly, we're promising to support it until at least our next major version.
 Let's add a private module where our feature implementation will live.
 
 Create the file `src/charmlibs/uptime/_uptime.py`, then copy the copyright header from `src/charmlibs/uptime/__init__.py` to `_uptime.py`. Next, add the following code to `_uptime.py`:
@@ -176,7 +177,7 @@ The `charmlibs` monorepo supports three distinct types of tests: unit, functiona
 The template starts you off with a simple passing test for each.
 We'll add a test of each kind for our `uptime` library in the following sections.
 
-> Read more: {ref}`charmlibs-tests`
+Read more: {ref}`charmlibs-tests`
 
 ### Add unit tests
 
@@ -242,7 +243,7 @@ You should also feel free to split your tests across as many files as needed to 
 
 For more on `ops.testing`, see:
 - [ops.testing reference docs for custom events](ops.testing.CharmEvents.custom)
-- [ops.testing how-to for testing that a custom event is emitted](https://documentation.ubuntu.com/ops/latest/howto/manage-libraries/#test-that-the-custom-event-is-emitted)
+- [ops.testing how-to for testing that a custom event is emitted](https://canonical.com/juju/docs/ops/latest/howto/manage-libraries/#test-that-the-custom-event-is-emitted)
 
 (tutorial-add-functional-tests)=
 ### Add functional tests
@@ -251,7 +252,7 @@ In this repository, functional tests are essentially integration or end-to-end t
 In contrast to unit tests, which typically mock out external concerns, functional tests interact with real systems, external processes, and networks.
 However, they do not interact with a real Juju environment, which is reserved for tests under the `integration/` directory.
 
-> Read more: {ref}`how-to-customize-functional-tests`
+Read more: {ref}`how-to-customize-functional-tests`
 
 ````{tip}
 If you're working on an interface library, functional tests probably aren't a good fit, since the main thing the library interacts with is Juju.
@@ -268,7 +269,7 @@ def test_hostname():
 
 Now run `just functional uptime` to verify that our new functional test passes.
 
-Realisticaly, our `uptime` function isn't really a good fit for functional tests, as its interaction with the external world is limited to fast and reliable system calls.
+Realistically, our `uptime` function isn't really a good fit for functional tests, as its interaction with the external world is limited to fast and reliable system calls.
 In this case, the library's core functionality would be well exercised by unit tests alone.
 We should still use full Juju integration tests to ensure everything is working correctly in the charm context, but in this case we could drop the functional tests altogether by removing the `tests/functional` directory.
 The functional tests would then show as skipped in CI.
@@ -288,7 +289,7 @@ Integration tests are the most complicated and most heavyweight part of the libr
 They involve packing a real charm that includes your library, and deploying it on a real Juju model.
 They can be customized in several ways depending on your library's needs.
 
-> Read more: {ref}`how-to-customize-integration-tests`
+Read more: {ref}`how-to-customize-integration-tests`
 
 For now, we'll just add an integration test for our `uptime` function.
 
@@ -353,7 +354,15 @@ Note that this will require `charmcraft` installed locally for packing, and a Ju
 However, you may find it easier to run the integration tests in CI instead, which is most easily done by opening a pull request.
 If you're following along with your own library, then see the next section for how to do this for real.
 Otherwise, if you're using the `uptime` example, open a PR against the `main` branch of your fork -- just make sure you enable the workflows first!
-You'll be prompted to do this if you visit `https://github.com/<USERNAME>/charmlibs/actions`. 
+You'll be prompted to do this if you visit `https://github.com/<USERNAME>/charmlibs/actions`.
+
+## Add library metadata
+
+The {ref}`interface library listing <interface-libs-listing>` and {ref}`general library listing <general-libs-listing>` are generated from `.docs/reference/libs.yaml`.
+Add an entry for your library so it appears in the listing.
+The entry includes your library's name, status, URLs, description, and tags.
+See `.docs/reference/tags.yaml` for the full list of available tags and their assignment criteria.
+Don't invent new tags, only use tags defined in `tags.yaml`.
 
 ## Next steps
 
@@ -376,4 +385,4 @@ Their review will cover whether the name and purpose of the library is appropria
 This type of review will be repeated for major version bumps of your library.
 All other releases will only require `CODEOWNERS` approval.
 
-> Read more: {ref}`charmlibs-publishing`
+Read more: {ref}`charmlibs-publishing`

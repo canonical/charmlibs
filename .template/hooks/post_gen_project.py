@@ -25,12 +25,16 @@ import warnings
 ##############################################################################
 
 # evaluated with jinja2 by cookiecutter
-# False by default, set to True by `just interface init`
+# False by default, set to True by `just init --interface`
 if {{cookiecutter._interface}}:  # noqa: F821
+    # Move src/charmlibs/* -> src/charmlibs/interfaces/*
     charmlibs = pathlib.Path('src', 'charmlibs')
     tmp = charmlibs.rename('.tmp')
     charmlibs.mkdir()
     tmp.rename(charmlibs / 'interfaces')
+else:  # Not an interface library.
+    shutil.rmtree('testing')
+
 
 #########################################################################################
 # unresolve symlinks -- we use these in the template for a better maintainer experience #
