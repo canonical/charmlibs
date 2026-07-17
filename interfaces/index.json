@@ -603,9 +603,9 @@
   {
     "name": "oauth",
     "version": "0",
-    "lib": "charms.hydra.oauth",
-    "lib_url": "https://charmhub.io/hydra/libraries/oauth",
-    "lib_docs_url": "",
+    "lib": "charmlibs.interfaces.oauth",
+    "lib_url": "https://pypi.org/project/charmlibs-interfaces-oauth",
+    "lib_docs_url": "https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/oauth",
     "docs_url": "https://canonical.com/juju/docs/charmlibs/reference/interfaces/oauth/",
     "summary": "Connect to an OAuth2/OIDC Provider.",
     "description": "The `oauth` interface allows charms to interface with an OAuth2/OIDC Provider.\nThe requirer acts as an OAuth2 client.\nThe provider exposes an OAuth2/OIDC Provider.",

@@ -174,8 +174,7 @@
 /interfaces/nginx-route/ruff.toml @canonical/platform-engineering
 
 # /interfaces/oauth/
-/interfaces/oauth/interface/ @canonical/identity
-/interfaces/oauth/ruff.toml @canonical/identity
+/interfaces/oauth/ @canonical/identity
 
 # /interfaces/opencti_connector/
 /interfaces/opencti_connector/interface/ @canonical/platform-engineering
