@@ -124,7 +124,7 @@ def unset(snap: str, keys: Iterable[str]) -> None:
         snap: The name of the snap to unset configuration on.
         keys: Configuration keys to unset. Nested options may be addressed with dotted
             notation, for example ``['server.port']``. Must not be a bare string.
-            An empty iterable is passed to snapd, where it is treated as a no-op.
+            An empty iterable is still passed to snapd, and may trigger the snap's config hook.
 
     Raises:
         TypeError: if ``keys`` is a string (must be a non-string iterable of strings).
