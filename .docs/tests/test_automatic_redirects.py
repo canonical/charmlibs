@@ -64,17 +64,15 @@ class TestBuildRedirects:
             ({'foo/a_b'}, {'foo/a-b': 'foo/a_b'}),
             # Redirects are created for category variants.
             ({'how-to/foo'}, {'how_to/foo': 'how-to/foo', 'howto/foo': 'how-to/foo'}),
-            # Trailing /index.html is handled.
-            ({'foo/a-b/index.html'}, {'foo/a_b/index.html': 'foo/a-b/'}),
             # Redirects are created from original name with category variant.
             (
-                {'how-to/a-b/index.html'},
+                {'how-to/a-b'},
                 {
-                    'how-to/a_b/index.html': 'how-to/a-b/',
-                    'how_to/a-b/index.html': 'how-to/a-b/',
-                    'how_to/a_b/index.html': 'how-to/a-b/',
-                    'howto/a-b/index.html': 'how-to/a-b/',
-                    'howto/a_b/index.html': 'how-to/a-b/',
+                    'how-to/a_b': 'how-to/a-b',
+                    'how_to/a-b': 'how-to/a-b',
+                    'how_to/a_b': 'how-to/a-b',
+                    'howto/a-b': 'how-to/a-b',
+                    'howto/a_b': 'how-to/a-b',
                 },
             ),
         ],

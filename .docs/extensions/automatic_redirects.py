@@ -94,11 +94,9 @@ def _build_redirects(found_docs: set[str]) -> dict[str, str]:
                 assert alias not in redirects, (
                     f'Alias {alias} already redirects to {redirects[alias]}'
                 )
-                if docname.endswith('/index.html'):
-                    # Remove 'index.html', preserve trailing '/'.
-                    redirects[alias] = docname.removesuffix('index.html')
-                else:
-                    redirects[alias] = docname
+                # We assume we always run *before* any /index.html shenanigans.
+                assert not docname.endswith('/index.html'), f'Unexpected docname format: {docname}'
+                redirects[alias] = docname
     return redirects
 
 
