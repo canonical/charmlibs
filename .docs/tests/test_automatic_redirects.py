@@ -28,7 +28,7 @@ if typing.TYPE_CHECKING:
     import sphinx.application
 
 
-class TestrVariants:
+class TestVariants:
     @pytest.mark.parametrize(
         ('docname', 'expected_unique'),
         [

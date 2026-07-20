@@ -76,7 +76,7 @@ def _automatic_redirects(
 def _build_redirects(found_docs: set[str]) -> dict[str, str]:
     """Redirect underscored names to hyphenated ones and vice versa.
 
-    Categories area also separately aliased with both variants and with no separator.
+    Categories are also separately aliased with both variants and with no separator.
     """
     redirects: dict[str, str] = {}
     for docname in sorted(found_docs):
