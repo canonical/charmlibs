@@ -1,0 +1,52 @@
+{
+    "type": "sync",
+    "status-code": 200,
+    "status": "OK",
+    "result": [
+        {
+            "snap": "lxd",
+            "name": "activate",
+            "daemon": "oneshot",
+            "daemon-scope": "system",
+            "enabled": true
+        },
+        {
+            "snap": "lxd",
+            "name": "daemon",
+            "daemon": "simple",
+            "daemon-scope": "system",
+            "enabled": true,
+            "activators": [
+                {
+                    "name": "unix",
+                    "type": "socket",
+                    "active": true,
+                    "enabled": true,
+                    "Name": "unix",
+                    "Type": "socket",
+                    "Active": true,
+                    "Enabled": true
+                }
+            ]
+        },
+        {
+            "snap": "lxd",
+            "name": "user-daemon",
+            "daemon": "simple",
+            "daemon-scope": "system",
+            "enabled": true,
+            "activators": [
+                {
+                    "name": "unix",
+                    "type": "socket",
+                    "active": true,
+                    "enabled": true,
+                    "Name": "unix",
+                    "Type": "socket",
+                    "Active": true,
+                    "Enabled": true
+                }
+            ]
+        }
+    ]
+}

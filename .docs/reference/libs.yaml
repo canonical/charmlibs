@@ -208,7 +208,7 @@ general:
 - name: charmlibs.apt
   status: recommended
   url: https://pypi.org/project/charmlibs-apt
-  docs: https://documentation.ubuntu.com/charmlibs/reference/charmlibs/apt
+  docs: https://canonical.com/juju/docs/charmlibs/reference/charmlibs/apt
   src: https://github.com/canonical/charmlibs/tree/main/apt
   kind: PyPI
   machine: true
@@ -219,7 +219,7 @@ general:
 - name: charmlibs.passwd
   status: recommended
   url: https://pypi.org/project/charmlibs-passwd
-  docs: https://documentation.ubuntu.com/charmlibs/reference/charmlibs/passwd
+  docs: https://canonical.com/juju/docs/charmlibs/reference/charmlibs/passwd
   src: https://github.com/canonical/charmlibs/tree/main/passwd
   kind: PyPI
   machine: true
@@ -230,7 +230,7 @@ general:
 - name: charmlibs.pathops
   status: recommended
   url: https://pypi.org/project/charmlibs-pathops
-  docs: https://documentation.ubuntu.com/charmlibs/reference/charmlibs/pathops
+  docs: https://canonical.com/juju/docs/charmlibs/reference/charmlibs/pathops
   src: https://github.com/canonical/charmlibs/tree/main/pathops
   kind: PyPI
   machine: true
@@ -241,7 +241,7 @@ general:
 - name: charmlibs.rollingops
   status: recommended
   url: https://pypi.org/project/charmlibs-rollingops
-  docs: https://documentation.ubuntu.com/charmlibs/reference/charmlibs/rollingops
+  docs: https://canonical.com/juju/docs/charmlibs/reference/charmlibs/rollingops
   src: https://github.com/canonical/charmlibs/tree/main/rollingops
   kind: PyPI
   machine: true
@@ -253,7 +253,7 @@ general:
 - name: charmlibs.snap
   status: recommended
   url: https://pypi.org/project/charmlibs-snap
-  docs: https://documentation.ubuntu.com/charmlibs/reference/charmlibs/snap
+  docs: https://canonical.com/juju/docs/charmlibs/reference/charmlibs/snap
   src: https://github.com/canonical/charmlibs/tree/main/snap
   kind: PyPI
   machine: true
@@ -264,7 +264,7 @@ general:
 - name: charmlibs.sysctl
   status: recommended
   url: https://pypi.org/project/charmlibs-sysctl
-  docs: https://documentation.ubuntu.com/charmlibs/reference/charmlibs/sysctl
+  docs: https://canonical.com/juju/docs/charmlibs/reference/charmlibs/sysctl
   src: https://github.com/canonical/charmlibs/tree/main/sysctl
   kind: PyPI
   machine: true
@@ -275,7 +275,7 @@ general:
 - name: charmlibs.systemd
   status: recommended
   url: https://pypi.org/project/charmlibs-systemd
-  docs: https://documentation.ubuntu.com/charmlibs/reference/charmlibs/systemd
+  docs: https://canonical.com/juju/docs/charmlibs/reference/charmlibs/systemd
   src: https://github.com/canonical/charmlibs/tree/main/systemd
   kind: PyPI
   machine: true
@@ -784,7 +784,7 @@ interfaces:
   kind: Charmhub
   rel_name: opencti-connector
   rel_url_charmhub: https://charmhub.io/integrations/opencti_connector
-  rel_url_schema: https://documentation.ubuntu.com/charmlibs/reference/interfaces/opencti_connector/v0/
+  rel_url_schema: https://canonical.com/juju/docs/charmlibs/reference/interfaces/opencti_connector/v0/
   description: ''
   tags:
   - security
@@ -1107,7 +1107,7 @@ interfaces:
   tags:
   - identity-auth
 - name: charms.oauth2_proxy_k8s.forward_auth
-  status: ''
+  status: legacy
   url: https://charmhub.io/oauth2-proxy-k8s/libraries/forward_auth
   docs: ''
   src: https://github.com/canonical/oauth2-proxy-k8s-operator
@@ -1115,7 +1115,19 @@ interfaces:
   rel_name: forward_auth
   rel_url_charmhub: https://charmhub.io/integrations/forward_auth
   rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/forward_auth/v0
-  description: ''
+  description: 'Interface library for providing API Gateways with Identity and Access Proxy information. Superseded by charmlibs-interfaces-forward-auth.'
+  tags:
+  - identity-auth
+- name: charmlibs.interfaces.forward_auth
+  status: recommended
+  url: https://pypi.org/project/charmlibs-interfaces-forward-auth
+  docs: https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/forward-auth
+  src: https://github.com/canonical/oauth2-proxy-k8s-operator
+  kind: PyPI
+  rel_name: forward_auth
+  rel_url_charmhub: https://charmhub.io/integrations/forward_auth
+  rel_url_schema: ''
+  description: 'Interface library for providing API Gateways with Identity and Access Proxy information.'
   tags:
   - identity-auth
 - name: charms.glauth_utils.glauth_auxiliary
@@ -1424,8 +1436,20 @@ interfaces:
   description: ''
   tags:
   - identity-auth
+- name: charmlibs.interfaces.oauth
+  status: recommended
+  url: https://pypi.org/project/charmlibs-interfaces-oauth
+  docs: https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/oauth
+  src: https://github.com/canonical/charmlibs/tree/main/interfaces/oauth
+  kind: PyPI
+  rel_name: oauth
+  rel_url_charmhub: https://charmhub.io/integrations/oauth
+  rel_url_schema: https://github.com/canonical/charmlibs/tree/main/interfaces/oauth/interface/v0
+  description: 'Register OAuth2/OIDC clients with an OIDC Provider.'
+  tags:
+  - identity-auth
 - name: charms.hydra.oauth
-  status: ''
+  status: legacy
   url: https://charmhub.io/hydra/libraries/oauth
   docs: ''
   src: https://github.com/canonical/hydra-operator
@@ -1433,7 +1457,7 @@ interfaces:
   rel_name: oauth
   rel_url_charmhub: https://charmhub.io/integrations/oauth
   rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/oauth/v0
-  description: ''
+  description: 'Register OAuth2/OIDC clients with an OIDC Provider. Superseded by charmlibs-interfaces-oauth.'
   tags:
   - identity-auth
 - name: charms.s3proxy_k8s.object_storage
@@ -1449,7 +1473,7 @@ interfaces:
   tags:
   - data
 - name: charms.openfga_k8s.openfga
-  status: ''
+  status: legacy
   url: https://charmhub.io/openfga-k8s/libraries/openfga
   docs: ''
   src: https://github.com/canonical/openfga-operator
@@ -1457,7 +1481,19 @@ interfaces:
   rel_name: openfga
   rel_url_charmhub: https://charmhub.io/integrations/openfga
   rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/openfga/v1
-  description: ''
+  description: 'Library for requesting OpenFGA authorization model stores to be created. Superseded by charmlibs-interfaces-openfga.'
+  tags:
+  - identity-auth
+- name: charmlibs.interfaces.openfga
+  status: recommended
+  url: https://pypi.org/project/charmlibs-interfaces-openfga
+  docs: https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/openfga
+  src: https://github.com/canonical/openfga-operator
+  kind: PyPI
+  rel_name: openfga
+  rel_url_charmhub: https://charmhub.io/integrations/openfga
+  rel_url_schema: https://github.com/canonical/charmlibs/tree/main/interfaces/openfga/interface/v1
+  description: 'Library for requesting OpenFGA authorization model stores to be created.'
   tags:
   - identity-auth
 - name: ops-lib-mysql
@@ -1585,7 +1621,7 @@ interfaces:
   tags:
   - data
 - name: charms.data_platform_libs.s3
-  status: ''
+  status: legacy
   url: https://charmhub.io/data-platform-libs/libraries/s3
   docs: ''
   src: https://github.com/canonical/data-platform-libs
@@ -1593,7 +1629,7 @@ interfaces:
   rel_name: s3
   rel_url_charmhub: https://charmhub.io/integrations/s3
   rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/s3/v0
-  description: Manage s3 credentials and metadata.
+  description: Deprecated in favour of ``object-storage-charmlib``.
   tags:
   - data
 - name: charms.saml_integrator.saml
@@ -1635,8 +1671,8 @@ interfaces:
 - name: charmlibs.interfaces.service_mesh
   status: recommended
   url: https://pypi.org/project/charmlibs-interfaces-service-mesh
-  docs: https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/service-mesh
-  src: https://github.com/canonical/charmlibs/tree/main/interfaces/service-mesh
+  docs: https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/service-mesh
+  src: https://github.com/canonical/charmlibs/tree/main/interfaces/service_mesh
   kind: PyPI
   rel_name: service_mesh
   rel_url_charmhub: https://charmhub.io/integrations/service_mesh
@@ -1683,7 +1719,7 @@ interfaces:
 - name: charmlibs.interfaces.tls_certificates
   status: recommended
   url: https://pypi.org/project/charmlibs-interfaces-tls-certificates
-  docs: https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/tls_certificates
+  docs: https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/tls_certificates
   src: https://github.com/canonical/charmlibs/tree/main/interfaces/tls_certificates
   kind: PyPI
   rel_name: tls_certificates
@@ -1775,7 +1811,7 @@ interfaces:
   kind: PyPI
   rel_name: litmus_auth
   rel_url_charmhub: https://charmhub.io/integrations/litmus_auth
-  rel_url_schema: https://documentation.ubuntu.com/charmlibs/reference/interfaces/litmus_auth/v0/
+  rel_url_schema: https://canonical.com/juju/docs/charmlibs/reference/interfaces/litmus_auth/v0/
   description: ''
   tags:
   - internal
@@ -1783,8 +1819,8 @@ interfaces:
 - name: charmlibs.interfaces.istio_request_auth
   status: recommended
   url: https://pypi.org/project/charmlibs-interfaces-istio-request-auth
-  docs: https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/istio-request-auth
-  src: https://github.com/canonical/charmlibs/tree/main/interfaces/istio-request-auth
+  docs: https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/istio-request-auth
+  src: https://github.com/canonical/charmlibs/tree/main/interfaces/istio_request_auth
   kind: PyPI
   rel_name: istio-request-auth
   rel_url_charmhub: ''
@@ -1809,8 +1845,8 @@ interfaces:
 - name: charmlibs.interfaces.gateway_metadata
   status: recommended
   url: https://pypi.org/project/charmlibs-interfaces-gateway-metadata
-  docs: https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/gateway-metadata
-  src: https://github.com/canonical/charmlibs/tree/main/interfaces/gateway-metadata
+  docs: https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/gateway-metadata
+  src: https://github.com/canonical/charmlibs/tree/main/interfaces/gateway_metadata
   kind: PyPI
   rel_name: gateway-metadata
   rel_url_charmhub: ''
@@ -1833,12 +1869,12 @@ interfaces:
 - name: charmlibs.interfaces.istio_metadata
   status: recommended
   url: https://pypi.org/project/charmlibs-interfaces-istio-metadata
-  docs: https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/istio_metadata
+  docs: https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/istio_metadata
   src: https://github.com/canonical/charmlibs/tree/main/interfaces/istio_metadata
   kind: PyPI
   rel_name: istio_metadata
   rel_url_charmhub: ''
-  rel_url_schema: https://documentation.ubuntu.com/charmlibs/reference/interfaces/istio_metadata/v0/
+  rel_url_schema: https://canonical.com/juju/docs/charmlibs/reference/interfaces/istio_metadata/v0/
   description: Share Istio installation metadata (e.g. root namespace) between charms.
   tags:
   - networking
@@ -1870,8 +1906,8 @@ interfaces:
 - name: charmlibs.interfaces.istio_ingress_route
   status: recommended
   url: https://pypi.org/project/charmlibs-interfaces-istio-ingress-route
-  docs: https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/istio-ingress-route
-  src: https://github.com/canonical/charmlibs/tree/main/interfaces/istio-ingress-route
+  docs: https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/istio-ingress-route
+  src: https://github.com/canonical/charmlibs/tree/main/interfaces/istio_ingress_route
   kind: PyPI
   rel_name: istio-ingress-route
   rel_url_charmhub: ''
@@ -1894,3 +1930,15 @@ interfaces:
   tags:
   - ingress
   - networking
+- name: object-storage-charmlib
+  status: recommended
+  url: https://pypi.org/project/object-storage-charmlib
+  docs: https://github.com/canonical/object-storage-integrator/blob/main/lib/README.md
+  src: https://github.com/canonical/object-storage-integrator/tree/main/lib
+  kind: PyPI
+  rel_name: s3
+  rel_url_charmhub: https://charmhub.io/integrations/s3
+  rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/s3/v1
+  description: Manage S3 (and Azure Blob Storage / GCS) credentials and metadata.
+  tags:
+  - data

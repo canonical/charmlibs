@@ -22,15 +22,8 @@ To install, add `charmlibs-rollingops` to your Python dependencies. Then in your
 from charmlibs import rollingops
 ```
 
-See the [reference documentation](https://documentation.ubuntu.com/charmlibs/reference/charmlibs/rollingops) for more.
+See the [reference documentation](https://canonical.com/juju/docs/charmlibs/reference/charmlibs/rollingops) for more.
 
 # Developing
 
 Refer to [CONTRIBUTING.md](https://github.com/canonical/charmlibs/blob/main/CONTRIBUTING.md) for development instructions.
-
-**Note:** Until this [issue](https://github.com/canonical/charmlibs/issues/449) is resolved,
-you must explicitly set the Python version when running `just` commands:
-
-```bash
-just python=3.12 <recipe> rollingops
-```

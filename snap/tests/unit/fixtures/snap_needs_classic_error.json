@@ -1,0 +1,10 @@
+{
+    "type": "error",
+    "status-code": 400,
+    "status": "Bad Request",
+    "result": {
+        "message": "snap \"just\" requires classic confinement",
+        "kind": "snap-needs-classic",
+        "value": "just"
+    }
+}

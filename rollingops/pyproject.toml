@@ -40,7 +40,7 @@ integration = [  # installed for `just integration rollingops`
 ]
 
 [project.urls]
-"Documentation" = "https://documentation.ubuntu.com/charmlibs/reference/charmlibs/rollingops"
+"Documentation" = "https://canonical.com/juju/docs/charmlibs/reference/charmlibs/rollingops"
 "Repository" = "https://github.com/canonical/charmlibs/tree/main/rollingops"
 "Issues" = "https://github.com/canonical/charmlibs/issues"
 "Changelog" = "https://github.com/canonical/charmlibs/blob/main/rollingops/CHANGELOG.md"

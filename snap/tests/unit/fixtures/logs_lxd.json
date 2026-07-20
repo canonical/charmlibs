@@ -1,0 +1,62 @@
+[
+    {
+        "timestamp": "2026-04-23T21:48:04.13454Z",
+        "message": "Starting snap.lxd.activate.service - Service for snap application lxd.activate...",
+        "sid": "systemd",
+        "pid": "1"
+    },
+    {
+        "timestamp": "2026-04-23T21:48:05.803818Z",
+        "message": "=> Starting LXD activation",
+        "sid": "lxd.activate",
+        "pid": "934"
+    },
+    {
+        "timestamp": "2026-04-23T21:48:05.804061Z",
+        "message": "==> Loading snap configuration",
+        "sid": "lxd.activate",
+        "pid": "934"
+    },
+    {
+        "timestamp": "2026-04-23T21:48:05.804061Z",
+        "message": "==> Checking for socket activation support",
+        "sid": "lxd.activate",
+        "pid": "934"
+    },
+    {
+        "timestamp": "2026-04-23T21:48:05.999861Z",
+        "message": "==> Setting LXD socket ownership",
+        "sid": "lxd.activate",
+        "pid": "934"
+    },
+    {
+        "timestamp": "2026-04-23T21:48:06.002732Z",
+        "message": "==> Setting LXD user socket ownership",
+        "sid": "lxd.activate",
+        "pid": "934"
+    },
+    {
+        "timestamp": "2026-04-23T21:48:06.0033Z",
+        "message": "==> Checking if LXD needs to be activated",
+        "sid": "lxd.activate",
+        "pid": "934"
+    },
+    {
+        "timestamp": "2026-04-23T21:48:07.120959Z",
+        "message": "snap.lxd.activate.service: Deactivated successfully.",
+        "sid": "systemd",
+        "pid": "1"
+    },
+    {
+        "timestamp": "2026-04-23T21:48:07.121194Z",
+        "message": "Finished snap.lxd.activate.service - Service for snap application lxd.activate.",
+        "sid": "systemd",
+        "pid": "1"
+    },
+    {
+        "timestamp": "2026-04-23T21:48:07.122744Z",
+        "message": "snap.lxd.activate.service: Consumed 2.030s CPU time.",
+        "sid": "systemd",
+        "pid": "1"
+    }
+]

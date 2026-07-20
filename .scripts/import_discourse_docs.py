@@ -28,7 +28,7 @@ resolving any embedded images along the way.
 
 It's a helper for migrating a library's docs into the charmlibs monorepo --
 see the "Migrate your library's docs" section of the migration how-to guide:
-https://documentation.ubuntu.com/charmlibs/how-to/migrate/
+https://canonical.com/juju/docs/charmlibs/how-to/migrate/
 
 Usage:
     .scripts/import_discourse_docs.py <discourse-url> <output-file>
