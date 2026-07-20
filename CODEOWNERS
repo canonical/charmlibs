@@ -40,8 +40,7 @@
 # charmlibs.interfaces packages (alphabetical)
 
 # /interfaces/auth_proxy/
-/interfaces/auth_proxy/interface/ @canonical/identity
-/interfaces/auth_proxy/ruff.toml @canonical/identity
+/interfaces/auth_proxy @canonical/identity
 
 # /interfaces/azure_service_principal/
 /interfaces/azure_service_principal/interface/ @canonical/data
