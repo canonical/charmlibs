@@ -18,9 +18,13 @@ from __future__ import annotations
 
 import typing
 
+import sphinx.util.logging
+
 if typing.TYPE_CHECKING:
     import sphinx.application
     import sphinx.environment
+
+logger = sphinx.util.logging.getLogger(__name__)
 
 
 def setup(app: sphinx.application.Sphinx) -> dict[str, str | bool]:
@@ -36,6 +40,9 @@ def _automatic_redirects(
     if app.config.package is not None:
         return
     redirects = _build_redirects(set(env.found_docs))
+    logger.info('Generated automatic redirects.')  # Show with `-v`.
+    for k, v in redirects.items():
+        logger.verbose(f'- {k} -> {v}')  # Show with `-vv`.
     target = typing.cast('dict[str, str]', app.config.rediraffe_redirects)
     assert isinstance(target, dict), f'rediraffe_redirects must be a dict, not {target!r}'
     if not set(target.keys()).isdisjoint(redirects.keys()):
