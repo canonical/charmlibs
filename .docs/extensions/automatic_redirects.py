@@ -18,13 +18,13 @@ from __future__ import annotations
 
 import typing
 
+import sphinx.application
+import sphinx.environment
 import sphinx.util.logging
 
 if typing.TYPE_CHECKING:
-    from typing import Generator
+    from collections.abc import Generator
 
-    import sphinx.application
-    import sphinx.environment
 
 logger = sphinx.util.logging.getLogger(__name__)
 
@@ -84,9 +84,7 @@ def _build_redirects(found_docs: set[str]) -> dict[str, str]:
             if alias == docname:
                 continue
             assert alias not in found_docs, f'Alias {alias} is a real page!'
-            assert alias not in redirects, (
-                f'Alias {alias} already redirects to {redirects[alias]}'
-            )
+            assert alias not in redirects, f'Alias {alias} already redirects to {redirects[alias]}'
             # We assume we always run *before* any /index.html shenanigans.
             assert not docname.endswith('/index.html'), f'Unexpected docname format: {docname}'
             redirects[alias] = docname
