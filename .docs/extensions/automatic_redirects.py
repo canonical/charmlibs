@@ -21,6 +21,8 @@ import typing
 import sphinx.util.logging
 
 if typing.TYPE_CHECKING:
+    from typing import Generator
+
     import sphinx.application
     import sphinx.environment
 
@@ -78,34 +80,28 @@ def _build_redirects(found_docs: set[str]) -> dict[str, str]:
     """
     redirects: dict[str, str] = {}
     for docname in sorted(found_docs):
-        category, _, doc = docname.partition('/')
-        category_variants = {
-            category,
-            category.replace('-', '_'),  # how_to
-            category.replace('_', '-'),  # how-to
-            category.replace('_', '').replace('-', ''),  # howto
-        }
-        for category_variant in sorted(category_variants):
-            for doc_variant in sorted({doc, _separator_variant(doc)}):
-                if (category_variant, doc_variant) == (category, doc):
-                    continue
-                alias = f'{category_variant}/{doc_variant}'
-                assert alias not in found_docs, f'Alias {alias} is a real page!'
-                assert alias not in redirects, (
-                    f'Alias {alias} already redirects to {redirects[alias]}'
-                )
-                # We assume we always run *before* any /index.html shenanigans.
-                assert not docname.endswith('/index.html'), f'Unexpected docname format: {docname}'
-                redirects[alias] = docname
+        for alias in sorted(set(_variants(docname))):
+            if alias == docname:
+                continue
+            assert alias not in found_docs, f'Alias {alias} is a real page!'
+            assert alias not in redirects, (
+                f'Alias {alias} already redirects to {redirects[alias]}'
+            )
+            # We assume we always run *before* any /index.html shenanigans.
+            assert not docname.endswith('/index.html'), f'Unexpected docname format: {docname}'
+            redirects[alias] = docname
     return redirects
 
 
-def _separator_variant(docname: str) -> str:
-    """Return the docname with ``-`` and ``_`` swapped."""
-    if '-' in docname:
-        assert '_' not in docname, f"Docname {docname} should not contain both '-' and '_'"
-        return docname.replace('-', '_')
-    if '_' in docname:
-        assert '-' not in docname, f"Docname {docname} should not contain both '-' and '_'"
-        return docname.replace('_', '-')
-    return docname
+def _variants(docname: str) -> Generator[str]:
+    """Return underscored and hyphenated variants of docname.
+
+    The category is also varied in non-separated form.
+    """
+    # Example input: how-to/some_interface/foo-bar
+    yield docname.replace('-', '_')  # -> how_to/some_interface/foo_bar
+    yield docname.replace('_', '-')  # -> how-to/some-interface/foo-bar
+    category, sep, doc = docname.partition('/')
+    cat = category.replace('_', '').replace('-', '')
+    yield cat + sep + doc.replace('-', '_')  # -> howto/some_interface/foo_bar
+    yield cat + sep + doc.replace('_', '-')  # -> howto/some-interface/foo-bar

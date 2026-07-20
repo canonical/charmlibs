@@ -28,29 +28,31 @@ if typing.TYPE_CHECKING:
     import sphinx.application
 
 
-class TestSeparatorVariant:
+class TestrVariants:
     @pytest.mark.parametrize(
-        ('docname', 'expected'),
+        ('docname', 'expected_unique'),
         [
             # Hyphens are translated to underscores and vice versa.
-            ('---', '___'),
-            ('___', '---'),
-            # / isn't special for this function.
-            ('how-to/manage-libraries', 'how_to/manage_libraries'),
-            ('how_to/manage_libraries', 'how-to/manage-libraries'),
-            # If there are no separators, the value is returned unmodified.
-            ('noseparators', 'noseparators'),
-            ('', ''),
+            ('a/---', {'a/___'}),
+            ('b/___', {'b/---'}),
+            # Category variant includes no separators.
+            ('how-to/foo', {'how_to/foo', 'howto/foo'}),
+            ('how-to/foo-bar', {'how_to/foo_bar', 'howto/foo_bar', 'howto/foo-bar'}),
+            # If there are no separators, there are no unique variants.
+            ('noseparators', set[str]()),
+            ('', set[str]()),
         ],
     )
-    def test_ok(self, docname: str, expected: str):
-        variant = automatic_redirects._separator_variant(docname)
-        assert variant == expected
+    def test_ok(self, docname: str, expected_unique: list[str]):
+        variants = automatic_redirects._variants(docname)
+        unique_variants = set(variants) - {docname}
+        assert unique_variants == expected_unique
 
-    def test_mixed_separators_raises(self):
-        """A docname containing both separators is an error."""
-        with pytest.raises(AssertionError, match='should not contain both'):
-            automatic_redirects._separator_variant('-_-')
+    def test_raw(self):
+        docname = 'how-to/manage-libraries'
+        variants = list(automatic_redirects._variants(docname))
+        assert len(variants) == 4
+        assert docname in variants
 
 
 class TestBuildRedirects:
@@ -64,16 +66,10 @@ class TestBuildRedirects:
             ({'foo/a_b'}, {'foo/a-b': 'foo/a_b'}),
             # Redirects are created for category variants.
             ({'how-to/foo'}, {'how_to/foo': 'how-to/foo', 'howto/foo': 'how-to/foo'}),
-            # Redirects are created from original name with category variant.
+            # Redirects are created for category and name variants.
             (
                 {'how-to/a-b'},
-                {
-                    'how-to/a_b': 'how-to/a-b',
-                    'how_to/a-b': 'how-to/a-b',
-                    'how_to/a_b': 'how-to/a-b',
-                    'howto/a-b': 'how-to/a-b',
-                    'howto/a_b': 'how-to/a-b',
-                },
+                {'how_to/a_b': 'how-to/a-b', 'howto/a-b': 'how-to/a-b', 'howto/a_b': 'how-to/a-b'},
             ),
         ],
     )
