@@ -1,4 +1,4 @@
-# Copyright 2025 Canonical Ltd.
+# Copyright 2026 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -37,8 +37,8 @@ def _automatic_redirects(
         return
     redirects = _build_redirects(set(env.found_docs))
     target = typing.cast('dict[str, str]', app.config.rediraffe_redirects)
-    assert isinstance(target, dict), f'rediraffe_redirects must be a dict, not {target}'
-    if not set(target).isdisjoint(redirects.keys()):
+    assert isinstance(target, dict), f'rediraffe_redirects must be a dict, not {target!r}'
+    if not set(target.keys()).isdisjoint(redirects.keys()):
         lines = ['Manually configured redirects would be clobbered by automatic redirects:']
         lines.extend(
             f'{k} -> {target[k]} would be overwritten by {k} -> {v}'
@@ -56,7 +56,7 @@ def _automatic_redirects(
             if v in redirects
         )
         raise ValueError('\n - '.join(lines))
-    if not set(target).isdisjoint(redirects.values()):
+    if not set(target.keys()).isdisjoint(redirects.values()):
         # This is probably safe in practice, but we'd like to notice the first time it happens.
         lines = ['The following automatic redirects chain with manually configured redirects:']
         lines.extend(f'{k} -> {v} -> {target[v]}' for k, v in redirects.items() if v in target)
