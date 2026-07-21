@@ -61,8 +61,8 @@ def connect(plug: tuple[str, str], slot: tuple[str, str] | str | None = None) ->
 
     Raises:
         APIError: if the plug is not fully specified (empty snap or plug name), if the plug snap
-            or slot snap is not installed, if the named plug or slot does not exist, if the plug and
-            slot interfaces do not match, or if the slot cannot be resolved unambiguously.
+            or slot snap is not installed, if the named plug or slot does not exist, if the plug
+            and slot interfaces do not match, or if the slot cannot be resolved unambiguously.
         ChangeError: if the operation fails after starting (for example, an interface hook errors).
 
     ::
