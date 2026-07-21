@@ -28,9 +28,11 @@ _PLUG = 'mount-observe'
 # The system snap that provides the auto-resolved slots. Present on any snapd system.
 _SYSTEM_SNAP = 'snapd'
 
-# A snap name that is never installed — used for error paths where any absent
+# Snap names that are never installed — used for error paths where any absent
 # snap produces the same error response, avoiding unnecessary remove operations.
+# Two distinct names are needed to test which snap snapd blames when both are absent.
 _ABSENT_SNAP = 'this-snap-does-not-exist-xyz-abc-123'
+_ABSENT_SNAP_2 = 'this-snap-also-does-not-exist-def-456'
 
 
 # ---------------------------------------------------------------------------
@@ -260,3 +262,51 @@ def test_connect_slot_snap_not_installed_raises():
         _snapd_interfaces.connect((_SNAP, _PLUG), (_ABSENT_SNAP, _PLUG))
     assert not ctx.value.kind
     assert 'not installed' in ctx.value.message
+
+
+# ---------------------------------------------------------------------------
+# error ordering
+#
+# snapd validates a connect/disconnect request in a fixed order (daemon/api_interfaces.go):
+# (1) the plug snap is installed, then (2) the slot snap is installed, then (3) the plug/slot
+# exist and their interfaces match (Resolve{Connect,Disconnect}). So a not-installed snap is
+# always reported before a bad plug/slot name, and when both snaps are absent the plug snap is
+# reported first. These tests pin that order: any future error-to-exception mapping (for example
+# probing snaps to raise a typed not-installed error) must not invert it. Probing plug-then-slot
+# and raising on the first absent snap matches this order.
+# ---------------------------------------------------------------------------
+
+
+def test_connect_slot_snap_not_installed_precedes_bad_plug():
+    # Installed-check beats plug-existence: a bad plug name AND a not-installed slot snap together
+    # report the not-installed slot snap, because the slot-snap check runs before ResolveConnect.
+    with pytest.raises(_errors.APIError) as ctx:
+        _snapd_interfaces.connect((_SNAP, 'nonexistent-plug'), (_ABSENT_SNAP, ''))
+    assert _ABSENT_SNAP in ctx.value.message
+    assert 'not installed' in ctx.value.message
+    assert 'nonexistent-plug' not in ctx.value.message
+
+
+def test_connect_plug_snap_checked_before_slot_snap():
+    # When both snaps are absent, the plug snap is reported (its installed-check runs first).
+    with pytest.raises(_errors.APIError) as ctx:
+        _snapd_interfaces.connect((_ABSENT_SNAP, 'x'), (_ABSENT_SNAP_2, ''))
+    assert _ABSENT_SNAP in ctx.value.message
+    assert _ABSENT_SNAP_2 not in ctx.value.message
+
+
+def test_disconnect_slot_snap_not_installed_precedes_bad_plug():
+    # Same ordering for disconnect: the not-installed slot snap beats the bad plug name.
+    with pytest.raises(_errors.APIError) as ctx:
+        _snapd_interfaces.disconnect((_SNAP, 'nonexistent-plug'), (_ABSENT_SNAP, 'x'))
+    assert _ABSENT_SNAP in ctx.value.message
+    assert 'not installed' in ctx.value.message
+    assert 'nonexistent-plug' not in ctx.value.message
+
+
+def test_disconnect_plug_snap_checked_before_slot_snap():
+    # When both snaps are absent, the plug snap is reported first.
+    with pytest.raises(_errors.APIError) as ctx:
+        _snapd_interfaces.disconnect((_ABSENT_SNAP, 'x'), (_ABSENT_SNAP_2, 'y'))
+    assert _ABSENT_SNAP in ctx.value.message
+    assert _ABSENT_SNAP_2 not in ctx.value.message
