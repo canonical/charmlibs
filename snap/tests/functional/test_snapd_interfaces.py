@@ -127,6 +127,24 @@ def test_connect_interface_mismatch_raises():
     assert 'cannot connect' in ctx.value.message
 
 
+def test_connect_all_empty_raises():
+    # An all-empty connect (empty plug, no slot) flows through to snapd, which rejects it with
+    # an empty-kind APIError. We deliberately do not guard this client-side.
+    with pytest.raises(_errors.APIError) as ctx:
+        _snapd_interfaces.connect(('', ''), ('', ''))
+    assert not ctx.value.kind
+    assert 'plug snap name is empty' in ctx.value.message
+
+
+def test_connect_empty_plug_name_raises():
+    # A plug with a snap but no plug name is rejected with a distinct message (the plug snap
+    # exists, but snapd cannot resolve which plug to connect).
+    with pytest.raises(_errors.APIError) as ctx:
+        _snapd_interfaces.connect((_SNAP, ''))
+    assert not ctx.value.kind
+    assert 'plug name is empty' in ctx.value.message
+
+
 # ---------------------------------------------------------------------------
 # disconnect
 # ---------------------------------------------------------------------------
@@ -206,9 +224,15 @@ def test_disconnect_nonexistent_plug_or_slot_raises():
     assert 'no plug or slot named' in ctx.value.message
 
 
-def test_disconnect_no_arguments_raises_value_error():
-    with pytest.raises(ValueError, match='at least one'):
-        _snapd_interfaces.disconnect()
+def test_disconnect_all_empty_raises():
+    # An all-empty disconnect -- whether from no arguments or explicit empty pairs (which encode
+    # identically) -- flows through to snapd, which rejects it with an empty-kind APIError. This
+    # matches connect's all-empty behaviour; we deliberately do not guard it client-side.
+    for args in [(), (('', ''),), (('', ''), ('', ''))]:
+        with pytest.raises(_errors.APIError) as ctx:
+            _snapd_interfaces.disconnect(*args)
+        assert not ctx.value.kind
+        assert 'allowed forms are' in ctx.value.message
 
 
 # ---------------------------------------------------------------------------

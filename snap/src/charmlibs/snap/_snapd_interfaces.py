@@ -23,6 +23,23 @@ from . import _client, _errors
 # /v2/interfaces
 
 
+def _snap_and_name(spec: tuple[str, str] | str | None) -> tuple[str, str]:
+    """Normalise a plug or slot spec to a ``(snap, name)`` pair of strings.
+
+    ``None`` becomes ``('', '')`` (fully unspecified: left for snapd to resolve or reject), and
+    a bare snap name becomes ``(snap, '')`` (name left for snapd to resolve or reject). A pair is
+    returned as-is; anything that is not a 2-item pair fails here with a clear ``ValueError``
+    (this is also what rejects a bare string where only a pair is accepted -- the whole string
+    is treated as the snap name, so it can never be silently split into characters).
+    """
+    if spec is None:
+        return '', ''
+    if isinstance(spec, str):
+        return spec, ''
+    snap, name = spec
+    return snap, name
+
+
 def connect(plug: tuple[str, str], slot: tuple[str, str] | str | None = None) -> None:
     """Connect a snap's plug to a slot.
 
@@ -33,17 +50,23 @@ def connect(plug: tuple[str, str], slot: tuple[str, str] | str | None = None) ->
             snapd cannot resolve a plug from the snap name alone.
         slot: The slot to connect to. May be given as:
 
-            - ``None`` (the default) to let snapd auto-resolve the slot, typically to the
-              system snap (``snapd`` or ``core``), matching the plug's interface.
-            - a bare snap name, to auto-resolve the matching slot on that snap.
+            - ``None`` (the default) to auto-resolve both the slot's snap and name. snapd
+              picks the system snap that provides slots -- ``snapd``, else ``core``, else
+              ``ubuntu-core`` -- then the single slot on it whose interface matches the plug.
+              It never resolves to a non-system snap, so this only works for interfaces the
+              system snap provides (for example ``home`` or ``network``, but not ``content``).
+              It raises if the chosen snap has no matching slot, or more than one.
+            - a bare snap name, to auto-resolve the matching slot on that snap (again raising
+              if that snap has no matching slot, or more than one).
             - a ``(snap, slot)`` pair, to name the slot explicitly. Either part may be an
-              empty string to have snapd resolve it (an empty snap resolves to the system
-              snap; an empty slot resolves to the matching slot on the given snap).
+              empty string to have snapd resolve it as above (an empty snap resolves to the
+              system snap; an empty slot resolves to the matching slot on the given snap).
 
     Raises:
-        APIError: if the plug snap or slot snap is not installed, the named plug or slot does
-            not exist, the plug and slot interfaces do not match, or the slot cannot be
-            resolved unambiguously. The error has an empty ``kind``; inspect ``message``.
+        APIError: if the plug is not fully specified (empty snap or plug name), the plug snap
+            or slot snap is not installed, the named plug or slot does not exist, the plug and
+            slot interfaces do not match, or the slot cannot be resolved unambiguously. The
+            error has an empty ``kind``; inspect ``message``.
         ChangeError: if the connection fails after starting (for example, an interface hook
             errors).
 
@@ -61,16 +84,12 @@ def connect(plug: tuple[str, str], slot: tuple[str, str] | str | None = None) ->
     # empty'), so a bare snap name is only meaningful for the slot side. The slot, by contrast,
     # is fully resolvable: an empty snap picks the system snap, and an empty slot name picks the
     # single matching slot on that snap. See interfaces/repo.go:ResolveConnect.
-    plug_snap, plug_name = plug  # Unpacking rejects a bare string plug with a clear ValueError.
-    if slot is None:
-        slot_snap, slot_name = '', ''
-    else:
-        # A bare snap name means 'resolve the matching slot on this snap'.
-        slot_snap, slot_name = (slot, None) if isinstance(slot, str) else slot
+    plug_snap, plug_name = _snap_and_name(plug)
+    slot_snap, slot_name = _snap_and_name(slot)
     data = {
         'action': 'connect',
         'plugs': [{'snap': plug_snap, 'plug': plug_name}],
-        'slots': [{'snap': slot_snap or '', 'slot': slot_name or ''}],
+        'slots': [{'snap': slot_snap, 'slot': slot_name}],
     }
     _client.post('/v2/interfaces', body=data)
 
@@ -83,9 +102,10 @@ def disconnect(
 ) -> None:
     """Disconnect a plug from a slot.
 
-    At least one of ``plug`` or ``slot`` must be given. Each is a ``(snap, name)`` pair;
-    unlike :func:`connect`, a bare snap name is not accepted on either side, because snapd
-    requires the plug or slot name to identify what to disconnect.
+    At least one of ``plug`` or ``slot`` should name something to disconnect. Each is a
+    ``(snap, name)`` pair; unlike :func:`connect`, a bare snap name is not accepted on either
+    side, because snapd requires the plug or slot name to identify what to disconnect. An empty
+    request (nothing named on either side) is passed through and rejected by snapd.
 
     Three forms are supported:
 
@@ -106,10 +126,10 @@ def disconnect(
             is not automatically reconnected on the next refresh.
 
     Raises:
-        ValueError: if neither ``plug`` nor ``slot`` is given.
-        APIError: if a named snap is not installed, the named plug or slot does not exist, or
-            the fully-specified plug and slot are not connected. The error has an empty
-            ``kind``; inspect ``message`` for details.
+        APIError: if neither ``plug`` nor ``slot`` names anything to disconnect (snapd rejects
+            the empty request with ``'allowed forms are ...'``), a named snap is not installed,
+            the named plug or slot does not exist, or the fully-specified plug and slot are not
+            connected. The error has an empty ``kind``; inspect ``message`` for details.
         ChangeError: if the disconnection fails after starting (for example, an interface hook
             errors).
 
@@ -122,13 +142,12 @@ def disconnect(
         # Disconnect one specific connection (raises if not connected).
         disconnect(('mysnap', 'content'), ('other-snap', 'content-slot'))
     """
-    if plug is None and slot is None:
-        raise ValueError('at least one of plug or slot must be given')
     # NOTE: A side is either fully empty ({'', ''}) or has a name; snapd rejects a bare snap
-    # ({snap, ''}) with 'allowed forms are ...'. Unpacking rejects a bare string with a clear
-    # ValueError. See overlord/ifacestate/ifacemgr.go:ResolveDisconnect.
-    plug_snap, plug_name = ('', '') if plug is None else plug
-    slot_snap, slot_name = ('', '') if slot is None else slot
+    # ({snap, ''}), and an all-empty request, with 'allowed forms are ...'. We let that flow
+    # through as an APIError -- as connect does for its own all-empty case -- rather than
+    # second-guessing snapd client-side. See overlord/ifacestate/ifacemgr.go:ResolveDisconnect.
+    plug_snap, plug_name = _snap_and_name(plug)
+    slot_snap, slot_name = _snap_and_name(slot)
     data: dict[str, Any] = {
         'action': 'disconnect',
         'plugs': [{'snap': plug_snap, 'plug': plug_name}],

@@ -42,16 +42,34 @@ class TestConnect:
         body = mock_client.post.call_args.kwargs['body']
         assert body['slots'] == [{'snap': 'core', 'slot': ''}]
 
+    def test_connect_slot_none_and_empty_pair_and_empty_string_all_equivalent(
+        self, mock_client: MockClient
+    ):
+        # None, ('', ''), and '' all normalise to a fully-empty slot for snapd to resolve.
+        bodies: list[object] = []
+        for slot in (None, ('', ''), ''):
+            _snapd_interfaces.connect(('vlc', 'mount-observe'), slot)
+            bodies.append(mock_client.post.call_args.kwargs['body']['slots'])
+        assert bodies == [[{'snap': '', 'slot': ''}]] * 3
+
     def test_connect_action_and_endpoint(self, mock_client: MockClient):
         _snapd_interfaces.connect(('vlc', 'mount-observe'))
         mock_client.post.assert_called_once()
         assert mock_client.post.call_args.args[0] == '/v2/interfaces'
         assert mock_client.post.call_args.kwargs['body']['action'] == 'connect'
 
-    def test_connect_bare_string_plug_raises(self, mock_client: MockClient):
-        # A bare snap name is not accepted for the plug: unpacking the 4-char string fails.
+    def test_connect_bare_string_plug_normalises_to_empty_plug_name(self, mock_client: MockClient):
+        # A bare string plug normalises to (snap, '') -- the whole string is the snap name, so
+        # it is never split into characters. snapd then rejects the empty plug name. Even a
+        # 2-char string (which would unpack silently) is treated as the snap name.
+        _snapd_interfaces.connect('ab')  # pyright: ignore[reportArgumentType]
+        body = mock_client.post.call_args.kwargs['body']
+        assert body['plugs'] == [{'snap': 'ab', 'plug': ''}]
+
+    def test_connect_non_pair_tuple_raises(self, mock_client: MockClient):
+        # A tuple that is not a 2-item pair fails fast with a ValueError.
         with pytest.raises(ValueError, match='unpack'):
-            _snapd_interfaces.connect('vlc')  # pyright: ignore[reportArgumentType]
+            _snapd_interfaces.connect(('a', 'b', 'c'))  # pyright: ignore[reportArgumentType]
         mock_client.post.assert_not_called()
 
 
@@ -75,10 +93,16 @@ class TestDisconnect:
         assert body['plugs'] == [{'snap': 'vlc', 'plug': 'plug'}]
         assert body['slots'] == [{'snap': 'core', 'slot': 'slot'}]
 
-    def test_disconnect_neither_side_raises(self, mock_client: MockClient):
-        with pytest.raises(ValueError, match='at least one'):
-            _snapd_interfaces.disconnect()
-        mock_client.post.assert_not_called()
+    def test_disconnect_all_empty_flows_through_to_api(self, mock_client: MockClient):
+        # No client-side guard: an all-empty disconnect (from no args, or from explicit empty
+        # pairs, which encode identically) is sent to snapd, which rejects it. This matches
+        # connect's all-empty behaviour -- we don't second-guess snapd's validation.
+        for args in [(), (('', ''),), (('', ''), ('', ''))]:
+            mock_client.post.reset_mock()
+            _snapd_interfaces.disconnect(*args)
+            body = mock_client.post.call_args.kwargs['body']
+            assert body['plugs'] == [{'snap': '', 'plug': ''}]
+            assert body['slots'] == [{'snap': '', 'slot': ''}]
 
     def test_disconnect_forget(self, mock_client: MockClient):
         _snapd_interfaces.disconnect(('vlc', 'mount-observe'), forget=True)
