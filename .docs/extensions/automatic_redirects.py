@@ -74,10 +74,7 @@ def _automatic_redirects(
 
 
 def _build_redirects(found_docs: set[str]) -> dict[str, str]:
-    """Redirect underscored names to hyphenated ones and vice versa.
-
-    Categories are also separately aliased with both variants and with no separator.
-    """
+    """Redirect underscored names to hyphenated ones and vice versa."""
     redirects: dict[str, str] = {}
     for docname in sorted(found_docs):
         for alias in sorted(set(_variants(docname))):
@@ -92,14 +89,7 @@ def _build_redirects(found_docs: set[str]) -> dict[str, str]:
 
 
 def _variants(docname: str) -> Generator[str]:
-    """Return underscored and hyphenated variants of docname.
-
-    The category is also varied in non-separated form.
-    """
+    """Return underscored and hyphenated variants of docname."""
     # Example input: how-to/some_interface/foo-bar
     yield docname.replace('-', '_')  # -> how_to/some_interface/foo_bar
     yield docname.replace('_', '-')  # -> how-to/some-interface/foo-bar
-    category, sep, doc = docname.partition('/')
-    cat = category.replace('_', '').replace('-', '')
-    yield cat + sep + doc.replace('-', '_')  # -> howto/some_interface/foo_bar
-    yield cat + sep + doc.replace('_', '-')  # -> howto/some-interface/foo-bar

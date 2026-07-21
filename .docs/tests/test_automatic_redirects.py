@@ -35,9 +35,8 @@ class TestVariants:
             # Hyphens are translated to underscores and vice versa.
             ('a/---', {'a/___'}),
             ('b/___', {'b/---'}),
-            # Category variant includes no separators.
-            ('how-to/foo', {'how_to/foo', 'howto/foo'}),
-            ('how-to/foo-bar', {'how_to/foo_bar', 'howto/foo_bar', 'howto/foo-bar'}),
+            ('how-to/foo', {'how_to/foo'}),
+            ('how-to/foo-bar', {'how_to/foo_bar'}),
             # If there are no separators, there are no unique variants.
             ('noseparators', set[str]()),
             ('', set[str]()),
@@ -51,7 +50,7 @@ class TestVariants:
     def test_raw(self):
         docname = 'how-to/manage-libraries'
         variants = list(automatic_redirects._variants(docname))
-        assert len(variants) == 4
+        assert len(variants) == 2
         assert docname in variants
 
 
@@ -64,13 +63,8 @@ class TestBuildRedirects:
             # Hyphen -> underscore and vice versa.
             ({'foo/a-b'}, {'foo/a_b': 'foo/a-b'}),
             ({'foo/a_b'}, {'foo/a-b': 'foo/a_b'}),
-            # Redirects are created for category variants.
-            ({'how-to/foo'}, {'how_to/foo': 'how-to/foo', 'howto/foo': 'how-to/foo'}),
-            # Redirects are created for category and name variants.
-            (
-                {'how-to/a-b'},
-                {'how_to/a_b': 'how-to/a-b', 'howto/a-b': 'how-to/a-b', 'howto/a_b': 'how-to/a-b'},
-            ),
+            ({'how-to/foo'}, {'how_to/foo': 'how-to/foo'}),
+            ({'how-to/a-b'}, {'how_to/a_b': 'how-to/a-b'}),
         ],
     )
     def test_ok(self, found: set[str], expected: dict[str, str]):
