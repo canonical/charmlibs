@@ -1,0 +1,9 @@
+name: test-interfaces-snap
+version: "1.0"
+summary: Snap declaring plugs for charmlibs.snap interface functional tests
+confinement: strict
+plugs:
+  mount-observe:
+    interface: mount-observe
+  system-observe:
+    interface: system-observe
