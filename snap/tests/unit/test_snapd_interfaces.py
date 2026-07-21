@@ -10,10 +10,18 @@ from typing import TYPE_CHECKING
 import pytest
 
 from charmlibs.snap import _snapd_interfaces
-from charmlibs.snap._errors import _InterfacesUnchangedError
+from charmlibs.snap._errors import APIError, NotFoundError, _InterfacesUnchangedError
 
 if TYPE_CHECKING:
     from conftest import MockClient
+
+
+def _api_error(message: str = 'boom') -> APIError:
+    return APIError(message, kind='', value='', status_code=400)
+
+
+def _not_found(message: str = 'not found') -> NotFoundError:
+    return NotFoundError(message, kind='snap-not-found', value='', status_code=404)
 
 
 class TestConnect:
@@ -71,6 +79,32 @@ class TestConnect:
         with pytest.raises(ValueError, match='unpack'):
             _snapd_interfaces.connect(('a', 'b', 'c'))  # pyright: ignore[reportArgumentType]
         mock_client.post.assert_not_called()
+
+    def test_connect_probes_plug_before_slot_on_api_error(self, mock_client: MockClient):
+        # On an API error, connect probes the named snaps -- plug first -- and re-raises the
+        # not-installed one as NotFoundError. Here the plug snap is installed and the slot is not.
+        mock_client.post.side_effect = _api_error()
+
+        def fake_get(path: str, query: object = None) -> dict[str, object]:
+            if path == '/v2/snaps/absent-slot':
+                raise _not_found()
+            return {}  # plug snap is installed
+
+        mock_client.get.side_effect = fake_get
+        with pytest.raises(NotFoundError):
+            _snapd_interfaces.connect(('installed-plug', 'p'), ('absent-slot', 's'))
+        # The plug snap is probed before the slot snap (matching snapd's blame order).
+        assert mock_client.get.call_args_list[0].args[0] == '/v2/snaps/installed-plug'
+
+    def test_connect_reraises_original_when_snaps_installed(self, mock_client: MockClient):
+        # If the probe finds every named snap installed, the original API error is re-raised
+        # unchanged (the failure was something other than a missing snap).
+        original = _api_error('snap "installed" has no plug named "foo"')
+        mock_client.post.side_effect = original
+        mock_client.get.return_value = {}  # all probed snaps installed
+        with pytest.raises(APIError) as ctx:
+            _snapd_interfaces.connect(('installed', 'foo'), 'snapd')
+        assert ctx.value is original
 
 
 class TestDisconnect:
@@ -140,3 +174,20 @@ class TestDisconnect:
             status='Bad Request',
         )
         _snapd_interfaces.disconnect(('vlc', 'mount-observe'), forget=True)  # Should not raise.
+
+    def test_disconnect_probes_and_raises_not_found(self, mock_client: MockClient):
+        # disconnect also converts a not-installed API error into a typed NotFoundError.
+        mock_client.post.side_effect = _api_error()
+        mock_client.get.side_effect = _not_found()
+        with pytest.raises(NotFoundError):
+            _snapd_interfaces.disconnect(('absent', 'p'))
+
+    def test_disconnect_unchanged_suppressed_before_probe(self, mock_client: MockClient):
+        # _InterfacesUnchangedError is caught before the not-installed probe: it is suppressed,
+        # and the probe (which would raise) is never reached.
+        mock_client.post.side_effect = _InterfacesUnchangedError(
+            'nothing to do', kind='interfaces-unchanged', value='', status_code=400
+        )
+        mock_client.get.side_effect = _not_found()  # would raise if the probe ran
+        _snapd_interfaces.disconnect(('vlc', 'mount-observe'))  # Should not raise.
+        mock_client.get.assert_not_called()

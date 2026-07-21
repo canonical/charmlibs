@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from . import _client, _errors
+from . import _client, _errors, _utils
 
 # /v2/interfaces
 
@@ -38,6 +38,21 @@ def _snap_and_name(spec: tuple[str, str] | str | None) -> tuple[str, str]:
         return spec, ''
     snap, name = spec
     return snap, name
+
+
+def _raise_not_installed_snap(plug_snap: str, slot_snap: str) -> None:
+    """Convert an empty-kind 'snap is not installed' API error into a typed NotFoundError.
+
+    snapd validates the plug snap before the slot snap (daemon/api_interfaces.go), reporting a
+    not-installed snap as an empty-kind ``APIError`` before any plug/slot resolution. We probe the
+    named snaps in the same order -- plug snap first -- so the ``NotFoundError`` names the same
+    snap snapd would blame. Empty (auto-resolved) sides are skipped, and the ``system``/``core``
+    aliases are skipped because snapd serves them without the core snap being installed. If both
+    named snaps are installed, this returns and the caller re-raises the original error.
+    """
+    for snap in (plug_snap, slot_snap):
+        if snap:
+            _utils.raise_if_snap_not_installed_or_system(snap)
 
 
 def connect(plug: tuple[str, str], slot: tuple[str, str] | str | None = None) -> None:
@@ -60,9 +75,12 @@ def connect(plug: tuple[str, str], slot: tuple[str, str] | str | None = None) ->
               system snap; an empty slot resolves to the matching slot on the given snap).
 
     Raises:
-        APIError: if the plug is not fully specified (empty snap or plug name), if the plug snap
-            or slot snap is not installed, if the named plug or slot does not exist, if the plug
-            and slot interfaces do not match, or if the slot cannot be resolved unambiguously.
+        NotFoundError: if the plug snap or slot snap is not installed (the plug snap is checked
+            first). Not raised for the ``system``/``core`` slot aliases, which snapd serves
+            without the core snap.
+        APIError: if the plug is not fully specified (empty snap or plug name), if the named plug
+            or slot does not exist, if the plug and slot interfaces do not match, or if the slot
+            cannot be resolved unambiguously.
         ChangeError: if the operation fails after starting (for example, an interface hook errors).
 
     ::
@@ -86,7 +104,12 @@ def connect(plug: tuple[str, str], slot: tuple[str, str] | str | None = None) ->
         'plugs': [{'snap': plug_snap, 'plug': plug_name}],
         'slots': [{'snap': slot_snap, 'slot': slot_name}],
     }
-    _client.post('/v2/interfaces', body=data)
+    try:
+        _client.post('/v2/interfaces', body=data)
+    except _errors.APIError:
+        # Turn snapd's empty-kind 'snap is not installed' error into a typed NotFoundError.
+        _raise_not_installed_snap(plug_snap, slot_snap)
+        raise
 
 
 def disconnect(
@@ -116,9 +139,9 @@ def disconnect(
             is not automatically reconnected on the next refresh.
 
     Raises:
-        APIError: if neither ``plug`` nor ``slot`` names anything to disconnect, if a named snap
-            is not installed, if the named plug or slot does not exist, or if the fully-specified
-            plug and slot are not connected.
+        NotFoundError: if a named snap is not installed (the plug snap is checked first).
+        APIError: if neither ``plug`` nor ``slot`` names anything to disconnect, if the named plug
+            or slot does not exist, or if the fully-specified plug and slot are not connected.
         ChangeError: if the operation fails after starting (for example, an interface hook errors).
 
     ::
@@ -151,3 +174,7 @@ def disconnect(
         _client.post('/v2/interfaces', body=data)
     except _errors._InterfacesUnchangedError:
         pass  # Follow the snap CLI's lead and suppress this error.
+    except _errors.APIError:
+        # Turn snapd's empty-kind 'snap is not installed' error into a typed NotFoundError.
+        _raise_not_installed_snap(plug_snap, slot_snap)
+        raise
