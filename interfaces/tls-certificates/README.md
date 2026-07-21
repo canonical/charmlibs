@@ -9,7 +9,7 @@ from charmlibs.interfaces import tls_certificates
 ```
 
 Read more:
-- [Tutorial](https://documentation.ubuntu.com/charmlibs/tutorials/charmlibs/interfaces/tls-certificates/tutorial/)
-- [Library reference](https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/tls-certificates/)
-- [How to configure certificate requests](https://documentation.ubuntu.com/charmlibs/how-to/charmlibs/interfaces/tls-certificates/configure-certificate-requests/)
-- [Explanation of the library design](https://documentation.ubuntu.com/charmlibs/explanation/charmlibs/interfaces/tls-certificates/design/)
+- [Tutorial](https://canonical.com/juju/docs/charmlibs/tutorials/charmlibs/interfaces/tls-certificates/tutorial/)
+- [Library reference](https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/tls-certificates/)
+- [How to configure certificate requests](https://canonical.com/juju/docs/charmlibs/how-to/charmlibs/interfaces/tls-certificates/configure-certificate-requests/)
+- [Explanation of the library design](https://canonical.com/juju/docs/charmlibs/explanation/charmlibs/interfaces/tls-certificates/design/)

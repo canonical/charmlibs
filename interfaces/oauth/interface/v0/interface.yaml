@@ -1,7 +1,7 @@
 name: oauth
 version: 0
 status: draft
-lib: charms.hydra.oauth
+lib: charmlibs.interfaces.oauth
 summary: Connect to an OAuth2/OIDC Provider.
 description: |
   The `oauth` interface allows charms to interface with an OAuth2/OIDC Provider.

@@ -40,8 +40,7 @@
 # charmlibs.interfaces packages (alphabetical)
 
 # /interfaces/auth_proxy/
-/interfaces/auth_proxy/interface/ @canonical/identity
-/interfaces/auth_proxy/ruff.toml @canonical/identity
+/interfaces/auth_proxy @canonical/identity
 
 # /interfaces/azure_service_principal/
 /interfaces/azure_service_principal/interface/ @canonical/data
@@ -83,8 +82,7 @@
 /interfaces/filesystem_info/ruff.toml @canonical/hpc-team
 
 # /interfaces/forward_auth/
-/interfaces/forward_auth/interface/ @canonical/identity
-/interfaces/forward_auth/ruff.toml @canonical/identity
+/interfaces/forward_auth @canonical/identity
 
 # /interfaces/gateway_metadata/
 /interfaces/gateway_metadata @canonical/service-mesh
@@ -175,16 +173,14 @@
 /interfaces/nginx-route/ruff.toml @canonical/platform-engineering
 
 # /interfaces/oauth/
-/interfaces/oauth/interface/ @canonical/identity
-/interfaces/oauth/ruff.toml @canonical/identity
+/interfaces/oauth/ @canonical/identity
 
 # /interfaces/opencti_connector/
 /interfaces/opencti_connector/interface/ @canonical/platform-engineering
 /interfaces/opencti_connector/ruff.toml @canonical/platform-engineering
 
 # /interfaces/openfga/
-/interfaces/openfga/interface/ @canonical/identity
-/interfaces/openfga/ruff.toml @canonical/identity
+/interfaces/openfga/ @canonical/identity
 
 # /interfaces/opensearch_client/
 /interfaces/opensearch_client/interface/ @canonical/data-nosql
