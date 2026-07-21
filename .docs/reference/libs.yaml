@@ -837,7 +837,7 @@ interfaces:
   tags:
   - observability
 - name: charms.oathkeeper.auth_proxy
-  status: ''
+  status: legacy
   url: https://charmhub.io/oathkeeper/libraries/auth_proxy
   docs: ''
   src: https://github.com/canonical/oathkeeper-operator
@@ -845,11 +845,11 @@ interfaces:
   rel_name: auth_proxy
   rel_url_charmhub: https://charmhub.io/integrations/auth_proxy
   rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/auth_proxy/v0
-  description: ''
+  description: 'Interface library for providing Oathkeeper with downstream charms auth-proxy information. Superseded by charmlibs-interfaces-auth-proxy.'
   tags:
   - identity-auth
 - name: charms.oauth2_proxy_k8s.auth_proxy
-  status: ''
+  status: legacy
   url: https://charmhub.io/oauth2-proxy-k8s/libraries/auth_proxy
   docs: ''
   src: https://github.com/canonical/oauth2-proxy-k8s-operator
@@ -857,7 +857,19 @@ interfaces:
   rel_name: auth_proxy
   rel_url_charmhub: https://charmhub.io/integrations/auth_proxy
   rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/auth_proxy/v0
-  description: ''
+  description: 'Interface library for providing OAuth2 Proxy with downstream charms auth-proxy information. Superseded by charmlibs-interfaces-auth-proxy.'
+  tags:
+  - identity-auth
+- name: charmlibs.interfaces.auth_proxy
+  status: recommended
+  url: https://pypi.org/project/charmlibs-interfaces-auth-proxy
+  docs: https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/auth-proxy
+  src: https://github.com/canonical/charmlibs/tree/main/interfaces/auth_proxy
+  kind: PyPI
+  rel_name: auth_proxy
+  rel_url_charmhub: https://charmhub.io/integrations/auth_proxy
+  rel_url_schema: https://github.com/canonical/charmlibs/tree/main/interfaces/auth_proxy/interface/v0
+  description: 'Interface library for providing OAuth2 Proxy with downstream charms auth-proxy information.'
   tags:
   - identity-auth
 - name: charms.blackbox_exporter_k8s.blackbox_probes
