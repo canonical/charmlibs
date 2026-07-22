@@ -50,6 +50,13 @@ class TestConnect:
         body = mock_client.post.call_args.kwargs['body']
         assert body['slots'] == [{'snap': 'core', 'slot': ''}]
 
+    def test_connect_slot_pair_with_empty_snap(self, mock_client: MockClient):
+        # An explicit pair with an empty slot snap (the ':name' / system-slot form) is passed
+        # through unchanged, for snapd to resolve the empty snap to the system snap.
+        _snapd_interfaces.connect(('vlc', 'plug'), ('', 'myslot'))
+        body = mock_client.post.call_args.kwargs['body']
+        assert body['slots'] == [{'snap': '', 'slot': 'myslot'}]
+
     def test_connect_slot_none_and_empty_pair_and_empty_string_all_equivalent(
         self, mock_client: MockClient
     ):
@@ -126,6 +133,16 @@ class TestDisconnect:
         body = mock_client.post.call_args.kwargs['body']
         assert body['plugs'] == [{'snap': 'vlc', 'plug': 'plug'}]
         assert body['slots'] == [{'snap': 'core', 'slot': 'slot'}]
+
+    def test_disconnect_empty_snap_pairs_pass_through(self, mock_client: MockClient):
+        # An empty snap with a name (the 'empty snap means system' form) is passed through as-is
+        # for snapd to remap to the system snap -- on either the plug or the slot side.
+        _snapd_interfaces.disconnect(('', 'myplug'))
+        plugs = mock_client.post.call_args.kwargs['body']['plugs']
+        assert plugs == [{'snap': '', 'plug': 'myplug'}]
+        _snapd_interfaces.disconnect(slot=('', 'myslot'))
+        slots = mock_client.post.call_args.kwargs['body']['slots']
+        assert slots == [{'snap': '', 'slot': 'myslot'}]
 
     def test_disconnect_all_empty_flows_through_to_api(self, mock_client: MockClient):
         # No client-side guard: an all-empty disconnect (from no args, or from explicit empty

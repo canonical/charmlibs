@@ -112,6 +112,28 @@ def test_connect_explicit_slot_pair():
     assert _is_connected()
 
 
+# Every type-correct slot form that resolves to the system snap's mount-observe slot. An empty
+# slot snap ('' or omitted) means the system snap, so these are all equivalent to slot=None: the
+# ('', name) case is the 'empty snap means system' semantic, applied to a named slot.
+@pytest.mark.parametrize(
+    'slot',
+    [None, '', _SYSTEM_SNAP, ('', ''), ('', _PLUG), (_SYSTEM_SNAP, ''), (_SYSTEM_SNAP, _PLUG)],
+)
+def test_connect_slot_forms_resolving_to_system(slot: object):
+    _ensure_disconnected()
+    _snapd_interfaces.connect((_SNAP, _PLUG), slot)  # pyright: ignore[reportArgumentType]
+    assert _is_connected()
+
+
+def test_connect_slot_empty_snap_wrong_interface_hits_system():
+    # ('', name) resolves the empty snap to the system snap, so a name on the wrong interface
+    # fails against snapd -- confirming the empty snap really did mean the system snap.
+    _ensure_disconnected()
+    with pytest.raises(_errors.APIError) as ctx:
+        _snapd_interfaces.connect((_SNAP, _PLUG), ('', 'network'))
+    assert 'snapd:network' in ctx.value.message
+
+
 def test_connect_nonexistent_plug_raises():
     # Connecting a nonexistent plug raises a base Error (no kind from snapd).
     with pytest.raises(_errors.Error) as ctx:
@@ -169,6 +191,39 @@ def test_disconnect_both_sides():
     _ensure_connected()
     _snapd_interfaces.disconnect((_SNAP, _PLUG), (_SYSTEM_SNAP, _PLUG))
     assert not _is_connected()
+
+
+# The 'empty snap means the system snap' semantic applies to disconnect on either side: our plug
+# is connected to the system's mount-observe slot, so naming that slot on the system -- whether
+# by an empty snap ('') or explicitly ('snapd') -- disconnects it. This is the same remap that
+# resolves connect's empty slot snap.
+@pytest.mark.parametrize('snap', ['', _SYSTEM_SNAP])
+@pytest.mark.parametrize('side', ['plug', 'slot'])
+def test_disconnect_empty_or_system_snap_targets_system(side: str, snap: str):
+    _ensure_connected()
+    if side == 'plug':
+        _snapd_interfaces.disconnect((snap, _PLUG))
+    else:
+        _snapd_interfaces.disconnect(slot=(snap, _PLUG))
+    assert not _is_connected()
+
+
+def test_disconnect_empty_snap_named_pair_both_sides():
+    # Fully-specified disconnect with an empty (system) slot snap resolves the specific
+    # connection between our plug and the system's mount-observe slot.
+    _ensure_connected()
+    _snapd_interfaces.disconnect((_SNAP, _PLUG), ('', _PLUG))
+    assert not _is_connected()
+
+
+def test_disconnect_snap_without_name_raises():
+    # A side with a snap but no name is a partial spec: unlike connect's slot (which auto-resolves
+    # the name), disconnect rejects it with 'allowed forms are ...'.
+    _ensure_connected()
+    with pytest.raises(_errors.APIError) as ctx:
+        _snapd_interfaces.disconnect((_SNAP, ''))
+    assert not ctx.value.kind
+    assert 'allowed forms are' in ctx.value.message
 
 
 def test_disconnect_plug_only_not_connected_no_error():

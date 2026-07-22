@@ -125,6 +125,9 @@ def disconnect(
     side, because snapd requires the plug or slot name to identify what to disconnect. An
     ``APIError`` is raised if neither side is specified or if either side is partially specified.
 
+    An empty snap on either side means the system snap (mirroring :func:`connect`'s slot): for
+    example ``('', 'mount-observe')`` refers to ``mount-observe`` on ``snapd``/``core``.
+
     Three forms are supported:
 
     - ``plug`` only: disconnect everything connected to that plug. No-op if nothing is connected.
