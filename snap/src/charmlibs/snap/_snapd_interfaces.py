@@ -152,14 +152,7 @@ def disconnect(
 
 
 def _snap_and_name(spec: tuple[str, str] | str | None) -> tuple[str, str]:
-    """Normalise a plug or slot spec to a ``(snap, name)`` pair of strings.
-
-    ``None`` becomes ``('', '')`` (fully unspecified: left for snapd to resolve or reject), and
-    a bare snap name becomes ``(snap, '')`` (name left for snapd to resolve or reject). A pair is
-    returned as-is; anything that is not a 2-item pair fails here with a clear ``ValueError``
-    (this is also what rejects a bare string where only a pair is accepted -- the whole string
-    is treated as the snap name, so it can never be silently split into characters).
-    """
+    """Normalise a plug or slot spec to a ``(snap, name)`` pair of strings."""
     if spec is None:
         return '', ''
     if isinstance(spec, str):
