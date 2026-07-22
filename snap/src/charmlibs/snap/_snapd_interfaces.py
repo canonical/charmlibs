@@ -106,7 +106,7 @@ def disconnect(
     Args:
         plug: The plug side, as a ``(snap, plug)`` pair. Omit to disconnect by slot only.
         slot: The slot side, as a ``(snap, slot)`` pair. Omit to disconnect by plug only.
-        forget: If ``True``, also forget any manual connection preference, so the interface
+        forget: If true, also forget any manual connection preference, so the interface
             is not automatically reconnected on the next refresh.
 
     Raises:
