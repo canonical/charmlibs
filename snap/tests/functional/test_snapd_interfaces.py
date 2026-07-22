@@ -169,6 +169,17 @@ def test_connect_empty_plug_name_raises():
     assert 'plug name is empty' in ctx.value.message
 
 
+# An empty plug *snap* (even with a real plug name, and whatever the slot) is rejected with a
+# different message from an empty plug *name* above -- the plug-snap check runs first. The slot is
+# never reached, so it makes no difference whether one is given.
+@pytest.mark.parametrize('slot', [None, _SYSTEM_SNAP])
+def test_connect_empty_plug_snap_raises(slot: str | None):
+    with pytest.raises(_errors.APIError) as ctx:
+        _snapd_interfaces.connect(('', _PLUG), slot)
+    assert not ctx.value.kind
+    assert 'plug snap name is empty' in ctx.value.message
+
+
 # ---------------------------------------------------------------------------
 # disconnect
 # ---------------------------------------------------------------------------
@@ -216,12 +227,29 @@ def test_disconnect_empty_snap_named_pair_both_sides():
     assert not _is_connected()
 
 
-def test_disconnect_snap_without_name_raises():
-    # A side with a snap but no name is a partial spec: unlike connect's slot (which auto-resolves
-    # the name), disconnect rejects it with 'allowed forms are ...'.
+def _disconnect(plug: object, slot: object) -> None:
+    _snapd_interfaces.disconnect(plug, slot)  # pyright: ignore[reportArgumentType]
+
+
+# A side that has a snap but no name is a *partial* spec (unlike connect's slot, which
+# auto-resolves the name), and snapd rejects any partial spec on either side with 'allowed forms
+# are ...'. A bare snap-name string normalises to the same thing -- ``disconnect('foo')`` becomes
+# the partial ``('foo', '')`` -- so, although a string is a type error for disconnect, it fails
+# the same way.
+@pytest.mark.parametrize(
+    ('plug', 'slot'),
+    [
+        ((_SNAP, ''), None),  # partial plug
+        (None, (_SYSTEM_SNAP, '')),  # partial slot
+        ((_SNAP, _PLUG), (_SYSTEM_SNAP, '')),  # full plug + partial slot
+        ((_SNAP, ''), (_SYSTEM_SNAP, _PLUG)),  # partial plug + full slot
+        (_SNAP, None),  # bare string -> normalises to ('test-interfaces-snap', '')
+    ],
+)
+def test_disconnect_partial_spec_raises(plug: object, slot: object):
     _ensure_connected()
     with pytest.raises(_errors.APIError) as ctx:
-        _snapd_interfaces.disconnect((_SNAP, ''))
+        _disconnect(plug, slot)
     assert not ctx.value.kind
     assert 'allowed forms are' in ctx.value.message
 
