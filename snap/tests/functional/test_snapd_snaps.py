@@ -12,6 +12,7 @@ tests that inherently install/remove as part of the test logic.
 from __future__ import annotations
 
 import datetime
+import functools
 import typing
 from typing import Any
 
@@ -37,6 +38,7 @@ def _list_snaps() -> list[_snapd.Info]:
     return [_snapd.Info._from_dict(info_dict) for info_dict in info_dicts]
 
 
+@functools.cache  # Cached to avoid repeated store queries.
 def _list_channels(snap: str) -> dict[str, _snapd.Info]:
     """List information about all channels of a snap available in the store."""
     results = _client.get('/v2/find', query={'name': snap})
