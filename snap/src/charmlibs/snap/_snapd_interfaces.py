@@ -106,8 +106,11 @@ def disconnect(
     Args:
         plug: The plug side, as a ``(snap, plug)`` pair. Omit to disconnect by slot only.
         slot: The slot side, as a ``(snap, slot)`` pair. Omit to disconnect by plug only.
-        forget: If true, also forget any manual connection preference, so the interface
-            is not automatically reconnected on the next refresh.
+        forget: If ``True``, also clear snapd's stored preference for this interface.
+            snapd normally remembers manual changes and replays them across snap refreshes.
+            An auto-connected interface you disconnect stays disconnected on refresh, while a
+            manual :func:`connect` is preserved. ``forget=True`` erases that stored preference
+            so the interface reverts to snapd's default auto-connection policy on the next refresh.
 
     Raises:
         NotFoundError: if a named snap is not installed (the plug snap is checked first).
