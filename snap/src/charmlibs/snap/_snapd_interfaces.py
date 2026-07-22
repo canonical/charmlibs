@@ -23,38 +23,6 @@ from . import _client, _errors, _utils
 # /v2/interfaces
 
 
-def _snap_and_name(spec: tuple[str, str] | str | None) -> tuple[str, str]:
-    """Normalise a plug or slot spec to a ``(snap, name)`` pair of strings.
-
-    ``None`` becomes ``('', '')`` (fully unspecified: left for snapd to resolve or reject), and
-    a bare snap name becomes ``(snap, '')`` (name left for snapd to resolve or reject). A pair is
-    returned as-is; anything that is not a 2-item pair fails here with a clear ``ValueError``
-    (this is also what rejects a bare string where only a pair is accepted -- the whole string
-    is treated as the snap name, so it can never be silently split into characters).
-    """
-    if spec is None:
-        return '', ''
-    if isinstance(spec, str):
-        return spec, ''
-    snap, name = spec
-    return snap, name
-
-
-def _raise_not_installed_snap(plug_snap: str, slot_snap: str) -> None:
-    """Convert an empty-kind 'snap is not installed' API error into a typed NotFoundError.
-
-    snapd validates the plug snap before the slot snap (daemon/api_interfaces.go), reporting a
-    not-installed snap as an empty-kind ``APIError`` before any plug/slot resolution. We probe the
-    named snaps in the same order -- plug snap first -- so the ``NotFoundError`` names the same
-    snap snapd would blame. Empty (auto-resolved) sides are skipped, and the ``system``/``core``
-    aliases are skipped because snapd serves them without the core snap being installed. If both
-    named snaps are installed, this returns and the caller re-raises the original error.
-    """
-    for snap in (plug_snap, slot_snap):
-        if snap:
-            _utils.raise_if_snap_not_installed_or_system(snap)
-
-
 def connect(plug: tuple[str, str], slot: tuple[str, str] | str | None = None) -> None:
     """Connect a snap's plug to a slot.
 
@@ -108,7 +76,7 @@ def connect(plug: tuple[str, str], slot: tuple[str, str] | str | None = None) ->
         _client.post('/v2/interfaces', body=data)
     except _errors.APIError:
         # Turn snapd's empty-kind 'snap is not installed' error into a typed NotFoundError.
-        _raise_not_installed_snap(plug_snap, slot_snap)
+        _raise_if_snaps_not_installed_or_system(plug_snap, slot_snap)
         raise
 
 
@@ -179,5 +147,38 @@ def disconnect(
         pass  # Follow the snap CLI's lead and suppress this error.
     except _errors.APIError:
         # Turn snapd's empty-kind 'snap is not installed' error into a typed NotFoundError.
-        _raise_not_installed_snap(plug_snap, slot_snap)
+        _raise_if_snaps_not_installed_or_system(plug_snap, slot_snap)
         raise
+
+
+def _snap_and_name(spec: tuple[str, str] | str | None) -> tuple[str, str]:
+    """Normalise a plug or slot spec to a ``(snap, name)`` pair of strings.
+
+    ``None`` becomes ``('', '')`` (fully unspecified: left for snapd to resolve or reject), and
+    a bare snap name becomes ``(snap, '')`` (name left for snapd to resolve or reject). A pair is
+    returned as-is; anything that is not a 2-item pair fails here with a clear ``ValueError``
+    (this is also what rejects a bare string where only a pair is accepted -- the whole string
+    is treated as the snap name, so it can never be silently split into characters).
+    """
+    if spec is None:
+        return '', ''
+    if isinstance(spec, str):
+        return spec, ''
+    snap, name = spec  # ValueError if not a 2-item pair.
+    return snap, name
+
+
+def _raise_if_snaps_not_installed_or_system(plug_snap: str, slot_snap: str) -> None:
+    """Convert an empty-kind 'snap is not installed' API error into a typed NotFoundError.
+
+    snapd validates the plug snap before the slot snap (daemon/api_interfaces.go), reporting a
+    not-installed snap as an empty-kind ``APIError`` before any plug/slot resolution. We probe the
+    named snaps in the same order -- plug snap first -- so the ``NotFoundError`` names the same
+    snap snapd would blame. Empty (auto-resolved) sides are skipped, and the ``system``/``core``
+    aliases are skipped because snapd serves them without the core snap being installed. If both
+    named snaps are installed, this returns and the caller re-raises the original error.
+    """
+    if plug_snap:
+        _utils.raise_if_snap_not_installed_or_system(plug_snap)
+    if slot_snap:
+        _utils.raise_if_snap_not_installed_or_system(slot_snap)
