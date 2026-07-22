@@ -137,9 +137,7 @@ situations, which are listed below:
 """
 
 from ._ldap import (
-    DEFAULT_RELATION_NAME,
     LdapProvider,
-    LdapProviderBaseData,
     LdapProviderData,
     LdapReadyEvent,
     LdapRequestedEvent,
@@ -150,9 +148,7 @@ from ._ldap import (
 from ._version import __version__ as __version__
 
 __all__ = [
-    'DEFAULT_RELATION_NAME',
     'LdapProvider',
-    'LdapProviderBaseData',
     'LdapProviderData',
     'LdapReadyEvent',
     'LdapRequestedEvent',
