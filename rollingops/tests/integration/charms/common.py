@@ -20,7 +20,7 @@ This file is symlinked alongside src/charm.py by these charms.
 import json
 import logging
 import time
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from ops import ActionEvent, CharmBase, Framework
@@ -40,7 +40,7 @@ TRACE_FILE = pathops.LocalPath('/var/lib/charm-rolling-ops/transitions.log')
 
 def _now_timestamp_str() -> str:
     """UTC timestamp as a epoch."""
-    return str(datetime.now(UTC).timestamp())
+    return str(datetime.now(timezone.utc).timestamp())
 
 
 class MySyncBackend(SyncLockBackend):

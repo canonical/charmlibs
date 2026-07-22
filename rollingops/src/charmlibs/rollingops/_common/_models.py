@@ -19,7 +19,7 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
-from enum import StrEnum
+from enum import Enum
 from typing import Any
 
 from ops import Model, Unit
@@ -41,7 +41,17 @@ from charmlibs.rollingops._common._utils import datetime_to_str, now_timestamp, 
 logger = logging.getLogger(__name__)
 
 
-class OperationResult(StrEnum):
+class _StrEnum(str, Enum):
+    """A str-valued enum whose ``str()`` returns the plain value.
+
+    Equivalent to ``enum.StrEnum`` (Python 3.11+), needed here since this
+    package supports Python 3.10.
+    """
+
+    __str__ = str.__str__
+
+
+class OperationResult(_StrEnum):
     """Result values returned by rolling-ops callbacks on async locks.
 
     These values control how the rolling-ops manager updates the operation
@@ -67,14 +77,14 @@ class OperationResult(StrEnum):
     RETRY_HOLD = 'retry-hold'
 
 
-class ProcessingBackend(StrEnum):
+class ProcessingBackend(_StrEnum):
     """Backend responsible for processing a unit's queue."""
 
     PEER = 'peer'
     ETCD = 'etcd'
 
 
-class _RunWithLockStatus(StrEnum):
+class _RunWithLockStatus(_StrEnum):
     """Status of an attempt to execute an operation under a distributed lock.
 
     These values describe what happened when a unit tried to run an
@@ -88,7 +98,7 @@ class _RunWithLockStatus(StrEnum):
     EXECUTED_NOT_COMMITTED = 'executed_not_committed'
 
 
-class RollingOpsStatus(StrEnum):
+class RollingOpsStatus(_StrEnum):
     """High-level rolling-ops status for a unit.
 
     It reflects whether the unit is currently executing work, waiting
