@@ -16,8 +16,6 @@
 """LDAP interface implementation.
 
 Migrated from charms.glauth_k8s.v0.ldap (v0.13).
-
-Version: 1.0.0
 """
 
 import json
@@ -36,74 +34,17 @@ from ops.charm import (
 )
 from ops.framework import EventSource, Handle, Object, ObjectEvents
 from ops.model import Relation, SecretNotFoundError
-from pydantic import StrictBool, ValidationError, version
+from pydantic import (
+    BaseModel,
+    Field,
+    StrictBool,
+    ValidationError,
+    field_serializer,
+    field_validator,
+)
 
 DEFAULT_RELATION_NAME = 'ldap'
 BIND_ACCOUNT_SECRET_LABEL_TEMPLATE = Template('relation-$relation_id-bind-account-secret')
-
-PYDANTIC_IS_V1 = int(version.VERSION.split('.')[0]) < 2
-if PYDANTIC_IS_V1:
-    # Pydantic v1 backwards compatibility logic,
-    # see https://docs.pydantic.dev/latest/migration/ for more info.
-    # This does not offer complete backwards compatibility
-
-    from pydantic import BaseModel as BaseModelV1
-    from pydantic import Field as FieldV1
-    from pydantic import validator
-    from pydantic.main import ModelMetaclass
-
-    def Field(*args: Any, **kwargs: Any) -> FieldV1:  # noqa N802
-        if frozen := kwargs.pop('frozen', None):
-            kwargs['allow_mutations'] = not frozen
-        return FieldV1(*args, **kwargs)
-
-    def field_validator(*args: Any, **kwargs: Any) -> Callable:
-        if kwargs.get('mode') == 'before':
-            kwargs.pop('mode')
-            kwargs['pre'] = True
-        return validator(*args, **kwargs)
-
-    encoders_config = {}
-
-    def field_serializer(*fields: str, mode: str | None = None) -> Callable:
-        def _field_serializer(f: Callable, *args: Any, **kwargs: Any) -> Callable:
-            @wraps(f)
-            def wrapper(self: object, *args: Any, **kwargs: Any) -> Any:
-                return f(self, *args, **kwargs)
-
-            encoders_config[wrapper] = fields
-            return wrapper
-
-        return _field_serializer
-
-    class ModelCompatibilityMeta(ModelMetaclass):
-        def __init__(self, name: str, bases: tuple[object], attrs: dict) -> None:
-            if not hasattr(self, '_encoders'):
-                self._encoders = {}
-
-            self._encoders.update({
-                encoder: func
-                for func in attrs.values()
-                if callable(func) and func in encoders_config
-                for encoder in encoders_config[func]
-            })
-
-            super().__init__(name, bases, attrs)
-
-    class BaseModel(BaseModelV1, metaclass=ModelCompatibilityMeta):
-        def model_dump(self, *args: Any, **kwargs: Any) -> dict:
-            d = self.dict(*args, **kwargs)
-            for name, f in self._encoders.items():
-                d[name] = f(self, d[name])
-            return d
-
-else:
-    from pydantic import (  # type: ignore[no-redef]
-        BaseModel,
-        Field,
-        field_serializer,
-        field_validator,
-    )
 
 
 def leader_unit(func: Callable) -> Callable:
