@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import functools
 import logging
+import random
 import subprocess
 import time
 import typing
@@ -29,41 +30,35 @@ snap_logger = logging.getLogger(snap.__name__)
 snap_logger.setLevel(logging.DEBUG)
 snap_logger.addHandler(handler)
 
-# The snap store rate-limits by client IP (HTTP 429). snapd surfaces this as a kindless error
-# with the message "too many requests" -- synchronously for store queries like /v2/find, and
-# wrapped in a ChangeError (an APIError subclass) for async install/refresh. CI runners share
-# egress IPs and run the functional matrix concurrently, so these 429s are transient: retry with
-# exponential backoff rather than failing the run. Only rate-limit errors are retried, so tests
-# asserting on a specific error still see that error unchanged.
-_RATE_LIMITED = 'too many requests'
-_RETRY_ATTEMPTS = 5
-_RETRY_BASE_DELAY = 2.0  # seconds; doubled each attempt (2, 4, 8, 16s between the 5 tries).
-
 
 def retry_on_rate_limit(func: Callable[_P, _T]) -> Callable[_P, _T]:
     """Wrap ``func`` so store rate-limit (HTTP 429) failures are retried with backoff.
 
-    Call as ``retry_on_rate_limit(op)(*args, **kwargs)``. The returned wrapper preserves
-    ``func``'s signature, so overloaded operations like ``install``/``refresh`` still type-check.
+    The snap store rate-limits by client IP. snapd surfaces this as a kindless error
+    with the message "too many requests" -- synchronously for store queries like /v2/find, and
+    wrapped in a ChangeError (an APIError subclass) for async install/refresh. CI runners share
+    egress IPs and run the functional matrix concurrently, so these 429s are transient: retry with
+    exponential backoff rather than failing the run. Only rate-limit errors are retried, so tests
+    asserting on a specific error still see that error unchanged.
     """
 
     @functools.wraps(func)
     def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> _T:
-        for attempt in range(_RETRY_ATTEMPTS):
+        retry_attempts = 5
+        i = 0
+        while True:
+            if i > 0:
+                # Exponential backoff with jitter: 5s-6s, 10s-12s, 20s-24s, 40s-48s, ...
+                delay = 5 * 2**i * random.uniform(1.0, 1.2)
+                msg = 'snap store rate-limited; retrying in %.0fs (attempt %d/%d)'
+                snap_logger.warning(msg, delay, i, retry_attempts)
+                time.sleep(delay)
+            i += 1
             try:
                 return func(*args, **kwargs)
-            except snap.APIError as e:  # noqa: PERF203
-                if _RATE_LIMITED not in e.message.lower() or attempt == _RETRY_ATTEMPTS - 1:
+            except snap.APIError as e:
+                if i == retry_attempts or 'too many requests' not in e.message.lower():
                     raise
-                delay = _RETRY_BASE_DELAY * 2**attempt
-                snap_logger.warning(
-                    'snap store rate-limited; retrying in %.0fs (attempt %d/%d)',
-                    delay,
-                    attempt + 1,
-                    _RETRY_ATTEMPTS,
-                )
-                time.sleep(delay)
-        raise AssertionError('unreachable')  # pragma: no cover -- last attempt re-raises above.
 
     return wrapper
 
