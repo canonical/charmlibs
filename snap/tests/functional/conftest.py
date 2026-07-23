@@ -44,20 +44,20 @@ def retry_on_rate_limit(func: Callable[_P, _T]) -> Callable[_P, _T]:
 
     @functools.wraps(func)
     def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> _T:
-        retry_attempts = 5
-        i = 0
+        max_attempts = 5
+        attempts = 0
         while True:
-            if i > 0:
+            if attempts > 0:
                 # Exponential backoff with jitter: 5s-6s, 10s-12s, 20s-24s, 40s-48s, ...
-                delay = 5 * 2 ** (i - 1) * random.uniform(1.0, 1.2)
+                delay = 5 * 2 ** (attempts - 1) * random.uniform(1.0, 1.2)
                 msg = 'snap store rate-limited; retrying in %.0fs (attempt %d/%d)'
-                snap_logger.warning(msg, delay, i, retry_attempts)
+                snap_logger.warning(msg, delay, attempts, max_attempts)
                 time.sleep(delay)
-            i += 1
+            attempts += 1
             try:
                 return func(*args, **kwargs)
             except snap.APIError as e:
-                if i >= retry_attempts or 'too many requests' not in e.message.lower():
+                if attempts >= max_attempts or 'too many requests' not in e.message.lower():
                     raise
 
     return wrapper
