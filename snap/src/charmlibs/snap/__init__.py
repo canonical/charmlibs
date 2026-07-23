@@ -77,6 +77,10 @@ from ._snapd_conf import (
     set,  # noqa: A004 (shadowing a Python builtin)
     unset,
 )
+from ._snapd_interfaces import (
+    connect,
+    disconnect,
+)
 from ._snapd_logs import (
     LogEntry,
     logs,
@@ -109,6 +113,8 @@ __all__ = [
     'RevisionNotAvailableError',
     'TimeoutError',
     'alias',
+    'connect',
+    'disconnect',
     'ensure',
     'ensure_revision',
     'get',
