@@ -33,19 +33,16 @@ def connect(plug: tuple[str, str], slot: tuple[str, str] | str | None = None) ->
             snapd cannot resolve a plug from the snap name alone.
         slot: The slot to connect to. May be given as:
 
-            - ``None`` (the default) to auto-resolve both the slot's snap and name. Shorthand
-              for ``('', '')``. snapd searches for a system snap and matching interface slot
-              for the plug. Raises if the chosen snap has no matching slot, or more than one.
-            - a bare snap name, to auto-resolve the matching slot on that snap (again raising
-              if that snap has no matching slot, or more than one). Shorthand for ``(snap, '')``.
-            - a ``(snap, slot)`` pair, to name the slot explicitly. Either part may be an
-              empty string to have snapd resolve it as above (an empty snap resolves to the
-              system snap; an empty slot resolves to the matching slot on the given snap).
+            - a ``(snap, slot)`` pair. Either part may be ``""`` to have snapd resolve it.
+              An empty slot resolves to the matching slot on the plug snap.
+              An ``APIError`` is raised if the slot cannot be resolved unambiguously.
+              An empty snap means the system snap.
+            - a bare snap name, shorthand for ``(snap, '')``.
+            - ``None`` (the default), shorthand for ``('', '')``.
 
     Raises:
-        NotFoundError: if the plug snap or slot snap is not installed (the plug snap is checked
-            first). Not raised for the ``system``/``core`` slot aliases, which snapd serves
-            without the core snap.
+        NotFoundError: if the plug snap or slot snap is not installed.
+            Never raised for the system snap.
         APIError: if the plug is not fully specified (empty snap or plug name), if the named plug
             or slot does not exist, if the plug and slot interfaces do not match, or if the slot
             cannot be resolved unambiguously.
@@ -60,11 +57,7 @@ def connect(plug: tuple[str, str], slot: tuple[str, str] | str | None = None) ->
         # Connect a plug to an explicitly named slot.
         connect(('mysnap', 'content'), ('other-snap', 'content-slot'))
     """
-    # NOTE: The API requires single-element plugs and slots lists (many-to-many is a 501),
-    # and rejects an empty plug snap or plug name ('plug snap name is empty' / 'plug name is
-    # empty'), so a bare snap name is only meaningful for the slot side. The slot, by contrast,
-    # is fully resolvable: an empty snap picks the system snap, and an empty slot name picks the
-    # single matching slot on that snap. See interfaces/repo.go:ResolveConnect.
+    # NOTE: plug snap and plug name are required, we let snapd validate this.
     plug_snap, plug_name = _snap_and_name(plug)
     slot_snap, slot_name = _snap_and_name(slot)
     data = {
@@ -88,20 +81,22 @@ def disconnect(
 ) -> None:
     """Disconnect a plug from a slot.
 
-    At least one of ``plug`` or ``slot`` should name something to disconnect. Each is a
-    ``(snap, name)`` pair; unlike :func:`connect`, a bare snap name is not accepted on either
-    side, because snapd requires the plug or slot name to identify what to disconnect. An
-    ``APIError`` is raised if neither side is specified or if either side is partially specified.
+    At least one of ``plug`` or ``slot`` must be specified. Each is a ``(snap, name)`` pair;
+    unlike :func:`connect`, a bare snap name is not accepted, because snapd requires the
+    plug or slot name to identify what to disconnect.
+
+    An ``APIError`` is raised if neither side is specified or if a specified side does not
+    specify the plug or slot name.
 
     An empty snap on either side means the system snap (mirroring :func:`connect`'s slot): for
     example ``('', 'mount-observe')`` refers to ``mount-observe`` on ``snapd``/``core``.
 
     Three forms are supported:
 
+    - both ``plug`` and ``slot``: disconnect that specific plug-slot connection.
+      An ``APIError`` is raised if they are not connected.
     - ``plug`` only: disconnect everything connected to that plug. No-op if nothing is connected.
     - ``slot`` only: disconnect everything connected to that slot. No-op if nothing is connected.
-    - both ``plug`` and ``slot``: disconnect that specific plug-slot connection. An ``APIError``
-      is raised if they are not connected.
 
     Args:
         plug: The plug side, as a ``(snap, plug)`` pair. Omit to disconnect by slot only.
@@ -113,7 +108,8 @@ def disconnect(
             so the interface reverts to snapd's default auto-connection policy on the next refresh.
 
     Raises:
-        NotFoundError: if a named snap is not installed (the plug snap is checked first).
+        NotFoundError: if the plug snap or slot snap is not installed.
+            Never raised for the system snap.
         APIError: if neither ``plug`` nor ``slot`` names anything to disconnect, if the named plug
             or slot does not exist, or if the fully-specified plug and slot are not connected.
         ChangeError: if the operation fails after starting (for example, an interface hook errors).
@@ -127,10 +123,8 @@ def disconnect(
         # Disconnect one specific connection (raises if not connected).
         disconnect(('mysnap', 'content'), ('other-snap', 'content-slot'))
     """
-    # NOTE: A side is either fully empty ({'', ''}) or has a name; snapd rejects a bare snap
-    # ({snap, ''}), and an all-empty request, with 'allowed forms are ...'. We let that flow
-    # through as an APIError -- as connect does for its own all-empty case -- rather than
-    # second-guessing snapd client-side. See overlord/ifacestate/ifacemgr.go:ResolveDisconnect.
+    # NOTE: snapd rejects both sides being ('', ''), and either side being (snap, '').
+    # We let snapd validate this.
     plug_snap, plug_name = _snap_and_name(plug)
     slot_snap, slot_name = _snap_and_name(slot)
     data: dict[str, Any] = {
@@ -140,10 +134,9 @@ def disconnect(
     }
     if forget:
         data['forget'] = True
-    # NOTE: For a single-sided disconnect, the API raises interfaces-unchanged when nothing is
-    # connected. We suppress this to make disconnect symmetric with connect (following the snap
-    # CLI). A fully-specified disconnect instead raises a plain 'it is not connected' APIError,
-    # which we leave to propagate (see the docstring).
+    # NOTE: For a one-sided disconnect, snapd raises interfaces-unchanged if nothing is connected.
+    # We suppress this to make disconnect symmetric with connect (following the snap CLI).
+    # A two-sided disconnect raise a plain 'it is not connected' APIError, which we let raise.
     try:
         _client.post('/v2/interfaces', body=data)
     except _errors._InterfacesUnchangedError:
