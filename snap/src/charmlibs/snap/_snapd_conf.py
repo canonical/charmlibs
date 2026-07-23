@@ -19,7 +19,7 @@ from __future__ import annotations
 import logging
 import typing
 
-from . import _client, _errors
+from . import _client, _errors, _utils
 
 if typing.TYPE_CHECKING:
     from collections.abc import Iterable
@@ -81,7 +81,7 @@ def get(snap: str, keys: Iterable[str] | None = None) -> dict[str, Any]:
             # NOTE: snapd returns the full configuration if no keys are specified.
             # We pass this behaviour through for keys=None, but for keys=[] we return
             # an empty dict, since the caller explicitly requested no keys.
-            _raise_if_snap_not_installed_or_system(snap)
+            _utils.raise_if_snap_not_installed_or_system(snap)
             return {}
         params = {'keys': ','.join(keys)}
     else:
@@ -92,27 +92,15 @@ def get(snap: str, keys: Iterable[str] | None = None) -> dict[str, Any]:
         # NOTE: snapd reports option-not-found both for a missing key and for a missing snap.
         # The CLI returns 'error: snap "foo" has no "bar" configuration' in both cases.
         # For symmetry with PUT (set/unset), we raise NotFoundError here for a missing snap.
-        _raise_if_snap_not_installed_or_system(snap)
+        _utils.raise_if_snap_not_installed_or_system(snap)
         raise
     if keys is None and not config:
         # NOTE: snapd returns {} for an installed snap with no config and for a missing snap.
         # The CLI returns 'error: snap "foo" has no configuration' for a missing snap.
         # For symmetry with PUT (set/unset), we raise NotFoundError here for a missing snap.
-        _raise_if_snap_not_installed_or_system(snap)
+        _utils.raise_if_snap_not_installed_or_system(snap)
     assert isinstance(config, dict)
     return typing.cast('dict[str, Any]', config)
-
-
-def _raise_if_snap_not_installed_or_system(snap: str) -> None:
-    """Raise NotFoundError if the snap is not installed, unless it's system/core."""
-    # NOTE: snapd's conf endpoints treat 'system' as an alias for 'core'.
-    # System configuration is served whether or not the core snap is installed.
-    # /v2/snaps/system always 404s (it's a hardcoded alias, not a real snap).
-    # /v2/snaps/core 404s when the core snap is absent (typical when no other snaps depend on it).
-    # For the purposes of this module, we can skip snap installed checks for both names.
-    if snap in ('system', 'core'):
-        return
-    _client.get(f'/v2/snaps/{snap}')  # Raise NotFoundError if the snap isn't installed.
 
 
 def unset(snap: str, keys: Iterable[str]) -> None:

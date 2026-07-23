@@ -12,12 +12,32 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Helpers that don't directly interact with the snapd REST API."""
+"""Helpers shared across the snapd modules."""
 
 from __future__ import annotations
 
 import datetime
 import sys
+
+from . import _client
+
+
+def raise_if_snap_not_installed_or_system(snap: str) -> None:
+    """Raise NotFoundError if the snap is not installed, unless it names a system snap.
+
+    snapd treats ``'system'`` as an alias for ``'core'`` on its config endpoints, and remaps both
+    ``'system'`` and ``'core'`` to the always-present snapd snap on its interface endpoints, so
+    operations on these names succeed whether or not the core snap is installed. For those names
+    the installed check is skipped; for any other name this probes ``/v2/snaps/{snap}``, which
+    raises :class:`NotFoundError` if the snap is not installed.
+    """
+    # NOTE: snapd's conf endpoints treat 'system' as an alias for 'core', and interface requests
+    # remap 'system'/'core' to the snapd snap, so both names are served without the core snap.
+    # /v2/snaps/system always 404s (a hardcoded alias, not a real snap) and /v2/snaps/core 404s
+    # when the core snap is absent, so probing either would turn a working call into NotFoundError.
+    if snap in ('system', 'core'):
+        return
+    _client.get(f'/v2/snaps/{snap}')  # Raises NotFoundError if the snap isn't installed.
 
 
 def normalize_channel(channel: str) -> str:
