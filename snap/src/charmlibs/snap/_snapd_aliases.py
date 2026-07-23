@@ -51,7 +51,7 @@ def unalias(alias_name: str) -> None:
         alias_name: The alias to remove.
 
     Raises:
-        ChangeError: if the unalias change fails after starting.
+        ChangeError: if the alias removal fails after starting.
         APIError: if the alias does not exist (e.g. was never created, or the snap it
             belonged to was removed — aliases do not survive snap removal).
     """
