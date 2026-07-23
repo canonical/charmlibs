@@ -75,7 +75,7 @@ def test_remove_nonexistent_user() -> None:
 
 def test_add_user_with_shell() -> None:
     """Verify we can add a user with a specific shell."""
-    assert passwd.add_user(username='bob', shell='/bin/sh')  # noqa: S604
+    assert passwd.add_user(username='bob', shell='/bin/sh')
     user_info = passwd.user_exists(user='bob')
     assert user_info is not None
     assert user_info.pw_shell == '/bin/sh'
