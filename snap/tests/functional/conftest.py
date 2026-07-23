@@ -5,7 +5,6 @@
 """Shared helpers for functional tests."""
 
 import logging
-import subprocess
 
 from charmlibs import snap
 from charmlibs.snap import _functions
@@ -16,13 +15,6 @@ handler.setLevel(logging.DEBUG)
 snap_logger = logging.getLogger(snap.__name__)
 snap_logger.setLevel(logging.DEBUG)
 snap_logger.addHandler(handler)
-
-
-def get_command_path(command: str) -> str:
-    try:
-        return subprocess.check_output(['which', command]).decode().strip()
-    except subprocess.CalledProcessError:
-        return ''
 
 
 def ensure_removed(*snaps: str) -> None:

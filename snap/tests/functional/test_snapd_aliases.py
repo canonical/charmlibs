@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import subprocess
 import typing
 
 import pytest
@@ -29,11 +30,12 @@ _ABSENT_SNAP = 'this-snap-does-not-exist-xyz-abc-123'
 
 
 # Test helper and possible future candidate for library public API.
-def _list_aliases() -> Mapping[str, Mapping[str, Mapping[str, str]]]:
-    """List all aliases, keyed by snap then alias name: {snap: {alias: {command, status, ...}}}."""
+def _list_aliases(snap: str) -> Mapping[str, Mapping[str, str]]:
+    """List a snap's aliases, keyed by alias name: {alias: {command, status, ...}}."""
     aliases = _client.get('/v2/aliases')
     assert isinstance(aliases, dict)
-    return typing.cast('dict[str, dict[str, dict[str, str]]]', aliases)
+    by_snap = typing.cast('dict[str, dict[str, dict[str, str]]]', aliases)
+    return by_snap.get(snap, {})
 
 
 def _cleanup_alias() -> None:
@@ -44,9 +46,25 @@ def _cleanup_alias() -> None:
         pass
 
 
-def _alias_exists() -> bool:
-    info = _list_aliases().get(_SNAP, {}).get(_ALIAS)
-    return info is not None and info.get('command') == f'{_SNAP}.{_APP}'
+def _get_command_path(command: str) -> str:
+    """Return the resolved PATH of a command, or '' if it isn't on PATH."""
+    try:
+        return subprocess.check_output(['which', command]).decode().strip()
+    except subprocess.CalledProcessError:
+        return ''
+
+
+def _assert_alias_exists() -> None:
+    """Assert the test alias points at `_SNAP._APP`, via both the snapd API and PATH.
+
+    An enabled alias is also a real command: snapd creates a `/snap/bin/<alias>` symlink that
+    resolves on PATH. The snapd API view and the on-disk symlink are two views of the same fact,
+    so we check both.
+    """
+    aliases = _list_aliases(_SNAP)
+    assert _ALIAS in aliases
+    assert aliases[_ALIAS].get('command') == f'{_SNAP}.{_APP}'
+    assert _get_command_path(_ALIAS) == f'/snap/bin/{_ALIAS}'
 
 
 # ---------------------------------------------------------------------------
@@ -58,7 +76,7 @@ def test_alias_creates_alias():
     ensure_installed(_SNAP)
     _cleanup_alias()
     _snapd_aliases.alias(_SNAP, _APP, _ALIAS)
-    assert _alias_exists()
+    _assert_alias_exists()
     _cleanup_alias()
 
 
@@ -77,7 +95,7 @@ def test_alias_is_idempotent():
     _cleanup_alias()
     _snapd_aliases.alias(_SNAP, _APP, _ALIAS)
     _snapd_aliases.alias(_SNAP, _APP, _ALIAS)  # Second call — no error.
-    assert _alias_exists()
+    _assert_alias_exists()
     _cleanup_alias()
 
 
@@ -108,9 +126,11 @@ def test_alias_name_conflicts_with_snap_command_namespace():
 def test_unalias_removes_alias():
     ensure_installed(_SNAP)
     _snapd_aliases.alias(_SNAP, _APP, _ALIAS)
-    assert _alias_exists()
+    _assert_alias_exists()
     _snapd_aliases.unalias(_ALIAS)
-    assert not _alias_exists()
+    # Removal drops the alias from both the snapd API listing and PATH.
+    assert _ALIAS not in _list_aliases(_SNAP)
+    assert not _get_command_path(_ALIAS)
 
 
 def test_unalias_nonexistent_alias_raises():
