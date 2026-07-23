@@ -57,6 +57,7 @@ def retry_on_rate_limit(func: Callable[_P, _T]) -> Callable[_P, _T]:
             try:
                 return func(*args, **kwargs)
             except snap.APIError as e:
+                # "too many requests" from canonical/snapd's store/store.go (ErrTooManyRequests)
                 if attempts >= max_attempts or 'too many requests' not in e.message.lower():
                     raise
 
