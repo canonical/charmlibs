@@ -52,7 +52,7 @@ def unalias(alias_name: str) -> None:
 
     Raises:
         ChangeError: if the alias removal fails after starting.
-        APIError: if the alias does not exist (e.g. was never created, or the snap it
+        APIError: if the alias does not exist (for example, was never created, or the snap it
             belonged to was removed — aliases do not survive snap removal).
     """
     data = {'action': 'unalias', 'alias': alias_name}
