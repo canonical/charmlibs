@@ -23,7 +23,7 @@ from . import _client
 logger = logging.getLogger(__name__)
 
 
-def alias(snap: str, app: str, alias_name: str) -> None:
+def alias(snap: str, app: str, alias: str) -> None:
     """Create an alias for a snap app.
 
     If the alias already exists for the same snap, this call succeeds silently,
@@ -32,7 +32,7 @@ def alias(snap: str, app: str, alias_name: str) -> None:
     Args:
         snap: The name of the snap that owns the app.
         app: The name of the app within the snap to alias.
-        alias_name: The alias (command name) to create for the app.
+        alias: The alias (command name) to create for the app.
 
     Raises:
         NotInstalledError: if the snap is not installed.
@@ -40,20 +40,20 @@ def alias(snap: str, app: str, alias_name: str) -> None:
             conflicts with the command namespace of an installed snap,
             or if the specified app does not exist within the snap.
     """
-    data = {'action': 'alias', 'snap': snap, 'app': app, 'alias': alias_name}
+    data = {'action': 'alias', 'snap': snap, 'app': app, 'alias': alias}
     _client.post('/v2/aliases', body=data)
 
 
-def unalias(alias_name: str) -> None:
+def unalias(alias: str) -> None:
     """Remove an alias.
 
     Args:
-        alias_name: The alias to remove.
+        alias: The alias to remove.
 
     Raises:
         ChangeError: if the alias removal fails after starting.
         APIError: if the alias does not exist (for example, was never created, or the snap it
             belonged to was removed — aliases do not survive snap removal).
     """
-    data = {'action': 'unalias', 'alias': alias_name}
+    data = {'action': 'unalias', 'alias': alias}
     _client.post('/v2/aliases', body=data)
