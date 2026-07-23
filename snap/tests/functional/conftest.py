@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import functools
 import logging
 import subprocess
 import time
@@ -16,8 +17,9 @@ from charmlibs.snap import _functions
 
 if typing.TYPE_CHECKING:
     from collections.abc import Callable
-    from typing import TypeVar
+    from typing import ParamSpec, TypeVar
 
+    _P = ParamSpec('_P')
     _T = TypeVar('_T')
 
 # Enable debug logging from snap library during tests.
@@ -38,27 +40,32 @@ _RETRY_ATTEMPTS = 5
 _RETRY_BASE_DELAY = 2.0  # seconds; doubled each attempt (2, 4, 8, 16s between the 5 tries).
 
 
-def retry_on_rate_limit(func: Callable[[], _T]) -> _T:
-    """Call ``func()``, retrying store rate-limit (HTTP 429) failures.
+def retry_on_rate_limit(func: Callable[_P, _T]) -> Callable[_P, _T]:
+    """Wrap ``func`` so store rate-limit (HTTP 429) failures are retried with backoff.
 
-    ``func`` is a zero-arg callable (typically a ``lambda`` wrapping the store operation), so
-    that overloaded operations like ``install``/``refresh`` keep their normal type checking.
+    Call as ``retry_on_rate_limit(op)(*args, **kwargs)``. The returned wrapper preserves
+    ``func``'s signature, so overloaded operations like ``install``/``refresh`` still type-check.
     """
-    for attempt in range(_RETRY_ATTEMPTS):
-        try:
-            return func()
-        except snap.APIError as e:  # noqa: PERF203
-            if _RATE_LIMITED not in e.message.lower() or attempt == _RETRY_ATTEMPTS - 1:
-                raise
-            delay = _RETRY_BASE_DELAY * 2**attempt
-            snap_logger.warning(
-                'snap store rate-limited; retrying in %.0fs (attempt %d/%d)',
-                delay,
-                attempt + 1,
-                _RETRY_ATTEMPTS,
-            )
-            time.sleep(delay)
-    raise AssertionError('unreachable')  # pragma: no cover -- last attempt re-raises above.
+
+    @functools.wraps(func)
+    def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> _T:
+        for attempt in range(_RETRY_ATTEMPTS):
+            try:
+                return func(*args, **kwargs)
+            except snap.APIError as e:  # noqa: PERF203
+                if _RATE_LIMITED not in e.message.lower() or attempt == _RETRY_ATTEMPTS - 1:
+                    raise
+                delay = _RETRY_BASE_DELAY * 2**attempt
+                snap_logger.warning(
+                    'snap store rate-limited; retrying in %.0fs (attempt %d/%d)',
+                    delay,
+                    attempt + 1,
+                    _RETRY_ATTEMPTS,
+                )
+                time.sleep(delay)
+        raise AssertionError('unreachable')  # pragma: no cover -- last attempt re-raises above.
+
+    return wrapper
 
 
 def get_command_path(command: str) -> str:
@@ -76,8 +83,4 @@ def ensure_removed(*snaps: str) -> None:
 
 def ensure_installed(*snaps: str, channel: str | None = None, classic: bool = False) -> None:
     for snap_name in snaps:
-        retry_on_rate_limit(
-            lambda name=snap_name: snap.ensure(
-                name, channel=channel, classic=classic, update=False
-            )
-        )
+        retry_on_rate_limit(snap.ensure)(snap_name, channel=channel, classic=classic, update=False)
