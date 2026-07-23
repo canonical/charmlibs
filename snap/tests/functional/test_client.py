@@ -18,7 +18,7 @@ from typing import Any
 import pytest
 
 from charmlibs.snap import _client, _errors
-from conftest import ensure_installed, ensure_removed
+from conftest import ensure_installed, ensure_removed, retry_on_rate_limit
 
 # A snap name that is never installed — used for error paths where any absent
 # snap produces the same error response, avoiding unnecessary remove operations.
@@ -67,7 +67,7 @@ def test_post_snap_no_update_available():
     # snap-no-update-available is raised (not suppressed) at the _client level.
     ensure_installed('hello-world', channel='latest/stable')
     with pytest.raises(_errors._NoUpdatesAvailableError) as ctx:
-        _client.post(
+        retry_on_rate_limit(_client.post)(
             '/v2/snaps/hello-world', body={'action': 'refresh', 'channel': 'latest/stable'}
         )
     assert ctx.value.kind == 'snap-no-update-available'
