@@ -54,8 +54,8 @@ def _get_command_path(command: str) -> str:
         return ''
 
 
-def _assert_alias_exists() -> None:
-    """Assert the test alias points at `_SNAP._APP`, via both the snapd API and PATH.
+def _assert_alias_exists(app: str = _APP) -> None:
+    """Assert the test alias points at `_SNAP.<app>`, via both the snapd API and PATH.
 
     An enabled alias is also a real command: snapd creates a `/snap/bin/<alias>` symlink that
     resolves on PATH. The snapd API view and the on-disk symlink are two views of the same fact,
@@ -63,7 +63,7 @@ def _assert_alias_exists() -> None:
     """
     aliases = _list_aliases(_SNAP)
     assert _ALIAS in aliases
-    assert aliases[_ALIAS].get('command') == f'{_SNAP}.{_APP}'
+    assert aliases[_ALIAS].get('command') == f'{_SNAP}.{app}'
     assert _get_command_path(_ALIAS) == f'/snap/bin/{_ALIAS}'
 
 
@@ -94,6 +94,7 @@ def test_alias_is_idempotent():
     ensure_installed(_SNAP)
     _cleanup_alias()
     _snapd_aliases.alias(_SNAP, _APP, _ALIAS)
+    _assert_alias_exists()
     _snapd_aliases.alias(_SNAP, _APP, _ALIAS)  # Second call — no error.
     _assert_alias_exists()
     _cleanup_alias()
@@ -105,7 +106,9 @@ def test_alias_reassigns_within_same_snap():
     ensure_installed(_SNAP)
     _cleanup_alias()
     _snapd_aliases.alias(_SNAP, _APP, _ALIAS)
+    _assert_alias_exists()
     _snapd_aliases.alias(_SNAP, _APP2, _ALIAS)  # Different app, same snap — no error.
+    _assert_alias_exists(_APP2)
     _cleanup_alias()
 
 
