@@ -30,7 +30,8 @@ def connect(plug: tuple[str, str], slot: tuple[str, str] | str | None = None) ->
 
     Args:
         plug: The plug to connect, as a ``(snap, plug)`` pair. Both parts are required:
-            snapd cannot resolve a plug from the snap name alone.
+            snapd cannot resolve a plug from the snap name alone, and treats a missing
+            snap name as an error.
         slot: The slot to connect to. May be given as:
 
             - a ``(snap, slot)`` pair. Either part may be ``""`` to have snapd resolve it.
