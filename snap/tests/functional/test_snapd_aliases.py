@@ -16,9 +16,12 @@ from conftest import ensure_installed, ensure_removed
 if typing.TYPE_CHECKING:
     from collections.abc import Mapping
 
-_SNAP = 'lxd'
-_APP = 'lxc'
-_ALIAS = 'test-functional-lxc-alias'
+# A small Canonical-owned snap with several apps, so an alias can be reassigned between them.
+# Defined in https://github.com/canonical/snapd/tree/master/tests/lib/snaps
+_SNAP = 'test-snapd-tools'
+_APP = 'echo'
+_APP2 = 'cat'
+_ALIAS = 'test-functional-alias'
 
 # A snap name that is never installed — used for error paths where any absent
 # snap produces the same error response, avoiding unnecessary remove operations.
@@ -47,7 +50,7 @@ def _alias_exists() -> bool:
 
 
 # ---------------------------------------------------------------------------
-# alias (lxd installed)
+# alias (snap installed)
 # ---------------------------------------------------------------------------
 
 
@@ -84,7 +87,7 @@ def test_alias_reassigns_within_same_snap():
     ensure_installed(_SNAP)
     _cleanup_alias()
     _snapd_aliases.alias(_SNAP, _APP, _ALIAS)
-    _snapd_aliases.alias(_SNAP, 'lxd', _ALIAS)  # Different app, same snap — no error.
+    _snapd_aliases.alias(_SNAP, _APP2, _ALIAS)  # Different app, same snap — no error.
     _cleanup_alias()
 
 
@@ -93,12 +96,12 @@ def test_alias_name_conflicts_with_snap_command_namespace():
     ensure_installed(_SNAP)
     _cleanup_alias()
     with pytest.raises(_errors.ChangeError) as ctx:
-        _snapd_aliases.alias(_SNAP, _APP, _SNAP)  # Alias name = 'lxd'.
+        _snapd_aliases.alias(_SNAP, _APP, _SNAP)  # Alias name = snap name.
     assert 'conflicts with the command namespace' in ctx.value.message
 
 
 # ---------------------------------------------------------------------------
-# unalias (lxd installed)
+# unalias (snap installed)
 # ---------------------------------------------------------------------------
 
 
@@ -149,7 +152,7 @@ def test_alias_not_installed_snap_raises():
 
 
 # ---------------------------------------------------------------------------
-# unalias after snap removed — last because it removes lxd
+# unalias after snap removed — last because it removes the snap
 # ---------------------------------------------------------------------------
 
 
