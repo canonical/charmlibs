@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import traceback
 from typing import TYPE_CHECKING
 
 import pytest
@@ -153,6 +154,15 @@ class TestGetAbsentSnapProbe:
             _snapd_conf.get('hello-world', ['mykey'])
         assert ctx.value.__cause__ is None
         assert ctx.value.__suppress_context__
+
+    def test_missing_key_on_absent_snap_traceback_excludes_probe(self, mock_client: MockClient):
+        # check_installed clears the probe's traceback, so the re-raised error starts at get()'s
+        # own raise and never walks back through the internal /v2/snaps/{snap} probe GET.
+        mock_client.get.side_effect = [self._option_not_found(), self._snap_not_found()]
+        with pytest.raises(NotFoundError) as ctx:
+            _snapd_conf.get('hello-world', ['mykey'])
+        files = [frame.filename for frame in traceback.extract_tb(ctx.value.__traceback__)]
+        assert not any(f.endswith('_utils.py') for f in files)
 
     def test_get_all_empty_on_absent_snap_raises_not_found(self, mock_client: MockClient):
         # A bare conf GET on an absent snap is a 200 with an empty result, so the probe is

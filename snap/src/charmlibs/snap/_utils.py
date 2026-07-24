@@ -27,8 +27,8 @@ def check_installed(snap: str) -> _errors.NotFoundError | None:
 
     Returns ``None`` when the snap is installed, and for the ``system``/``core`` aliases, which
     snapd serves whether or not the core snap is installed (so they are never treated as absent).
-    Otherwise probes ``GET /v2/snaps/{snap}`` and returns snapd's own :class:`NotFoundError`
-    unchanged when it reports the snap absent, ready for the caller to ``raise``.
+    Otherwise probes ``GET /v2/snaps/{snap}`` and returns snapd's own :class:`NotFoundError` when
+    it reports the snap absent, ready for the caller to ``raise``.
 
     The error-or-``None`` return supports the ``if error := check_installed(snap): raise error``
     idiom at the call sites (with ``from None`` where an error is already being handled).
@@ -39,8 +39,10 @@ def check_installed(snap: str) -> _errors.NotFoundError | None:
     interface endpoints, which name the snap in the message directly, but we don't hand-construct
     an error to paper over that -- the value and ``str()`` carry the name either way.
 
-    Raise the returned error with ``from None`` when converting an error snapd has already
-    reported, so the caller sees a single traceback instead of a chained one exposing this probe.
+    Its traceback is cleared before returning: snapd's error was raised deep inside this probe's
+    ``GET /v2/snaps/{snap}``, and re-raising it with that traceback attached would expose the
+    internal probe. Cleared, a ``raise`` at the call site produces a single traceback that starts
+    there. Pair the ``raise`` with ``from None`` to also drop any error being handled.
     """
     # NOTE: snapd's conf endpoints treat 'system' as an alias for 'core', and interface requests
     # remap 'system'/'core' to the snapd snap, so both names are served without the core snap.
@@ -51,7 +53,7 @@ def check_installed(snap: str) -> _errors.NotFoundError | None:
     try:
         _client.get(f'/v2/snaps/{snap}')
     except _errors.NotFoundError as e:
-        return e
+        return e.with_traceback(None)
     return None
 
 
