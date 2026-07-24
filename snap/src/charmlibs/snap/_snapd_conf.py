@@ -84,8 +84,7 @@ def get(snap: str, keys: Iterable[str] | None = None) -> dict[str, Any]:
             # NOTE: This is the library's only eager installed-check: with no conf request to
             # make, probing is the only way to tell an installed snap ({}) from an absent one.
             # Everywhere else we probe reactively, once a request has actually failed.
-            error = _utils.probe_not_installed(snap)
-            if error is not None:
+            if error := _utils.check_installed(snap):
                 raise error
             return {}
         params = {'keys': ','.join(keys)}
@@ -99,14 +98,13 @@ def get(snap: str, keys: Iterable[str] | None = None) -> dict[str, Any]:
         # For symmetry with PUT (set/unset), we raise NotFoundError here for a missing snap.
         # Raised with 'from None': the option-not-found error snapd sent for the absent snap
         # is misleading, and chaining it would only expose the internal probe.
-        error = _utils.probe_not_installed(snap)
-        if error is not None:
+        if error := _utils.check_installed(snap):
             raise error from None
         raise
     # NOTE: snapd returns {} for an installed snap with no config and for a missing snap.
     # The CLI returns 'error: snap "foo" has no configuration' for a missing snap.
     # For symmetry with PUT (set/unset), we raise NotFoundError here for a missing snap.
-    if keys is None and not config and (error := _utils.probe_not_installed(snap)) is not None:
+    if not config and keys is None and (error := _utils.check_installed(snap)):
         raise error
     assert isinstance(config, dict)
     return typing.cast('dict[str, Any]', config)

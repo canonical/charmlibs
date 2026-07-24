@@ -72,8 +72,7 @@ def connect(plug: tuple[str, str], slot: tuple[str, str] | str | None = None) ->
         # Turn snapd's empty-kind 'snap is not installed' error into a typed NotFoundError.
         # Raised with 'from None' so the caller gets one traceback naming the missing snap,
         # rather than a chained one exposing the internal probe.
-        error = _first_not_installed(plug_snap, slot_snap)
-        if error is not None:
+        if error := _first_not_installed(plug_snap, slot_snap):
             raise error from None
         raise
 
@@ -150,8 +149,7 @@ def disconnect(
         # Turn snapd's empty-kind 'snap is not installed' error into a typed NotFoundError.
         # Raised with 'from None' so the caller gets one traceback naming the missing snap,
         # rather than a chained one exposing the internal probe.
-        error = _first_not_installed(plug_snap, slot_snap)
-        if error is not None:
+        if error := _first_not_installed(plug_snap, slot_snap):
             raise error from None
         raise
 
@@ -181,6 +179,6 @@ def _first_not_installed(plug_snap: str, slot_snap: str) -> _errors.NotFoundErro
     last frame in the traceback, with no uninformative wrapper frame below it.
     """
     for snap in (plug_snap, slot_snap):
-        if snap and (error := _utils.probe_not_installed(snap)) is not None:
+        if snap and (error := _utils.check_installed(snap)):
             return error
     return None

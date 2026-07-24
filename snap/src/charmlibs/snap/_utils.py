@@ -22,13 +22,16 @@ import sys
 from . import _client, _errors
 
 
-def probe_not_installed(snap: str) -> _errors.NotFoundError | None:
-    """Probe whether the snap is installed, returning snapd's not-installed error if it isn't.
+def check_installed(snap: str) -> _errors.NotFoundError | None:
+    """Check whether the snap is installed, returning snapd's not-installed error if it isn't.
 
     Returns ``None`` when the snap is installed, and for the ``system``/``core`` aliases, which
     snapd serves whether or not the core snap is installed (so they are never treated as absent).
     Otherwise probes ``GET /v2/snaps/{snap}`` and returns snapd's own :class:`NotFoundError`
     unchanged when it reports the snap absent, ready for the caller to ``raise``.
+
+    The error-or-``None`` return supports the ``if error := check_installed(snap): raise error``
+    idiom at the call sites (with ``from None`` where an error is already being handled).
 
     The error is snapd's, not one we build: its message is the terse 'snap not installed' with
     the snap name in ``value`` (which ``str()`` surfaces as 'snap not installed (name)'), and it
