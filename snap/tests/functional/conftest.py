@@ -9,7 +9,6 @@ from __future__ import annotations
 import functools
 import logging
 import random
-import subprocess
 import time
 import typing
 
@@ -62,13 +61,6 @@ def retry_on_rate_limit(func: Callable[_P, _T]) -> Callable[_P, _T]:
                     raise
 
     return wrapper
-
-
-def get_command_path(command: str) -> str:
-    try:
-        return subprocess.check_output(['which', command]).decode().strip()
-    except subprocess.CalledProcessError:
-        return ''
 
 
 def ensure_removed(*snaps: str) -> None:
