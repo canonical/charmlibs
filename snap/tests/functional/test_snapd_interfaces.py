@@ -330,7 +330,8 @@ def test_disconnect_all_empty_raises():
 
 
 # The probe hits /v2/snaps/{name}, whose not-found error carries a generic message
-# ('snap not installed') and puts the snap name in `value` (unlike the /v2/interfaces message).
+# ('snap not installed') with the snap name only in `value`. The raised error doesn't reuse that
+# message: it names the snap, matching snapd's own wording on /v2/interfaces (and on conf PUT).
 
 
 def test_connect_not_installed_snap_raises_not_found():
@@ -338,6 +339,16 @@ def test_connect_not_installed_snap_raises_not_found():
         _snapd_interfaces.connect((_ABSENT_SNAP, 'home'))
     assert ctx.value.kind == 'snap-not-found'
     assert _ABSENT_SNAP in str(ctx.value.value)
+    assert ctx.value.message == f'snap "{_ABSENT_SNAP}" is not installed'
+
+
+def test_connect_not_installed_snap_error_is_not_chained():
+    # The original API error is suppressed ('raise ... from None'), so the traceback is a single
+    # error naming the snap, with no 'During handling of the above exception' probe noise.
+    with pytest.raises(_errors.NotFoundError) as ctx:
+        _snapd_interfaces.connect((_ABSENT_SNAP, 'home'))
+    assert ctx.value.__cause__ is None
+    assert ctx.value.__suppress_context__
 
 
 def test_disconnect_not_installed_snap_raises_not_found():
@@ -345,6 +356,7 @@ def test_disconnect_not_installed_snap_raises_not_found():
         _snapd_interfaces.disconnect((_ABSENT_SNAP, 'home'))
     assert ctx.value.kind == 'snap-not-found'
     assert _ABSENT_SNAP in str(ctx.value.value)
+    assert ctx.value.message == f'snap "{_ABSENT_SNAP}" is not installed'
 
 
 def test_connect_slot_snap_not_installed_raises_not_found():
@@ -352,6 +364,7 @@ def test_connect_slot_snap_not_installed_raises_not_found():
         _snapd_interfaces.connect((_SNAP, _PLUG), (_ABSENT_SNAP, _PLUG))
     assert ctx.value.kind == 'snap-not-found'
     assert _ABSENT_SNAP in str(ctx.value.value)
+    assert ctx.value.message == f'snap "{_ABSENT_SNAP}" is not installed'
 
 
 # ---------------------------------------------------------------------------

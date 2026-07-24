@@ -81,7 +81,11 @@ def get(snap: str, keys: Iterable[str] | None = None) -> dict[str, Any]:
             # NOTE: snapd returns the full configuration if no keys are specified.
             # We pass this behaviour through for keys=None, but for keys=[] we return
             # an empty dict, since the caller explicitly requested no keys.
-            _utils.raise_if_snap_not_installed_or_system(snap)
+            # NOTE: This is the library's only eager installed-check: with no conf request to
+            # make, probing is the only way to tell an installed snap ({}) from an absent one.
+            # Everywhere else we probe reactively, once a request has actually failed.
+            if not _utils.snap_installed(snap):
+                raise _utils.not_installed_error(snap)
             return {}
         params = {'keys': ','.join(keys)}
     else:
@@ -92,13 +96,16 @@ def get(snap: str, keys: Iterable[str] | None = None) -> dict[str, Any]:
         # NOTE: snapd reports option-not-found both for a missing key and for a missing snap.
         # The CLI returns 'error: snap "foo" has no "bar" configuration' in both cases.
         # For symmetry with PUT (set/unset), we raise NotFoundError here for a missing snap.
-        _utils.raise_if_snap_not_installed_or_system(snap)
+        # Raised with 'from None': the option-not-found error snapd sent for the absent snap
+        # is misleading, and chaining it would only expose the internal probe.
+        if not _utils.snap_installed(snap):
+            raise _utils.not_installed_error(snap) from None
         raise
-    if keys is None and not config:
-        # NOTE: snapd returns {} for an installed snap with no config and for a missing snap.
-        # The CLI returns 'error: snap "foo" has no configuration' for a missing snap.
-        # For symmetry with PUT (set/unset), we raise NotFoundError here for a missing snap.
-        _utils.raise_if_snap_not_installed_or_system(snap)
+    # NOTE: snapd returns {} for an installed snap with no config and for a missing snap.
+    # The CLI returns 'error: snap "foo" has no configuration' for a missing snap.
+    # For symmetry with PUT (set/unset), we raise NotFoundError here for a missing snap.
+    if keys is None and not config and not _utils.snap_installed(snap):
+        raise _utils.not_installed_error(snap)
     assert isinstance(config, dict)
     return typing.cast('dict[str, Any]', config)
 

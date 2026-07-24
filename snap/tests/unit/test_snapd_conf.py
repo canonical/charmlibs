@@ -87,8 +87,13 @@ class TestGetEmptyKeys:
         mock_client.get.side_effect = NotFoundError(
             'snap not installed', kind='snap-not-found', value='hello-world'
         )
-        with pytest.raises(NotFoundError):
+        with pytest.raises(NotFoundError) as ctx:
             _snapd_conf.get('hello-world', [])
+        # The probe's generic message is replaced with one naming the snap, and the probe's own
+        # error isn't chained -- it was handled, not propagated.
+        assert ctx.value.message == 'snap "hello-world" is not installed'
+        assert ctx.value.value == 'hello-world'
+        assert ctx.value.__context__ is None
 
     def test_get_empty_keys_system_not_probed(self, mock_client: MockClient):
         # system/core skip the installed-snap probe entirely, so no network call is made.
@@ -124,15 +129,31 @@ class TestGetAbsentSnapProbe:
 
     def test_missing_key_on_absent_snap_raises_not_found(self, mock_client: MockClient):
         mock_client.get.side_effect = [self._OPTION_NOT_FOUND, self._SNAP_NOT_FOUND]
-        with pytest.raises(NotFoundError):
+        with pytest.raises(NotFoundError) as ctx:
             _snapd_conf.get('hello-world', ['mykey'])
+        assert ctx.value.message == 'snap "hello-world" is not installed'
+        assert ctx.value.value == 'hello-world'
+
+    def test_missing_key_on_absent_snap_does_not_chain_option_not_found(
+        self, mock_client: MockClient
+    ):
+        # The misleading option-not-found error snapd sent for the absent snap is suppressed
+        # ('raise ... from None'), so the user sees a single traceback.
+        mock_client.get.side_effect = [self._OPTION_NOT_FOUND, self._SNAP_NOT_FOUND]
+        with pytest.raises(NotFoundError) as ctx:
+            _snapd_conf.get('hello-world', ['mykey'])
+        assert ctx.value.__cause__ is None
+        assert ctx.value.__suppress_context__
 
     def test_get_all_empty_on_absent_snap_raises_not_found(self, mock_client: MockClient):
         # A bare conf GET on an absent snap is a 200 with an empty result, so the probe is
         # what turns it into an error.
         mock_client.get.side_effect = [{}, self._SNAP_NOT_FOUND]
-        with pytest.raises(NotFoundError):
+        with pytest.raises(NotFoundError) as ctx:
             _snapd_conf.get('hello-world')
+        assert ctx.value.message == 'snap "hello-world" is not installed'
+        assert ctx.value.value == 'hello-world'
+        assert ctx.value.__context__ is None
 
     def test_get_all_empty_on_installed_snap_returns_empty_dict(self, mock_client: MockClient):
         mock_client.get.side_effect = [{}, result_of('snap_info_hello_world.json')]

@@ -70,7 +70,11 @@ def connect(plug: tuple[str, str], slot: tuple[str, str] | str | None = None) ->
         _client.post('/v2/interfaces', body=data)
     except _errors.APIError:
         # Turn snapd's empty-kind 'snap is not installed' error into a typed NotFoundError.
-        _raise_if_snaps_not_installed_or_system(plug_snap, slot_snap)
+        # Raised with 'from None' so the caller gets one traceback naming the missing snap,
+        # rather than a chained one exposing the internal probe.
+        absent = _not_installed_snap(plug_snap, slot_snap)
+        if absent is not None:
+            raise _utils.not_installed_error(absent) from None
         raise
 
 
@@ -144,7 +148,11 @@ def disconnect(
         pass  # Follow the snap CLI's lead and suppress this error.
     except _errors.APIError:
         # Turn snapd's empty-kind 'snap is not installed' error into a typed NotFoundError.
-        _raise_if_snaps_not_installed_or_system(plug_snap, slot_snap)
+        # Raised with 'from None' so the caller gets one traceback naming the missing snap,
+        # rather than a chained one exposing the internal probe.
+        absent = _not_installed_snap(plug_snap, slot_snap)
+        if absent is not None:
+            raise _utils.not_installed_error(absent) from None
         raise
 
 
@@ -158,17 +166,21 @@ def _snap_and_name(spec: tuple[str, str] | str | None) -> tuple[str, str]:
     return snap, name
 
 
-def _raise_if_snaps_not_installed_or_system(plug_snap: str, slot_snap: str) -> None:
-    """Convert an empty-kind 'snap is not installed' API error into a typed NotFoundError.
+def _not_installed_snap(plug_snap: str, slot_snap: str) -> str | None:
+    """Return the first of the named snaps that isn't installed, or None if they all are.
 
     snapd validates the plug snap before the slot snap (daemon/api_interfaces.go), reporting a
     not-installed snap as an empty-kind ``APIError`` before any plug/slot resolution. We probe the
     named snaps in the same order -- plug snap first -- so the ``NotFoundError`` names the same
     snap snapd would blame. Empty (auto-resolved) sides are skipped, and the ``system``/``core``
-    aliases are skipped because snapd serves them without the core snap being installed. If both
-    named snaps are installed, this returns and the caller re-raises the original error.
+    aliases count as installed because snapd serves them without the core snap being installed.
+    If both named snaps are installed, this returns ``None`` and the caller re-raises the
+    original error.
+
+    This returns the snap rather than raising so that the caller's ``raise ... from None`` is the
+    last frame in the traceback, with no uninformative wrapper frame below it.
     """
-    if plug_snap:
-        _utils.raise_if_snap_not_installed_or_system(plug_snap)
-    if slot_snap:
-        _utils.raise_if_snap_not_installed_or_system(slot_snap)
+    for snap in (plug_snap, slot_snap):
+        if snap and not _utils.snap_installed(snap):
+            return snap
+    return None

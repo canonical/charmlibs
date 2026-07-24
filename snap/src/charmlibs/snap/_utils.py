@@ -19,25 +19,44 @@ from __future__ import annotations
 import datetime
 import sys
 
-from . import _client
+from . import _client, _errors
 
 
-def raise_if_snap_not_installed_or_system(snap: str) -> None:
-    """Raise NotFoundError if the snap is not installed, unless it names a system snap.
+def snap_installed(snap: str) -> bool:
+    """Return whether the snap is installed, treating the system snap names as always installed.
 
     snapd treats ``'system'`` as an alias for ``'core'`` on its config endpoints, and remaps both
     ``'system'`` and ``'core'`` to the always-present snapd snap on its interface endpoints, so
-    operations on these names succeed whether or not the core snap is installed. For those names
-    the installed check is skipped; for any other name this probes ``/v2/snaps/{snap}``, which
-    raises :class:`NotFoundError` if the snap is not installed.
+    operations on these names succeed whether or not the core snap is installed. Those names are
+    reported as installed without probing; any other name is probed with ``GET /v2/snaps/{snap}``.
     """
     # NOTE: snapd's conf endpoints treat 'system' as an alias for 'core', and interface requests
     # remap 'system'/'core' to the snapd snap, so both names are served without the core snap.
     # /v2/snaps/system always 404s (a hardcoded alias, not a real snap) and /v2/snaps/core 404s
-    # when the core snap is absent, so probing either would turn a working call into NotFoundError.
+    # when the core snap is absent, so probing either would report a working call as not installed.
     if snap in ('system', 'core'):
-        return
-    _client.get(f'/v2/snaps/{snap}')  # Raises NotFoundError if the snap isn't installed.
+        return True
+    try:
+        _client.get(f'/v2/snaps/{snap}')
+    except _errors.NotFoundError:
+        return False
+    return True
+
+
+def not_installed_error(snap: str) -> _errors.NotFoundError:
+    """Build the typed error to raise for a snap that isn't installed.
+
+    The message matches snapd's own wording for this case, as returned by the conf PUT and the
+    interface endpoints, so the error names the snap even when it was detected by the
+    :func:`snap_installed` probe, whose ``GET /v2/snaps/{snap}`` reports only 'snap not installed'
+    with the name in ``value``.
+
+    Raise this with ``from None`` when converting an error snapd has already reported, so the
+    caller sees a single traceback instead of a chained one exposing the internal probe.
+    """
+    return _errors.NotFoundError(
+        f'snap "{snap}" is not installed', kind='snap-not-found', value=snap
+    )
 
 
 def normalize_channel(channel: str) -> str:
