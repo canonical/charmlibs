@@ -12,6 +12,7 @@ tests that inherently install/remove as part of the test logic.
 from __future__ import annotations
 
 import datetime
+import functools
 import typing
 from typing import Any
 
@@ -19,7 +20,7 @@ import pytest
 
 from charmlibs.snap import _client, _errors
 from charmlibs.snap import _snapd_snaps as _snapd
-from conftest import ensure_installed, ensure_removed
+from conftest import ensure_installed, ensure_removed, retry_on_rate_limit
 
 # A snap name that is never installed — used for error paths where any absent
 # snap produces the same error response, avoiding unnecessary remove operations.
@@ -37,6 +38,7 @@ def _list_snaps() -> list[_snapd.Info]:
     return [_snapd.Info._from_dict(info_dict) for info_dict in info_dicts]
 
 
+@functools.cache  # Cached to avoid repeated store queries.
 def _list_channels(snap: str) -> dict[str, _snapd.Info]:
     """List information about all channels of a snap available in the store."""
     results = _client.get('/v2/find', query={'name': snap})
@@ -82,7 +84,7 @@ def test_install_already_installed_returns_false():
 
 def test_refresh_no_updates_returns_false():
     ensure_installed('hello-world', channel='latest/stable')
-    result = _snapd.refresh('hello-world', channel='latest/stable')
+    result = retry_on_rate_limit(_snapd.refresh)('hello-world', channel='latest/stable')
     assert result is False
     assert _snapd.info('hello-world').channel == 'latest/stable'
 
@@ -91,7 +93,7 @@ def test_refresh_channel():
     ensure_installed('hello-world', channel='latest/stable')
     # Pre-flight: confirm the target channel exists before refreshing to it.
     assert 'latest/candidate' in _list_channels('hello-world')
-    _snapd.refresh('hello-world', channel='latest/candidate')
+    retry_on_rate_limit(_snapd.refresh)('hello-world', channel='latest/candidate')
     info = _snapd.info('hello-world')
     assert info.channel == 'latest/candidate'
 
@@ -99,14 +101,14 @@ def test_refresh_channel():
 def test_refresh_invalid_channel_raises():
     ensure_installed('hello-world')
     with pytest.raises(_errors.ChannelNotAvailableError) as ctx:
-        _snapd.refresh('hello-world', channel='garbage')
+        retry_on_rate_limit(_snapd.refresh)('hello-world', channel='garbage')
     assert ctx.value.kind == 'snap-channel-not-available'
 
 
 def test_refresh_revision_not_available_raises():
     ensure_installed('hello-world')
     with pytest.raises(_errors.RevisionNotAvailableError) as ctx:
-        _snapd.refresh('hello-world', revision=99999999)
+        retry_on_rate_limit(_snapd.refresh)('hello-world', revision=99999999)
     assert ctx.value.kind == 'snap-revision-not-available'
 
 
@@ -191,7 +193,7 @@ def test_refresh_not_installed_raises_base_snap_error():
     # This is distinct from NotFoundError; it's a base Error.
     ensure_removed('hello-world')
     with pytest.raises(_errors.Error) as ctx:
-        _snapd.refresh('hello-world')
+        retry_on_rate_limit(_snapd.refresh)('hello-world')
     # No kind is set -- the message contains "is not installed" but snapd omits the kind field.
     assert not ctx.value.kind
     assert 'not installed' in ctx.value.message
@@ -214,7 +216,7 @@ def test_unhold_not_installed_no_error():
 def test_install_invalid_channel_raises():
     ensure_removed('hello-world')
     with pytest.raises(_errors.ChannelNotAvailableError) as ctx:
-        _snapd.install('hello-world', channel='garbage')
+        retry_on_rate_limit(_snapd.install)('hello-world', channel='garbage')
     assert ctx.value.kind == 'snap-channel-not-available'
     assert 'channel' in ctx.value.message or 'no snap revision' in ctx.value.message
 
@@ -222,7 +224,7 @@ def test_install_invalid_channel_raises():
 def test_install_revision_not_available_raises():
     ensure_removed('hello-world')
     with pytest.raises(_errors.RevisionNotAvailableError) as ctx:
-        _snapd.install('hello-world', revision=99999999)
+        retry_on_rate_limit(_snapd.install)('hello-world', revision=99999999)
     assert ctx.value.kind == 'snap-revision-not-available'
 
 
@@ -233,7 +235,7 @@ def test_install_revision_not_available_raises():
 
 def test_install():
     ensure_removed('hello-world')
-    _snapd.install('hello-world')
+    retry_on_rate_limit(_snapd.install)('hello-world')
     info = _snapd.info('hello-world')
     assert info.name == 'hello-world'
     assert info.channel == 'latest/stable'
@@ -245,7 +247,7 @@ def test_install_channel():
     ensure_removed('hello-world')
     # Pre-flight: confirm the target channel actually exists in the store.
     assert 'latest/candidate' in _list_channels('hello-world')
-    _snapd.install('hello-world', channel='latest/candidate')
+    retry_on_rate_limit(_snapd.install)('hello-world', channel='latest/candidate')
     info = _snapd.info('hello-world')
     assert info.channel == 'latest/candidate'
 
@@ -256,7 +258,7 @@ def test_install_revision():
     # from the store rather than hard-coded, to document the relationship and catch drift).
     current = int(_list_channels('hello-world')['latest/stable'].revision)
     previous = current - 1
-    _snapd.install('hello-world', revision=previous)
+    retry_on_rate_limit(_snapd.install)('hello-world', revision=previous)
     info = _snapd.info('hello-world')
     assert info.revision == str(previous)
 
@@ -269,13 +271,13 @@ def test_install_revision():
 def test_install_needs_classic_raises():
     ensure_removed('charmcraft')
     with pytest.raises(_errors.NeedsClassicError) as ctx:
-        _snapd.install('charmcraft')
+        retry_on_rate_limit(_snapd.install)('charmcraft')
     assert ctx.value.kind == 'snap-needs-classic'
 
 
 def test_install_classic():
     ensure_removed('charmcraft')
-    _snapd.install('charmcraft', classic=True)
+    retry_on_rate_limit(_snapd.install)('charmcraft', classic=True)
     info = _snapd.info('charmcraft')
     assert info.classic is True
 
@@ -287,7 +289,7 @@ def test_install_classic():
 
 def test_install_nonexistent_snap_raises():
     with pytest.raises(_errors.NotFoundError) as ctx:
-        _snapd.install(_ABSENT_SNAP)
+        retry_on_rate_limit(_snapd.install)(_ABSENT_SNAP)
     assert ctx.value.kind == 'snap-not-found'
     assert ctx.value.value == _ABSENT_SNAP
 
