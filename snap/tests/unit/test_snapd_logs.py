@@ -157,3 +157,22 @@ class TestParseTimestamp:
         assert ts.tzinfo is not None
         assert ts.utcoffset() == datetime.timedelta(hours=13)
         assert ts.hour == 16
+
+
+class TestEmptySnapName:
+    def test_empty_name_raises_value_error_without_request(self, mock_client: MockClient):
+        # An empty name is a caller error, not a request for system-wide logs: snapd answers
+        # names='' with an app-not-found 'no matching services'.
+        with pytest.raises(ValueError, match='must not be empty'):
+            _snapd_logs.logs('')
+        mock_client.get_logs.assert_not_called()
+
+    def test_empty_name_among_valid_names_raises(self, mock_client: MockClient):
+        with pytest.raises(ValueError, match='must not be empty'):
+            _snapd_logs.logs('lxd', '')
+        mock_client.get_logs.assert_not_called()
+
+    def test_empty_name_validated_before_limit(self, mock_client: MockClient):
+        with pytest.raises(ValueError, match='must not be empty'):
+            _snapd_logs.logs('', limit=0)
+        mock_client.get_logs.assert_not_called()

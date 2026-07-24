@@ -98,10 +98,11 @@ def info(snap: str) -> Info:
         An Info object with information about the snap.
 
     Raises:
+        ValueError: if the snap name is empty or is not a single path segment.
         NotFoundError: if the snap is not installed.
         Error: (or a subtype) if the information could not be retrieved for another reason.
     """
-    info_dict = _client.get(f'/v2/snaps/{snap}')
+    info_dict = _client.get(f'/v2/snaps/{_utils.snap_path_segment(snap)}')
     assert isinstance(info_dict, dict)
     info_dict = typing.cast('dict[str, str]', info_dict)
     return Info._from_dict(info_dict)
@@ -142,7 +143,8 @@ def install(
         Not guaranteed to be an actual :class:`bool`.
 
     Raises:
-        ValueError: if both channel and revision are specified.
+        ValueError: if the snap name is empty or is not a single path segment, or if both
+            channel and revision are specified.
         NotFoundError: if the snap does not exist in the store.
         RevisionNotAvailableError: if the specified revision is not available.
         ChannelNotAvailableError: if the specified channel is not available.
@@ -150,6 +152,7 @@ def install(
         ChangeError: if the install fails after starting (for example, an install hook errors).
         Error: (or a subtype) if the snap could not be installed for another reason.
     """
+    path = f'/v2/snaps/{_utils.snap_path_segment(snap)}'
     if channel is not None and revision is not None:
         # NOTE: Revision silently takes precedence over channel in the snapd API.
         # The CLI instead returns an error if the specified revision doesn't exist on that channel.
@@ -163,7 +166,7 @@ def install(
         data['classic'] = True
     # NOTE: Unlike the API, the CLI doesn't error if it's already installed (just prints a msg).
     try:
-        _client.post(f'/v2/snaps/{snap}', body=data)
+        _client.post(path, body=data)
     except _errors._AlreadyInstalledError:
         return False
     return True
@@ -181,15 +184,17 @@ def remove(snap: str, *, purge: bool = False) -> object:
         Not guaranteed to be an actual :class:`bool`.
 
     Raises:
+        ValueError: if the snap name is empty or is not a single path segment.
         ChangeError: if the removal fails after starting (for example, a remove hook errors).
         Error: (or a subtype) if the snap could not be removed as requested.
     """
+    path = f'/v2/snaps/{_utils.snap_path_segment(snap)}'
     data: dict[str, Any] = {'action': 'remove'}
     if purge:
         data['purge'] = True
     # NOTE: Unlike the API, the CLI doesn't error if the snap isn't installed (just prints a msg).
     try:
-        _client.post(f'/v2/snaps/{snap}', body=data)
+        _client.post(path, body=data)
     except _errors.NotInstalledError:
         return False
     return True
@@ -221,12 +226,14 @@ def refresh(
         Not guaranteed to be an actual :class:`bool`.
 
     Raises:
-        ValueError: if both channel and revision are specified.
+        ValueError: if the snap name is empty or is not a single path segment, or if both
+            channel and revision are specified.
         RevisionNotAvailableError: if the specified revision is not available.
         ChannelNotAvailableError: if the specified channel is not available.
         ChangeError: if the refresh fails after starting (for example, a refresh hook errors).
         Error: (or a subtype) if the snap could not be refreshed for another reason.
     """
+    path = f'/v2/snaps/{_utils.snap_path_segment(snap)}'
     if channel is not None and revision is not None:
         # NOTE: Revision silently takes precedence over channel in the snapd API.
         # The CLI instead returns an error if the specified revision doesn't exist on that channel.
@@ -238,7 +245,7 @@ def refresh(
         data['revision'] = str(revision)
     # NOTE: Unlike the API, the CLI doesn't error if there are no updates (just prints a msg).
     try:
-        _client.post(f'/v2/snaps/{snap}', body=data)
+        _client.post(path, body=data)
     except _errors._NoUpdatesAvailableError:
         return False
     return True
@@ -256,9 +263,11 @@ def hold(snap: str, duration: datetime.timedelta | int | float | None = None) ->
             (default), the snap is held indefinitely.
 
     Raises:
+        ValueError: if the snap name is empty or is not a single path segment.
         NotFoundError: If the snap is not installed.
         ChangeError: If the hold change fails after starting.
     """
+    path = f'/v2/snaps/{_utils.snap_path_segment(snap)}'
     # https://forum.snapcraft.io/t/snapd-rest-api/17954
     if duration is None:
         until = 'forever'
@@ -272,7 +281,7 @@ def hold(snap: str, duration: datetime.timedelta | int | float | None = None) ->
     # NOTE: The API returns an error with no 'kind' when holding a non-installed snap.
     # The CLI raises an error in this case, so we pre-emptively check if the snap is installed.
     info(snap)  # Raise NotFoundError if not installed.
-    _client.post(f'/v2/snaps/{snap}', body=data)
+    _client.post(path, body=data)
 
 
 def unhold(snap: str) -> None:
@@ -284,7 +293,8 @@ def unhold(snap: str) -> None:
         snap: The name of the snap to unhold.
 
     Raises:
+        ValueError: if the snap name is empty or is not a single path segment.
         ChangeError: If the unhold change fails after starting.
     """
     # NOTE: Neither the API nor CLI error if the snap isn't installed or held.
-    _client.post(f'/v2/snaps/{snap}', body={'action': 'unhold'})
+    _client.post(f'/v2/snaps/{_utils.snap_path_segment(snap)}', body={'action': 'unhold'})

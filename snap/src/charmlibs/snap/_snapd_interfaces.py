@@ -59,6 +59,10 @@ def connect(plug: tuple[str, str], slot: tuple[str, str] | str | None = None) ->
         connect(('mysnap', 'content'), ('other-snap', 'content-slot'))
     """
     # NOTE: plug snap and plug name are required, we let snapd validate this.
+    # Unlike the other modules, an empty snap name isn't rejected client-side here: it is
+    # meaningful on the slot side (the system snap, or auto-resolution), snap names go in the
+    # request body rather than the URL, and snapd's own message for an empty plug snap is clear
+    # ('cannot resolve connection, plug snap name is empty').
     plug_snap, plug_name = _snap_and_name(plug)
     slot_snap, slot_name = _snap_and_name(slot)
     data = {
@@ -167,6 +171,10 @@ def _raise_if_snaps_not_installed_or_system(plug_snap: str, slot_snap: str) -> N
     snap snapd would blame. Empty (auto-resolved) sides are skipped, and the ``system``/``core``
     aliases are skipped because snapd serves them without the core snap being installed. If both
     named snaps are installed, this returns and the caller re-raises the original error.
+
+    Skipping empty sides is load-bearing in two ways: the probe would raise ValueError for an
+    empty name, masking the API error being classified, and ``/v2/snaps/`` 404s with a generic
+    'not found' rather than listing snaps.
     """
     if plug_snap:
         _utils.raise_if_snap_not_installed_or_system(plug_snap)

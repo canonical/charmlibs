@@ -18,8 +18,41 @@ from __future__ import annotations
 
 import datetime
 import sys
+import urllib.parse
 
 from . import _client
+
+
+def raise_if_snap_name_empty(snap: str) -> None:
+    """Raise ValueError if the snap name is empty.
+
+    An empty snap name is a caller programming error, so we reject it before making a request
+    rather than passing it to snapd, whose response depends on the endpoint (anything from a
+    typed ``snap "" not found`` to a redirect with an empty body).
+    """
+    if not snap:
+        raise ValueError('snap name must not be empty')
+
+
+def snap_path_segment(snap: str) -> str:
+    """Validate a snap name and encode it for use as a single URL path segment.
+
+    Raises ValueError if the name is empty or would not be a single, canonical path segment.
+    Percent-encoding alone is not enough to guarantee that:
+
+    - snapd's router (gorilla/mux) matches on the *decoded* path, so ``%2F`` is still a path
+      separator to it: without this check ``info('hello-world/conf')`` would reach
+      ``/v2/snaps/hello-world/conf`` and return that snap's configuration.
+    - ``urllib.parse.quote`` leaves ``.`` unencoded, so a ``.`` or ``..`` name would still make
+      the path non-canonical, which mux answers with a ``301`` to the cleaned path.
+
+    Encoding is still applied, so that characters such as ``?`` and ``#`` in a name are sent as
+    part of the path instead of starting a query string or fragment.
+    """
+    raise_if_snap_name_empty(snap)
+    if '/' in snap or snap in ('.', '..'):
+        raise ValueError(f'snap name must be a single path segment, not {snap!r}')
+    return urllib.parse.quote(snap, safe='')
 
 
 def raise_if_snap_not_installed_or_system(snap: str) -> None:
@@ -30,6 +63,10 @@ def raise_if_snap_not_installed_or_system(snap: str) -> None:
     operations on these names succeed whether or not the core snap is installed. For those names
     the installed check is skipped; for any other name this probes ``/v2/snaps/{snap}``, which
     raises :class:`NotFoundError` if the snap is not installed.
+
+    Raises ValueError for a name that can't be used as a path segment (see
+    :func:`snap_path_segment`). Callers that reach this from an exception handler must skip
+    empty names, so that a ValueError can't mask the error they're classifying.
     """
     # NOTE: snapd's conf endpoints treat 'system' as an alias for 'core', and interface requests
     # remap 'system'/'core' to the snapd snap, so both names are served without the core snap.
@@ -37,7 +74,8 @@ def raise_if_snap_not_installed_or_system(snap: str) -> None:
     # when the core snap is absent, so probing either would turn a working call into NotFoundError.
     if snap in ('system', 'core'):
         return
-    _client.get(f'/v2/snaps/{snap}')  # Raises NotFoundError if the snap isn't installed.
+    # Raises NotFoundError if the snap isn't installed.
+    _client.get(f'/v2/snaps/{snap_path_segment(snap)}')
 
 
 def normalize_channel(channel: str) -> str:

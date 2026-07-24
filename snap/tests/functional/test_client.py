@@ -13,6 +13,7 @@ Tests are ordered to minimise snap install/remove churn.
 from __future__ import annotations
 
 import typing
+import urllib.parse
 from typing import Any
 
 import pytest
@@ -222,6 +223,52 @@ def test_poll_fails_fast_when_socket_missing():
         # snapd is still processing the original change; wait for it before cleaning up.
         change.wait()
         _client.put('/v2/snaps/lxd/conf', body={'test-gone-key': None})
+
+
+# ---------------------------------------------------------------------------
+# Non-canonical paths: snapd's router redirects, and we report it
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ('path', 'location'),
+    [
+        # snapd registers its routes on a gorilla/mux router with path cleaning left on, so any
+        # path containing '//', '/./' or '/../' is answered with a 301 to the cleaned path and an
+        # empty body. '/v2/snaps//conf' is what an empty snap name used to build.
+        ('/v2/snaps//conf', '/v2/snaps/conf'),
+        ('/v2/snaps/..', '/v2'),
+        ('/v2/snaps/../changes', '/v2/changes'),
+    ],
+)
+def test_redirect_raises_bad_response_error(path: str, location: str):
+    # We don't follow redirects: the snap names we interpolate into paths are validated and
+    # encoded, so a redirect means a bug on our side or a change in snapd. Before this was
+    # handled, the empty body of the 301 surfaced as a confusing 'Invalid JSON' error.
+    with pytest.raises(_errors.BadResponseError) as ctx:
+        _client.get(path)
+    assert ctx.value.kind == 'charmlibs-snap-unexpected-redirect'
+    assert ctx.value.value == location
+    assert path in ctx.value.message
+    assert 'Invalid JSON' not in ctx.value.message
+
+
+def test_percent_encoded_separator_still_reaches_another_endpoint():
+    # Why snap names are validated and not merely percent-encoded: snapd's router matches on the
+    # *decoded* path, so '%2F' is still a path separator to it. A name of 'lxd/conf' encodes to a
+    # single segment on the wire, but reaches /v2/snaps/lxd/conf -- the snap's configuration.
+    ensure_installed('lxd')
+    try:
+        _client.put('/v2/snaps/lxd/conf', body={'test-key-encoded': 'alpha'})
+        segment = urllib.parse.quote('lxd/conf', safe='')
+        assert '/' not in segment
+        result = _client.get(f'/v2/snaps/{segment}')
+        assert isinstance(result, dict)
+        result = typing.cast('dict[str, Any]', result)
+        assert result.get('test-key-encoded') == 'alpha'  # The conf, not the snap info.
+        assert 'name' not in result
+    finally:
+        _client.put('/v2/snaps/lxd/conf', body={'test-key-encoded': None})
 
 
 def test_get_logs_returns_list():

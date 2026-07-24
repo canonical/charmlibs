@@ -147,11 +147,12 @@ def _request(
     )
     opener = urllib.request.OpenerDirector()
     opener.add_handler(_client_sockets.UnixSocketHandler(_SOCKET_PATH))
-    opener.add_handler(urllib.request.HTTPRedirectHandler())
     # We need to handle HTTP errors ourselves, since the response body contains meaningful info,
     # so we don't add HTTPErrorProcessor or HTTPDefaultErrorHandler, which would raise too early.
+    # Without HTTPErrorProcessor, urllib never dispatches 3xx responses to a redirect handler
+    # either, so we don't add one -- we report redirects instead of following them (see below).
     try:
-        return opener.open(request, timeout=_REQUEST_TIMEOUT)
+        response = opener.open(request, timeout=_REQUEST_TIMEOUT)
     except TimeoutError:
         raise _errors.TimeoutError(
             f'Request to snapd timed out after {_REQUEST_TIMEOUT}s: {method} {path}',
@@ -170,6 +171,22 @@ def _request(
             kind='charmlibs-snap-connection-error',
             value='',
         ) from e
+    if 300 <= response.status < 400:
+        # snapd itself never redirects: its only redirect is its router's path canonicalisation,
+        # which answers a path containing '//', '/./' or '/../' with a 301 to the cleaned path.
+        # We validate and encode the snap names we interpolate into paths, so the paths we build
+        # are canonical -- a redirect here means a bug on our side or a change in snapd. Either
+        # way, reporting it beats following it, and beats letting the empty body of the redirect
+        # fall through to a confusing 'Invalid JSON ... char 0' decode error.
+        location = response.getheader('Location')
+        raise _errors.BadResponseError(
+            message=f'Unexpected redirect for path {path!r} to {location!r}',
+            kind='charmlibs-snap-unexpected-redirect',
+            value=location or '',
+            status_code=response.status,
+            status=response.reason,
+        )
+    return response
 
 
 def _decode(response: http.client.HTTPResponse) -> object | _Change:

@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import logging
 
-from . import _client
+from . import _client, _utils
 
 logger = logging.getLogger(__name__)
 
@@ -35,11 +35,13 @@ def alias(snap: str, app: str, alias: str) -> None:
         alias: The alias (command name) to create for the app.
 
     Raises:
+        ValueError: if the snap name is empty.
         NotInstalledError: if the snap is not installed.
         ChangeError: if the alias name is already claimed by a different snap,
             conflicts with the command namespace of an installed snap,
             or if the specified app does not exist within the snap.
     """
+    _utils.raise_if_snap_name_empty(snap)
     data = {'action': 'alias', 'snap': snap, 'app': app, 'alias': alias}
     _client.post('/v2/aliases', body=data)
 

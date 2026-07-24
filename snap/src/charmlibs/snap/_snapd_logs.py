@@ -92,10 +92,16 @@ def logs(*snaps: str, limit: int | None = 10) -> list[LogEntry]:
         snapd are skipped (and logged as warnings) rather than raising.
 
     Raises:
-        ValueError: If ``limit`` is not ``None`` and is not a positive integer.
+        ValueError: If any snap name is empty, or if ``limit`` is not ``None`` and is not a
+            positive integer.
         NotFoundError: If a specified snap is not installed.
         AppNotFoundError: If a specified snap has no services.
     """
+    # NOTE: An empty name is rejected rather than dropped: snapd answers logs('') with an
+    # app-not-found 'no matching services', and silently treating it as logs() -- system-wide
+    # logs -- would hide the caller's mistake behind a much broader result.
+    for snap in snaps:
+        _utils.raise_if_snap_name_empty(snap)
     if limit is None:
         # snapd treats n=-1 as "no limit": return all available log entries.
         n = -1

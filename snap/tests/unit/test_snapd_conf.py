@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -223,3 +223,52 @@ class TestConfigureHookFailure:
         mock_client.put.side_effect = self._CHANGE_ERROR
         with pytest.raises(ChangeError):
             _snapd_conf.unset('hello-world', ['mykey'])
+
+
+class TestSnapNameInPath:
+    # get, set and unset all interpolate the snap name into the URL path. An unvalidated empty
+    # name builds '/v2/snaps//conf', which snapd answers with an empty-bodied 301 to
+    # '/v2/snaps/conf' -- previously surfaced as a BadResponseError about invalid JSON.
+    @pytest.mark.parametrize('snap', ['', '.', '..', 'hello-world/conf'])
+    def test_get_invalid_name_raises_value_error_without_request(
+        self, mock_client: MockClient, snap: str
+    ):
+        with pytest.raises(ValueError):
+            _snapd_conf.get(snap)
+        mock_client.get.assert_not_called()
+
+    @pytest.mark.parametrize('keys', [None, [], ['mykey'], 'mykey'])
+    def test_get_empty_name_raises_value_error_for_any_keys(
+        self, mock_client: MockClient, keys: Any
+    ):
+        # Including keys=[] (the installed-snap probe) and a string (a TypeError otherwise),
+        # so that every path through get() reports the empty name the same way.
+        with pytest.raises(ValueError, match='must not be empty'):
+            _snapd_conf.get('', keys)
+        mock_client.get.assert_not_called()
+
+    @pytest.mark.parametrize('snap', ['', '.', '..', 'hello-world/conf'])
+    def test_set_invalid_name_raises_value_error_without_request(
+        self, mock_client: MockClient, snap: str
+    ):
+        with pytest.raises(ValueError):
+            _snapd_conf.set(snap, {'mykey': 'myval'})
+        mock_client.put.assert_not_called()
+
+    @pytest.mark.parametrize('snap', ['', '.', '..', 'hello-world/conf'])
+    def test_unset_invalid_name_raises_value_error_without_request(
+        self, mock_client: MockClient, snap: str
+    ):
+        with pytest.raises(ValueError):
+            _snapd_conf.unset(snap, ['mykey'])
+        mock_client.put.assert_not_called()
+
+    def test_unset_validates_name_before_keys(self, mock_client: MockClient):
+        with pytest.raises(ValueError, match='must not be empty'):
+            _snapd_conf.unset('', 'mykey')  # A string 'keys' would otherwise be a TypeError.
+
+    def test_name_is_percent_encoded(self, mock_client: MockClient):
+        _snapd_conf.set('hello world', {'mykey': 'myval'})
+        mock_client.put.assert_called_once_with(
+            '/v2/snaps/hello%20world/conf', body={'mykey': 'myval'}
+        )

@@ -3,7 +3,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
+
+import pytest
 
 from charmlibs.snap import _snapd_apps
 
@@ -63,3 +65,25 @@ class TestRestart:
         _snapd_apps.restart('lxd', 'daemon')
         body = mock_client.post.call_args.kwargs['body']
         assert body['names'] == ['lxd.daemon']
+
+
+_FUNCTIONS = [_snapd_apps.start, _snapd_apps.stop, _snapd_apps.restart]
+
+
+class TestEmptySnapName:
+    # /v2/apps takes the snap name in the request body, where snapd already answers an empty name
+    # with a typed 'snap "" not found'. We still reject it up front, so that every function in the
+    # library reports an empty snap name the same way.
+    @pytest.mark.parametrize('func', _FUNCTIONS, ids=lambda f: f.__name__)
+    def test_empty_name_raises_value_error_without_request(
+        self, mock_client: MockClient, func: Any
+    ):
+        with pytest.raises(ValueError, match='must not be empty'):
+            func('')
+        mock_client.post.assert_not_called()
+
+    @pytest.mark.parametrize('func', _FUNCTIONS, ids=lambda f: f.__name__)
+    def test_empty_name_with_services_raises(self, mock_client: MockClient, func: Any):
+        with pytest.raises(ValueError, match='must not be empty'):
+            func('', 'daemon')
+        mock_client.post.assert_not_called()
