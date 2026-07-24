@@ -30,7 +30,7 @@ import pytest
 
 from charmlibs import snap
 from charmlibs.snap import _client, _errors, _snapd_interfaces
-from conftest import ensure_removed
+from conftest import ensure_installed, ensure_removed
 from test_snapd_local import SNAPS_DIR, install_local
 
 if TYPE_CHECKING:
@@ -65,9 +65,9 @@ def core_snap(request: pytest.FixtureRequest) -> Iterator[str]:
         ensure_removed('hello-world', 'test-snapd-with-configure')
         snap.remove('core')  # Errors loudly if an unmanaged snap still depends on core.
         yield request.param
-        snap.install('core')
+        ensure_installed('core')
     else:
-        snap.install('core')  # A no-op if already installed.
+        ensure_installed('core')  # A no-op if already installed.
         yield request.param
 
 
