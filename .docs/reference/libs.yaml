@@ -1107,7 +1107,7 @@ interfaces:
   tags:
   - telco
 - name: charms.oathkeeper.forward_auth
-  status: ''
+  status: legacy
   url: https://charmhub.io/oathkeeper/libraries/forward_auth
   docs: ''
   src: https://github.com/canonical/oathkeeper-operator
@@ -1138,7 +1138,7 @@ interfaces:
   kind: PyPI
   rel_name: forward_auth
   rel_url_charmhub: https://charmhub.io/integrations/forward_auth
-  rel_url_schema: ''
+  rel_url_schema: https://github.com/canonical/charmlibs/tree/main/interfaces/forward_auth/interface/v0
   description: 'Interface library for providing API Gateways with Identity and Access Proxy information.'
   tags:
   - identity-auth
