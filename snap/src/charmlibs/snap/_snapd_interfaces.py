@@ -72,9 +72,9 @@ def connect(plug: tuple[str, str], slot: tuple[str, str] | str | None = None) ->
         # Turn snapd's empty-kind 'snap is not installed' error into a typed NotFoundError.
         # Raised with 'from None' so the caller gets one traceback naming the missing snap,
         # rather than a chained one exposing the internal probe.
-        absent = _not_installed_snap(plug_snap, slot_snap)
-        if absent is not None:
-            raise _utils.not_installed_error(absent) from None
+        error = _first_not_installed(plug_snap, slot_snap)
+        if error is not None:
+            raise error from None
         raise
 
 
@@ -150,9 +150,9 @@ def disconnect(
         # Turn snapd's empty-kind 'snap is not installed' error into a typed NotFoundError.
         # Raised with 'from None' so the caller gets one traceback naming the missing snap,
         # rather than a chained one exposing the internal probe.
-        absent = _not_installed_snap(plug_snap, slot_snap)
-        if absent is not None:
-            raise _utils.not_installed_error(absent) from None
+        error = _first_not_installed(plug_snap, slot_snap)
+        if error is not None:
+            raise error from None
         raise
 
 
@@ -166,8 +166,8 @@ def _snap_and_name(spec: tuple[str, str] | str | None) -> tuple[str, str]:
     return snap, name
 
 
-def _not_installed_snap(plug_snap: str, slot_snap: str) -> str | None:
-    """Return the first of the named snaps that isn't installed, or None if they all are.
+def _first_not_installed(plug_snap: str, slot_snap: str) -> _errors.NotFoundError | None:
+    """Return the not-installed error for the first named snap that is absent, or None if all are.
 
     snapd validates the plug snap before the slot snap (daemon/api_interfaces.go), reporting a
     not-installed snap as an empty-kind ``APIError`` before any plug/slot resolution. We probe the
@@ -177,10 +177,10 @@ def _not_installed_snap(plug_snap: str, slot_snap: str) -> str | None:
     If both named snaps are installed, this returns ``None`` and the caller re-raises the
     original error.
 
-    This returns the snap rather than raising so that the caller's ``raise ... from None`` is the
+    This returns the error rather than raising so that the caller's ``raise ... from None`` is the
     last frame in the traceback, with no uninformative wrapper frame below it.
     """
     for snap in (plug_snap, slot_snap):
-        if snap and not _utils.snap_installed(snap):
-            return snap
+        if snap and (error := _utils.probe_not_installed(snap)) is not None:
+            return error
     return None
