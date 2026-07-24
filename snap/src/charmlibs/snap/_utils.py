@@ -23,17 +23,18 @@ from . import _client, _errors
 
 
 def probe_not_installed(snap: str) -> _errors.NotFoundError | None:
-    """Probe whether the snap is installed, returning the typed error to raise if it isn't.
+    """Probe whether the snap is installed, returning snapd's not-installed error if it isn't.
 
     Returns ``None`` when the snap is installed, and for the ``system``/``core`` aliases, which
     snapd serves whether or not the core snap is installed (so they are never treated as absent).
-    Otherwise probes ``GET /v2/snaps/{snap}`` and, when snapd reports the snap absent, returns a
-    :class:`NotFoundError` whose message names the snap, ready for the caller to ``raise``.
+    Otherwise probes ``GET /v2/snaps/{snap}`` and returns snapd's own :class:`NotFoundError`
+    unchanged when it reports the snap absent, ready for the caller to ``raise``.
 
-    The message is composed rather than passed through from the probe's own error, which says
-    only 'snap not installed' with the name in ``value``. Naming the snap matches snapd's own
-    wording on the conf PUT and interface endpoints, so every operation reports a missing snap
-    the same way.
+    The error is snapd's, not one we build: its message is the terse 'snap not installed' with
+    the snap name in ``value`` (which ``str()`` surfaces as 'snap not installed (name)'), and it
+    carries snapd's real ``status_code``. It reads a little differently from the conf PUT and
+    interface endpoints, which name the snap in the message directly, but we don't hand-construct
+    an error to paper over that -- the value and ``str()`` carry the name either way.
 
     Raise the returned error with ``from None`` when converting an error snapd has already
     reported, so the caller sees a single traceback instead of a chained one exposing this probe.
@@ -46,10 +47,8 @@ def probe_not_installed(snap: str) -> _errors.NotFoundError | None:
         return None
     try:
         _client.get(f'/v2/snaps/{snap}')
-    except _errors.NotFoundError:
-        return _errors.NotFoundError(
-            f'snap "{snap}" is not installed', kind='snap-not-found', value=snap
-        )
+    except _errors.NotFoundError as e:
+        return e
     return None
 
 

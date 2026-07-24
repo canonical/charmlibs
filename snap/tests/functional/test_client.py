@@ -93,11 +93,12 @@ def test_get_sync_error_snap_not_found():
     with pytest.raises(_errors.NotFoundError) as ctx:
         _client.get(f'/v2/snaps/{_ABSENT_SNAP}')
     assert ctx.value.kind == 'snap-not-found'
-    # This endpoint is what _utils.probe_not_installed probes with, and its message is generic
-    # (the snap name is in `value` only). That's why callers translating a not-installed snap into
-    # a typed error compose their own message rather than reusing the probe's.
+    # This endpoint is what _utils.probe_not_installed probes with; its message is terse, with the
+    # snap name in `value`. get()/connect()/disconnect() raise this very error unchanged, relying
+    # on str() to surface the name rather than building their own message.
     assert ctx.value.message == 'snap not installed'
     assert str(ctx.value.value) == _ABSENT_SNAP
+    assert str(ctx.value) == f'snap not installed ({_ABSENT_SNAP})'
 
 
 def test_get_sync_error_no_kind():
