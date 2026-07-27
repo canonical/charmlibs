@@ -16,7 +16,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from . import _client, _errors, _utils
 
@@ -154,8 +154,13 @@ def disconnect(
         raise
 
 
-def _snap_and_name(spec: tuple[str, str] | str | None, what: str) -> tuple[str, str]:
-    """Normalise a plug or slot spec to a ``(snap, name)`` pair of strings.
+def _snap_and_name(
+    spec: tuple[str, str] | str | None, side: Literal['plug', 'slot']
+) -> tuple[str, str]:
+    """Normalise one side of a connection to a ``(snap, name)`` pair of strings.
+
+    ``side`` names which end of the connection the spec is, and is only used to say so in
+    the error message: a blank plug name and a blank slot name are otherwise the same error.
 
     Unlike the rest of the library, an empty value is not rejected here: it selects the system
     snap, or asks snapd to resolve that side of the connection. A blank value has no such
@@ -168,10 +173,9 @@ def _snap_and_name(spec: tuple[str, str] | str | None, what: str) -> tuple[str, 
         snap, name = spec, ''
     else:
         snap, name = spec  # ValueError if not a 2-item pair.
-    if err := _utils.get_err_if_blank(snap, label=f'{what} snap name'):
-        raise err
-    if err := _utils.get_err_if_blank(name, label=f'{what} name'):
-        raise err
+    for value, label in ((snap, f'{side} snap name'), (name, f'{side} name')):
+        if err := _utils.get_err_if_blank(value, label=label):
+            raise err
     return snap, name
 
 

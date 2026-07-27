@@ -41,12 +41,9 @@ def alias(snap: str, app: str, alias: str) -> None:
             conflicts with the command namespace of an installed snap,
             or if the specified app does not exist within the snap.
     """
-    if err := _utils.get_err_if_empty_or_blank(snap, label='snap name'):
-        raise err
-    if err := _utils.get_err_if_empty_or_blank(app, label='app name'):
-        raise err
-    if err := _utils.get_err_if_empty_or_blank(alias, label='alias'):
-        raise err
+    for value, label in ((snap, 'snap name'), (app, 'app name'), (alias, 'alias')):
+        if err := _utils.get_err_if_empty_or_blank(value, label=label):
+            raise err
     data = {'action': 'alias', 'snap': snap, 'app': app, 'alias': alias}
     _client.post('/v2/aliases', body=data)
 
