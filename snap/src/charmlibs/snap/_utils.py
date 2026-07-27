@@ -23,17 +23,6 @@ import urllib.parse
 from . import _client, _errors
 
 
-def raise_if_snap_name_empty(snap: str) -> None:
-    """Raise ValueError if the snap name is empty.
-
-    An empty snap name is a caller programming error, so we reject it before making a request
-    rather than passing it to snapd, whose response depends on the endpoint (anything from a
-    typed ``snap "" not found`` to a redirect with an empty body).
-    """
-    if not snap:
-        raise ValueError('snap name must not be empty')
-
-
 def snap_path_segment(snap: str) -> str:
     """Validate a snap name and encode it for use as a single URL path segment.
 
@@ -53,6 +42,17 @@ def snap_path_segment(snap: str) -> str:
     if '/' in snap or snap in ('.', '..'):
         raise ValueError(f'snap name must be a single path segment, not {snap!r}')
     return urllib.parse.quote(snap, safe='')
+
+
+def raise_if_snap_name_empty(snap: str) -> None:
+    """Raise ValueError if the snap name is empty.
+
+    An empty snap name is a caller programming error, so we reject it before making a request
+    rather than passing it to snapd, whose response depends on the endpoint (anything from a
+    typed ``snap "" not found`` to a redirect with an empty body).
+    """
+    if not snap:
+        raise ValueError('snap name must not be empty')
 
 
 def check_installed_or_system(snap: str) -> _errors.NotFoundError | None:
