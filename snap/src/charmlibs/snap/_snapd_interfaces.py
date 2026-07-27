@@ -42,6 +42,8 @@ def connect(plug: tuple[str, str], slot: tuple[str, str] | str | None = None) ->
             - ``None`` (the default), shorthand for ``('', '')``.
 
     Raises:
+        ValueError: if any part of ``plug`` or ``slot`` is blank (only whitespace). An empty
+            part is meaningful here, and is passed to snapd.
         NotFoundError: if the plug snap or slot snap is not installed.
             Never raised for the system snap.
         APIError: if the plug is not fully specified (empty snap or plug name), if the named plug
@@ -59,8 +61,8 @@ def connect(plug: tuple[str, str], slot: tuple[str, str] | str | None = None) ->
         connect(('mysnap', 'content'), ('other-snap', 'content-slot'))
     """
     # NOTE: plug snap and plug name are required, we let snapd validate this.
-    plug_snap, plug_name = _snap_and_name(plug)
-    slot_snap, slot_name = _snap_and_name(slot)
+    plug_snap, plug_name = _snap_and_name(plug, 'plug')
+    slot_snap, slot_name = _snap_and_name(slot, 'slot')
     data = {
         'action': 'connect',
         'plugs': [{'snap': plug_snap, 'plug': plug_name}],
@@ -110,6 +112,8 @@ def disconnect(
             so the interface reverts to snapd's default auto-connection policy on the next refresh.
 
     Raises:
+        ValueError: if any part of ``plug`` or ``slot`` is blank (only whitespace). An empty
+            part is meaningful here, and is passed to snapd.
         NotFoundError: if the plug snap or slot snap is not installed.
             Never raised for the system snap.
         APIError: if neither ``plug`` nor ``slot`` names anything to disconnect, if the named plug
@@ -127,8 +131,8 @@ def disconnect(
     """
     # NOTE: snapd rejects both sides being ('', ''), and either side being (snap, '').
     # We let snapd validate this.
-    plug_snap, plug_name = _snap_and_name(plug)
-    slot_snap, slot_name = _snap_and_name(slot)
+    plug_snap, plug_name = _snap_and_name(plug, 'plug')
+    slot_snap, slot_name = _snap_and_name(slot, 'slot')
     data: dict[str, Any] = {
         'action': 'disconnect',
         'plugs': [{'snap': plug_snap, 'plug': plug_name}],
@@ -150,13 +154,22 @@ def disconnect(
         raise
 
 
-def _snap_and_name(spec: tuple[str, str] | str | None) -> tuple[str, str]:
-    """Normalise a plug or slot spec to a ``(snap, name)`` pair of strings."""
+def _snap_and_name(spec: tuple[str, str] | str | None, what: str) -> tuple[str, str]:
+    """Normalise a plug or slot spec to a ``(snap, name)`` pair of strings.
+
+    Unlike the rest of the library, an empty value is not rejected here: it selects the system
+    snap, or asks snapd to resolve that side of the connection. A blank value has no such
+    meaning -- snapd reads it as a name, and reports that no such snap, plug, or slot exists --
+    so we reject it rather than let it look like the empty value it was probably meant to be.
+    """
     if spec is None:
         return '', ''
     if isinstance(spec, str):
-        return spec, ''
-    snap, name = spec  # ValueError if not a 2-item pair.
+        snap, name = spec, ''
+    else:
+        snap, name = spec  # ValueError if not a 2-item pair.
+    _utils.raise_if_blank(snap, f'{what} snap name')
+    _utils.raise_if_blank(name, f'{what} name')
     return snap, name
 
 

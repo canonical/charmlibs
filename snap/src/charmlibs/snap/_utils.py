@@ -38,21 +38,63 @@ def snap_path_segment(snap: str) -> str:
     Encoding is still applied, so that characters such as ``?`` and ``#`` in a name are sent as
     part of the path instead of starting a query string or fragment.
     """
-    raise_if_snap_name_empty(snap)
+    raise_if_empty_or_blank(snap, 'snap name')
     if '/' in snap or snap in ('.', '..'):
         raise ValueError(f'snap name must be a single path segment, not {snap!r}')
     return urllib.parse.quote(snap, safe='')
 
 
-def raise_if_snap_name_empty(snap: str) -> None:
-    """Raise ValueError if the snap name is empty.
+def raise_if_empty_or_blank(value: str, what: str) -> None:
+    """Raise ValueError if the value is empty or contains only whitespace.
 
-    An empty snap name is a caller programming error, so we reject it before making a request
-    rather than passing it to snapd, whose response depends on the endpoint (anything from a
-    typed ``snap "" not found`` to a redirect with an empty body).
+    Both are caller programming errors, so we reject them before making a request rather than
+    passing them to snapd, whose response depends on the endpoint (anything from a typed
+    ``snap "" not found`` to a redirect with an empty body, or to being silently ignored).
+
+    Use :func:`raise_if_blank` instead where snapd gives an empty value a meaning of its own.
     """
-    if not snap:
-        raise ValueError('snap name must not be empty')
+    if not value:
+        raise ValueError(f'{what} must not be empty')
+    raise_if_blank(value, what)
+
+
+def raise_if_blank(value: str, what: str) -> None:
+    """Raise ValueError if the value is non-empty but contains only whitespace.
+
+    Separate from :func:`raise_if_empty_or_blank` for the interface functions, where an empty
+    value is meaningful -- it selects the system snap, or asks snapd to resolve that side of the
+    connection. A blank value is never meaningful anywhere: snapd either treats it as a name that
+    can't exist, or (on the endpoints that take a comma-separated list) discards it entirely.
+    """
+    if value and not value.strip():
+        raise ValueError(f'{what} must not be blank: {value!r}')
+
+
+def raise_if_not_comma_list_safe(value: str, what: str) -> None:
+    """Raise ValueError if the value would not survive snapd's comma-separated list parsing.
+
+    Some snapd endpoints take several values in one query parameter, joined by commas. snapd
+    parses these with ``strutil.CommaSeparatedList``, which splits on commas, strips whitespace
+    from each field, and discards the empty ones. A value that doesn't survive that unchanged is
+    silently turned into something other than what the caller asked for, so we reject it here:
+
+    - an empty or blank value contributes no field at all, so the request means "all of them"
+      rather than "this one" -- ``logs('')`` would return the logs of every snap on the system.
+    - a value containing a comma contributes two or more fields, quietly querying values the
+      caller never named.
+    - a value padded with whitespace comes back stripped, so it addresses a different name than
+      the caller passed, and any result is keyed by the stripped name.
+
+    Python's :meth:`str.strip` and the ``unicode.IsSpace`` that snapd's Go implementation strips
+    with agree on every whitespace character we've tested, including the ones they define
+    separately (U+0085, U+00A0, U+1680, U+2000, U+3000), and agree that zero-width characters
+    (U+200B, U+FEFF) are content rather than whitespace.
+    """
+    raise_if_empty_or_blank(value, what)
+    if ',' in value:
+        raise ValueError(f'{what} must not contain a comma: {value!r}')
+    if value != value.strip():
+        raise ValueError(f'{what} must not have leading or trailing whitespace: {value!r}')
 
 
 def check_installed_or_system(snap: str) -> _errors.NotFoundError | None:
