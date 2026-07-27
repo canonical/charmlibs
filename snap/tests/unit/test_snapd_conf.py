@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import traceback
 from typing import TYPE_CHECKING
 
 import pytest
@@ -87,8 +88,14 @@ class TestGetEmptyKeys:
         mock_client.get.side_effect = NotFoundError(
             'snap not installed', kind='snap-not-found', value='hello-world'
         )
-        with pytest.raises(NotFoundError):
+        with pytest.raises(NotFoundError) as ctx:
             _snapd_conf.get('hello-world', [])
+        # snapd's own probe error is raised unchanged: terse message, snap name in value (which
+        # str() surfaces). Not chained -- the probe's error was handled, not propagated.
+        assert ctx.value.message == 'snap not installed'
+        assert ctx.value.value == 'hello-world'
+        assert str(ctx.value) == 'snap not installed (hello-world)'
+        assert ctx.value.__context__ is None
 
     def test_get_empty_keys_system_not_probed(self, mock_client: MockClient):
         # system/core skip the installed-snap probe entirely, so no network call is made.
@@ -101,20 +108,27 @@ class TestGetAbsentSnapProbe:
     # empty configuration), so get() probes /v2/snaps/{snap} on those paths to raise
     # NotFoundError, consistent with set and unset. See the functional tests for captured
     # responses.
-    _OPTION_NOT_FOUND = OptionNotFoundError(
-        'snap "hello-world" has no "mykey" configuration option',
-        kind='option-not-found',
-        value="{'SnapName': 'hello-world', 'Key': 'mykey'}",
-    )
-    _SNAP_NOT_FOUND = NotFoundError(
-        'snap not installed', kind='snap-not-found', value='hello-world'
-    )
+    # Built fresh per call, not shared: raising an exception mutates its __context__, and the
+    # probe now re-raises snapd's own error object, so a shared instance would leak chaining
+    # state between tests (in production each probe gets a freshly parsed exception).
+    @staticmethod
+    def _option_not_found() -> OptionNotFoundError:
+        return OptionNotFoundError(
+            'snap "hello-world" has no "mykey" configuration option',
+            kind='option-not-found',
+            # snapd sends this value as a JSON object, not a string (see the conf fixture).
+            value={'SnapName': 'hello-world', 'Key': 'mykey'},
+        )
+
+    @staticmethod
+    def _snap_not_found() -> NotFoundError:
+        return NotFoundError('snap not installed', kind='snap-not-found', value='hello-world')
 
     def test_missing_key_on_installed_snap_reraises_option_not_found(
         self, mock_client: MockClient
     ):
         mock_client.get.side_effect = [
-            self._OPTION_NOT_FOUND,
+            self._option_not_found(),
             result_of('snap_info_hello_world.json'),
         ]
         with pytest.raises(OptionNotFoundError):
@@ -123,16 +137,42 @@ class TestGetAbsentSnapProbe:
         assert probe_call.args[0] == '/v2/snaps/hello-world'
 
     def test_missing_key_on_absent_snap_raises_not_found(self, mock_client: MockClient):
-        mock_client.get.side_effect = [self._OPTION_NOT_FOUND, self._SNAP_NOT_FOUND]
-        with pytest.raises(NotFoundError):
+        mock_client.get.side_effect = [self._option_not_found(), self._snap_not_found()]
+        with pytest.raises(NotFoundError) as ctx:
             _snapd_conf.get('hello-world', ['mykey'])
+        assert ctx.value.message == 'snap not installed'
+        assert ctx.value.value == 'hello-world'
+        assert str(ctx.value) == 'snap not installed (hello-world)'
+
+    def test_missing_key_on_absent_snap_does_not_chain_option_not_found(
+        self, mock_client: MockClient
+    ):
+        # The misleading option-not-found error snapd sent for the absent snap is suppressed
+        # ('raise ... from None'), so the user sees a single traceback.
+        mock_client.get.side_effect = [self._option_not_found(), self._snap_not_found()]
+        with pytest.raises(NotFoundError) as ctx:
+            _snapd_conf.get('hello-world', ['mykey'])
+        assert ctx.value.__cause__ is None
+        assert ctx.value.__suppress_context__
+
+    def test_missing_key_on_absent_snap_traceback_excludes_probe(self, mock_client: MockClient):
+        # check_installed clears the probe's traceback, so the re-raised error starts at get()'s
+        # own raise and never walks back through the internal /v2/snaps/{snap} probe GET.
+        mock_client.get.side_effect = [self._option_not_found(), self._snap_not_found()]
+        with pytest.raises(NotFoundError) as ctx:
+            _snapd_conf.get('hello-world', ['mykey'])
+        files = [frame.filename for frame in traceback.extract_tb(ctx.value.__traceback__)]
+        assert not any(f.endswith('_utils.py') for f in files)
 
     def test_get_all_empty_on_absent_snap_raises_not_found(self, mock_client: MockClient):
         # A bare conf GET on an absent snap is a 200 with an empty result, so the probe is
         # what turns it into an error.
-        mock_client.get.side_effect = [{}, self._SNAP_NOT_FOUND]
-        with pytest.raises(NotFoundError):
+        mock_client.get.side_effect = [{}, self._snap_not_found()]
+        with pytest.raises(NotFoundError) as ctx:
             _snapd_conf.get('hello-world')
+        assert ctx.value.message == 'snap not installed'
+        assert str(ctx.value) == 'snap not installed (hello-world)'
+        assert ctx.value.__context__ is None
 
     def test_get_all_empty_on_installed_snap_returns_empty_dict(self, mock_client: MockClient):
         mock_client.get.side_effect = [{}, result_of('snap_info_hello_world.json')]
@@ -145,7 +185,7 @@ class TestGetAbsentSnapProbe:
 
     def test_missing_key_on_system_is_not_probed(self, mock_client: MockClient):
         # /v2/snaps/system always 404s while its conf is served, so system names skip the probe.
-        mock_client.get.side_effect = self._OPTION_NOT_FOUND
+        mock_client.get.side_effect = self._option_not_found()
         with pytest.raises(OptionNotFoundError):
             _snapd_conf.get('system', ['mykey'])
         mock_client.get.assert_called_once()
