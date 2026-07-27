@@ -20,7 +20,7 @@ import datetime
 import sys
 import urllib.parse
 
-from . import _client
+from . import _client, _errors
 
 
 def raise_if_snap_name_empty(snap: str) -> None:
@@ -55,27 +55,26 @@ def snap_path_segment(snap: str) -> str:
     return urllib.parse.quote(snap, safe='')
 
 
-def raise_if_snap_not_installed_or_system(snap: str) -> None:
-    """Raise NotFoundError if the snap is not installed, unless it names a system snap.
+def check_installed_or_system(snap: str) -> _errors.NotFoundError | None:
+    """Return NotFoundError if the snap is not installed or a system/core alias.
 
-    snapd treats ``'system'`` as an alias for ``'core'`` on its config endpoints, and remaps both
-    ``'system'`` and ``'core'`` to the always-present snapd snap on its interface endpoints, so
-    operations on these names succeed whether or not the core snap is installed. For those names
-    the installed check is skipped; for any other name this probes ``/v2/snaps/{snap}``, which
-    raises :class:`NotFoundError` if the snap is not installed.
-
-    Raises ValueError for a name that can't be used as a path segment (see
-    :func:`snap_path_segment`). Callers that reach this from an exception handler must skip
-    empty names, so that a ValueError can't mask the error they're classifying.
+    Returns ``None`` when the snap is installed, and for the ``system``/``core`` aliases, which
+    snapd handles config and interfaces for whether or not the core snap is installed as a snap.
+    Check if this system handling is appropriate if using this function with other snapd endpoints.
+    Otherwise probes ``GET /v2/snaps/{snap}`` and returns snapd's own :class:`NotFoundError` when
+    it reports the snap absent, ready for the caller to ``raise``.
     """
     # NOTE: snapd's conf endpoints treat 'system' as an alias for 'core', and interface requests
     # remap 'system'/'core' to the snapd snap, so both names are served without the core snap.
     # /v2/snaps/system always 404s (a hardcoded alias, not a real snap) and /v2/snaps/core 404s
-    # when the core snap is absent, so probing either would turn a working call into NotFoundError.
+    # when the core snap is absent, so probing either would report a working call as not installed.
     if snap in ('system', 'core'):
-        return
-    # Raises NotFoundError if the snap isn't installed.
-    _client.get(f'/v2/snaps/{snap_path_segment(snap)}')
+        return None
+    try:
+        _client.get(f'/v2/snaps/{snap}')
+    except _errors.NotFoundError as e:
+        return e.with_traceback(None)  # Clean error with no traceback for the caller to raise.
+    return None
 
 
 def normalize_channel(channel: str) -> str:

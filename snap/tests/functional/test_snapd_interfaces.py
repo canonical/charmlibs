@@ -329,29 +329,46 @@ def test_disconnect_all_empty_raises():
 # ---------------------------------------------------------------------------
 
 
-# The probe hits /v2/snaps/{name}, whose not-found error carries a generic message
-# ('snap not installed') and puts the snap name in `value` (unlike the /v2/interfaces message).
+# The probe hits /v2/snaps/{name}, whose not-found error carries a terse message
+# ('snap not installed') with the snap name in `value`. connect/disconnect raise that error
+# unchanged; str() surfaces the name as 'snap not installed (<snap>)'. This reads differently
+# from snapd's /v2/interfaces wording, which we deliberately don't reconstruct.
 
 
 def test_connect_not_installed_snap_raises_not_found():
     with pytest.raises(_errors.NotFoundError) as ctx:
         _snapd_interfaces.connect((_ABSENT_SNAP, 'home'))
     assert ctx.value.kind == 'snap-not-found'
-    assert _ABSENT_SNAP in str(ctx.value.value)
+    assert str(ctx.value.value) == _ABSENT_SNAP
+    assert ctx.value.message == 'snap not installed'
+    assert str(ctx.value) == f'snap not installed ({_ABSENT_SNAP})'
+
+
+def test_connect_not_installed_snap_error_is_not_chained():
+    # The original API error is suppressed ('raise ... from None'), so the traceback is a single
+    # error naming the snap, with no 'During handling of the above exception' probe noise.
+    with pytest.raises(_errors.NotFoundError) as ctx:
+        _snapd_interfaces.connect((_ABSENT_SNAP, 'home'))
+    assert ctx.value.__cause__ is None
+    assert ctx.value.__suppress_context__
 
 
 def test_disconnect_not_installed_snap_raises_not_found():
     with pytest.raises(_errors.NotFoundError) as ctx:
         _snapd_interfaces.disconnect((_ABSENT_SNAP, 'home'))
     assert ctx.value.kind == 'snap-not-found'
-    assert _ABSENT_SNAP in str(ctx.value.value)
+    assert str(ctx.value.value) == _ABSENT_SNAP
+    assert ctx.value.message == 'snap not installed'
+    assert str(ctx.value) == f'snap not installed ({_ABSENT_SNAP})'
 
 
 def test_connect_slot_snap_not_installed_raises_not_found():
     with pytest.raises(_errors.NotFoundError) as ctx:
         _snapd_interfaces.connect((_SNAP, _PLUG), (_ABSENT_SNAP, _PLUG))
     assert ctx.value.kind == 'snap-not-found'
-    assert _ABSENT_SNAP in str(ctx.value.value)
+    assert str(ctx.value.value) == _ABSENT_SNAP
+    assert ctx.value.message == 'snap not installed'
+    assert str(ctx.value) == f'snap not installed ({_ABSENT_SNAP})'
 
 
 # ---------------------------------------------------------------------------

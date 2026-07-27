@@ -74,7 +74,8 @@ def connect(plug: tuple[str, str], slot: tuple[str, str] | str | None = None) ->
         _client.post('/v2/interfaces', body=data)
     except _errors.APIError:
         # Turn snapd's empty-kind 'snap is not installed' error into a typed NotFoundError.
-        _raise_if_snaps_not_installed_or_system(plug_snap, slot_snap)
+        if error := _first_not_installed(plug_snap, slot_snap):
+            raise error from None
         raise
 
 
@@ -148,7 +149,8 @@ def disconnect(
         pass  # Follow the snap CLI's lead and suppress this error.
     except _errors.APIError:
         # Turn snapd's empty-kind 'snap is not installed' error into a typed NotFoundError.
-        _raise_if_snaps_not_installed_or_system(plug_snap, slot_snap)
+        if error := _first_not_installed(plug_snap, slot_snap):
+            raise error from None
         raise
 
 
@@ -162,21 +164,16 @@ def _snap_and_name(spec: tuple[str, str] | str | None) -> tuple[str, str]:
     return snap, name
 
 
-def _raise_if_snaps_not_installed_or_system(plug_snap: str, slot_snap: str) -> None:
-    """Convert an empty-kind 'snap is not installed' API error into a typed NotFoundError.
+def _first_not_installed(plug_snap: str, slot_snap: str) -> _errors.NotFoundError | None:
+    """Return a NotFoundError for the first named snap that is absent.
 
     snapd validates the plug snap before the slot snap (daemon/api_interfaces.go), reporting a
     not-installed snap as an empty-kind ``APIError`` before any plug/slot resolution. We probe the
     named snaps in the same order -- plug snap first -- so the ``NotFoundError`` names the same
-    snap snapd would blame. Empty (auto-resolved) sides are skipped, and the ``system``/``core``
-    aliases are skipped because snapd serves them without the core snap being installed. If both
-    named snaps are installed, this returns and the caller re-raises the original error.
-
-    Skipping empty sides is load-bearing in two ways: the probe would raise ValueError for an
-    empty name, masking the API error being classified, and ``/v2/snaps/`` 404s with a generic
-    'not found' rather than listing snaps.
+    snap snapd would blame. Empty (auto-resolved) sides are skipped. Note the ``system``/``core``
+    aliases count as installed because snapd serves them without the core snap being installed.
     """
-    if plug_snap:
-        _utils.raise_if_snap_not_installed_or_system(plug_snap)
-    if slot_snap:
-        _utils.raise_if_snap_not_installed_or_system(slot_snap)
+    for snap in (plug_snap, slot_snap):
+        if snap and (error := _utils.check_installed_or_system(snap)):
+            return error
+    return None
