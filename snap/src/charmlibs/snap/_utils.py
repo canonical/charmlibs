@@ -45,7 +45,7 @@ def snap_path_segment(snap: str) -> str:
     Raises rather than returning the error, since it returns the encoded name. Callers that want
     the error reported at their own frame should validate the name before calling this.
     """
-    if problem := empty_or_blank(snap):
+    if problem := check_empty_or_blank(snap):
         raise ValueError(f'snap name {problem}')
     if '/' in snap or snap in ('.', '..'):
         raise ValueError(f'snap name must be a single path segment, not {snap!r}')
@@ -62,40 +62,34 @@ def snap_path_segment(snap: str) -> str:
 #
 # Returning rather than raising also keeps the traceback short. A charm's tracebacks end up in the
 # Juju debug log, where frames between the call and the error are noise for whoever reads them,
-# and these compose: comma_list defers to empty_or_blank, which defers to blank. Raising from in
-# here would put all of that in front of the reader.
+# and these compose: check_comma_list defers to check_empty_or_blank, which defers to
+# check_blank. Raising from in here would put all of that in front of the reader.
 
 
-def _each(values: str | Iterable[str]) -> Iterable[str]:
-    """Yield the values, treating a bare string as one value rather than an iterable of one-char.
-
-    An iterable is consumed, so callers holding a generator should materialise it before checking
-    it, or they will send an empty request afterwards.
-    """
-    return (values,) if isinstance(values, str) else values
-
-
-def empty_or_blank(values: str | Iterable[str]) -> str | None:
+def check_empty_or_blank(values: str | Iterable[str]) -> str | None:
     """Describe why a value is unusable if it is empty or contains only whitespace.
 
     Both are caller programming errors, so we reject them before making a request rather than
     passing them to snapd, whose response depends on the endpoint (anything from a typed
     ``snap "" not found`` to a redirect with an empty body, or to being silently ignored).
 
-    Use :func:`blank` instead where snapd gives an empty value a meaning of its own.
+    Use :func:`check_blank` instead where snapd gives an empty value a meaning of its own.
     """
-    for value in _each(values):
+    if isinstance(values, str):
+        # A bare string is one value, not an iterable of one-character values.
+        values = [values]
+    for value in values:
         if not value:
             return 'must not be empty'
-        if problem := blank(value):
+        if problem := check_blank(value):
             return problem
     return None
 
 
-def blank(values: str | Iterable[str]) -> str | None:
+def check_blank(values: str | Iterable[str]) -> str | None:
     """Describe why a value is unusable if it is non-empty but contains only whitespace.
 
-    Separate from :func:`empty_or_blank` for the interface functions, where an empty value is
+    Separate from :func:`check_empty_or_blank` for the interface functions, where an empty value is
     meaningful -- it selects the system snap, or asks snapd to resolve that side of the
     connection. A blank value is never meaningful anywhere: snapd either treats it as a name that
     can't exist, or (on the endpoints that take a comma-separated list) discards it entirely.
@@ -103,13 +97,16 @@ def blank(values: str | Iterable[str]) -> str | None:
     The value is quoted in the phrase, since a blank one is invisible otherwise, and a space and
     a tab read identically in an error message.
     """
-    for value in _each(values):
+    if isinstance(values, str):
+        # A bare string is one value, not an iterable of one-character values.
+        values = [values]
+    for value in values:
         if value and not value.strip():
             return f'must not be blank: {value!r}'
     return None
 
 
-def comma_list(values: str | Iterable[str]) -> str | None:
+def check_comma_list(values: str | Iterable[str]) -> str | None:
     """Describe why a value would not survive snapd's comma-separated list parsing.
 
     Some snapd endpoints take several values in one query parameter, joined by commas. snapd
@@ -129,8 +126,16 @@ def comma_list(values: str | Iterable[str]) -> str | None:
     separately (U+0085, U+00A0, U+1680, U+2000, U+3000), and agree that zero-width characters
     (U+200B, U+FEFF) are content rather than whitespace.
     """
-    for value in _each(values):
-        if problem := empty_or_blank(value):
+    if isinstance(values, str):
+        # A bare string is one value, not an iterable of one-character values.
+        values = [values]
+    # NOTE: each value is checked completely before moving on to the next, rather than checking
+    # every value for one kind of problem before the next kind. That keeps what's reported for a
+    # value independent of the other values, and keeps this to a single pass, so an iterable that
+    # can only be consumed once still works. The caller names the whole collection in the error,
+    # so a second problem later in it isn't hidden either way.
+    for value in values:
+        if problem := check_empty_or_blank(value):
             return problem
         if ',' in value:
             return f'must not contain a comma: {value!r}'

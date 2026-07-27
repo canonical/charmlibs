@@ -70,7 +70,7 @@ def connect(plug: tuple[str, str], slot: tuple[str, str] | str | None = None) ->
         (slot_snap, 'slot snap name'),
         (slot_name, 'slot name'),
     ):
-        if problem := _utils.blank(value):
+        if problem := _utils.check_blank(value):
             raise ValueError(f'{label} {problem}')
     data = {
         'action': 'connect',
@@ -149,7 +149,7 @@ def disconnect(
         (slot_snap, 'slot snap name'),
         (slot_name, 'slot name'),
     ):
-        if problem := _utils.blank(value):
+        if problem := _utils.check_blank(value):
             raise ValueError(f'{label} {problem}')
     data: dict[str, Any] = {
         'action': 'disconnect',

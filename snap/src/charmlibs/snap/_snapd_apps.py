@@ -37,9 +37,9 @@ def start(snap: str, *services: str, enable: bool = False) -> None:
         AppNotFoundError: if the snap is not installed or the service is not found.
         ChangeError: if the change fails (for example, the service fails to start).
     """
-    if problem := _utils.empty_or_blank(snap):
+    if problem := _utils.check_empty_or_blank(snap):
         raise ValueError(f'snap name {problem}')
-    if problem := _utils.empty_or_blank(services):
+    if problem := _utils.check_empty_or_blank(services):
         raise ValueError(f'service name {problem} (services={services!r})')
     names = [f'{snap}.{s}' for s in services] if services else [snap]
     data: dict[str, Any] = {'action': 'start', 'names': names}
@@ -62,9 +62,9 @@ def stop(snap: str, *services: str, disable: bool = False) -> None:
         AppNotFoundError: if the snap is not installed or the service is not found.
         ChangeError: if the change fails (for example, the service fails to stop).
     """
-    if problem := _utils.empty_or_blank(snap):
+    if problem := _utils.check_empty_or_blank(snap):
         raise ValueError(f'snap name {problem}')
-    if problem := _utils.empty_or_blank(services):
+    if problem := _utils.check_empty_or_blank(services):
         raise ValueError(f'service name {problem} (services={services!r})')
     names = [f'{snap}.{s}' for s in services] if services else [snap]
     data: dict[str, Any] = {'action': 'stop', 'names': names}
@@ -86,9 +86,9 @@ def restart(snap: str, *services: str) -> None:
         AppNotFoundError: if the snap is not installed or the service is not found.
         ChangeError: if the change fails (for example, the service fails to restart).
     """
-    if problem := _utils.empty_or_blank(snap):
+    if problem := _utils.check_empty_or_blank(snap):
         raise ValueError(f'snap name {problem}')
-    if problem := _utils.empty_or_blank(services):
+    if problem := _utils.check_empty_or_blank(services):
         raise ValueError(f'service name {problem} (services={services!r})')
     names = [f'{snap}.{s}' for s in services] if services else [snap]
     data: dict[str, Any] = {'action': 'restart', 'names': names}

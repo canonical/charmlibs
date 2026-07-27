@@ -42,7 +42,7 @@ def alias(snap: str, app: str, alias: str) -> None:
             or if the specified app does not exist within the snap.
     """
     for value, label in ((snap, 'snap name'), (app, 'app name'), (alias, 'alias')):
-        if problem := _utils.empty_or_blank(value):
+        if problem := _utils.check_empty_or_blank(value):
             raise ValueError(f'{label} {problem}')
     data = {'action': 'alias', 'snap': snap, 'app': app, 'alias': alias}
     _client.post('/v2/aliases', body=data)
@@ -60,7 +60,7 @@ def unalias(alias: str) -> None:
         APIError: if the alias does not exist (for example, was never created, or the snap it
             belonged to was removed — aliases do not survive snap removal).
     """
-    if problem := _utils.empty_or_blank(alias):
+    if problem := _utils.check_empty_or_blank(alias):
         raise ValueError(f'alias {problem}')
     data = {'action': 'unalias', 'alias': alias}
     _client.post('/v2/aliases', body=data)
