@@ -89,21 +89,24 @@ def test_snap_error():
     assert str(err) == 'the message (the-value)'
 
 
-def test_str_appends_informative_string_value():
-    def s(message: str, value: object) -> str:
-        return str(_errors.Error(message, kind='k', value=value))
-
-    # A non-empty string value not already in the message is appended in parentheses -- this is
-    # what surfaces the snap name in snapd's terse 'snap not installed' error.
-    assert s('snap not installed', 'hello-world') == 'snap not installed (hello-world)'
-    # Not appended when it would be redundant: value already present in the message ...
-    assert s('snap "hello-world" is not installed', 'hello-world') == (
-        'snap "hello-world" is not installed'
-    )
-    # ... or empty ...
-    assert s('boom', '') == 'boom'
-    # ... or not a plain string (e.g. option-not-found's {'SnapName', 'Key'} dict, whose contents
-    # the message already spells out -- rendering the dict here would just be noise).
-    assert s('snap "lxd" has no "k" configuration option', {'SnapName': 'lxd', 'Key': 'k'}) == (
-        'snap "lxd" has no "k" configuration option'
-    )
+@pytest.mark.parametrize(
+    ('message', 'value', 'expected'),
+    [
+        ('snap not installed', 'hello-world', 'snap not installed (hello-world)'),
+        # Not appended when the value appears in the message.
+        (
+            'snap "hello-world" is not installed',
+            'hello-world',
+            'snap "hello-world" is not installed',
+        ),
+        ('boom', '', 'boom'),  # Not appended when the value is empty.
+        # Not appended when the value is not a string.
+        (
+            'snap "lxd" has no "k" configuration option',
+            {'SnapName': 'lxd', 'Key': 'k'},
+            'snap "lxd" has no "k" configuration option',
+        ),
+    ],
+)
+def test_str_appends_informative_string_value(message: str, value: object, expected: str):
+    assert str(_errors.Error(message, kind='some-kind', value=value)) == expected
