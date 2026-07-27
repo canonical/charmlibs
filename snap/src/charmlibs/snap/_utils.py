@@ -45,25 +45,25 @@ def snap_path_segment(snap: str) -> str:
     Raises rather than returning the error, since it returns the encoded name. Callers that want
     the error reported at their own frame should validate the name before calling this.
     """
-    if problem := empty_or_blank_problem(snap):
+    if problem := empty_or_blank(snap):
         raise ValueError(f'snap name {problem}')
     if '/' in snap or snap in ('.', '..'):
         raise ValueError(f'snap name must be a single path segment, not {snap!r}')
     return urllib.parse.quote(snap, safe='')
 
 
-# The *_problem functions describe what is wrong with a value, and leave raising to the caller.
-# Each takes one value or an iterable of them (including a dict, whose keys are checked), and
-# describes the first that is unusable.
-# Each returns a phrase to put after the name of the thing being checked -- "must not be empty",
-# "must not contain a comma: ',,'" -- or None if the value is fine. The caller supplies the noun
-# and any context it can add, so one check can say "config key must not be empty (keys=['a', ''])"
-# in one place and "snap name must not be empty" in another, without the check knowing either.
+# The checks below describe what is wrong with a value, and leave raising to the caller. Each
+# takes one value or an iterable of them (including a dict, whose keys are checked), and describes
+# the first that is unusable: a phrase to put after the name of the thing being checked -- "must
+# not be empty", "must not contain a comma: ',,'" -- or None if every value is fine. The caller
+# supplies the noun and any context it can add, so one check can say "config key must not be empty
+# (keys=['a', ''])" in one place and "snap name must not be empty" in another, without the check
+# knowing either.
 #
-# Returning rather than raising also keeps the traceback short. A charm's tracebacks end up in
-# the Juju debug log, where frames between the call and the error are noise for whoever reads
-# them, and these compose: comma_list_problem defers to empty_or_blank_problem, which defers to
-# blank_problem. Raising from in here would put all of that in front of the reader.
+# Returning rather than raising also keeps the traceback short. A charm's tracebacks end up in the
+# Juju debug log, where frames between the call and the error are noise for whoever reads them,
+# and these compose: comma_list defers to empty_or_blank, which defers to blank. Raising from in
+# here would put all of that in front of the reader.
 
 
 def _each(values: str | Iterable[str]) -> Iterable[str]:
@@ -75,28 +75,28 @@ def _each(values: str | Iterable[str]) -> Iterable[str]:
     return (values,) if isinstance(values, str) else values
 
 
-def empty_or_blank_problem(values: str | Iterable[str]) -> str | None:
+def empty_or_blank(values: str | Iterable[str]) -> str | None:
     """Describe why a value is unusable if it is empty or contains only whitespace.
 
     Both are caller programming errors, so we reject them before making a request rather than
     passing them to snapd, whose response depends on the endpoint (anything from a typed
     ``snap "" not found`` to a redirect with an empty body, or to being silently ignored).
 
-    Use :func:`blank_problem` instead where snapd gives an empty value a meaning of its own.
+    Use :func:`blank` instead where snapd gives an empty value a meaning of its own.
     """
     for value in _each(values):
         if not value:
             return 'must not be empty'
-        if problem := blank_problem(value):
+        if problem := blank(value):
             return problem
     return None
 
 
-def blank_problem(values: str | Iterable[str]) -> str | None:
+def blank(values: str | Iterable[str]) -> str | None:
     """Describe why a value is unusable if it is non-empty but contains only whitespace.
 
-    Separate from :func:`empty_or_blank_problem` for the interface functions, where an empty
-    value is meaningful -- it selects the system snap, or asks snapd to resolve that side of the
+    Separate from :func:`empty_or_blank` for the interface functions, where an empty value is
+    meaningful -- it selects the system snap, or asks snapd to resolve that side of the
     connection. A blank value is never meaningful anywhere: snapd either treats it as a name that
     can't exist, or (on the endpoints that take a comma-separated list) discards it entirely.
 
@@ -109,7 +109,7 @@ def blank_problem(values: str | Iterable[str]) -> str | None:
     return None
 
 
-def comma_list_problem(values: str | Iterable[str]) -> str | None:
+def comma_list(values: str | Iterable[str]) -> str | None:
     """Describe why a value would not survive snapd's comma-separated list parsing.
 
     Some snapd endpoints take several values in one query parameter, joined by commas. snapd
@@ -130,7 +130,7 @@ def comma_list_problem(values: str | Iterable[str]) -> str | None:
     (U+200B, U+FEFF) are content rather than whitespace.
     """
     for value in _each(values):
-        if problem := empty_or_blank_problem(value):
+        if problem := empty_or_blank(value):
             return problem
         if ',' in value:
             return f'must not contain a comma: {value!r}'

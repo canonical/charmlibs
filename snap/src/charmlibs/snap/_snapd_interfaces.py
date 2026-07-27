@@ -16,7 +16,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Any
 
 from . import _client, _errors, _utils
 
@@ -61,8 +61,17 @@ def connect(plug: tuple[str, str], slot: tuple[str, str] | str | None = None) ->
         connect(('mysnap', 'content'), ('other-snap', 'content-slot'))
     """
     # NOTE: plug snap and plug name are required, we let snapd validate this.
-    plug_snap, plug_name = _snap_and_name(plug, 'plug')
-    slot_snap, slot_name = _snap_and_name(slot, 'slot')
+    plug_snap, plug_name = _snap_and_name(plug)
+    slot_snap, slot_name = _snap_and_name(slot)
+    # NOTE: an empty part is meaningful to snapd, so only blank parts are rejected here.
+    for value, label in (
+        (plug_snap, 'plug snap name'),
+        (plug_name, 'plug name'),
+        (slot_snap, 'slot snap name'),
+        (slot_name, 'slot name'),
+    ):
+        if problem := _utils.blank(value):
+            raise ValueError(f'{label} {problem}')
     data = {
         'action': 'connect',
         'plugs': [{'snap': plug_snap, 'plug': plug_name}],
@@ -131,8 +140,17 @@ def disconnect(
     """
     # NOTE: snapd rejects both sides being ('', ''), and either side being (snap, '').
     # We let snapd validate this.
-    plug_snap, plug_name = _snap_and_name(plug, 'plug')
-    slot_snap, slot_name = _snap_and_name(slot, 'slot')
+    plug_snap, plug_name = _snap_and_name(plug)
+    slot_snap, slot_name = _snap_and_name(slot)
+    # NOTE: an empty part is meaningful to snapd, so only blank parts are rejected here.
+    for value, label in (
+        (plug_snap, 'plug snap name'),
+        (plug_name, 'plug name'),
+        (slot_snap, 'slot snap name'),
+        (slot_name, 'slot name'),
+    ):
+        if problem := _utils.blank(value):
+            raise ValueError(f'{label} {problem}')
     data: dict[str, Any] = {
         'action': 'disconnect',
         'plugs': [{'snap': plug_snap, 'plug': plug_name}],
@@ -154,28 +172,19 @@ def disconnect(
         raise
 
 
-def _snap_and_name(
-    spec: tuple[str, str] | str | None, side: Literal['plug', 'slot']
-) -> tuple[str, str]:
+def _snap_and_name(spec: tuple[str, str] | str | None) -> tuple[str, str]:
     """Normalise one side of a connection to a ``(snap, name)`` pair of strings.
 
-    ``side`` names which end of the connection the spec is, and is only used to say so in
-    the error message: a blank plug name and a blank slot name are otherwise the same error.
-
-    Unlike the rest of the library, an empty value is not rejected here: it selects the system
-    snap, or asks snapd to resolve that side of the connection. A blank value has no such
-    meaning -- snapd reads it as a name, and reports that no such snap, plug, or slot exists --
-    so we reject it rather than let it look like the empty value it was probably meant to be.
+    Either part may come back empty, which is meaningful to snapd here: it selects the system
+    snap, or asks snapd to resolve that side of the connection. Callers check the parts for
+    blankness themselves, since a blank part is not meaningful and would otherwise be reported
+    from in here rather than from the function the caller called.
     """
     if spec is None:
         return '', ''
     if isinstance(spec, str):
-        snap, name = spec, ''
-    else:
-        snap, name = spec  # ValueError if not a 2-item pair.
-    for value, label in ((snap, f'{side} snap name'), (name, f'{side} name')):
-        if problem := _utils.blank_problem(value):
-            raise ValueError(f'{label} {problem}')
+        return spec, ''
+    snap, name = spec  # ValueError if not a 2-item pair.
     return snap, name
 
 

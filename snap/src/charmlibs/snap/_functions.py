@@ -38,10 +38,6 @@ def ensure_revision(snap: str, revision: int | str, *, classic: bool = False) ->
         ChangeError: If the install or refresh fails after starting (for example, a hook errors).
         Error: (or a subtype) if the snap could not be installed or refreshed for another reason.
     """
-    # NOTE: validated here rather than left to the snapd calls below, so that the error is
-    # raised from the function the caller called, not from inside the _get_info probe.
-    if problem := _utils.empty_or_blank_problem(snap):
-        raise ValueError(f'snap name {problem}')
     info = _get_info(snap)
     if info is None:  # Not installed.
         _snapd_snaps.install(snap, revision=revision, classic=classic)
@@ -88,10 +84,6 @@ def ensure(
         ChangeError: If the install or refresh fails after starting (for example, a hook errors).
         Error: (or a subtype) if the snap could not be installed or refreshed for another reason.
     """
-    # NOTE: validated here rather than left to the snapd calls below, so that the error is
-    # raised from the function the caller called, not from inside the _get_info probe.
-    if problem := _utils.empty_or_blank_problem(snap):
-        raise ValueError(f'snap name {problem}')
     info = _get_info(snap)
     if info is None:  # Not installed.
         _snapd_snaps.install(snap, channel=channel, classic=classic)

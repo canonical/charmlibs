@@ -141,7 +141,7 @@ def test_error_is_raised_from_the_function_the_caller_called():
     # raises from its own frame. A charm's traceback ends up in the Juju debug log, where frames
     # between the call and the error are noise for whoever reads it -- and the checks compose, so
     # raising from inside them would add a frame per layer. logs() is the deepest composition:
-    # comma_list_problem defers to empty_or_blank_problem, which defers to blank_problem. None of
+    # comma_list defers to empty_or_blank, which defers to blank. None of
     # that should be visible.
     with pytest.raises(ValueError) as ctx:
         snap.logs(_BLANK)
@@ -152,10 +152,19 @@ def test_error_is_raised_from_the_function_the_caller_called():
 # itself. It is the only helper allowed to appear in a traceback.
 _MAY_RAISE_FROM_UTILS = '_utils.py:snap_path_segment'
 
+# ensure and ensure_revision are compositions of the other public functions rather than calls to
+# an endpoint of their own, and don't check the snap name themselves: whichever function they
+# reach first does it. That leaves the deepest traceback in the library -- ensure, its _get_info
+# probe, info, and snap_path_segment -- which is the price of not duplicating the check in a
+# layer that doesn't own it.
+_COMPOSITE_FUNCTIONS = {'ensure', 'ensure_revision'}
+
 
 @pytest.mark.parametrize('name', sorted(_CALLS) + sorted(_BLANK_ONLY_CALLS))
 def test_no_call_buries_the_error_in_a_helper(name: str, mock_client: MockClient):
     # As above, for every field.
+    if name in _COMPOSITE_FUNCTIONS:
+        pytest.skip('validated by the function it delegates to, not by itself')
     calls = _CALLS if name in _CALLS else _BLANK_ONLY_CALLS
     with pytest.raises(ValueError) as ctx:
         calls[name](_BLANK)
@@ -163,3 +172,12 @@ def test_no_call_buries_the_error_in_a_helper(name: str, mock_client: MockClient
     assert len(frames) <= 2, frames
     from_utils = [frame for frame in frames if frame.startswith('_utils.py:')]
     assert from_utils in ([], [_MAY_RAISE_FROM_UTILS]), frames
+
+
+@pytest.mark.parametrize('name', sorted(_COMPOSITE_FUNCTIONS))
+def test_composite_functions_still_reject_before_any_request(name: str, mock_client: MockClient):
+    # The exemption above is about where the error is raised, not whether it is: these still
+    # reject an unusable name, and still do it before reaching snapd.
+    with pytest.raises(ValueError, match='must not be blank'):
+        _CALLS[name](_BLANK)
+    _assert_no_request(mock_client)
