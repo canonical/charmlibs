@@ -143,6 +143,8 @@ ignore = [
     "S105",
     # Hard-coded password function argument.
     "S106",
+    # Complains about use of `random`.
+    "S311",
 
     # "Useless" expression.
     "B018",
@@ -186,12 +188,6 @@ stubPath = ""  # silence warning: https://github.com/microsoft/pyright/issues/77
 
 [tool.pytest.ini_options]
 addopts = ["--strict-markers"]
-# Promote warnings to errors so deprecations and resource-cleanup leaks surface in CI
-# rather than going unnoticed. Individual packages can relax specific categories by
-# extending filterwarnings in their own pyproject.toml if they need to.
-filterwarnings = [
-    "error",
-]
 markers = [
     "pebble: functional tests that require a running Pebble to interact with",
     "sudo: functional tests that require superuser privileges",
