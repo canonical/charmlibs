@@ -143,8 +143,6 @@ ignore = [
     "S105",
     # Hard-coded password function argument.
     "S106",
-    # Complains about use of `random`.
-    "S311",
 
     # "Useless" expression.
     "B018",
