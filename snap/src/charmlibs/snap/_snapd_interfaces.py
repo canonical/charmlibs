@@ -170,8 +170,12 @@ def _first_not_installed(plug_snap: str, slot_snap: str) -> _errors.NotFoundErro
     snapd validates the plug snap before the slot snap (daemon/api_interfaces.go), reporting a
     not-installed snap as an empty-kind ``APIError`` before any plug/slot resolution. We probe the
     named snaps in the same order -- plug snap first -- so the ``NotFoundError`` names the same
-    snap snapd would blame. Empty (auto-resolved) sides are skipped. Note the ``system``/``core``
-    aliases count as installed because snapd serves them without the core snap being installed.
+    snap snapd would blame. Note the ``system``/``core`` aliases count as installed because snapd
+    serves them without the core snap being installed.
+
+    Skipping empty (auto-resolved) sides is load-bearing in two ways: the probe would raise
+    ValueError for an empty name, masking the API error being classified, and ``/v2/snaps/``
+    404s with a generic 'not found' rather than listing snaps.
     """
     for snap in (plug_snap, slot_snap):
         if snap and (error := _utils.check_installed_or_system(snap)):

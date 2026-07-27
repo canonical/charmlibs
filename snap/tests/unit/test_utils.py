@@ -60,24 +60,22 @@ class TestSnapPathSegment:
         assert _utils.snap_path_segment(snap) == expected
 
 
-class TestRaiseIfSnapNotInstalledOrSystem:
+class TestCheckInstalledOrSystem:
     def test_empty_raises_value_error_without_request(self, mock_client: MockClient):
         with pytest.raises(ValueError, match='must not be empty'):
-            _utils.raise_if_snap_not_installed_or_system('')
+            _utils.check_installed_or_system('')
         mock_client.get.assert_not_called()
 
     @pytest.mark.parametrize('snap', ['system', 'core'])
     def test_system_names_are_not_probed(self, snap: str, mock_client: MockClient):
-        _utils.raise_if_snap_not_installed_or_system(snap)
+        assert _utils.check_installed_or_system(snap) is None
         mock_client.get.assert_not_called()
 
     def test_installed_snap_is_probed(self, mock_client: MockClient):
-        _utils.raise_if_snap_not_installed_or_system('hello world')
+        assert _utils.check_installed_or_system('hello world') is None
         mock_client.get.assert_called_once_with('/v2/snaps/hello%20world')
 
-    def test_absent_snap_raises_not_found(self, mock_client: MockClient):
-        mock_client.get.side_effect = NotFoundError(
-            'snap not installed', kind='snap-not-found', value='hello-world'
-        )
-        with pytest.raises(NotFoundError):
-            _utils.raise_if_snap_not_installed_or_system('hello-world')
+    def test_absent_snap_returns_not_found(self, mock_client: MockClient):
+        error = NotFoundError('snap not installed', kind='snap-not-found', value='hello-world')
+        mock_client.get.side_effect = error
+        assert _utils.check_installed_or_system('hello-world') is error

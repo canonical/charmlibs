@@ -63,6 +63,10 @@ def check_installed_or_system(snap: str) -> _errors.NotFoundError | None:
     Check if this system handling is appropriate if using this function with other snapd endpoints.
     Otherwise probes ``GET /v2/snaps/{snap}`` and returns snapd's own :class:`NotFoundError` when
     it reports the snap absent, ready for the caller to ``raise``.
+
+    Raises ValueError for a name that can't be used as a path segment (see
+    :func:`snap_path_segment`). Callers that reach this from an exception handler must skip
+    empty names, so that a ValueError can't mask the error they're classifying.
     """
     # NOTE: snapd's conf endpoints treat 'system' as an alias for 'core', and interface requests
     # remap 'system'/'core' to the snapd snap, so both names are served without the core snap.
@@ -70,8 +74,9 @@ def check_installed_or_system(snap: str) -> _errors.NotFoundError | None:
     # when the core snap is absent, so probing either would report a working call as not installed.
     if snap in ('system', 'core'):
         return None
+    path = f'/v2/snaps/{snap_path_segment(snap)}'
     try:
-        _client.get(f'/v2/snaps/{snap}')
+        _client.get(path)
     except _errors.NotFoundError as e:
         return e.with_traceback(None)  # Clean error with no traceback for the caller to raise.
     return None
