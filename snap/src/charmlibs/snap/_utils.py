@@ -24,7 +24,7 @@ import urllib.parse
 from . import _client, _errors
 
 if typing.TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Collection
 
 
 def snap_path_segment(snap: str) -> str:
@@ -66,7 +66,7 @@ def snap_path_segment(snap: str) -> str:
 # check_blank. Raising from in here would put all of that in front of the reader.
 
 
-def check_empty_or_blank(values: str | Iterable[str]) -> str | None:
+def check_empty_or_blank(values: str | Collection[str]) -> str | None:
     """Describe why a value is unusable if it is empty or contains only whitespace.
 
     Both are caller programming errors, so we reject them before making a request rather than
@@ -86,7 +86,7 @@ def check_empty_or_blank(values: str | Iterable[str]) -> str | None:
     return None
 
 
-def check_blank(values: str | Iterable[str]) -> str | None:
+def check_blank(values: str | Collection[str]) -> str | None:
     """Describe why a value is unusable if it is non-empty but contains only whitespace.
 
     Separate from :func:`check_empty_or_blank` for the interface functions, where an empty value is
@@ -106,7 +106,7 @@ def check_blank(values: str | Iterable[str]) -> str | None:
     return None
 
 
-def check_comma_list(values: str | Iterable[str]) -> str | None:
+def check_comma_list(values: str | Collection[str]) -> str | None:
     """Describe why a value would not survive snapd's comma-separated list parsing.
 
     Some snapd endpoints take several values in one query parameter, joined by commas. snapd
@@ -131,9 +131,9 @@ def check_comma_list(values: str | Iterable[str]) -> str | None:
         values = [values]
     # NOTE: each value is checked completely before moving on to the next, rather than checking
     # every value for one kind of problem before the next kind. That keeps what's reported for a
-    # value independent of the other values, and keeps this to a single pass, so an iterable that
-    # can only be consumed once still works. The caller names the whole collection in the error,
-    # so a second problem later in it isn't hidden either way.
+    # value independent of the other values: the same bad value is described the same way whatever
+    # it is passed alongside. The caller names the whole collection in the error, so a second
+    # problem later in it isn't hidden either way.
     for value in values:
         if problem := check_empty_or_blank(value):
             return problem
