@@ -81,7 +81,7 @@ def get(snap: str, keys: Iterable[str] | None = None) -> dict[str, Any]:
             # NOTE: snapd returns the full configuration if no keys are specified.
             # We pass this behaviour through for keys=None, but for keys=[] we return
             # an empty dict, since the caller explicitly requested no keys.
-            if error := _utils.check_installed(snap):
+            if error := _utils.check_installed_or_system(snap):
                 raise error
             return {}
         params = {'keys': ','.join(keys)}
@@ -93,13 +93,13 @@ def get(snap: str, keys: Iterable[str] | None = None) -> dict[str, Any]:
         # NOTE: snapd reports option-not-found both for a missing key and for a missing snap.
         # The CLI returns 'error: snap "foo" has no "bar" configuration' in both cases.
         # For symmetry with PUT (set/unset), we convert to NotFoundError here for a missing snap.
-        if error := _utils.check_installed(snap):
+        if error := _utils.check_installed_or_system(snap):
             raise error from None
         raise
     # NOTE: snapd returns {} for an installed snap with no config and for a missing snap.
     # The CLI returns 'error: snap "foo" has no configuration' for a missing snap.
     # For symmetry with PUT (set/unset), we raise NotFoundError here for a missing snap.
-    if not config and keys is None and (error := _utils.check_installed(snap)):
+    if not config and keys is None and (error := _utils.check_installed_or_system(snap)):
         raise error
     assert isinstance(config, dict)
     return typing.cast('dict[str, Any]', config)

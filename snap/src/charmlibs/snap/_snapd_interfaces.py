@@ -170,6 +170,6 @@ def _first_not_installed(plug_snap: str, slot_snap: str) -> _errors.NotFoundErro
     aliases count as installed because snapd serves them without the core snap being installed.
     """
     for snap in (plug_snap, slot_snap):
-        if snap and (error := _utils.check_installed(snap)):
+        if snap and (error := _utils.check_installed_or_system(snap)):
             return error
     return None

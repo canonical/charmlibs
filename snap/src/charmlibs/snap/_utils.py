@@ -22,11 +22,12 @@ import sys
 from . import _client, _errors
 
 
-def check_installed(snap: str) -> _errors.NotFoundError | None:
+def check_installed_or_system(snap: str) -> _errors.NotFoundError | None:
     """Return NotFoundError if the snap is not installed or a system/core alias.
 
     Returns ``None`` when the snap is installed, and for the ``system``/``core`` aliases, which
     snapd handles config and interfaces for whether or not the core snap is installed as a snap.
+    Check if this system handling is appropriate if using this function with other snapd endpoints.
     Otherwise probes ``GET /v2/snaps/{snap}`` and returns snapd's own :class:`NotFoundError` when
     it reports the snap absent, ready for the caller to ``raise``.
     """
