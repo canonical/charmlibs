@@ -4,10 +4,6 @@
 
 """Functional tests for _snapd_logs: logs."""
 
-from __future__ import annotations
-
-from typing import Any
-
 import pytest
 
 from charmlibs.snap import _client, _errors, _snapd_logs
@@ -129,56 +125,31 @@ def test_logs_not_installed_snap_raises():
 # change to which logs you get -- which is the reason we don't pass one through.
 # ---------------------------------------------------------------------------
 
-# A snap that is installed but has no services, so snapd's answer names it and doesn't depend
-# on anything having been logged.
-_NO_SERVICES_SNAP = 'htop'
+
+@pytest.mark.parametrize('names', ['', ',', ',,'])
+def test_empty_names_leave_no_filter(names: str):
+    # Nothing is left once the empty entries are dropped, so there is nothing to filter on and
+    # these queries return system-wide logs -- the same as omitting 'names' entirely. This is
+    # what an empty name would do if we passed it through: widen a request for one snap's logs
+    # into a request for every snap's logs, rather than fail.
+    #
+    # Entries are compared by their syslog identifiers, since new ones are logged all the time.
+    # The unfiltered query runs first so that entries logged in between can only add identifiers
+    # to the second result, which is why this is a superset rather than an equality.
+    ensure_installed(_SNAP, classic=True)
+    unfiltered = {entry['sid'] for entry in _client.get_logs(query={'n': -1})}
+    assert unfiltered, 'no system-wide logs to compare against'
+    result = {entry['sid'] for entry in _client.get_logs(query={'n': -1, 'names': names})}
+    assert result.issuperset(unfiltered)
 
 
-def _logs_outcome(names: str | None) -> tuple[str, ...] | set[str]:
-    """Summarise what snapd does with a ``names`` query, comparably across calls.
-
-    Passing ``None`` omits the parameter entirely. New entries can be logged between two calls,
-    so a successful query is summarised by the syslog identifiers of its entries -- which
-    services the logs came from -- rather than by the entries themselves. An error is compared
-    in full, because its message names the snap snapd resolved the query to.
-    """
-    query: dict[str, Any] = {'n': -1}
-    if names is not None:
-        query['names'] = names
-    try:
-        entries = _client.get_logs(query=query)
-    except _errors.Error as e:
-        return (type(e).__name__, str(e.kind), e.message)
-    return {str(entry['sid']) for entry in entries}
-
-
-@pytest.mark.parametrize(
-    ('names', 'equivalent_to'),
-    [
-        # Nothing is left once the empty entries are dropped, so there is nothing to filter on:
-        # the same as omitting 'names'. This is why an empty name is rejected client-side --
-        # it widens a request for one snap's logs into a request for every snap's logs.
-        ('', None),
-        (',', None),
-        (',,', None),
-        # The named snap is left, so these mean exactly what naming it on its own means.
-        (f',{_NO_SERVICES_SNAP}', _NO_SERVICES_SNAP),
-        (f'{_NO_SERVICES_SNAP},', _NO_SERVICES_SNAP),
-        (f',{_NO_SERVICES_SNAP},', _NO_SERVICES_SNAP),
-    ],
-)
-def test_snapd_drops_empty_names(names: str, equivalent_to: str | None):
-    # Each query is compared against the query it should be equivalent to, rather than against
-    # a fixed expectation, so the assertion holds whether or not any snap on the system has
-    # services to log: with none installed both sides report 'no matching services', and with
-    # some installed both sides report the same services.
-    ensure_installed(_NO_SERVICES_SNAP)
-    baseline = _logs_outcome(equivalent_to)
-    result = _logs_outcome(names)
-    if isinstance(baseline, set) and isinstance(result, set):
-        # Both queries returned entries. A service logging for the first time between the two
-        # calls adds an identifier to the later result, so the later result must contain the
-        # earlier one rather than equal it.
-        assert result.issuperset(baseline)
-    else:
-        assert result == baseline
+@pytest.mark.parametrize('names', [',htop', 'htop,', ',htop,'])
+def test_empty_names_leave_the_named_snap(names: str):
+    # The named snap is all that is left once the empty entries are dropped, so these queries
+    # mean what naming it on its own means: snapd resolves the name and reports that it has no
+    # services. An empty entry taken as a name of its own would report something else.
+    ensure_installed('htop')
+    with pytest.raises(_errors.AppNotFoundError) as ctx:
+        _client.get_logs(query={'n': -1, 'names': names})
+    assert ctx.value.kind == 'app-not-found'
+    assert ctx.value.message == 'snap "htop" has no services'
