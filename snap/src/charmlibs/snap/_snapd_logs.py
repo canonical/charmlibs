@@ -100,9 +100,8 @@ def logs(*snaps: str, limit: int | None = 10) -> list[LogEntry]:
     # NOTE: the names are sent as one comma-separated query parameter, so a name that snapd's
     # parser alters is silently not the query the caller asked for: logs('') and logs(' ')
     # would become queries for every snap's logs, and logs('a,b') a query for two snaps.
-    for snap in snaps:
-        if problem := _utils.comma_list_problem(snap):
-            raise ValueError(f'snap name {problem} (names={snaps!r})')
+    if problem := _utils.comma_list_problem(snaps):
+        raise ValueError(f'snap name {problem} (names={snaps!r})')
     if limit is None:
         # snapd treats n=-1 as "no limit": return all available log entries.
         n = -1

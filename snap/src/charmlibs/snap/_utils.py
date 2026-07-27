@@ -18,9 +18,13 @@ from __future__ import annotations
 
 import datetime
 import sys
+import typing
 import urllib.parse
 
 from . import _client, _errors
+
+if typing.TYPE_CHECKING:
+    from collections.abc import Iterable
 
 
 def snap_path_segment(snap: str) -> str:
@@ -49,6 +53,8 @@ def snap_path_segment(snap: str) -> str:
 
 
 # The *_problem functions describe what is wrong with a value, and leave raising to the caller.
+# Each takes one value or an iterable of them (including a dict, whose keys are checked), and
+# describes the first that is unusable.
 # Each returns a phrase to put after the name of the thing being checked -- "must not be empty",
 # "must not contain a comma: ',,'" -- or None if the value is fine. The caller supplies the noun
 # and any context it can add, so one check can say "config key must not be empty (keys=['a', ''])"
@@ -60,7 +66,16 @@ def snap_path_segment(snap: str) -> str:
 # blank_problem. Raising from in here would put all of that in front of the reader.
 
 
-def empty_or_blank_problem(value: str) -> str | None:
+def _each(values: str | Iterable[str]) -> Iterable[str]:
+    """Yield the values, treating a bare string as one value rather than an iterable of one-char.
+
+    An iterable is consumed, so callers holding a generator should materialise it before checking
+    it, or they will send an empty request afterwards.
+    """
+    return (values,) if isinstance(values, str) else values
+
+
+def empty_or_blank_problem(values: str | Iterable[str]) -> str | None:
     """Describe why a value is unusable if it is empty or contains only whitespace.
 
     Both are caller programming errors, so we reject them before making a request rather than
@@ -69,12 +84,15 @@ def empty_or_blank_problem(value: str) -> str | None:
 
     Use :func:`blank_problem` instead where snapd gives an empty value a meaning of its own.
     """
-    if not value:
-        return 'must not be empty'
-    return blank_problem(value)
+    for value in _each(values):
+        if not value:
+            return 'must not be empty'
+        if problem := blank_problem(value):
+            return problem
+    return None
 
 
-def blank_problem(value: str) -> str | None:
+def blank_problem(values: str | Iterable[str]) -> str | None:
     """Describe why a value is unusable if it is non-empty but contains only whitespace.
 
     Separate from :func:`empty_or_blank_problem` for the interface functions, where an empty
@@ -82,15 +100,16 @@ def blank_problem(value: str) -> str | None:
     connection. A blank value is never meaningful anywhere: snapd either treats it as a name that
     can't exist, or (on the endpoints that take a comma-separated list) discards it entirely.
 
-    The value is quoted in the phrase, since a blank one is invisible otherwise, and ``' '`` and
-    ``'\\t'`` read identically in an error message.
+    The value is quoted in the phrase, since a blank one is invisible otherwise, and a space and
+    a tab read identically in an error message.
     """
-    if value and not value.strip():
-        return f'must not be blank: {value!r}'
+    for value in _each(values):
+        if value and not value.strip():
+            return f'must not be blank: {value!r}'
     return None
 
 
-def comma_list_problem(value: str) -> str | None:
+def comma_list_problem(values: str | Iterable[str]) -> str | None:
     """Describe why a value would not survive snapd's comma-separated list parsing.
 
     Some snapd endpoints take several values in one query parameter, joined by commas. snapd
@@ -110,12 +129,13 @@ def comma_list_problem(value: str) -> str | None:
     separately (U+0085, U+00A0, U+1680, U+2000, U+3000), and agree that zero-width characters
     (U+200B, U+FEFF) are content rather than whitespace.
     """
-    if problem := empty_or_blank_problem(value):
-        return problem
-    if ',' in value:
-        return f'must not contain a comma: {value!r}'
-    if value != value.strip():
-        return f'must not have leading or trailing whitespace: {value!r}'
+    for value in _each(values):
+        if problem := empty_or_blank_problem(value):
+            return problem
+        if ',' in value:
+            return f'must not contain a comma: {value!r}'
+        if value != value.strip():
+            return f'must not have leading or trailing whitespace: {value!r}'
     return None
 
 

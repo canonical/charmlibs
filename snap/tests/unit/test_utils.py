@@ -45,6 +45,33 @@ class TestEmptyOrBlankProblem:
         assert _utils.empty_or_blank_problem(value) is None
 
 
+class TestOneValueOrMany:
+    # Each check takes one value or an iterable of them, so the caller can hand over the whole
+    # collection it was given and keep the loop out of the call site.
+    def test_a_bare_string_is_one_value_not_an_iterable_of_characters(self):
+        # ' a' is not blank, but its characters are: iterating it would report the wrong problem.
+        assert _utils.empty_or_blank_problem(' a') is None
+        assert _utils.comma_list_problem('ab') is None
+
+    def test_first_unusable_value_is_described(self):
+        assert _utils.empty_or_blank_problem(['a', ' ', '']) == "must not be blank: ' '"
+        assert _utils.comma_list_problem(['a', 'b,c']) == "must not contain a comma: 'b,c'"
+
+    def test_all_usable_values(self):
+        assert _utils.empty_or_blank_problem(['a', 'b']) is None
+        assert _utils.comma_list_problem(('a', 'b')) is None
+
+    def test_no_values(self):
+        # Callers pass collections that may be empty (keys=[], no services, no snap names).
+        assert _utils.empty_or_blank_problem([]) is None
+        assert _utils.comma_list_problem(()) is None
+
+    def test_a_dict_is_checked_by_its_keys(self):
+        # set() hands over its config mapping directly.
+        assert _utils.empty_or_blank_problem({'a': 1, 'b': 2}) is None
+        assert _utils.empty_or_blank_problem({'a': 1, '': 2}) == 'must not be empty'
+
+
 class TestBlankProblem:
     def test_empty_is_not_a_problem(self):
         # The interface functions give an empty value a meaning of its own.

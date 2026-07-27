@@ -39,9 +39,8 @@ def start(snap: str, *services: str, enable: bool = False) -> None:
     """
     if problem := _utils.empty_or_blank_problem(snap):
         raise ValueError(f'snap name {problem}')
-    for service in services:
-        if problem := _utils.empty_or_blank_problem(service):
-            raise ValueError(f'service name {problem} (services={services!r})')
+    if problem := _utils.empty_or_blank_problem(services):
+        raise ValueError(f'service name {problem} (services={services!r})')
     names = [f'{snap}.{s}' for s in services] if services else [snap]
     data: dict[str, Any] = {'action': 'start', 'names': names}
     if enable:
@@ -65,9 +64,8 @@ def stop(snap: str, *services: str, disable: bool = False) -> None:
     """
     if problem := _utils.empty_or_blank_problem(snap):
         raise ValueError(f'snap name {problem}')
-    for service in services:
-        if problem := _utils.empty_or_blank_problem(service):
-            raise ValueError(f'service name {problem} (services={services!r})')
+    if problem := _utils.empty_or_blank_problem(services):
+        raise ValueError(f'service name {problem} (services={services!r})')
     names = [f'{snap}.{s}' for s in services] if services else [snap]
     data: dict[str, Any] = {'action': 'stop', 'names': names}
     if disable:
@@ -90,9 +88,8 @@ def restart(snap: str, *services: str) -> None:
     """
     if problem := _utils.empty_or_blank_problem(snap):
         raise ValueError(f'snap name {problem}')
-    for service in services:
-        if problem := _utils.empty_or_blank_problem(service):
-            raise ValueError(f'service name {problem} (services={services!r})')
+    if problem := _utils.empty_or_blank_problem(services):
+        raise ValueError(f'service name {problem} (services={services!r})')
     names = [f'{snap}.{s}' for s in services] if services else [snap]
     data: dict[str, Any] = {'action': 'restart', 'names': names}
     _client.post('/v2/apps', body=data)
