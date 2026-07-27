@@ -70,8 +70,6 @@ def connect(plug: tuple[str, str], slot: tuple[str, str] | str | None = None) ->
         _client.post('/v2/interfaces', body=data)
     except _errors.APIError:
         # Turn snapd's empty-kind 'snap is not installed' error into a typed NotFoundError.
-        # Raised with 'from None' so the caller gets one traceback naming the missing snap,
-        # rather than a chained one exposing the internal probe.
         if error := _first_not_installed(plug_snap, slot_snap):
             raise error from None
         raise
@@ -147,8 +145,6 @@ def disconnect(
         pass  # Follow the snap CLI's lead and suppress this error.
     except _errors.APIError:
         # Turn snapd's empty-kind 'snap is not installed' error into a typed NotFoundError.
-        # Raised with 'from None' so the caller gets one traceback naming the missing snap,
-        # rather than a chained one exposing the internal probe.
         if error := _first_not_installed(plug_snap, slot_snap):
             raise error from None
         raise
@@ -165,18 +161,13 @@ def _snap_and_name(spec: tuple[str, str] | str | None) -> tuple[str, str]:
 
 
 def _first_not_installed(plug_snap: str, slot_snap: str) -> _errors.NotFoundError | None:
-    """Return the not-installed error for the first named snap that is absent, or None if all are.
+    """Return a NotFoundError for the first named snap that is absent.
 
     snapd validates the plug snap before the slot snap (daemon/api_interfaces.go), reporting a
     not-installed snap as an empty-kind ``APIError`` before any plug/slot resolution. We probe the
     named snaps in the same order -- plug snap first -- so the ``NotFoundError`` names the same
-    snap snapd would blame. Empty (auto-resolved) sides are skipped, and the ``system``/``core``
+    snap snapd would blame. Empty (auto-resolved) sides are skipped. Note the ``system``/``core``
     aliases count as installed because snapd serves them without the core snap being installed.
-    If both named snaps are installed, this returns ``None`` and the caller re-raises the
-    original error.
-
-    This returns the error rather than raising so that the caller's ``raise ... from None`` is the
-    last frame in the traceback, with no uninformative wrapper frame below it.
     """
     for snap in (plug_snap, slot_snap):
         if snap and (error := _utils.check_installed(snap)):

@@ -81,9 +81,6 @@ def get(snap: str, keys: Iterable[str] | None = None) -> dict[str, Any]:
             # NOTE: snapd returns the full configuration if no keys are specified.
             # We pass this behaviour through for keys=None, but for keys=[] we return
             # an empty dict, since the caller explicitly requested no keys.
-            # NOTE: This is the library's only eager installed-check: with no conf request to
-            # make, probing is the only way to tell an installed snap ({}) from an absent one.
-            # Everywhere else we probe reactively, once a request has actually failed.
             if error := _utils.check_installed(snap):
                 raise error
             return {}
@@ -95,9 +92,7 @@ def get(snap: str, keys: Iterable[str] | None = None) -> dict[str, Any]:
     except _errors.OptionNotFoundError:
         # NOTE: snapd reports option-not-found both for a missing key and for a missing snap.
         # The CLI returns 'error: snap "foo" has no "bar" configuration' in both cases.
-        # For symmetry with PUT (set/unset), we raise NotFoundError here for a missing snap.
-        # Raised with 'from None': the option-not-found error snapd sent for the absent snap
-        # is misleading, and chaining it would only expose the internal probe.
+        # For symmetry with PUT (set/unset), we convert to NotFoundError here for a missing snap.
         if error := _utils.check_installed(snap):
             raise error from None
         raise

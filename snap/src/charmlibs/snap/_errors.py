@@ -69,12 +69,9 @@ class Error(Exception):
         return str(self._value)
 
     def __str__(self) -> str:
-        # Surface `value` when it adds information the message doesn't already carry -- most
-        # importantly the snap name in snapd's terse 'snap not installed' error, whose message
-        # omits it. Only non-empty string values are appended, and only when not already present
-        # in the message: structured values (e.g. option-not-found's {'SnapName', 'Key'}) are
-        # already reflected in the message and would be noisy here. The raw value and the full
-        # detail remain available via the `value` property and `repr`.
+        # Surface `value` when it adds information the message doesn't already carry.
+        # Most useful for NotFoundError, with message 'snap not installed' and value '<snap>'.
+        # Skip OptionNotFoundError's non-string value, which is redundant with its message.
         value = self._value
         if isinstance(value, str) and value and value not in self._message:
             return f'{self._message} ({value})'

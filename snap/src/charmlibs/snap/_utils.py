@@ -23,26 +23,12 @@ from . import _client, _errors
 
 
 def check_installed(snap: str) -> _errors.NotFoundError | None:
-    """Check whether the snap is installed, returning snapd's not-installed error if it isn't.
+    """Return NotFoundError if the snap is not installed or a system/core alias.
 
     Returns ``None`` when the snap is installed, and for the ``system``/``core`` aliases, which
-    snapd serves whether or not the core snap is installed (so they are never treated as absent).
+    snapd handles config and interfaces for whether or not the core snap is installed as a snap.
     Otherwise probes ``GET /v2/snaps/{snap}`` and returns snapd's own :class:`NotFoundError` when
     it reports the snap absent, ready for the caller to ``raise``.
-
-    The error-or-``None`` return supports the ``if error := check_installed(snap): raise error``
-    idiom at the call sites (with ``from None`` where an error is already being handled).
-
-    The error is snapd's, not one we build: its message is the terse 'snap not installed' with
-    the snap name in ``value`` (which ``str()`` surfaces as 'snap not installed (name)'), and it
-    carries snapd's real ``status_code``. It reads a little differently from the conf PUT and
-    interface endpoints, which name the snap in the message directly, but we don't hand-construct
-    an error to paper over that -- the value and ``str()`` carry the name either way.
-
-    Its traceback is cleared before returning: snapd's error was raised deep inside this probe's
-    ``GET /v2/snaps/{snap}``, and re-raising it with that traceback attached would expose the
-    internal probe. Cleared, a ``raise`` at the call site produces a single traceback that starts
-    there. Pair the ``raise`` with ``from None`` to also drop any error being handled.
     """
     # NOTE: snapd's conf endpoints treat 'system' as an alias for 'core', and interface requests
     # remap 'system'/'core' to the snapd snap, so both names are served without the core snap.
@@ -53,7 +39,7 @@ def check_installed(snap: str) -> _errors.NotFoundError | None:
     try:
         _client.get(f'/v2/snaps/{snap}')
     except _errors.NotFoundError as e:
-        return e.with_traceback(None)
+        return e.with_traceback(None)  # Clean error with no traceback for the caller to raise.
     return None
 
 
