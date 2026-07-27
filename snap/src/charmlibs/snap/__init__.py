@@ -14,7 +14,8 @@
 
 """Opinionated library for performing snap operations, targeted at use in charm code.
 
-Use :func:`ensure` or :func:`ensure_revision` to ensure that a snap is installed.
+Use :func:`ensure` to ensure that a snap is installed, optionally on a specific channel
+or revision.
 
 Manually manage snap installation with :func:`install`, :func:`refresh`, and :func:`remove`.
 Use :func:`info` to query the current state of an installed snap.
@@ -61,7 +62,6 @@ from ._errors import (
 )
 from ._functions import (
     ensure,
-    ensure_revision,
 )
 from ._snapd_aliases import (
     alias,
@@ -116,7 +116,6 @@ __all__ = [
     'connect',
     'disconnect',
     'ensure',
-    'ensure_revision',
     'get',
     'hold',
     'info',

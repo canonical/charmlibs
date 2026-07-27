@@ -21,7 +21,6 @@ if TYPE_CHECKING:
 _CALLS: dict[str, Callable[[], object]] = {
     'alias': lambda: snap.alias('', 'lxc', 'testlxc'),
     'ensure': lambda: snap.ensure(''),
-    'ensure_revision': lambda: snap.ensure_revision('', 1),
     'get': lambda: snap.get(''),
     'hold': lambda: snap.hold(''),
     'info': lambda: snap.info(''),

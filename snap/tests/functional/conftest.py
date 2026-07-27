@@ -11,9 +11,11 @@ import logging
 import random
 import time
 import typing
+from typing import Any
 
 from charmlibs import snap
-from charmlibs.snap import _functions
+from charmlibs.snap import _client, _functions
+from charmlibs.snap import _snapd_snaps as _snapd
 
 if typing.TYPE_CHECKING:
     from collections.abc import Callable
@@ -72,3 +74,25 @@ def ensure_removed(*snaps: str) -> None:
 def ensure_installed(*snaps: str, channel: str | None = None, classic: bool = False) -> None:
     for snap_name in snaps:
         retry_on_rate_limit(snap.ensure)(snap_name, channel=channel, classic=classic, update=False)
+
+
+@functools.cache  # Cached to avoid repeated store queries.
+def list_channels(snap: str) -> dict[str, _snapd.Info]:
+    """List information about all channels of a snap available in the store.
+
+    Sources channel/revision info from the store, so that tests can assert against the
+    revisions actually on each channel rather than hard-coding them.
+    """
+    results = _client.get('/v2/find', query={'name': snap})
+    assert isinstance(results, list)
+    results = typing.cast('list[dict[str, Any]]', results)
+    # API returns a list of results, or an error if there are no matches.
+    # We'll have one result for an exact name match.
+    result, *_ = results
+    channels = result['channels']
+    # Store results are keyed by channel and have no tracking channel, so the key is supplied as
+    # both: Info.channel reads 'tracking-channel', which only an installed snap has.
+    return {
+        k: _snapd.Info._from_dict({'name': snap, 'channel': k, 'tracking-channel': k, **v})
+        for k, v in channels.items()
+    }

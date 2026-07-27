@@ -82,22 +82,58 @@ def check_installed_or_system(snap: str) -> _errors.NotFoundError | None:
     return None
 
 
-def normalize_channel(channel: str) -> str:
-    """Normalize a snap channel string to the form "track/risk".
+RISKS = ('stable', 'candidate', 'beta', 'edge')
 
-    Channels may be specified as track or risk only, or as "track/risk" or "track/risk/branch".
-    Snapd uses default values internally, but will record the *requested* value in the snap info.
-    This function normalizes channels with no "/" to the form "track/risk" for easier comparison.
+
+def normalize_channel(channel: str) -> str:
+    """Normalize a snap channel string to the form snapd reports it in.
+
+    Channels may be specified as a track or risk only, or as "track/risk",
+    "risk/branch", or "track/risk/branch". Snapd fills in the defaults and records the
+    *resolved* value, so a channel must be normalized the same way before it can be
+    compared with the channel from :func:`info`.
+
+    This mirrors ``channel.Full`` in snapd: a lone risk gets the ``latest`` track, a lone
+    track gets the ``stable`` risk, and a leading risk in a two part channel means the
+    second part is a branch rather than a risk, so the ``latest`` track is filled in.
+    """
+    components = [c for c in channel.split('/') if c]
+    if not components:
+        return ''
+    if len(components) == 1:
+        # Either a risk, which takes the default track, or a track, which takes the default risk.
+        return f'latest/{components[0]}' if components[0] in RISKS else f'{components[0]}/stable'
+    if len(components) == 2 and components[0] in RISKS:
+        # "risk/branch", which takes the default track.
+        return f'latest/{components[0]}/{components[1]}'
+    return '/'.join(components)
+
+
+def resolve_channel(channel: str, current: str) -> str:
+    """Resolve a requested channel against the channel a snap currently tracks.
+
+    Returns the channel that snapd would end up tracking, so that a caller can tell whether
+    a requested channel is the one already tracked, without making a request to snapd.
+
+    A channel that starts with a risk inherits the track the snap is on, rather than the
+    default ``latest`` track. For example, refreshing a snap that tracks ``3.6/stable`` to
+    ``edge`` gives ``3.6/edge``, not ``latest/edge``. A channel that names a track doesn't
+    inherit the risk, so refreshing that same snap to ``4.0`` gives ``4.0/stable``. This
+    mirrors ``channel.Resolve`` in snapd.
+
+    Args:
+        channel: The requested channel, or an empty string to keep the current channel.
+        current: The channel the snap currently tracks, as reported by :func:`info`. Empty
+            for a snap that isn't installed, or was installed from a local file.
     """
     if not channel:
-        return ''
-    if '/' not in channel:
-        if channel not in ('edge', 'beta', 'candidate', 'stable'):
-            # Track only, append default risk.
-            return f'{channel}/stable'
-        # Risk only, prepend default track.
-        return f'latest/{channel}'
-    return channel
+        return current
+    # A track can only be inherited from a channel that has one. The channel reported by snapd
+    # is always normalized, so this is only empty for a snap with no channel to inherit from.
+    track = current.partition('/')[0] if '/' in current else ''
+    if track and channel.partition('/')[0] in RISKS:
+        channel = f'{track}/{channel}'
+    return normalize_channel(channel)
 
 
 def parse_timestamp(timestamp: str) -> datetime.datetime:

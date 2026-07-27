@@ -12,45 +12,28 @@ tests that inherently install/remove as part of the test logic.
 from __future__ import annotations
 
 import datetime
-import functools
 import typing
-from typing import Any
 
 import pytest
 
 from charmlibs.snap import _client, _errors
 from charmlibs.snap import _snapd_snaps as _snapd
-from conftest import ensure_installed, ensure_removed, retry_on_rate_limit
+from conftest import ensure_installed, ensure_removed, list_channels, retry_on_rate_limit
 
 # A snap name that is never installed — used for error paths where any absent
 # snap produces the same error response, avoiding unnecessary remove operations.
 _ABSENT_SNAP = 'this-snap-does-not-exist-xyz-abc-123'
 
 
-# Test helpers and possible future candidates for library public API.
-# _list_channels sources store channel/revision info for the install/refresh tests;
+# Test helper and possible future candidate for library public API.
 # _list_snaps is an independent oracle (hits /v2/snaps) for the info()/missing-ok tests.
+# list_channels (from conftest) sources store channel/revision info for install/refresh tests.
 def _list_snaps() -> list[_snapd.Info]:
     """List all installed snaps."""
     info_dicts = _client.get('/v2/snaps')
     assert isinstance(info_dicts, list)
     info_dicts = typing.cast('list[dict[str, str]]', info_dicts)
     return [_snapd.Info._from_dict(info_dict) for info_dict in info_dicts]
-
-
-@functools.cache  # Cached to avoid repeated store queries.
-def _list_channels(snap: str) -> dict[str, _snapd.Info]:
-    """List information about all channels of a snap available in the store."""
-    results = _client.get('/v2/find', query={'name': snap})
-    assert isinstance(results, list)
-    results = typing.cast('list[dict[str, Any]]', results)
-    # API returns a list of results, or an error if there are no matches.
-    # We'll have one result for an exact name match.
-    result, *_ = results
-    channels = result['channels']
-    return {
-        k: _snapd.Info._from_dict({'name': snap, 'channel': k, **v}) for k, v in channels.items()
-    }
 
 
 # ---------------------------------------------------------------------------
@@ -92,7 +75,7 @@ def test_refresh_no_updates_returns_false():
 def test_refresh_channel():
     ensure_installed('hello-world', channel='latest/stable')
     # Pre-flight: confirm the target channel exists before refreshing to it.
-    assert 'latest/candidate' in _list_channels('hello-world')
+    assert 'latest/candidate' in list_channels('hello-world')
     retry_on_rate_limit(_snapd.refresh)('hello-world', channel='latest/candidate')
     info = _snapd.info('hello-world')
     assert info.channel == 'latest/candidate'
@@ -240,13 +223,13 @@ def test_install():
     assert info.name == 'hello-world'
     assert info.channel == 'latest/stable'
     # The installed revision should match the store's current latest/stable revision.
-    assert info.revision == _list_channels('hello-world')['latest/stable'].revision
+    assert info.revision == list_channels('hello-world')['latest/stable'].revision
 
 
 def test_install_channel():
     ensure_removed('hello-world')
     # Pre-flight: confirm the target channel actually exists in the store.
-    assert 'latest/candidate' in _list_channels('hello-world')
+    assert 'latest/candidate' in list_channels('hello-world')
     retry_on_rate_limit(_snapd.install)('hello-world', channel='latest/candidate')
     info = _snapd.info('hello-world')
     assert info.channel == 'latest/candidate'
@@ -256,7 +239,7 @@ def test_install_revision():
     ensure_removed('hello-world')
     # hello-world revision 28 is one behind the current latest/stable revision (sourced
     # from the store rather than hard-coded, to document the relationship and catch drift).
-    current = int(_list_channels('hello-world')['latest/stable'].revision)
+    current = int(list_channels('hello-world')['latest/stable'].revision)
     previous = current - 1
     retry_on_rate_limit(_snapd.install)('hello-world', revision=previous)
     info = _snapd.info('hello-world')
@@ -294,11 +277,42 @@ def test_install_nonexistent_snap_raises():
     assert ctx.value.value == _ABSENT_SNAP
 
 
-def test_install_channel_and_revision_raises():
-    with pytest.raises(ValueError):
-        _snapd.install('hello-world', channel='latest/stable', revision=28)  # type: ignore[call-overload]
+def test_install_channel_and_revision():
+    # Not mutually exclusive: snapd installs the revision and tracks the channel.
+    ensure_removed('hello-world')
+    edge = list_channels('hello-world')['latest/edge'].revision
+    retry_on_rate_limit(_snapd.install)('hello-world', channel='latest/edge', revision=edge)
+    info = _snapd.info('hello-world')
+    assert info.revision == edge
+    assert info.channel == 'latest/edge'
 
 
-def test_refresh_channel_and_revision_raises():
-    with pytest.raises(ValueError):
-        _snapd.refresh('hello-world', channel='latest/stable', revision=28)  # type: ignore[call-overload]
+def test_install_revision_not_on_channel_raises():
+    # The store checks the revision against the channel, so asking for a revision that isn't
+    # on the requested channel is an error -- reported against the channel, not the revision.
+    ensure_removed('hello-world')
+    channels = list_channels('hello-world')
+    absent_from_stable = int(channels['latest/stable'].revision) - 1
+    with pytest.raises(_errors.ChannelNotAvailableError) as ctx:
+        retry_on_rate_limit(_snapd.install)(
+            'hello-world', channel='latest/stable', revision=absent_from_stable
+        )
+    assert ctx.value.kind == 'snap-channel-not-available'
+
+
+def test_refresh_channel_and_revision():
+    ensure_installed('hello-world', channel='latest/stable')
+    edge = list_channels('hello-world')['latest/edge'].revision
+    retry_on_rate_limit(_snapd.refresh)('hello-world', channel='latest/edge', revision=edge)
+    info = _snapd.info('hello-world')
+    assert info.revision == edge
+    assert info.channel == 'latest/edge'
+
+
+def test_refresh_revision_already_installed_still_refreshes():
+    # Snapd runs a full refresh when a revision is specified, even if that revision is already
+    # installed, so refresh reports that it did something. ensure() relies on knowing this.
+    ensure_installed('hello-world')
+    current = _snapd.info('hello-world').revision
+    result = retry_on_rate_limit(_snapd.refresh)('hello-world', revision=current)
+    assert result is True
