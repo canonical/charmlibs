@@ -63,6 +63,10 @@ from ._functions import (
     ensure,
     ensure_revision,
 )
+from ._snapd_aliases import (
+    alias,
+    unalias,
+)
 from ._snapd_apps import (
     restart,
     start,
@@ -72,6 +76,10 @@ from ._snapd_conf import (
     get,
     set,  # noqa: A004 (shadowing a Python builtin)
     unset,
+)
+from ._snapd_interfaces import (
+    connect,
+    disconnect,
 )
 from ._snapd_logs import (
     LogEntry,
@@ -104,6 +112,9 @@ __all__ = [
     'OptionNotFoundError',
     'RevisionNotAvailableError',
     'TimeoutError',
+    'alias',
+    'connect',
+    'disconnect',
     'ensure',
     'ensure_revision',
     'get',
@@ -117,6 +128,7 @@ __all__ = [
     'set',
     'start',
     'stop',
+    'unalias',
     'unhold',
     'unset',
 ]
