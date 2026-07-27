@@ -109,7 +109,7 @@ def normalize_channel(channel: str) -> str:
     return '/'.join(components)
 
 
-def resolve_channel(channel: str, current: str) -> str:
+def resolve_channel(channel: str, tracking: str) -> str:
     """Resolve a requested channel against the channel a snap currently tracks.
 
     Returns the channel that snapd would end up tracking, so that a caller can tell whether
@@ -122,15 +122,15 @@ def resolve_channel(channel: str, current: str) -> str:
     mirrors ``channel.Resolve`` in snapd.
 
     Args:
-        channel: The requested channel, or an empty string to keep the current channel.
-        current: The channel the snap currently tracks, as reported by :func:`info`. Empty
-            for a snap that isn't installed, or was installed from a local file.
+        channel: The requested channel, or an empty string to keep the tracked channel.
+        tracking: The channel the snap currently tracks, as reported by ``Info.tracking``.
+            Empty for a snap that isn't installed, or was installed from a local file.
     """
     if not channel:
-        return current
+        return tracking
     # A track can only be inherited from a channel that has one. The channel reported by snapd
     # is always normalized, so this is only empty for a snap with no channel to inherit from.
-    track = current.partition('/')[0] if '/' in current else ''
+    track = tracking.partition('/')[0] if '/' in tracking else ''
     if track and channel.partition('/')[0] in RISKS:
         channel = f'{track}/{channel}'
     return normalize_channel(channel)

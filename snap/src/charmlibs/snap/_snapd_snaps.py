@@ -37,14 +37,14 @@ class Info:
         self,
         name: str,
         classic: bool,
-        channel: str,
+        tracking: str,
         revision: int | str,
         version: str,
         hold: datetime.datetime | str | None,
     ):
         self._name = name
         self._classic = classic
-        self._channel = _utils.normalize_channel(channel)
+        self._tracking = _utils.normalize_channel(tracking)
         self._revision = str(revision)
         self._version = version
         self._hold = _utils.parse_timestamp(hold) if isinstance(hold, str) else hold
@@ -58,7 +58,7 @@ class Info:
             # the channel the installed revision was sourced from: installing a revision without
             # a channel tracks latest/stable but sources the revision from wherever it lives.
             # Absent entirely for a snap installed from a local file.
-            channel=info_dict.get('tracking-channel', ''),
+            tracking=info_dict.get('tracking-channel', ''),
             revision=info_dict['revision'],
             version=info_dict['version'],
             classic=info_dict['confinement'] == 'classic',
@@ -74,16 +74,16 @@ class Info:
         return self._classic
 
     @property
-    def channel(self) -> str:
+    def tracking(self) -> str:
         """The channel the snap tracks, for example ``latest/stable``.
 
-        This is the channel a refresh follows, as shown by ``snap list``. It isn't necessarily
-        the channel the installed revision came from: installing a specific revision without a
-        channel tracks ``latest/stable``, whichever channel that revision was found on.
+        This is the channel a refresh follows, shown as ``Tracking`` by ``snap list``. It isn't
+        necessarily the channel the installed revision came from: installing a specific revision
+        without a channel tracks ``latest/stable``, whichever channel that revision was found on.
 
         Empty for a snap installed from a local file, which tracks no channel.
         """
-        return self._channel
+        return self._tracking
 
     @property
     def revision(self) -> str:

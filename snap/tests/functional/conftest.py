@@ -91,7 +91,7 @@ def list_channels(snap: str) -> dict[str, _snapd.Info]:
     result, *_ = results
     channels = result['channels']
     # Store results are keyed by channel and have no tracking channel, so the key is supplied as
-    # both: Info.channel reads 'tracking-channel', which only an installed snap has.
+    # both: Info.tracking reads 'tracking-channel', which only an installed snap has.
     return {
         k: _snapd.Info._from_dict({'name': snap, 'channel': k, 'tracking-channel': k, **v})
         for k, v in channels.items()

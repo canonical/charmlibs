@@ -80,8 +80,8 @@ def ensure(
         _snapd_snaps.install(snap, channel=channel, revision=revision, classic=classic)
         return True
     # Compare against the channel snapd would end up tracking, not the channel as requested,
-    # so that an equivalent way of naming the current channel isn't seen as a change.
-    on_channel = _utils.resolve_channel(channel or '', info.channel) == info.channel
+    # so that an equivalent way of naming the tracked channel isn't seen as a change.
+    on_channel = _utils.resolve_channel(channel or '', info.tracking) == info.tracking
     on_revision = revision is None or info.revision == str(revision)
     if not on_channel or not on_revision:
         _snapd_snaps.refresh(snap, channel=channel, revision=revision, classic=classic)

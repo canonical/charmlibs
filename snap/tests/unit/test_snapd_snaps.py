@@ -50,7 +50,7 @@ class TestInfoFromDict:
         info = _snapd.Info._from_dict(_MINIMAL_INFO_DICT)
         assert info.name == 'hello-world'
         assert info.version == '6.4'
-        assert info.channel == 'latest/stable'
+        assert info.tracking == 'latest/stable'
         assert info.revision == '29'
         assert info.classic is False
         assert info.hold is None
@@ -59,7 +59,7 @@ class TestInfoFromDict:
         info = _snapd.Info._from_dict({**_MINIMAL_INFO_DICT, 'revision': 'x1'})
         assert info.revision == 'x1'
 
-    def test_channel_is_the_tracking_channel(self):
+    def test_tracking_is_not_the_revision_source_channel(self):
         # 'channel' is the channel the installed revision came from, which can differ from the
         # channel the snap tracks -- installing a revision without a channel tracks
         # latest/stable but sources the revision from wherever it's available.
@@ -68,13 +68,13 @@ class TestInfoFromDict:
             'channel': 'edge',
             'tracking-channel': 'latest/stable',
         })
-        assert info.channel == 'latest/stable'
+        assert info.tracking == 'latest/stable'
 
-    def test_channel_empty_when_no_tracking_channel(self):
+    def test_tracking_empty_when_field_absent(self):
         # A snap installed from a local file tracks no channel: snapd omits the field entirely.
         info_dict = {k: v for k, v in _MINIMAL_INFO_DICT.items() if k != 'tracking-channel'}
         info = _snapd.Info._from_dict({**info_dict, 'channel': ''})
-        assert info.channel == ''
+        assert info.tracking == ''
 
     @pytest.mark.parametrize('confinement', ['strict', 'devmode'])
     def test_non_classic_confinement(self, confinement: str):

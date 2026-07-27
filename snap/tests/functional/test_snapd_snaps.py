@@ -45,7 +45,7 @@ def test_info_installed():
     ensure_installed('hello-world')
     info = _snapd.info('hello-world')
     assert info.name == 'hello-world'
-    assert info.channel
+    assert info.tracking
     assert info.revision
     assert info.version
     # Independent oracle: /v2/snaps (list) should agree with /v2/snaps/{snap} (info).
@@ -69,7 +69,7 @@ def test_refresh_no_updates_returns_false():
     ensure_installed('hello-world', channel='latest/stable')
     result = retry_on_rate_limit(_snapd.refresh)('hello-world', channel='latest/stable')
     assert result is False
-    assert _snapd.info('hello-world').channel == 'latest/stable'
+    assert _snapd.info('hello-world').tracking == 'latest/stable'
 
 
 def test_refresh_channel():
@@ -78,7 +78,7 @@ def test_refresh_channel():
     assert 'latest/candidate' in list_channels('hello-world')
     retry_on_rate_limit(_snapd.refresh)('hello-world', channel='latest/candidate')
     info = _snapd.info('hello-world')
-    assert info.channel == 'latest/candidate'
+    assert info.tracking == 'latest/candidate'
 
 
 def test_refresh_invalid_channel_raises():
@@ -221,7 +221,7 @@ def test_install():
     retry_on_rate_limit(_snapd.install)('hello-world')
     info = _snapd.info('hello-world')
     assert info.name == 'hello-world'
-    assert info.channel == 'latest/stable'
+    assert info.tracking == 'latest/stable'
     # The installed revision should match the store's current latest/stable revision.
     assert info.revision == list_channels('hello-world')['latest/stable'].revision
 
@@ -232,7 +232,7 @@ def test_install_channel():
     assert 'latest/candidate' in list_channels('hello-world')
     retry_on_rate_limit(_snapd.install)('hello-world', channel='latest/candidate')
     info = _snapd.info('hello-world')
-    assert info.channel == 'latest/candidate'
+    assert info.tracking == 'latest/candidate'
 
 
 def test_install_revision():
@@ -284,7 +284,7 @@ def test_install_channel_and_revision():
     retry_on_rate_limit(_snapd.install)('hello-world', channel='latest/edge', revision=edge)
     info = _snapd.info('hello-world')
     assert info.revision == edge
-    assert info.channel == 'latest/edge'
+    assert info.tracking == 'latest/edge'
 
 
 def test_install_revision_not_on_channel_raises():
@@ -306,7 +306,7 @@ def test_refresh_channel_and_revision():
     retry_on_rate_limit(_snapd.refresh)('hello-world', channel='latest/edge', revision=edge)
     info = _snapd.info('hello-world')
     assert info.revision == edge
-    assert info.channel == 'latest/edge'
+    assert info.tracking == 'latest/edge'
 
 
 def test_refresh_revision_already_installed_still_refreshes():

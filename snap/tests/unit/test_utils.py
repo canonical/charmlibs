@@ -108,7 +108,7 @@ class TestNormalizeChannel:
 
 class TestResolveChannel:
     @pytest.mark.parametrize(
-        ('channel', 'current', 'expected'),
+        ('channel', 'tracking', 'expected'),
         [
             # No requested channel keeps whatever the snap is on.
             ('', 'latest/stable', 'latest/stable'),
@@ -128,14 +128,14 @@ class TestResolveChannel:
             ('latest/edge', '3.6/stable', 'latest/edge'),
         ],
     )
-    def test_resolve(self, channel: str, current: str, expected: str):
-        assert _utils.resolve_channel(channel, current) == expected
+    def test_resolve(self, channel: str, tracking: str, expected: str):
+        assert _utils.resolve_channel(channel, tracking) == expected
 
     @pytest.mark.parametrize('channel', ['stable', 'candidate', 'beta', 'edge'])
-    def test_resolving_the_current_channel_is_a_no_op(self, channel: str):
+    def test_resolving_the_tracked_channel_is_a_no_op(self, channel: str):
         # ensure() relies on this to tell whether a requested channel is the one already
         # tracked, so resolving a snap's own channel must give that channel back unchanged.
         for track in ('latest', '3.6'):
-            current = f'{track}/{channel}'
-            assert _utils.resolve_channel(channel, current) == current
-            assert _utils.resolve_channel(current, current) == current
+            tracking = f'{track}/{channel}'
+            assert _utils.resolve_channel(channel, tracking) == tracking
+            assert _utils.resolve_channel(tracking, tracking) == tracking
