@@ -449,3 +449,14 @@ def test_disconnect_plug_snap_checked_before_slot_snap():
     assert ctx.value.kind == 'snap-not-found'
     assert _ABSENT_SNAP in str(ctx.value.value)
     assert _ABSENT_SNAP_2 not in str(ctx.value.value)
+
+
+def test_disconnect_empty_snap_with_unknown_name_reports_against_system_snap():
+    # The 'empty snap means the system snap' remap also applies to a name that doesn't exist:
+    # snapd resolves the empty snap to 'snapd' first, so the error names snapd rather than the
+    # empty string. Surprising, but it's the same remap the tests above rely on, and snap names
+    # are meaningful when empty here, so disconnect doesn't reject them client-side.
+    with pytest.raises(_errors.APIError) as ctx:
+        _snapd_interfaces.disconnect(('', 'nonexistent-plug'))
+    assert not ctx.value.kind
+    assert 'snap "snapd" has no plug or slot named "nonexistent-plug"' in ctx.value.message

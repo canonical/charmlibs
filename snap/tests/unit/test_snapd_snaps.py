@@ -240,3 +240,43 @@ class TestUnhold:
         mock_client.post.assert_called_once_with(
             '/v2/snaps/hello-world', body={'action': 'unhold'}
         )
+
+
+_PATH_FUNCTIONS = [_snapd.info, _snapd.install, _snapd.remove, _snapd.refresh, _snapd.unhold]
+
+
+class TestSnapNameInPath:
+    # Every one of these interpolates the snap name into the URL path, so the name is validated
+    # and encoded first: an empty name would build '/v2/snaps/' (a generic 404), and a name with
+    # a path separator or dot segment would steer the request to a different endpoint.
+    @pytest.mark.parametrize('func', _PATH_FUNCTIONS, ids=lambda f: f.__name__)
+    @pytest.mark.parametrize('snap', ['', '.', '..', 'hello-world/conf'])
+    def test_invalid_name_raises_value_error_without_request(
+        self, mock_client: MockClient, func: Any, snap: str
+    ):
+        with pytest.raises(ValueError):
+            func(snap)
+        mock_client.get.assert_not_called()
+        mock_client.post.assert_not_called()
+
+    @pytest.mark.parametrize('snap', ['', '.', '..', 'hello-world/conf'])
+    def test_hold_invalid_name_raises_value_error_without_request(
+        self, mock_client: MockClient, monkeypatch: pytest.MonkeyPatch, snap: str
+    ):
+        # hold() probes info() before posting; the name is validated before either request.
+        info = MagicMock()
+        monkeypatch.setattr(_snapd, 'info', info)
+        with pytest.raises(ValueError):
+            _snapd.hold(snap)
+        info.assert_not_called()
+        mock_client.post.assert_not_called()
+
+    def test_install_validates_name_before_channel_and_revision(self, mock_client: MockClient):
+        # Both arguments are wrong; the snap name is reported first.
+        with pytest.raises(ValueError, match='must not be empty'):
+            _snapd.install('', channel='edge', revision=5)  # type: ignore[call-overload]
+
+    def test_name_is_percent_encoded(self, mock_client: MockClient):
+        mock_client.get.return_value = {**_MINIMAL_INFO_DICT, 'name': 'hello world'}
+        _snapd.info('hello world')
+        mock_client.get.assert_called_once_with('/v2/snaps/hello%20world')

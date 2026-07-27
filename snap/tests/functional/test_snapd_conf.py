@@ -447,3 +447,28 @@ def test_rejected_set_rolls_back_entire_transaction(configure_snap: None):
         _snapd_conf.set('test-configure-snap', {'good-key': 'after', 'bad-key': 'x'})
     assert _snapd_conf.get('test-configure-snap', ['good-key']) == {'good-key': 'before'}
     _snapd_conf.unset('test-configure-snap', ['good-key'])
+
+
+# ---------------------------------------------------------------------------
+# empty and non-canonical snap names -> ValueError
+# ---------------------------------------------------------------------------
+# These names are rejected before a request is made. Without that, an empty name builds
+# '/v2/snaps//conf', which snapd answers with an empty-bodied 301 to '/v2/snaps/conf' -- a
+# BadResponseError about invalid JSON, indistinguishable from a transport fault. A name with a
+# path separator is worse: snapd's router decodes '%2F' before matching, so get('lxd/conf') would
+# have read '/v2/snaps/lxd/conf' -- another snap's configuration. See tests/functional/test_client
+# for both behaviours against the raw client.
+
+
+@pytest.mark.parametrize('snap', ['', '.', '..', 'lxd/conf'])
+def test_conf_invalid_snap_name_raises_value_error(snap: str):
+    with pytest.raises(ValueError):
+        _snapd_conf.get(snap)
+    with pytest.raises(ValueError):
+        _snapd_conf.get(snap, [_KEY])
+    with pytest.raises(ValueError):
+        _snapd_conf.get(snap, [])  # The installed-snap probe path.
+    with pytest.raises(ValueError):
+        _snapd_conf.set(snap, {_KEY: 'x'})
+    with pytest.raises(ValueError):
+        _snapd_conf.unset(snap, [_KEY])

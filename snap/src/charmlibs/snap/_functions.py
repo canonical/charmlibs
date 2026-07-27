@@ -31,6 +31,7 @@ def ensure_revision(snap: str, revision: int | str, *, classic: bool = False) ->
         Not guaranteed to be an actual :class:`bool`.
 
     Raises:
+        ValueError: if the snap name is empty or is not a single path segment.
         NotFoundError: If the snap does not exist in the store.
         RevisionNotAvailableError: If the revision does not exist.
         NeedsClassicError: If the snap requires ``classic=True``.
@@ -76,6 +77,7 @@ def ensure(
         Not guaranteed to be an actual :class:`bool`.
 
     Raises:
+        ValueError: if the snap name is empty or is not a single path segment.
         NotFoundError: If the snap does not exist in the store.
         NeedsClassicError: If the snap requires ``classic=True``.
         ChannelNotAvailableError: If the channel is invalid or unavailable.

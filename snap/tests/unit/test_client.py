@@ -186,6 +186,43 @@ class TestErrorResponses:
             _client.get('/v2/snaps/hello-world')
         assert message_fragment in exc_info.value.message
 
+    @pytest.mark.parametrize('status', [200, 400, 404, 500])
+    def test_non_redirect_status_is_decoded_from_the_body(
+        self, monkeypatch: pytest.MonkeyPatch, status: int
+    ):
+        # Only 3xx is special-cased in _request: 4xx and 5xx bodies carry the error we report.
+        body = {'type': 'sync', 'status-code': status, 'result': {'foo': 'bar'}}
+        response = _fake_response(body, status=status)
+        monkeypatch.setattr(
+            urllib.request.OpenerDirector, 'open', MagicMock(return_value=response)
+        )
+        assert _client.get('/v2/snaps/hello-world') == {'foo': 'bar'}
+
+    def test_redirect_raises_bad_response_error(self, monkeypatch: pytest.MonkeyPatch):
+        # snapd's router answers a non-canonical path (e.g. the '/v2/snaps//conf' that an empty
+        # snap name used to build) with an empty-bodied 301 to the cleaned path. We don't follow
+        # redirects: we report them, rather than failing on the empty body as invalid JSON.
+        def getheader(name: str) -> str | None:
+            return '/v2/snaps/conf' if name == 'Location' else None
+
+        response = SimpleNamespace(
+            read=lambda: b'',
+            status=301,
+            reason='Moved Permanently',
+            url='http://localhost/v2/snaps//conf',
+            getheader=getheader,
+        )
+        monkeypatch.setattr(
+            urllib.request.OpenerDirector, 'open', MagicMock(return_value=response)
+        )
+        with pytest.raises(BadResponseError) as exc_info:
+            _client.get('/v2/snaps//conf')
+        assert exc_info.value.kind == 'charmlibs-snap-unexpected-redirect'
+        assert '/v2/snaps//conf' in exc_info.value.message  # The path we asked for.
+        assert '/v2/snaps/conf' in exc_info.value.message  # Where snapd points us.
+        assert exc_info.value.value == '/v2/snaps/conf'
+        assert exc_info.value._status_code == 301
+
     def test_request_timeout_raises_snap_timeout_error(self, monkeypatch: pytest.MonkeyPatch):
         # Patch opener.open inside _request to raise TimeoutError, exercising the conversion.
         monkeypatch.setattr(
