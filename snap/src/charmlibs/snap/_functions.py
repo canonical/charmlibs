@@ -31,13 +31,17 @@ def ensure_revision(snap: str, revision: int | str, *, classic: bool = False) ->
         Not guaranteed to be an actual :class:`bool`.
 
     Raises:
-        ValueError: if the snap name is empty or is not a single path segment.
+        ValueError: if the snap name is empty, blank, or is not a single path segment.
         NotFoundError: If the snap does not exist in the store.
         RevisionNotAvailableError: If the revision does not exist.
         NeedsClassicError: If the snap requires ``classic=True``.
         ChangeError: If the install or refresh fails after starting (for example, a hook errors).
         Error: (or a subtype) if the snap could not be installed or refreshed for another reason.
     """
+    # NOTE: validated here rather than left to the snapd calls below, so that the error is
+    # raised from the function the caller called, not from inside the _get_info probe.
+    if err := _utils.get_err_if_empty_or_blank(snap, label='snap name'):
+        raise err
     info = _get_info(snap)
     if info is None:  # Not installed.
         _snapd_snaps.install(snap, revision=revision, classic=classic)
@@ -77,13 +81,17 @@ def ensure(
         Not guaranteed to be an actual :class:`bool`.
 
     Raises:
-        ValueError: if the snap name is empty or is not a single path segment.
+        ValueError: if the snap name is empty, blank, or is not a single path segment.
         NotFoundError: If the snap does not exist in the store.
         NeedsClassicError: If the snap requires ``classic=True``.
         ChannelNotAvailableError: If the channel is invalid or unavailable.
         ChangeError: If the install or refresh fails after starting (for example, a hook errors).
         Error: (or a subtype) if the snap could not be installed or refreshed for another reason.
     """
+    # NOTE: validated here rather than left to the snapd calls below, so that the error is
+    # raised from the function the caller called, not from inside the _get_info probe.
+    if err := _utils.get_err_if_empty_or_blank(snap, label='snap name'):
+        raise err
     info = _get_info(snap)
     if info is None:  # Not installed.
         _snapd_snaps.install(snap, channel=channel, classic=classic)

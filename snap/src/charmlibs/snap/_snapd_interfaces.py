@@ -168,8 +168,10 @@ def _snap_and_name(spec: tuple[str, str] | str | None, what: str) -> tuple[str, 
         snap, name = spec, ''
     else:
         snap, name = spec  # ValueError if not a 2-item pair.
-    _utils.raise_if_blank(snap, f'{what} snap name')
-    _utils.raise_if_blank(name, f'{what} name')
+    if err := _utils.get_err_if_blank(snap, label=f'{what} snap name'):
+        raise err
+    if err := _utils.get_err_if_blank(name, label=f'{what} name'):
+        raise err
     return snap, name
 
 

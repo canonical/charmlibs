@@ -11,6 +11,7 @@ on the interface endpoints. A blank value -- one that is not empty but contains 
 from __future__ import annotations
 
 import inspect
+import pathlib
 from typing import TYPE_CHECKING
 
 import pytest
@@ -119,3 +120,42 @@ def test_empty_is_passed_through_by_the_interface_functions(name: str, mock_clie
     # The other half of the exemption: an empty value is meaningful here, so it reaches snapd.
     _BLANK_ONLY_CALLS[name]('')
     mock_client.post.assert_called_once()
+
+
+def _library_frames(exc: BaseException) -> list[str]:
+    """Return the library frames of a traceback, as ``module.py:function``."""
+    source_dir = pathlib.Path(snap.__file__).parent
+    frames: list[str] = []
+    tb = exc.__traceback__
+    while tb is not None:
+        code = tb.tb_frame.f_code
+        path = pathlib.Path(code.co_filename)
+        if path.parent == source_dir:
+            frames.append(f'{path.name}:{code.co_name}')
+        tb = tb.tb_next
+    return frames
+
+
+def test_error_is_raised_from_the_function_the_caller_called():
+    # The validation helpers return the error instead of raising it, so the public function
+    # raises it from its own frame. A charm's traceback ends up in the Juju debug log, where
+    # frames between the call and the error are noise for whoever reads it -- and the helpers
+    # compose, so raising from inside them would add a frame per layer. logs() is the deepest
+    # composition: get_err_if_not_comma_list_safe defers to get_err_if_empty_or_blank, which
+    # defers to get_err_if_blank. None of that should be visible.
+    with pytest.raises(ValueError) as ctx:
+        snap.logs(_BLANK)
+    assert _library_frames(ctx.value) == ['_snapd_logs.py:logs']
+
+
+@pytest.mark.parametrize('name', sorted(_CALLS) + sorted(_BLANK_ONLY_CALLS))
+def test_no_call_buries_the_error_in_a_helper(name: str, mock_client: MockClient):
+    # As above, for every field. Two frames are allowed for the functions that reach validation
+    # through snap_path_segment or _snap_and_name: both return a value, so they have nowhere to
+    # put an error and have to raise it themselves.
+    calls = _CALLS if name in _CALLS else _BLANK_ONLY_CALLS
+    with pytest.raises(ValueError) as ctx:
+        calls[name](_BLANK)
+    frames = _library_frames(ctx.value)
+    assert len(frames) <= 2, frames
+    assert not any(frame.startswith('_utils.py:get_err_if_') for frame in frames), frames

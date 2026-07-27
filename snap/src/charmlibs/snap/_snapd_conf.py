@@ -87,14 +87,14 @@ def get(snap: str, keys: Iterable[str] | None = None) -> dict[str, Any]:
             if error := _utils.check_installed_or_system(snap):
                 raise error
             return {}
-        for key in keys:
-            # NOTE: the keys are sent as one comma-separated query parameter, so a key that
-            # snapd's parser alters is silently not the query the caller asked for. Keys that all
-            # parse away to nothing are the dangerous case: the request becomes a request for the
-            # whole configuration, which for a snap that isn't installed is answered with an empty
-            # result -- so without this check, get('absent-snap', ['']) returned {} instead of
-            # raising NotFoundError, because the probe below only runs for keys=None.
-            _utils.raise_if_not_comma_list_safe(key, 'config key')
+        # NOTE: the keys are sent as one comma-separated query parameter, so a key that snapd's
+        # parser alters is silently not the query the caller asked for. Keys that all parse away
+        # to nothing are the dangerous case: the request becomes a request for the whole
+        # configuration, which for a snap that isn't installed is answered with an empty result
+        # -- so without this check, get('absent-snap', ['']) returned {} instead of raising
+        # NotFoundError, because the probe below only runs for keys=None.
+        if err := _utils.get_err_if_not_comma_list_safe(*keys, label='config key'):
+            raise err
         params = {'keys': ','.join(keys)}
     else:
         params = None
@@ -141,11 +141,11 @@ def unset(snap: str, keys: Iterable[str]) -> None:
     if isinstance(keys, str):
         raise TypeError('keys must be an iterable of strings (not a string)')
     keys = list(keys)
-    for key in keys:
-        # NOTE: snapd rejects these itself, but only once the configure hook runs, as a
-        # ChangeError reporting an 'internal error' for an empty key. We reject them up front,
-        # so that an unusable key is the same ValueError here as it is for get().
-        _utils.raise_if_empty_or_blank(key, 'config key')
+    # NOTE: snapd rejects these itself, but only once the configure hook runs, as a ChangeError
+    # reporting an 'internal error' for an empty key. We reject them up front, so that an
+    # unusable key is the same ValueError here as it is for get().
+    if err := _utils.get_err_if_empty_or_blank(*keys, label='config key'):
+        raise err
     # NOTE: snap-not-found is returned for a missing snap, but not for system or core,
     # even if the core snap isn't installed -- configuration changes are still applied.
     # NOTE: Unset with no keys is a no-op (like set with an empty dict). We let snapd handle it.
@@ -173,9 +173,9 @@ def set(snap: str, config: dict[str, Any]) -> None:  # noqa: A001 (shadowing a P
             from the request is applied.
     """
     path = f'/v2/snaps/{_utils.snap_path_segment(snap)}/conf'
-    for key in config:
-        # NOTE: as for unset, snapd only rejects these once the configure hook runs.
-        _utils.raise_if_empty_or_blank(key, 'config key')
+    # NOTE: as for unset, snapd only rejects these once the configure hook runs.
+    if err := _utils.get_err_if_empty_or_blank(*config, label='config key'):
+        raise err
     # NOTE: snap-not-found is returned for a missing snap, but not for system or core,
     # even if the core snap isn't installed -- configuration changes are still applied.
     # NOTE: Set with an empty dict is a no-op. We let snapd handle it.

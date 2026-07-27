@@ -97,11 +97,11 @@ def logs(*snaps: str, limit: int | None = 10) -> list[LogEntry]:
         NotFoundError: If a specified snap is not installed.
         AppNotFoundError: If a specified snap has no services.
     """
-    for snap in snaps:
-        # NOTE: the names are sent as one comma-separated query parameter, so a name that snapd's
-        # parser alters is silently not the query the caller asked for: logs('') and logs(' ')
-        # would become queries for every snap's logs, and logs('a,b') a query for two snaps.
-        _utils.raise_if_not_comma_list_safe(snap, 'snap name')
+    # NOTE: the names are sent as one comma-separated query parameter, so a name that snapd's
+    # parser alters is silently not the query the caller asked for: logs('') and logs(' ')
+    # would become queries for every snap's logs, and logs('a,b') a query for two snaps.
+    if err := _utils.get_err_if_not_comma_list_safe(*snaps, label='snap name'):
+        raise err
     if limit is None:
         # snapd treats n=-1 as "no limit": return all available log entries.
         n = -1

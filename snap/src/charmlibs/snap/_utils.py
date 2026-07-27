@@ -37,41 +37,61 @@ def snap_path_segment(snap: str) -> str:
 
     Encoding is still applied, so that characters such as ``?`` and ``#`` in a name are sent as
     part of the path instead of starting a query string or fragment.
+
+    Raises rather than returning the error, since it returns the encoded name. Callers that want
+    the error reported at their own frame should validate the name before calling this.
     """
-    raise_if_empty_or_blank(snap, 'snap name')
+    if err := get_err_if_empty_or_blank(snap, label='snap name'):
+        raise err
     if '/' in snap or snap in ('.', '..'):
         raise ValueError(f'snap name must be a single path segment, not {snap!r}')
     return urllib.parse.quote(snap, safe='')
 
 
-def raise_if_empty_or_blank(value: str, what: str) -> None:
-    """Raise ValueError if the value is empty or contains only whitespace.
+# The get_err_if_* functions return an error rather than raising it, so that the caller can
+# raise it from the frame the charm author called, rather than from inside a helper. A charm's
+# tracebacks end up in the Juju debug log, so the frames between the call and the error are
+# noise for the person reading them. Returning the error also keeps that cost flat as these
+# compose: get_err_if_not_comma_list_safe defers to get_err_if_empty_or_blank, which defers to
+# get_err_if_blank, and none of that shows up in the traceback.
+#
+# Each takes any number of values sharing one label, and returns the error for the first value
+# that fails, or None if they all pass.
+
+
+def get_err_if_empty_or_blank(*values: str, label: str) -> ValueError | None:
+    """Return a ValueError if any value is empty or contains only whitespace.
 
     Both are caller programming errors, so we reject them before making a request rather than
     passing them to snapd, whose response depends on the endpoint (anything from a typed
     ``snap "" not found`` to a redirect with an empty body, or to being silently ignored).
 
-    Use :func:`raise_if_blank` instead where snapd gives an empty value a meaning of its own.
+    Use :func:`get_err_if_blank` instead where snapd gives an empty value a meaning of its own.
     """
-    if not value:
-        raise ValueError(f'{what} must not be empty')
-    raise_if_blank(value, what)
+    for value in values:
+        if not value:
+            return ValueError(f'{label} must not be empty')
+        if err := get_err_if_blank(value, label=label):
+            return err
+    return None
 
 
-def raise_if_blank(value: str, what: str) -> None:
-    """Raise ValueError if the value is non-empty but contains only whitespace.
+def get_err_if_blank(*values: str, label: str) -> ValueError | None:
+    """Return a ValueError if any value is non-empty but contains only whitespace.
 
-    Separate from :func:`raise_if_empty_or_blank` for the interface functions, where an empty
+    Separate from :func:`get_err_if_empty_or_blank` for the interface functions, where an empty
     value is meaningful -- it selects the system snap, or asks snapd to resolve that side of the
     connection. A blank value is never meaningful anywhere: snapd either treats it as a name that
     can't exist, or (on the endpoints that take a comma-separated list) discards it entirely.
     """
-    if value and not value.strip():
-        raise ValueError(f'{what} must not be blank: {value!r}')
+    for value in values:
+        if value and not value.strip():
+            return ValueError(f'{label} must not be blank: {value!r}')
+    return None
 
 
-def raise_if_not_comma_list_safe(value: str, what: str) -> None:
-    """Raise ValueError if the value would not survive snapd's comma-separated list parsing.
+def get_err_if_not_comma_list_safe(*values: str, label: str) -> ValueError | None:
+    """Return a ValueError if any value would not survive snapd's comma-separated list parsing.
 
     Some snapd endpoints take several values in one query parameter, joined by commas. snapd
     parses these with ``strutil.CommaSeparatedList``, which splits on commas, strips whitespace
@@ -90,11 +110,14 @@ def raise_if_not_comma_list_safe(value: str, what: str) -> None:
     separately (U+0085, U+00A0, U+1680, U+2000, U+3000), and agree that zero-width characters
     (U+200B, U+FEFF) are content rather than whitespace.
     """
-    raise_if_empty_or_blank(value, what)
-    if ',' in value:
-        raise ValueError(f'{what} must not contain a comma: {value!r}')
-    if value != value.strip():
-        raise ValueError(f'{what} must not have leading or trailing whitespace: {value!r}')
+    for value in values:
+        if err := get_err_if_empty_or_blank(value, label=label):
+            return err
+        if ',' in value:
+            return ValueError(f'{label} must not contain a comma: {value!r}')
+        if value != value.strip():
+            return ValueError(f'{label} must not have leading or trailing whitespace: {value!r}')
+    return None
 
 
 def check_installed_or_system(snap: str) -> _errors.NotFoundError | None:
