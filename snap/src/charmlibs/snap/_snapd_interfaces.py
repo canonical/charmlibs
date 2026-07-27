@@ -174,8 +174,8 @@ def _snap_and_name(
     else:
         snap, name = spec  # ValueError if not a 2-item pair.
     for value, label in ((snap, f'{side} snap name'), (name, f'{side} name')):
-        if err := _utils.get_err_if_blank(value, label=label):
-            raise err
+        if problem := _utils.blank_problem(value):
+            raise ValueError(f'{label} {problem}')
     return snap, name
 
 

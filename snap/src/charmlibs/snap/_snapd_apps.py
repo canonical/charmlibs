@@ -37,10 +37,11 @@ def start(snap: str, *services: str, enable: bool = False) -> None:
         AppNotFoundError: if the snap is not installed or the service is not found.
         ChangeError: if the change fails (for example, the service fails to start).
     """
-    if err := _utils.get_err_if_empty_or_blank(snap, label='snap name'):
-        raise err
-    if err := _utils.get_err_if_empty_or_blank(*services, label='service name'):
-        raise err
+    if problem := _utils.empty_or_blank_problem(snap):
+        raise ValueError(f'snap name {problem}')
+    for service in services:
+        if problem := _utils.empty_or_blank_problem(service):
+            raise ValueError(f'service name {problem} (services={services!r})')
     names = [f'{snap}.{s}' for s in services] if services else [snap]
     data: dict[str, Any] = {'action': 'start', 'names': names}
     if enable:
@@ -62,10 +63,11 @@ def stop(snap: str, *services: str, disable: bool = False) -> None:
         AppNotFoundError: if the snap is not installed or the service is not found.
         ChangeError: if the change fails (for example, the service fails to stop).
     """
-    if err := _utils.get_err_if_empty_or_blank(snap, label='snap name'):
-        raise err
-    if err := _utils.get_err_if_empty_or_blank(*services, label='service name'):
-        raise err
+    if problem := _utils.empty_or_blank_problem(snap):
+        raise ValueError(f'snap name {problem}')
+    for service in services:
+        if problem := _utils.empty_or_blank_problem(service):
+            raise ValueError(f'service name {problem} (services={services!r})')
     names = [f'{snap}.{s}' for s in services] if services else [snap]
     data: dict[str, Any] = {'action': 'stop', 'names': names}
     if disable:
@@ -86,10 +88,11 @@ def restart(snap: str, *services: str) -> None:
         AppNotFoundError: if the snap is not installed or the service is not found.
         ChangeError: if the change fails (for example, the service fails to restart).
     """
-    if err := _utils.get_err_if_empty_or_blank(snap, label='snap name'):
-        raise err
-    if err := _utils.get_err_if_empty_or_blank(*services, label='service name'):
-        raise err
+    if problem := _utils.empty_or_blank_problem(snap):
+        raise ValueError(f'snap name {problem}')
+    for service in services:
+        if problem := _utils.empty_or_blank_problem(service):
+            raise ValueError(f'service name {problem} (services={services!r})')
     names = [f'{snap}.{s}' for s in services] if services else [snap]
     data: dict[str, Any] = {'action': 'restart', 'names': names}
     _client.post('/v2/apps', body=data)

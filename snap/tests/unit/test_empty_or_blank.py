@@ -137,25 +137,29 @@ def _library_frames(exc: BaseException) -> list[str]:
 
 
 def test_error_is_raised_from_the_function_the_caller_called():
-    # The validation helpers return the error instead of raising it, so the public function
-    # raises it from its own frame. A charm's traceback ends up in the Juju debug log, where
-    # frames between the call and the error are noise for whoever reads it -- and the helpers
-    # compose, so raising from inside them would add a frame per layer. logs() is the deepest
-    # composition: get_err_if_not_comma_list_safe defers to get_err_if_empty_or_blank, which
-    # defers to get_err_if_blank. None of that should be visible.
+    # The checks describe the problem and leave raising to the caller, so the public function
+    # raises from its own frame. A charm's traceback ends up in the Juju debug log, where frames
+    # between the call and the error are noise for whoever reads it -- and the checks compose, so
+    # raising from inside them would add a frame per layer. logs() is the deepest composition:
+    # comma_list_problem defers to empty_or_blank_problem, which defers to blank_problem. None of
+    # that should be visible.
     with pytest.raises(ValueError) as ctx:
         snap.logs(_BLANK)
     assert _library_frames(ctx.value) == ['_snapd_logs.py:logs']
 
 
+# snap_path_segment returns the encoded name, so it has nowhere to put a problem and raises it
+# itself. It is the only helper allowed to appear in a traceback.
+_MAY_RAISE_FROM_UTILS = '_utils.py:snap_path_segment'
+
+
 @pytest.mark.parametrize('name', sorted(_CALLS) + sorted(_BLANK_ONLY_CALLS))
 def test_no_call_buries_the_error_in_a_helper(name: str, mock_client: MockClient):
-    # As above, for every field. Two frames are allowed for the functions that reach validation
-    # through snap_path_segment or _snap_and_name: both return a value, so they have nowhere to
-    # put an error and have to raise it themselves.
+    # As above, for every field.
     calls = _CALLS if name in _CALLS else _BLANK_ONLY_CALLS
     with pytest.raises(ValueError) as ctx:
         calls[name](_BLANK)
     frames = _library_frames(ctx.value)
     assert len(frames) <= 2, frames
-    assert not any(frame.startswith('_utils.py:get_err_if_') for frame in frames), frames
+    from_utils = [frame for frame in frames if frame.startswith('_utils.py:')]
+    assert from_utils in ([], [_MAY_RAISE_FROM_UTILS]), frames
