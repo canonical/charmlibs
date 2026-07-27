@@ -161,8 +161,9 @@ class TestParseTimestamp:
 
 class TestEmptySnapName:
     def test_empty_name_raises_value_error_without_request(self, mock_client: MockClient):
-        # An empty name is a caller error, not a request for system-wide logs: snapd answers
-        # names='' with an app-not-found 'no matching services'.
+        # An empty name is a caller error, and snapd wouldn't report it as one: it drops empty
+        # entries from 'names', so names='' silently widens the query to system-wide logs
+        # instead of failing (pinned by the functional tests). We reject it before the request.
         with pytest.raises(ValueError, match='must not be empty'):
             _snapd_logs.logs('')
         mock_client.get_logs.assert_not_called()

@@ -97,10 +97,10 @@ def logs(*snaps: str, limit: int | None = 10) -> list[LogEntry]:
         NotFoundError: If a specified snap is not installed.
         AppNotFoundError: If a specified snap has no services.
     """
-    # NOTE: An empty name is rejected rather than dropped: snapd answers logs('') with an
-    # app-not-found 'no matching services', and silently treating it as logs() -- system-wide
-    # logs -- would hide the caller's mistake behind a much broader result.
     for snap in snaps:
+        # NOTE: snapd ignores empty snap names, so logs('') or logs('', '') would silently become
+        # queries for all logs, and logs('', 'some-snap') becomes a query for 'some-snap' only.
+        # Following the rest of the library, we reject empty snap names client-side.
         _utils.raise_if_snap_name_empty(snap)
     if limit is None:
         # snapd treats n=-1 as "no limit": return all available log entries.
