@@ -437,6 +437,31 @@ def test_raw_put_unusable_key_fails_the_change(key: str, expected: str):
     assert expected in ctx.value.message
 
 
+# A key with an empty dotted segment is neither empty nor blank, so it isn't guarded client-side
+# and reaches snapd -- which splits it on dots and blames the empty segment, naming a value the
+# caller never passed. These go through the public API rather than _client, since that is how a
+# caller reaches them.
+
+
+@pytest.mark.parametrize('key', ['a.', '.a', 'a..b', '.'])
+def test_get_key_with_an_empty_dotted_segment_raises(key: str):
+    # On the read side this is at least immediate: a synchronous APIError, no change, no hook.
+    ensure_installed(_SNAP, channel='latest/edge')
+    with pytest.raises(_errors.APIError) as ctx:
+        _snapd_conf.get(_SNAP, [key])
+    assert not ctx.value.kind
+    assert ctx.value.message == 'invalid option name: ""'
+
+
+@pytest.mark.parametrize('key', ['a.', '.a', 'a..b', '.'])
+def test_set_key_with_an_empty_dotted_segment_fails_the_change(key: str):
+    # On the write side it costs a round trip and a configure hook run before failing.
+    ensure_installed(_SNAP, channel='latest/edge')
+    with pytest.raises(_errors.ChangeError) as ctx:
+        _snapd_conf.set(_SNAP, {key: 'value'})
+    assert 'invalid option name: ""' in ctx.value.message
+
+
 def test_raw_put_unusable_key_rolls_back_the_valid_keys():
     # The change is all-or-nothing, so a valid key sent alongside an unusable one is not applied.
     ensure_installed(_SNAP, channel='latest/edge')
