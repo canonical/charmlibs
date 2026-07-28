@@ -45,26 +45,18 @@ def snap_path_segment(snap: str) -> str:
     Raises rather than returning the error, since it returns the encoded name. Callers that want
     the error reported at their own frame should validate the name before calling this.
     """
-    if problem := check_empty_or_blank(snap):
-        raise ValueError(f'snap name {problem}')
+    raise_if_empty_or_blank(snap, label='snap name')
     if '/' in snap or snap in ('.', '..'):
         raise ValueError(f'snap name must be a single path segment, not {snap!r}')
     return urllib.parse.quote(snap, safe='')
 
 
-# The checks below describe what is wrong with a value, and leave raising to the caller. Each
-# takes one value or a collection of them (including a dict, whose keys are checked), and
-# describes the first that is unusable: a phrase to put after the name of the thing being checked
-# -- "must not be empty", "must not contain a comma: ',,'" -- or None if every value is fine. The
-# caller supplies the noun and any context it can add, so one check can say "config key must not
-# be empty (keys=['a', ''])" in one place and "snap name must not be empty" in another, without
-# the check knowing either.
+# The raise_if_* functions below reject a value the library can't use, before any request is
+# made. Each takes one value or a collection of them (including a dict, whose keys are checked),
+# a label naming what the values are, and raises ValueError describing the first unusable one.
 #
-# Returning rather than raising also keeps the traceback short. A charm's tracebacks end up in the
-# Juju debug log, where frames between the call and the error are noise for whoever reads them.
-#
-# Each check spells out the rules it applies, as a chain of the single-value predicates below, so
-# that what it rejects can be read off the one function rather than traced through the others.
+# Each spells out the rules it applies as a chain of the single-value predicates below, so that
+# what it rejects can be read off the one function rather than traced through the others.
 
 
 def _empty(value: str) -> str | None:
@@ -100,43 +92,58 @@ def _padding(value: str) -> str | None:
     return None
 
 
-def check_empty_or_blank(values: str | Collection[str]) -> str | None:
-    """Describe why a value is unusable if it is empty or contains only whitespace.
+def _values(values: str | Collection[str]) -> list[str]:
+    """Normalise the argument to the list of values to check.
+
+    A bare string is one value, not an iterable of one-character values. A dict becomes its keys,
+    which is both what the caller means and what keeps its values out of the error message: the
+    config a charm sets can hold secrets, and an error ends up in the Juju debug log.
+    """
+    return [values] if isinstance(values, str) else list(values)
+
+
+def _message(label: str, problem: str, values: list[str]) -> str:
+    """Build the error message, naming the whole collection when there was more than one value.
+
+    Returns the message rather than raising it, so that the raise happens in the raise_if_*
+    function and this doesn't add a frame to the traceback.
+    """
+    if len(values) > 1:
+        return f'{label} {problem} (in {values!r})'
+    return f'{label} {problem}'
+
+
+def raise_if_empty_or_blank(values: str | Collection[str], *, label: str) -> None:
+    """Raise ValueError if a value is empty or contains only whitespace.
 
     Both are caller programming errors, so we reject them before making a request rather than
     passing them to snapd, whose response depends on the endpoint (anything from a typed
     ``snap "" not found`` to a redirect with an empty body, or to being silently ignored).
 
-    Use :func:`check_blank` instead where snapd gives an empty value a meaning of its own.
+    Use :func:`raise_if_blank` instead where snapd gives an empty value a meaning of its own.
     """
-    if isinstance(values, str):
-        # A bare string is one value, not an iterable of one-character values.
-        values = [values]
+    values = _values(values)
     for value in values:
-        if problem := (_empty(value) or _blank(value)):
-            return problem
-    return None
+        if problem := _empty(value) or _blank(value):
+            raise ValueError(_message(label, problem, values))
 
 
-def check_blank(values: str | Collection[str]) -> str | None:
-    """Describe why a value is unusable if it is non-empty but contains only whitespace.
+def raise_if_blank(values: str | Collection[str], *, label: str) -> None:
+    """Raise ValueError if a value is non-empty but contains only whitespace.
 
-    Separate from :func:`check_empty_or_blank` for the interface functions, where an empty value
-    is meaningful -- it selects the system snap, or asks snapd to resolve that side of the
+    Separate from :func:`raise_if_empty_or_blank` for the interface functions, where an empty
+    value is meaningful -- it selects the system snap, or asks snapd to resolve that side of the
     connection. A blank value is never meaningful anywhere: snapd either treats it as a name that
     can't exist, or (on the endpoints that take a comma-separated list) discards it entirely.
     """
-    if isinstance(values, str):
-        # A bare string is one value, not an iterable of one-character values.
-        values = [values]
+    values = _values(values)
     for value in values:
         if problem := _blank(value):
-            return problem
-    return None
+            raise ValueError(_message(label, problem, values))
 
 
-def check_comma_list(values: str | Collection[str]) -> str | None:
-    """Describe why a value would not survive snapd's comma-separated list parsing.
+def raise_if_not_comma_list_safe(values: str | Collection[str], *, label: str) -> None:
+    """Raise ValueError if a value would not survive snapd's comma-separated list parsing.
 
     Some snapd endpoints take several values in one query parameter, joined by commas. snapd
     parses these with ``strutil.CommaSeparatedList``, which splits on commas, strips whitespace
@@ -155,18 +162,15 @@ def check_comma_list(values: str | Collection[str]) -> str | None:
     separately (U+0085, U+00A0, U+1680, U+2000, U+3000), and agree that zero-width characters
     (U+200B, U+FEFF) are content rather than whitespace.
     """
-    if isinstance(values, str):
-        # A bare string is one value, not an iterable of one-character values.
-        values = [values]
+    values = _values(values)
     # NOTE: each value is checked completely before moving on to the next, rather than checking
     # every value for one kind of problem before the next kind. That keeps what's reported for a
     # value independent of the other values: the same bad value is described the same way whatever
-    # it is passed alongside. The caller names the whole collection in the error, so a second
-    # problem later in it isn't hidden either way.
+    # it is passed alongside. The message names the whole collection, so a second problem later in
+    # it isn't hidden either way.
     for value in values:
-        if problem := (_empty(value) or _blank(value) or _comma(value) or _padding(value)):
-            return problem
-    return None
+        if problem := _empty(value) or _blank(value) or _comma(value) or _padding(value):
+            raise ValueError(_message(label, problem, values))
 
 
 def check_installed_or_system(snap: str) -> _errors.NotFoundError | None:

@@ -136,42 +136,42 @@ def _library_frames(exc: BaseException) -> list[str]:
     return frames
 
 
-def test_error_is_raised_from_the_function_the_caller_called():
-    # The checks describe the problem and leave raising to the caller, so the public function
-    # raises from its own frame. A charm's traceback ends up in the Juju debug log, where frames
-    # between the call and the error are noise for whoever reads it -- and the checks compose, so
-    # raising from inside them would add a frame per layer. logs() is the deepest composition:
-    # comma_list defers to empty_or_blank, which defers to blank. None of
-    # that should be visible.
+def test_error_is_raised_one_frame_below_the_function_the_caller_called():
+    # The check raises, so a charm's traceback shows the function it called and the check itself.
+    # A charm's tracebacks end up in the Juju debug log, so the frames between the call and the
+    # error are noise for whoever reads them: the single-value predicates the check chains
+    # together return rather than raise, so none of them appear here.
     with pytest.raises(ValueError) as ctx:
         snap.logs(_BLANK)
-    assert _library_frames(ctx.value) == ['_snapd_logs.py:logs']
+    assert _library_frames(ctx.value) == [
+        '_snapd_logs.py:logs',
+        '_utils.py:raise_if_not_comma_list_safe',
+    ]
 
 
-# snap_path_segment returns the encoded name, so it has nowhere to put a problem and raises it
-# itself. It is the only helper allowed to appear in a traceback.
-_MAY_RAISE_FROM_UTILS = '_utils.py:snap_path_segment'
+# The functions that validate through snap_path_segment reach the check one frame deeper, since
+# it returns the encoded name and so has to call the check itself.
+_MAX_FRAMES = 3
 
 # ensure and ensure_revision are compositions of the other public functions rather than calls to
 # an endpoint of their own, and don't check the snap name themselves: whichever function they
 # reach first does it. That leaves the deepest traceback in the library -- ensure, its _get_info
-# probe, info, and snap_path_segment -- which is the price of not duplicating the check in a
-# layer that doesn't own it.
+# probe, info, snap_path_segment and the check -- which is the price of not duplicating the check
+# in a layer that doesn't own it.
 _COMPOSITE_FUNCTIONS = {'ensure', 'ensure_revision'}
 
 
 @pytest.mark.parametrize('name', sorted(_CALLS) + sorted(_BLANK_ONLY_CALLS))
-def test_no_call_buries_the_error_in_a_helper(name: str, mock_client: MockClient):
-    # As above, for every field.
+def test_no_call_buries_the_error_deeper_than_the_check(name: str, mock_client: MockClient):
+    # As above, for every field: the error surfaces from the check, not from somewhere further in.
     if name in _COMPOSITE_FUNCTIONS:
         pytest.skip('validated by the function it delegates to, not by itself')
     calls = _CALLS if name in _CALLS else _BLANK_ONLY_CALLS
     with pytest.raises(ValueError) as ctx:
         calls[name](_BLANK)
     frames = _library_frames(ctx.value)
-    assert len(frames) <= 2, frames
-    from_utils = [frame for frame in frames if frame.startswith('_utils.py:')]
-    assert from_utils in ([], [_MAY_RAISE_FROM_UTILS]), frames
+    assert len(frames) <= _MAX_FRAMES, frames
+    assert frames[-1].startswith('_utils.py:raise_if_'), frames
 
 
 @pytest.mark.parametrize('name', sorted(_COMPOSITE_FUNCTIONS))

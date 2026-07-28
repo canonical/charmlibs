@@ -64,14 +64,10 @@ def connect(plug: tuple[str, str], slot: tuple[str, str] | str | None = None) ->
     plug_snap, plug_name = _snap_and_name(plug)
     slot_snap, slot_name = _snap_and_name(slot)
     # NOTE: an empty part is meaningful to snapd, so only blank parts are rejected here.
-    for value, label in (
-        (plug_snap, 'plug snap name'),
-        (plug_name, 'plug name'),
-        (slot_snap, 'slot snap name'),
-        (slot_name, 'slot name'),
-    ):
-        if problem := _utils.check_blank(value):
-            raise ValueError(f'{label} {problem}')
+    _utils.raise_if_blank(plug_snap, label='plug snap name')
+    _utils.raise_if_blank(plug_name, label='plug name')
+    _utils.raise_if_blank(slot_snap, label='slot snap name')
+    _utils.raise_if_blank(slot_name, label='slot name')
     data = {
         'action': 'connect',
         'plugs': [{'snap': plug_snap, 'plug': plug_name}],
@@ -143,14 +139,10 @@ def disconnect(
     plug_snap, plug_name = _snap_and_name(plug)
     slot_snap, slot_name = _snap_and_name(slot)
     # NOTE: an empty part is meaningful to snapd, so only blank parts are rejected here.
-    for value, label in (
-        (plug_snap, 'plug snap name'),
-        (plug_name, 'plug name'),
-        (slot_snap, 'slot snap name'),
-        (slot_name, 'slot name'),
-    ):
-        if problem := _utils.check_blank(value):
-            raise ValueError(f'{label} {problem}')
+    _utils.raise_if_blank(plug_snap, label='plug snap name')
+    _utils.raise_if_blank(plug_name, label='plug name')
+    _utils.raise_if_blank(slot_snap, label='slot snap name')
+    _utils.raise_if_blank(slot_name, label='slot name')
     data: dict[str, Any] = {
         'action': 'disconnect',
         'plugs': [{'snap': plug_snap, 'plug': plug_name}],

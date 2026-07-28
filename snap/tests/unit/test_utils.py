@@ -49,67 +49,112 @@ class TestPredicates:
         assert predicate(value) == expected
 
 
-class TestEmptyOrBlank:
+def assert_raises(call: Callable[[], None], expected: str) -> None:
+    """Assert the check raises ValueError with exactly the expected message."""
+    with pytest.raises(ValueError) as ctx:
+        call()
+    assert str(ctx.value) == expected
+
+
+class TestRaiseIfEmptyOrBlank:
     def test_empty(self):
-        assert _utils.check_empty_or_blank('') == 'must not be empty'
+        assert_raises(
+            lambda: _utils.raise_if_empty_or_blank('', label='snap name'),
+            'snap name must not be empty',
+        )
 
     @pytest.mark.parametrize('value', BLANK)
     def test_blank(self, value: str):
-        assert _utils.check_empty_or_blank(value) == f'must not be blank: {value!r}'
+        assert_raises(
+            lambda: _utils.raise_if_empty_or_blank(value, label='snap name'),
+            f'snap name must not be blank: {value!r}',
+        )
 
-    def test_blank_phrase_quotes_the_value(self):
-        # A blank value is invisible without the repr, and ' ' and '\t' read identically.
-        assert _utils.check_empty_or_blank('\t') == "must not be blank: '\\t'"
+    def test_label_names_the_value(self):
+        assert_raises(
+            lambda: _utils.raise_if_empty_or_blank('', label='config key'),
+            'config key must not be empty',
+        )
 
     @pytest.mark.parametrize(
         'value', ['hello-world', 'lxd', '..', 'a/b', 'a b', ' a', *ZERO_WIDTH]
     )
-    def test_usable_values(self, value: str):
+    def test_usable_values_do_not_raise(self, value: str):
         # Only emptiness and blankness are checked here -- names that aren't usable in a path are
         # the business of snap_path_segment, and padding is only a problem for the endpoints
-        # covered by comma_list.
-        assert _utils.check_empty_or_blank(value) is None
+        # covered by raise_if_not_comma_list_safe.
+        _utils.raise_if_empty_or_blank(value, label='snap name')
 
 
 class TestOneValueOrMany:
-    # Each check takes one value or a collection of them, so the caller can hand over the
-    # whole collection it was given and keep the loop out of the call site.
-    def test_a_bare_string_is_one_value_not_an_iterable_of_characters(self):
+    # Each check takes one value or a collection of them, so the caller can hand over the whole
+    # collection it was given and keep the loop out of the call site.
+    def test_a_bare_string_is_one_value_not_a_collection_of_characters(self):
         # ' a' is not blank, but its characters are: iterating it would report the wrong problem.
-        assert _utils.check_empty_or_blank(' a') is None
-        assert _utils.check_comma_list('ab') is None
+        _utils.raise_if_empty_or_blank(' a', label='snap name')
+        _utils.raise_if_not_comma_list_safe('ab', label='snap name')
 
-    def test_first_unusable_value_is_described(self):
-        assert _utils.check_empty_or_blank(['a', ' ', '']) == "must not be blank: ' '"
-        assert _utils.check_comma_list(['a', 'b,c']) == "must not contain a comma: 'b,c'"
+    def test_first_unusable_value_is_reported(self):
+        assert_raises(
+            lambda: _utils.raise_if_empty_or_blank(['a', ' ', ''], label='config key'),
+            "config key must not be blank: ' ' (in ['a', ' ', ''])",
+        )
 
-    def test_all_usable_values(self):
-        assert _utils.check_empty_or_blank(['a', 'b']) is None
-        assert _utils.check_comma_list(('a', 'b')) is None
+    def test_all_usable_values_do_not_raise(self):
+        _utils.raise_if_empty_or_blank(['a', 'b'], label='config key')
+        _utils.raise_if_not_comma_list_safe(('a', 'b'), label='snap name')
 
-    def test_no_values(self):
+    def test_no_values_does_not_raise(self):
         # Callers pass collections that may be empty (keys=[], no services, no snap names).
-        assert _utils.check_empty_or_blank([]) is None
-        assert _utils.check_comma_list(()) is None
+        _utils.raise_if_empty_or_blank([], label='config key')
+        _utils.raise_if_not_comma_list_safe((), label='snap name')
 
     def test_a_dict_is_checked_by_its_keys(self):
         # set() hands over its config mapping directly.
-        assert _utils.check_empty_or_blank({'a': 1, 'b': 2}) is None
-        assert _utils.check_empty_or_blank({'a': 1, '': 2}) == 'must not be empty'
+        _utils.raise_if_empty_or_blank({'a': 1, 'b': 2}, label='config key')
+        assert_raises(
+            lambda: _utils.raise_if_empty_or_blank({'a': 1, '': 2}, label='config key'),
+            "config key must not be empty (in ['a', ''])",
+        )
+
+    def test_a_dicts_values_are_never_in_the_message(self):
+        # The config a charm sets can hold secrets, and the error reaches the Juju debug log.
+        with pytest.raises(ValueError) as ctx:
+            _utils.raise_if_empty_or_blank({'password': 'hunter2', '': 1}, label='config key')
+        assert 'hunter2' not in str(ctx.value)
 
 
-class TestBlank:
-    def test_empty_is_not_a_problem(self):
+class TestMessageContext:
+    # The collection is named only when there was more than one value to pick from: for a single
+    # value the phrase already quotes it, and repeating it reads as noise.
+    def test_one_value_is_not_repeated(self):
+        assert_raises(
+            lambda: _utils.raise_if_empty_or_blank([' '], label='snap name'),
+            "snap name must not be blank: ' '",
+        )
+
+    def test_many_values_are_named(self):
+        assert_raises(
+            lambda: _utils.raise_if_empty_or_blank(['a', ' '], label='snap name'),
+            "snap name must not be blank: ' ' (in ['a', ' '])",
+        )
+
+
+class TestRaiseIfBlank:
+    def test_empty_does_not_raise(self):
         # The interface functions give an empty value a meaning of its own.
-        assert _utils.check_blank('') is None
+        _utils.raise_if_blank('', label='slot snap name')
 
     @pytest.mark.parametrize('value', BLANK)
     def test_blank(self, value: str):
-        assert _utils.check_blank(value) == f'must not be blank: {value!r}'
+        assert_raises(
+            lambda: _utils.raise_if_blank(value, label='slot snap name'),
+            f'slot snap name must not be blank: {value!r}',
+        )
 
     @pytest.mark.parametrize('value', ['hello-world', 'a b', ' a', *ZERO_WIDTH])
-    def test_usable_values(self, value: str):
-        assert _utils.check_blank(value) is None
+    def test_usable_values_do_not_raise(self, value: str):
+        _utils.raise_if_blank(value, label='slot snap name')
 
 
 def comma_separated_list(value: str) -> list[str]:
@@ -120,14 +165,14 @@ def comma_separated_list(value: str) -> list[str]:
     return [stripped for field in value.split(',') if (stripped := field.strip())]
 
 
-# The contract comma_list exists to enforce: a value snapd's parser gives back unchanged
-# is fine, and anything else is a problem. Asserting that against a mirror of the parser keeps
-# the individual checks in the function honest as a set.
+# The contract raise_if_not_comma_list_safe exists to enforce: a value snapd's parser gives back
+# unchanged is fine, and anything else is rejected. Asserting that against a mirror of the parser
+# keeps the individual predicates in the chain honest as a set.
 SAFE = ['hello-world', 'lxd', 'a.b', 'a b', 'core24', *ZERO_WIDTH]
 UNSAFE = ['', *BLANK, ',', ',,', 'a,b', ' , ', ' a', 'a ', '\ta\n']
 
 
-class TestCommaList:
+class TestRaiseIfNotCommaListSafe:
     @pytest.mark.parametrize('value', SAFE)
     def test_safe_values_round_trip_through_the_parser(self, value: str):
         assert comma_separated_list(value) == [value]
@@ -137,38 +182,41 @@ class TestCommaList:
         assert comma_separated_list(value) != [value]
 
     @pytest.mark.parametrize('value', SAFE)
-    def test_safe_values_have_no_problem(self, value: str):
-        assert _utils.check_comma_list(value) is None
+    def test_safe_values_do_not_raise(self, value: str):
+        _utils.raise_if_not_comma_list_safe(value, label='snap name')
 
     @pytest.mark.parametrize('value', UNSAFE)
-    def test_unsafe_values_have_a_problem(self, value: str):
-        assert _utils.check_comma_list(value) is not None
+    def test_unsafe_values_raise(self, value: str):
+        with pytest.raises(ValueError):
+            _utils.raise_if_not_comma_list_safe(value, label='snap name')
 
     @pytest.mark.parametrize(
         ('value', 'expected'),
         [
-            ('', 'must not be empty'),
-            (' ', "must not be blank: ' '"),
-            (',', "must not contain a comma: ','"),
-            ('a,b', "must not contain a comma: 'a,b'"),
-            (' a', "must not have leading or trailing whitespace: ' a'"),
-            ('a\n', "must not have leading or trailing whitespace: 'a\\n'"),
+            ('', 'snap name must not be empty'),
+            (' ', "snap name must not be blank: ' '"),
+            (',', "snap name must not contain a comma: ','"),
+            ('a,b', "snap name must not contain a comma: 'a,b'"),
+            (' a', "snap name must not have leading or trailing whitespace: ' a'"),
+            ('a\n', "snap name must not have leading or trailing whitespace: 'a\\n'"),
         ],
     )
-    def test_each_way_of_failing_has_its_own_phrase(self, value: str, expected: str):
-        assert _utils.check_comma_list(value) == expected
+    def test_each_way_of_failing_has_its_own_message(self, value: str, expected: str):
+        assert_raises(
+            lambda: _utils.raise_if_not_comma_list_safe(value, label='snap name'), expected
+        )
 
     def test_each_value_is_checked_completely_before_the_next(self):
-        # The first unusable value is described, not the most severe problem across all of them:
+        # The first unusable value is reported, not the most severe problem across all of them:
         # what gets reported for a value doesn't depend on what comes after it.
-        assert _utils.check_comma_list(['a,b', '']) == "must not contain a comma: 'a,b'"
-        assert _utils.check_comma_list(['', 'a,b']) == 'must not be empty'
-
-    def test_phrases_read_as_a_sentence_after_a_noun(self):
-        # The phrases are written to follow the name of the thing being checked, which is what
-        # lets each call site supply its own noun and context.
-        problem = _utils.check_comma_list('a,b')
-        assert f'config key {problem}' == "config key must not contain a comma: 'a,b'"
+        assert_raises(
+            lambda: _utils.raise_if_not_comma_list_safe(['a,b', ''], label='snap name'),
+            "snap name must not contain a comma: 'a,b' (in ['a,b', ''])",
+        )
+        assert_raises(
+            lambda: _utils.raise_if_not_comma_list_safe(['', 'a,b'], label='snap name'),
+            "snap name must not be empty (in ['', 'a,b'])",
+        )
 
 
 class TestSnapPathSegment:

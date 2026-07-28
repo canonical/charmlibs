@@ -93,8 +93,7 @@ def get(snap: str, keys: Iterable[str] | None = None) -> dict[str, Any]:
         # configuration, which for a snap that isn't installed is answered with an empty result
         # -- so without this check, get('absent-snap', ['']) returned {} instead of raising
         # NotFoundError, because the probe below only runs for keys=None.
-        if problem := _utils.check_comma_list(keys):
-            raise ValueError(f'config key {problem} (keys={keys!r})')
+        _utils.raise_if_not_comma_list_safe(keys, label='config key')
         params = {'keys': ','.join(keys)}
     else:
         params = None
@@ -144,8 +143,7 @@ def unset(snap: str, keys: Iterable[str]) -> None:
     # NOTE: snapd rejects these itself, but only once the configure hook runs, as a ChangeError
     # reporting an 'internal error' for an empty key. We reject them up front, so that an
     # unusable key is the same ValueError here as it is for get().
-    if problem := _utils.check_empty_or_blank(keys):
-        raise ValueError(f'config key {problem} (keys={keys!r})')
+    _utils.raise_if_empty_or_blank(keys, label='config key')
     # NOTE: snap-not-found is returned for a missing snap, but not for system or core,
     # even if the core snap isn't installed -- configuration changes are still applied.
     # NOTE: Unset with no keys is a no-op (like set with an empty dict). We let snapd handle it.
@@ -174,8 +172,7 @@ def set(snap: str, config: dict[str, Any]) -> None:  # noqa: A001 (shadowing a P
     """
     path = f'/v2/snaps/{_utils.snap_path_segment(snap)}/conf'
     # NOTE: as for unset, snapd only rejects these once the configure hook runs.
-    if problem := _utils.check_empty_or_blank(config):
-        raise ValueError(f'config key {problem} (keys={list(config)!r})')
+    _utils.raise_if_empty_or_blank(config, label='config key')
     # NOTE: snap-not-found is returned for a missing snap, but not for system or core,
     # even if the core snap isn't installed -- configuration changes are still applied.
     # NOTE: Set with an empty dict is a no-op. We let snapd handle it.
