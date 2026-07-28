@@ -270,3 +270,63 @@ class TestCheckInstalledOrSystem:
         error = NotFoundError('snap not installed', kind='snap-not-found', value='hello-world')
         mock_client.get.side_effect = error
         assert _utils.check_installed_or_system('hello-world') is error
+
+
+class TestNormalizeChannel:
+    @pytest.mark.parametrize(
+        ('channel', 'expected'),
+        [
+            ('', ''),
+            ('/', ''),
+            ('stable', 'latest/stable'),
+            ('candidate', 'latest/candidate'),
+            ('beta', 'latest/beta'),
+            ('edge', 'latest/edge'),
+            ('mytrack', 'mytrack/stable'),
+            ('latest', 'latest/stable'),
+            ('latest/stable', 'latest/stable'),
+            ('latest/stable/hotfix', 'latest/stable/hotfix'),
+            ('3/stable', '3/stable'),
+            ('3.6/edge', '3.6/edge'),
+            # A leading risk in a two part channel means the second part is a branch, so the
+            # default track is filled in -- 'edge/hotfix' is not the 'hotfix' risk on track 'edge'.
+            ('edge/hotfix', 'latest/edge/hotfix'),
+        ],
+    )
+    def test_normalize(self, channel: str, expected: str):
+        assert _utils.normalize_channel(channel) == expected
+
+
+class TestResolveChannel:
+    @pytest.mark.parametrize(
+        ('channel', 'tracking', 'expected'),
+        [
+            # No requested channel keeps whatever the snap is on.
+            ('', 'latest/stable', 'latest/stable'),
+            ('', '', ''),
+            # Not installed (or installed from a local file): nothing to inherit a track from.
+            ('edge', '', 'latest/edge'),
+            ('3.6', '', '3.6/stable'),
+            # A risk inherits the track the snap is on.
+            ('edge', 'latest/stable', 'latest/edge'),
+            ('edge', '3.6/stable', '3.6/edge'),
+            ('stable', '3.6/edge', '3.6/stable'),
+            ('edge/hotfix', '3.6/stable', '3.6/edge/hotfix'),
+            # A track doesn't inherit the risk: it takes the default risk instead.
+            ('4.0', '3.6/edge', '4.0/stable'),
+            # A fully specified channel is used as given.
+            ('4.0/edge', '3.6/stable', '4.0/edge'),
+            ('latest/edge', '3.6/stable', 'latest/edge'),
+        ],
+    )
+    def test_resolve(self, channel: str, tracking: str, expected: str):
+        assert _utils.resolve_channel(channel, tracking) == expected
+
+    @pytest.mark.parametrize('channel', ['stable', 'candidate', 'beta', 'edge'])
+    def test_resolving_the_tracked_channel_is_a_no_op(self, channel: str):
+        # ensure() relies on this to tell whether a requested channel is the one already
+        # tracked, so resolving a snap's own channel must give that channel back unchanged.
+        for track in ('latest', '3.6'):
+            tracking = f'{track}/{channel}'
+            assert _utils.resolve_channel(channel, tracking) == tracking
+            assert _utils.resolve_channel(tracking, tracking) == tracking

@@ -38,7 +38,8 @@ def _make_snap_not_found():
 _MINIMAL_INFO_DICT: dict[str, Any] = {
     'name': 'hello-world',
     'version': '6.4',
-    'channel': 'latest/stable',
+    'channel': 'stable',
+    'tracking-channel': 'latest/stable',
     'revision': '29',
     'confinement': 'strict',
 }
@@ -49,7 +50,7 @@ class TestInfoFromDict:
         info = _snapd.Info._from_dict(_MINIMAL_INFO_DICT)
         assert info.name == 'hello-world'
         assert info.version == '6.4'
-        assert info.channel == 'latest/stable'
+        assert info.tracking == 'latest/stable'
         assert info.revision == '29'
         assert info.classic is False
         assert info.hold is None
@@ -57,6 +58,23 @@ class TestInfoFromDict:
     def test_local_revision(self):
         info = _snapd.Info._from_dict({**_MINIMAL_INFO_DICT, 'revision': 'x1'})
         assert info.revision == 'x1'
+
+    def test_tracking_is_not_the_revision_source_channel(self):
+        # 'channel' is the channel the installed revision came from, which can differ from the
+        # channel the snap tracks -- installing a revision without a channel tracks
+        # latest/stable but sources the revision from wherever it's available.
+        info = _snapd.Info._from_dict({
+            **_MINIMAL_INFO_DICT,
+            'channel': 'edge',
+            'tracking-channel': 'latest/stable',
+        })
+        assert info.tracking == 'latest/stable'
+
+    def test_tracking_empty_when_field_absent(self):
+        # A snap installed from a local file tracks no channel: snapd omits the field entirely.
+        info_dict = {k: v for k, v in _MINIMAL_INFO_DICT.items() if k != 'tracking-channel'}
+        info = _snapd.Info._from_dict({**info_dict, 'channel': ''})
+        assert info.tracking == ''
 
     @pytest.mark.parametrize('confinement', ['strict', 'devmode'])
     def test_non_classic_confinement(self, confinement: str):
@@ -75,7 +93,6 @@ class TestInfoFromDict:
     def test_extra_fields_ignored(self):
         info_dict: dict[str, Any] = {
             **_MINIMAL_INFO_DICT,
-            'tracking-channel': 'latest/stable',
             'type': 'app',
             'devmode': False,
             'jailmode': False,
@@ -140,10 +157,13 @@ class TestInstall:
         body = mock_client.post.call_args.kwargs['body']
         assert body['revision'] == '5'  # Sent as string per snapd API convention.
 
-    def test_install_both_raises(self, mock_client: MockClient):
-        with pytest.raises(ValueError):
-            _snapd.install('hello-world', channel='edge', revision=5)  # type: ignore[call-overload]
-        mock_client.post.assert_not_called()
+    def test_install_channel_and_revision(self, mock_client: MockClient):
+        # Not mutually exclusive: snapd installs the revision and tracks the channel, and
+        # errors if the revision isn't available on that channel.
+        _snapd.install('hello-world', channel='edge', revision=5)
+        body = mock_client.post.call_args.kwargs['body']
+        assert body['channel'] == 'edge'
+        assert body['revision'] == '5'
 
     def test_install_already_installed_returns_false(self, mock_client: MockClient):
         mock_client.post.side_effect = _AlreadyInstalledError('', kind='', value='')
@@ -187,9 +207,21 @@ class TestRefresh:
         body = mock_client.post.call_args.kwargs['body']
         assert body['revision'] == '42'
 
-    def test_refresh_both_raises(self, mock_client: MockClient):
-        with pytest.raises(ValueError):
-            _snapd.refresh('hello-world', channel='edge', revision=42)  # type: ignore[call-overload]
+    def test_refresh_channel_and_revision(self, mock_client: MockClient):
+        _snapd.refresh('hello-world', channel='edge', revision=42)
+        body = mock_client.post.call_args.kwargs['body']
+        assert body['channel'] == 'edge'
+        assert body['revision'] == '42'
+
+    def test_refresh_classic(self, mock_client: MockClient):
+        _snapd.refresh('hello-world', classic=True)
+        body = mock_client.post.call_args.kwargs['body']
+        assert body['classic'] is True
+
+    def test_refresh_classic_omitted_by_default(self, mock_client: MockClient):
+        _snapd.refresh('hello-world')
+        body = mock_client.post.call_args.kwargs['body']
+        assert 'classic' not in body
 
     def test_refresh_no_updates_returns_false(self, mock_client: MockClient):
         mock_client.post.side_effect = _NoUpdatesAvailableError(
@@ -271,10 +303,9 @@ class TestSnapNameInPath:
         info.assert_not_called()
         mock_client.post.assert_not_called()
 
-    def test_install_validates_name_before_channel_and_revision(self, mock_client: MockClient):
-        # Both arguments are wrong; the snap name is reported first.
+    def test_install_validates_name_before_building_body(self, mock_client: MockClient):
         with pytest.raises(ValueError, match='must not be empty'):
-            _snapd.install('', channel='edge', revision=5)  # type: ignore[call-overload]
+            _snapd.install('', channel='edge', revision=5)
 
     def test_name_is_percent_encoded(self, mock_client: MockClient):
         mock_client.get.return_value = {**_MINIMAL_INFO_DICT, 'name': 'hello world'}

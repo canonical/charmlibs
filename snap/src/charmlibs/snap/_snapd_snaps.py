@@ -37,14 +37,14 @@ class Info:
         self,
         name: str,
         classic: bool,
-        channel: str,
+        tracking: str,
         revision: int | str,
         version: str,
         hold: datetime.datetime | str | None,
     ):
         self._name = name
         self._classic = classic
-        self._channel = _utils.normalize_channel(channel)
+        self._tracking = _utils.normalize_channel(tracking)
         self._revision = str(revision)
         self._version = version
         self._hold = _utils.parse_timestamp(hold) if isinstance(hold, str) else hold
@@ -53,7 +53,12 @@ class Info:
     def _from_dict(cls, info_dict: dict[str, str]) -> Self:
         return cls(
             name=info_dict['name'],
-            channel=info_dict['channel'],
+            # NOTE: 'tracking-channel' is the channel the snap follows, which is what `snap list`
+            # reports and what a refresh without a channel follows. It differs from 'channel',
+            # the channel the installed revision was sourced from: installing a revision without
+            # a channel tracks latest/stable but sources the revision from wherever it lives.
+            # Absent entirely for a snap installed from a local file.
+            tracking=info_dict.get('tracking-channel', ''),
             revision=info_dict['revision'],
             version=info_dict['version'],
             classic=info_dict['confinement'] == 'classic',
@@ -69,8 +74,16 @@ class Info:
         return self._classic
 
     @property
-    def channel(self) -> str:
-        return self._channel
+    def tracking(self) -> str:
+        """The channel the snap tracks, for example ``latest/stable``.
+
+        This is the channel a refresh follows, shown as ``Tracking`` by ``snap list``. It isn't
+        necessarily the channel the installed revision came from: installing a specific revision
+        without a channel tracks ``latest/stable``, whichever channel that revision was found on.
+
+        Empty for a snap installed from a local file, which tracks no channel.
+        """
+        return self._tracking
 
     @property
     def revision(self) -> str:
@@ -108,18 +121,6 @@ def info(snap: str) -> Info:
     return Info._from_dict(info_dict)
 
 
-@typing.overload
-def install(
-    snap: str, *, channel: str, revision: None = None, classic: bool = False
-) -> object: ...
-@typing.overload
-def install(
-    snap: str, *, channel: None = None, revision: int | str, classic: bool = False
-) -> object: ...
-@typing.overload
-def install(
-    snap: str, *, channel: None = None, revision: None = None, classic: bool = False
-) -> object: ...
 def install(
     snap: str,
     *,
@@ -131,10 +132,17 @@ def install(
 
     Args:
         snap: The name of the snap to install.
-        channel: The channel to install from, for example ``latest/edge``. Mutually exclusive
-            with ``revision``. If neither is given, snapd installs from ``latest/stable``.
-        revision: The revision to install, as an int or string. Mutually exclusive with
-            ``channel``.
+        channel: The channel to track, for example ``latest/edge``. If ``revision`` is also
+            given, the revision must be available on this channel. If neither is given, snapd
+            installs from ``latest/stable``.
+        revision: The revision to install, as an int or string. Installing a revision doesn't
+            pin the snap to it -- the next refresh will move the snap to the current revision
+            of the channel it tracks. Use :func:`hold` to prevent automatic refreshes.
+
+            Without ``channel``, snapd finds the revision on whichever channel it's available
+            on, but the snap tracks ``latest/stable`` regardless, so a later refresh may move
+            the snap to a different channel's revision. Pass ``channel`` as well to control
+            which channel the snap tracks.
         classic: If ``True``, install the snap with classic confinement. Required for snaps
             that use classic confinement.
 
@@ -143,24 +151,27 @@ def install(
         Not guaranteed to be an actual :class:`bool`.
 
     Raises:
-        ValueError: if the snap name is empty or is not a single path segment, or if both
-            channel and revision are specified.
+        ValueError: if the snap name is empty or is not a single path segment.
         NotFoundError: if the snap does not exist in the store.
-        RevisionNotAvailableError: if the specified revision is not available.
-        ChannelNotAvailableError: if the specified channel is not available.
+        RevisionNotAvailableError: if the specified revision is not available on any channel.
+        ChannelNotAvailableError: if the specified channel is not available, or if the specified
+            revision is not available on it.
         NeedsClassicError: if the snap requires classic confinement and ``classic`` is not set.
         ChangeError: if the install fails after starting (for example, an install hook errors).
         Error: (or a subtype) if the snap could not be installed for another reason.
     """
     path = f'/v2/snaps/{_utils.snap_path_segment(snap)}'
-    if channel is not None and revision is not None:
-        # NOTE: Revision silently takes precedence over channel in the snapd API.
-        # The CLI instead returns an error if the specified revision doesn't exist on that channel.
-        raise ValueError('Only one of channel or revision may be specified')
+    # NOTE: channel and revision aren't mutually exclusive. Snapd installs the revision and
+    # tracks the channel, erroring if the revision isn't available on that channel. The one
+    # combination snapd does reject is a revision with a cohort key, which this library doesn't
+    # support yet: adding cohort support means adding overloads and a check for it, here and in
+    # refresh, rather than reinstating them for channel and revision.
     data: dict[str, Any] = {'action': 'install'}
     if channel:
         data['channel'] = channel
-    if revision:
+    # Sent whenever it isn't None, so that an invalid revision is reported by snapd rather than
+    # silently dropped. Snap revisions are positive, or 'xN' for a snap installed from a file.
+    if revision is not None:
         data['revision'] = str(revision)
     if classic:
         data['classic'] = True
@@ -200,49 +211,56 @@ def remove(snap: str, *, purge: bool = False) -> object:
     return True
 
 
-@typing.overload
-def refresh(snap: str, channel: str, *, revision: None = None) -> object: ...
-@typing.overload
-def refresh(snap: str, channel: None = None, *, revision: int | str) -> object: ...
-@typing.overload
-def refresh(snap: str, channel: None = None, *, revision: None = None) -> object: ...
 def refresh(
     snap: str,
     channel: str | None = None,
     *,
     revision: int | str | None = None,
+    classic: bool = False,
 ) -> object:
     """Refresh a snap.
 
     Args:
         snap: The name of the snap to refresh.
-        channel: The channel to refresh to, for example ``latest/edge``. Mutually exclusive
-            with ``revision``. If neither is given, the snap is refreshed on its current channel.
-        revision: The revision to refresh to, as an int or string. Mutually exclusive with
-            ``channel``.
+        channel: The channel to track, for example ``latest/edge``. If ``revision`` is also
+            given, the revision must be available on this channel. If neither is given, the
+            snap is refreshed on its current channel.
+
+            A channel that starts with a risk inherits the track the snap is on, so refreshing
+            a snap that tracks ``3.6/stable`` to ``edge`` gives ``3.6/edge``.
+        revision: The revision to refresh to, as an int or string. Refreshing to a revision
+            doesn't pin the snap to it -- the next refresh will move the snap to the current
+            revision of the channel it tracks. Use :func:`hold` to prevent automatic refreshes.
+
+            Without ``channel``, the snap keeps tracking its current channel, even if the
+            revision was found on another one.
+        classic: If ``True``, refresh the snap with classic confinement. Only needed to change
+            the confinement of an already installed snap -- a refresh otherwise keeps the
+            confinement the snap was installed with.
 
     Returns:
         A truthy value if the snap was refreshed, or a falsy value if no updates were available.
-        Not guaranteed to be an actual :class:`bool`.
+        Not guaranteed to be an actual :class:`bool`. Note that snapd always refreshes when a
+        revision is specified, even if that revision is already installed.
 
     Raises:
-        ValueError: if the snap name is empty or is not a single path segment, or if both
-            channel and revision are specified.
-        RevisionNotAvailableError: if the specified revision is not available.
-        ChannelNotAvailableError: if the specified channel is not available.
+        ValueError: if the snap name is empty or is not a single path segment.
+        RevisionNotAvailableError: if the specified revision is not available on any channel.
+        ChannelNotAvailableError: if the specified channel is not available, or if the specified
+            revision is not available on it.
+        NeedsClassicError: if the snap requires classic confinement and ``classic`` is not set.
         ChangeError: if the refresh fails after starting (for example, a refresh hook errors).
         Error: (or a subtype) if the snap could not be refreshed for another reason.
     """
     path = f'/v2/snaps/{_utils.snap_path_segment(snap)}'
-    if channel is not None and revision is not None:
-        # NOTE: Revision silently takes precedence over channel in the snapd API.
-        # The CLI instead returns an error if the specified revision doesn't exist on that channel.
-        raise ValueError('Only one of channel or revision may be specified')
-    data = {'action': 'refresh'}
+    data: dict[str, Any] = {'action': 'refresh'}
     if channel:
         data['channel'] = channel
-    if revision:
+    # Sent whenever it isn't None -- see the note in install().
+    if revision is not None:
         data['revision'] = str(revision)
+    if classic:
+        data['classic'] = True
     # NOTE: Unlike the API, the CLI doesn't error if there are no updates (just prints a msg).
     try:
         _client.post(path, body=data)

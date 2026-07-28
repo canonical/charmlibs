@@ -30,7 +30,6 @@ _CALLS: dict[str, Callable[[str], object]] = {
     'alias (app)': lambda v: snap.alias('lxd', v, 'testlxc'),
     'alias (alias)': lambda v: snap.alias('lxd', 'lxc', v),
     'ensure': lambda v: snap.ensure(v),
-    'ensure_revision': lambda v: snap.ensure_revision(v, 1),
     'get': lambda v: snap.get(v),
     'get (key)': lambda v: snap.get('lxd', [v]),
     'hold': lambda v: snap.hold(v),
@@ -153,12 +152,12 @@ def test_error_is_raised_one_frame_below_the_function_the_caller_called():
 # it returns the encoded name and so has to call the check itself.
 _MAX_FRAMES = 3
 
-# ensure and ensure_revision are compositions of the other public functions rather than calls to
-# an endpoint of their own, and don't check the snap name themselves: whichever function they
-# reach first does it. That leaves the deepest traceback in the library -- ensure, its _get_info
-# probe, info, snap_path_segment and the check -- which is the price of not duplicating the check
-# in a layer that doesn't own it.
-_COMPOSITE_FUNCTIONS = {'ensure', 'ensure_revision'}
+# ensure is a composition of the other public functions rather than a call to an endpoint of its
+# own, and doesn't check the snap name itself: whichever function it reaches first does it. That
+# leaves the deepest traceback in the library -- ensure, its _get_info probe, info,
+# snap_path_segment and the check -- which is the price of not duplicating the check in a layer
+# that doesn't own it.
+_COMPOSITE_FUNCTIONS = {'ensure'}
 
 
 @pytest.mark.parametrize('name', sorted(_CALLS) + sorted(_BLANK_ONLY_CALLS))
