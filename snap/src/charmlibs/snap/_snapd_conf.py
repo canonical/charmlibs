@@ -33,26 +33,27 @@ logger = logging.getLogger(__name__)
 
 # Getting one config value looks like get(s, [k])[k]. In future we could add a get_one(s) helper.
 # Get with keys=None returns the entire config, following the CLI (get_all is unnecessary).
-def get(snap: str, keys: Iterable[str] | None = None) -> dict[str, Any]:
+def get(snap: str, keys: str | Iterable[str] | None = None) -> dict[str, Any]:
     """Get snap configuration.
 
     Args:
         snap: The name of the snap to read configuration from.
-        keys: Configuration keys to read. Nested options may be accessed with dotted notation,
-            for example ``['server.port']``. If ``None``, the full config is returned as a
-            nested dict. If an empty iterable, an empty dict is returned if the snap is installed.
-            Must not be a bare string.
+        keys: Configuration keys to read, as a single key or an iterable of keys. Nested options
+            may be accessed with dotted notation, for example ``'server.port'``. If ``None``, the
+            full config is returned as a nested dict. If an empty iterable, an empty dict is
+            returned if the snap is installed.
 
     Returns:
         A dict mapping each requested key to its configured value. If all keys are requested
         (keys=None), the entire config is returned as a nested dict (empty if the snap has no
         configuration). If no keys are requested (keys=[]), an empty dict is returned if the snap
-        is installed. Each dotted key queried is returned as a top-level entry.
+        is installed. Each dotted key queried is returned as a top-level entry. A single key
+        passed as a bare string is no different from passing it in a list: the result is still a
+        dict, so reading one value looks like ``get(snap, key)[key]``.
 
     Raises:
         ValueError: if the snap name is empty, blank, or is not a single path segment, or if a
             key is empty, blank, or contains a comma or surrounding whitespace.
-        TypeError: if ``keys`` is a string (must be a non-string iterable of strings, or ``None``).
         NotFoundError: if the snap is not installed. Never raised for ``system`` or ``core``,
             whose configuration is served whether or not the core snap is installed.
         OptionNotFoundError: if a requested key has no value stored in the snap's configuration.
@@ -67,24 +68,20 @@ def get(snap: str, keys: Iterable[str] | None = None) -> dict[str, Any]:
         get('foo')  # {'server': {'port': 8080}, 'client': {'timeout': 30}}
         get('foo', keys=None)  # {'server': {'port': 8080}, 'client': {'timeout': 30}}
         # Querying specific keys.
-        get('foo', ['client'])  # {'client': {'timeout': 30}}
+        get('foo', 'client')  # {'client': {'timeout': 30}}
         get('foo', ['client.timeout'])  # {'client.timeout': 30}
         get('foo', ['server', 'server.port'])  # {'server': {'port': 8080}, 'server.port': 8080}
         # Querying no keys.
         get('foo', keys=[])  # {}
-        # Invalid keys argument.
-        get('foo', keys='client')  # TypeError
     """
     path = f'/v2/snaps/{_utils.snap_path_segment(snap)}/conf'
-    if isinstance(keys, str):
-        raise TypeError('keys must be an iterable of strings, or None (not a string)')
+    keys = None if keys is None else _utils.as_list(keys)
     if keys is not None:
-        keys = list(keys)
         if not keys:
             # NOTE: snapd returns the full configuration if no keys are specified.
             # We pass this behaviour through for keys=None, but for keys=[] we return
             # an empty dict, since the caller explicitly requested no keys.
-            if error := _utils.check_installed_or_system(snap):
+            if error := _utils.check_installed(snap, skip_system=True):
                 raise error
             return {}
         # NOTE: snapd strips whitespace and drops empty keys. We make them an error up front so
@@ -99,11 +96,15 @@ def get(snap: str, keys: Iterable[str] | None = None) -> dict[str, Any]:
         # NOTE: snapd reports option-not-found both for a missing key and for a missing snap.
         # The CLI returns 'error: snap "foo" has no "bar" configuration' in both cases.
         # For symmetry with PUT (set/unset), we convert to NotFoundError here for a missing snap.
-        if error := _utils.check_installed_or_system(snap):
+        if error := _utils.check_installed(snap, skip_system=True):
             raise error from None
         raise
     # Empty result when all config was requested: error if the snap isn't installed.
-    if (not config) and (keys is None) and (error := _utils.check_installed_or_system(snap)):
+    if (
+        (not config)
+        and (keys is None)
+        and (error := _utils.check_installed(snap, skip_system=True))
+    ):
         # NOTE: snapd returns {} for an installed snap with no config and for a missing snap.
         # The CLI returns 'error: snap "foo" has no configuration' for a missing snap.
         # For symmetry with PUT (set/unset), we raise NotFoundError here for a missing snap.
@@ -112,30 +113,31 @@ def get(snap: str, keys: Iterable[str] | None = None) -> dict[str, Any]:
     return typing.cast('dict[str, Any]', config)
 
 
-def unset(snap: str, keys: Iterable[str]) -> None:
+def unset(snap: str, keys: str | Iterable[str]) -> None:
     """Unset snap configuration keys.
 
     Unsetting a key that is not currently set is a no-op and does not raise.
 
     Args:
         snap: The name of the snap to unset configuration on.
-        keys: Configuration keys to unset. Nested options may be addressed with dotted
-            notation, for example ``['server.port']``. Must not be a bare string.
-            An empty iterable is still passed to snapd, and may trigger the snap's config hook.
+        keys: Configuration keys to unset, as a single key or an iterable of keys. Nested options
+            may be addressed with dotted notation, for example ``'server.port'``. An empty
+            iterable is still passed to snapd, and may trigger the snap's config hook.
+
+            Unlike :func:`get`, there is no ``None`` meaning "all keys": snapd has no request for
+            it, and building one out of the keys :func:`get` reports would unset keys the caller
+            never named.
 
     Raises:
         ValueError: if the snap name is empty, blank, or is not a single path segment,
             or if a key is empty or blank.
-        TypeError: if ``keys`` is a string (must be a non-string iterable of strings).
         NotFoundError: if the snap is not installed.
         ChangeError: if the snap's configure hook fails. This includes unsetting any
             configuration on a snap that does not define a configure hook. A failed change
             is rolled back: no key from the request is unset.
     """
     path = f'/v2/snaps/{_utils.snap_path_segment(snap)}/conf'
-    if isinstance(keys, str):
-        raise TypeError('keys must be an iterable of strings (not a string)')
-    keys = list(keys)
+    keys = _utils.as_list(keys)
     # NOTE: snapd rejects empty or blank keys. We reject them up front for symmetry with get().
     _utils.raise_if_empty_or_blank(keys, label='config key')
     # NOTE: snap-not-found is returned for a missing snap, but not for system or core,

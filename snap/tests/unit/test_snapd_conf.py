@@ -90,11 +90,36 @@ class TestGet:
         assert isinstance(result, dict)
         assert 'criu' in result
 
-    def test_get_string_keys_raises_typeerror(self, mock_client: MockClient):
-        # A bare string is iterable, so it's rejected explicitly rather than being
-        # silently split into single-character keys.
-        with pytest.raises(TypeError):
-            _snapd_conf.get('lxd', 'integer')
+    def test_get_bare_string_is_one_key(self, mock_client: MockClient):
+        # A bare string is iterable, so it means that one key rather than being silently split
+        # into single-character keys. The result is still a dict, so get(s, k)[k] holds.
+        mock_client.get.return_value = result_of('conf_lxd_single_key.json')
+        result = _snapd_conf.get('lxd', 'integer')
+        mock_client.get.assert_called_once_with('/v2/snaps/lxd/conf', query={'keys': 'integer'})
+        assert result['integer'] == 1
+
+    def test_get_bare_string_is_the_same_as_a_single_element_list(self, mock_client: MockClient):
+        mock_client.get.return_value = result_of('conf_lxd_single_key.json')
+        from_string = _snapd_conf.get('lxd', 'integer')
+        from_list = _snapd_conf.get('lxd', ['integer'])
+        assert from_string == from_list
+        assert [call.kwargs['query'] for call in mock_client.get.call_args_list] == [
+            {'keys': 'integer'},
+            {'keys': 'integer'},
+        ]
+
+    def test_get_bare_string_is_validated(self, mock_client: MockClient):
+        # A single key gets the same checks as one in a list: a comma in it would otherwise
+        # become two keys once joined into the query parameter.
+        with pytest.raises(ValueError, match='must not contain a comma'):
+            _snapd_conf.get('lxd', 'a,b')
+        mock_client.get.assert_not_called()
+
+    def test_get_empty_string_is_not_empty_keys(self, mock_client: MockClient):
+        # The one case the bare-string rule makes ambiguous: '' is one (unusable) key, not an
+        # empty collection of them, so it's a ValueError rather than the keys=[] no-op.
+        with pytest.raises(ValueError, match='must not be empty'):
+            _snapd_conf.get('lxd', '')
         mock_client.get.assert_not_called()
 
 
@@ -241,11 +266,17 @@ class TestUnset:
         body = mock_client.put.call_args.kwargs['body']
         assert body == {'a': None, 'b': None}
 
-    def test_unset_string_keys_raises_typeerror(self, mock_client: MockClient):
-        # A bare string is iterable, so it's rejected explicitly rather than being
-        # silently split into single-character keys.
-        with pytest.raises(TypeError):
-            _snapd_conf.unset('lxd', 'mykey')
+    def test_unset_bare_string_is_one_key(self, mock_client: MockClient):
+        # A bare string is iterable, so it means that one key rather than being silently split
+        # into single-character keys.
+        _snapd_conf.unset('lxd', 'mykey')
+        mock_client.put.assert_called_once_with('/v2/snaps/lxd/conf', body={'mykey': None})
+
+    def test_unset_empty_string_key_raises(self, mock_client: MockClient):
+        # The one case the bare-string rule makes ambiguous: '' is one (unusable) key, not an
+        # empty collection of them.
+        with pytest.raises(ValueError, match='must not be empty'):
+            _snapd_conf.unset('lxd', '')
         mock_client.put.assert_not_called()
 
     def test_unset_empty_keys_is_noop(self, mock_client: MockClient):
@@ -339,8 +370,8 @@ class TestSnapNameInPath:
     def test_get_empty_name_raises_value_error_for_any_keys(
         self, mock_client: MockClient, keys: Any
     ):
-        # Including keys=[] (the installed-snap probe) and a string (a TypeError otherwise),
-        # so that every path through get() reports the empty name the same way.
+        # Including keys=[] (the installed-snap probe) and a bare string, so that every path
+        # through get() reports the empty name the same way.
         with pytest.raises(ValueError, match='must not be empty'):
             _snapd_conf.get('', keys)
         mock_client.get.assert_not_called()
@@ -361,9 +392,13 @@ class TestSnapNameInPath:
             _snapd_conf.unset(snap, ['mykey'])
         mock_client.put.assert_not_called()
 
-    def test_unset_validates_name_before_keys(self, mock_client: MockClient):
+    @pytest.mark.parametrize('keys', [[], ['mykey'], 'mykey'])
+    def test_unset_empty_name_raises_value_error_for_any_keys(
+        self, mock_client: MockClient, keys: Any
+    ):
         with pytest.raises(ValueError, match='must not be empty'):
-            _snapd_conf.unset('', 'mykey')  # A string 'keys' would otherwise be a TypeError.
+            _snapd_conf.unset('', keys)
+        mock_client.put.assert_not_called()
 
     def test_name_is_percent_encoded(self, mock_client: MockClient):
         _snapd_conf.set('hello world', {'mykey': 'myval'})

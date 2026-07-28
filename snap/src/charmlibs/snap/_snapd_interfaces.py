@@ -182,6 +182,6 @@ def _first_not_installed(plug_snap: str, slot_snap: str) -> _errors.NotFoundErro
     serves them without the core snap being installed. Empty (auto-resolved) sides are skipped.
     """
     for snap in (plug_snap, slot_snap):
-        if snap and (error := _utils.check_installed_or_system(snap)):
+        if snap and (error := _utils.check_installed(snap, skip_system=True)):
             return error
     return None

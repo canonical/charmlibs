@@ -13,7 +13,7 @@ from charmlibs.snap import _utils
 from charmlibs.snap._errors import NotFoundError
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Iterable
 
     from conftest import MockClient
 
@@ -41,6 +41,10 @@ class TestPredicates:
             (_utils._comma, 'a', None),
             (_utils._padding, ' a', "must not have leading or trailing whitespace: ' a'"),
             (_utils._padding, 'a b', None),
+            (_utils._path_segment, 'a/b', "must be a single path segment: 'a/b'"),
+            (_utils._path_segment, '.', "must be a single path segment: '.'"),
+            (_utils._path_segment, '..', "must be a single path segment: '..'"),
+            (_utils._path_segment, 'a.b', None),  # Only '.' and '..' are non-canonical.
         ],
     )
     def test_predicate(
@@ -251,25 +255,60 @@ class TestSnapPathSegment:
         assert _utils.snap_path_segment(snap) == expected
 
 
-class TestCheckInstalledOrSystem:
+class TestAsList:
+    # A bare string is one value, not an iterable of its characters. Every function taking a
+    # 'one value or several' argument normalises it through here, so the rule is stated once.
+    @pytest.mark.parametrize(
+        ('values', 'expected'),
+        [
+            ('abc', ['abc']),
+            ('', ['']),  # Emptiness is the checks' business, not this function's.
+            ([], []),
+            (['a', 'b'], ['a', 'b']),
+            (('a', 'b'), ['a', 'b']),
+            ({'a': 1, 'b': 2}, ['a', 'b']),  # A mapping iterates its keys.
+        ],
+    )
+    def test_as_list(self, values: str | Iterable[str], expected: list[str]):
+        assert _utils.as_list(values) == expected
+
+    def test_generator_is_materialised(self):
+        # The values are iterated more than once -- to validate them and then to send them -- so
+        # a generator must be consumed here rather than passed on.
+        generator = (c for c in ('a', 'b'))
+        assert _utils.as_list(generator) == ['a', 'b']
+        assert list(generator) == []
+
+
+class TestCheckInstalled:
     def test_empty_raises_value_error_without_request(self, mock_client: MockClient):
         with pytest.raises(ValueError, match='must not be empty'):
-            _utils.check_installed_or_system('')
+            _utils.check_installed('')
         mock_client.get.assert_not_called()
 
     @pytest.mark.parametrize('snap', ['system', 'core'])
-    def test_system_names_are_not_probed(self, snap: str, mock_client: MockClient):
-        assert _utils.check_installed_or_system(snap) is None
+    def test_system_names_are_not_probed_when_skipped(self, snap: str, mock_client: MockClient):
+        assert _utils.check_installed(snap, skip_system=True) is None
         mock_client.get.assert_not_called()
 
+    @pytest.mark.parametrize('snap', ['system', 'core'])
+    def test_system_names_are_probed_by_default(self, snap: str, mock_client: MockClient):
+        # skip_system is for endpoints snapd serves under these names whether or not the core
+        # snap is installed. Elsewhere -- /v2/apps -- they get no special treatment, so an
+        # absent 'core' (and 'system', which is never a snap) is reported as not installed.
+        error = NotFoundError('snap not installed', kind='snap-not-found', value=snap)
+        mock_client.get.side_effect = error
+        assert _utils.check_installed(snap) is error
+        mock_client.get.assert_called_once_with(f'/v2/snaps/{snap}')
+
     def test_installed_snap_is_probed(self, mock_client: MockClient):
-        assert _utils.check_installed_or_system('hello world') is None
+        assert _utils.check_installed('hello world') is None
         mock_client.get.assert_called_once_with('/v2/snaps/hello%20world')
 
     def test_absent_snap_returns_not_found(self, mock_client: MockClient):
         error = NotFoundError('snap not installed', kind='snap-not-found', value='hello-world')
         mock_client.get.side_effect = error
-        assert _utils.check_installed_or_system('hello-world') is error
+        assert _utils.check_installed('hello-world') is error
 
 
 class TestNormalizeChannel:

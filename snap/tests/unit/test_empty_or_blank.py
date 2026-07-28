@@ -149,7 +149,10 @@ def test_error_is_raised_one_frame_below_the_function_the_caller_called():
 
 
 # The functions that validate through snap_path_segment reach the check one frame deeper, since
-# it returns the encoded name and so has to call the check itself.
+# it returns the encoded name and so has to call the check itself. The /v2/apps functions are the
+# same depth for a different reason: start, stop and restart share one implementation, and it
+# calls the check. Neither is deeper than that, which is why raise_if_not_path_segment chains the
+# empty and blank predicates itself rather than calling raise_if_empty_or_blank.
 _MAX_FRAMES = 3
 
 # ensure is a composition of the other public functions rather than a call to an endpoint of its

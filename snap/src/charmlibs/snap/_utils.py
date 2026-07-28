@@ -24,48 +24,45 @@ import urllib.parse
 from . import _client, _errors
 
 if typing.TYPE_CHECKING:
-    from collections.abc import Collection
+    from collections.abc import Collection, Iterable
 
 
 def snap_path_segment(snap: str) -> str:
     """Validate a snap name and encode it for use as a single URL path segment.
 
-    Raises ValueError if the name is empty or would not be a single, canonical path segment.
-    Percent-encoding alone is not enough to guarantee that:
+    Raises ValueError if the name is empty or would not be a single, canonical path segment
+    (see :func:`raise_if_not_path_segment`).
 
-    - snapd's router (gorilla/mux) matches on the *decoded* path, so ``%2F`` is still a path
-      separator to it: without this check ``info('hello-world/conf')`` would reach
-      ``/v2/snaps/hello-world/conf`` and return that snap's configuration.
-    - ``urllib.parse.quote`` leaves ``.`` unencoded, so a ``.`` or ``..`` name would still make
-      the path non-canonical, which mux answers with a ``301`` to the cleaned path.
-
-    Encoding is still applied, so that characters such as ``?`` and ``#`` in a name are sent as
+    Encoding is applied, so that characters such as ``?`` and ``#`` in a name are sent as
     part of the path instead of starting a query string or fragment.
     """
-    raise_if_empty_or_blank(snap, label='snap name')
-    if '/' in snap or snap in ('.', '..'):
-        raise ValueError(f'snap name must be a single path segment, not {snap!r}')
+    raise_if_not_path_segment(snap)
     return urllib.parse.quote(snap, safe='')
 
 
-def check_installed_or_system(snap: str) -> _errors.NotFoundError | None:
-    """Return NotFoundError if the snap is not installed or a system/core alias.
+def check_installed(snap: str, *, skip_system: bool = False) -> _errors.NotFoundError | None:
+    """Return snapd's own NotFoundError if the snap is not installed, otherwise ``None``.
 
-    Returns ``None`` when the snap is installed, and for the ``system``/``core`` aliases, which
-    snapd handles config and interfaces for whether or not the core snap is installed as a snap.
-    Check if this system handling is appropriate if using this function with other snapd endpoints.
-    Otherwise probes ``GET /v2/snaps/{snap}`` and returns snapd's own :class:`NotFoundError` when
+    Probes ``GET /v2/snaps/{snap}`` and returns the :class:`NotFoundError` snapd answers with when
     it reports the snap absent, ready for the caller to ``raise``.
 
+    Args:
+        snap: The name of the snap to check.
+        skip_system: If ``True``, treat ``system`` and ``core`` as installed without probing.
+            Pass this for endpoints snapd serves under those names whether or not the core snap
+            is installed: the conf endpoints treat ``system`` as an alias for ``core``, and
+            interface requests remap ``system``/``core`` to the snapd snap. Leave it ``False``
+            for endpoints where ``core`` is an ordinary snap and ``system`` names nothing at all,
+            such as ``/v2/apps``.
+
     Raises ValueError for a name that can't be used as a path segment (see
-    :func:`snap_path_segment`). Callers that reach this from an exception handler must skip
-    empty names, so that a ValueError can't mask the error they're classifying.
+    :func:`snap_path_segment`). Callers that reach this from an exception handler must have
+    validated the name already, so that a ValueError can't mask the error they're classifying.
     """
-    # NOTE: snapd's conf endpoints treat 'system' as an alias for 'core', and interface requests
-    # remap 'system'/'core' to the snapd snap, so both names are served without the core snap.
-    # /v2/snaps/system always 404s (a hardcoded alias, not a real snap) and /v2/snaps/core 404s
-    # when the core snap is absent, so probing either would report a working call as not installed.
-    if snap in ('system', 'core'):
+    # NOTE: /v2/snaps/system always 404s (a hardcoded alias, not a real snap) and /v2/snaps/core
+    # 404s when the core snap is absent, so probing either would report a working call -- on an
+    # endpoint that serves these names specially -- as not installed.
+    if skip_system and snap in ('system', 'core'):
         return None
     path = f'/v2/snaps/{snap_path_segment(snap)}'
     try:
@@ -153,14 +150,55 @@ def parse_timestamp(timestamp: str) -> datetime.datetime:
     return base + microseconds
 
 
+########################################################
+# Normalising arguments that take one value or several #
+########################################################
+
+
+def as_list(values: str | Iterable[str]) -> list[str]:
+    """Normalise an argument that accepts one value or several to a list.
+
+    A bare string is one value, not an iterable of its characters: ``'abc'`` means ``['abc']``.
+    Every other iterable is materialised, so that the caller can iterate it more than once --
+    to validate the values and then send them.
+
+    Callers whose argument also accepts ``None`` (meaning "all") handle that case themselves,
+    so that ``None`` is never confused with an empty iterable (meaning "none").
+    """
+    return [values] if isinstance(values, str) else list(values)
+
+
 #############################################################
 # Rejecting values snapd can't use, before making a request #
 #############################################################
 
 
+def raise_if_not_path_segment(snap: str) -> None:
+    """Raise ValueError if a snap name would not be a single, canonical URL path segment.
+
+    Percent-encoding alone is not enough to guarantee that:
+
+    - snapd's router (gorilla/mux) matches on the *decoded* path, so ``%2F`` is still a path
+      separator to it: without this check ``info('hello-world/conf')`` would reach
+      ``/v2/snaps/hello-world/conf`` and return that snap's configuration.
+    - ``urllib.parse.quote`` leaves ``.`` unencoded, so a ``.`` or ``..`` name would still make
+      the path non-canonical, which mux answers with a ``301`` to the cleaned path.
+
+    Functions that send the snap name in a request body rather than the path check it too: a name
+    that isn't a path segment can't be a snap, and :func:`check_installed` builds a path from it.
+
+    The empty and blank checks are chained here rather than delegated to
+    :func:`raise_if_empty_or_blank`, so that the error is raised no deeper in the traceback than
+    any other check (see tests/unit/test_empty_or_blank.py).
+    """
+    problem = _empty(snap) or _blank(snap) or _path_segment(snap)
+    if problem:
+        raise ValueError(_message('snap name', problem, [snap]))
+
+
 def raise_if_empty_or_blank(values: str | Collection[str], *, label: str) -> None:
     """Raise ValueError if a value is empty or contains only whitespace."""
-    values = _list(values)
+    values = as_list(values)
     for value in values:
         problem = _empty(value) or _blank(value)
         if problem:
@@ -169,7 +207,7 @@ def raise_if_empty_or_blank(values: str | Collection[str], *, label: str) -> Non
 
 def raise_if_blank(values: str | Collection[str], *, label: str) -> None:
     """Raise ValueError if a value is non-empty but contains only whitespace."""
-    values = _list(values)
+    values = as_list(values)
     for value in values:
         problem = _blank(value)
         if problem:
@@ -185,15 +223,11 @@ def raise_if_not_comma_list_safe(values: str | Collection[str], *, label: str) -
     Snapd drops empty or blank values entirely (confusing when no values means "all"), and
     silently strips leading and trailing whitespace (breaking ``get(s, [k])[k]``).
     """
-    values = _list(values)
+    values = as_list(values)
     for value in values:
         problem = _empty(value) or _blank(value) or _comma(value) or _padding(value)
         if problem:
             raise ValueError(_message(label, problem, values))
-
-
-def _list(values: str | Collection[str]) -> list[str]:
-    return [values] if isinstance(values, str) else list(values)
 
 
 def _empty(value: str) -> str | None:
@@ -205,6 +239,12 @@ def _empty(value: str) -> str | None:
 def _blank(value: str) -> str | None:
     if value and not value.strip():
         return f'must not be blank: {value!r}'
+    return None
+
+
+def _path_segment(value: str) -> str | None:
+    if '/' in value or value in ('.', '..'):
+        return f'must be a single path segment: {value!r}'
     return None
 
 
