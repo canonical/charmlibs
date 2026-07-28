@@ -92,14 +92,14 @@ def logs(*snaps: str, limit: int | None = 10) -> list[LogEntry]:
         snapd are skipped (and logged as warnings) rather than raising.
 
     Raises:
-        ValueError: If any snap name is empty, blank, or contains a comma or surrounding
-            whitespace, or if ``limit`` is not ``None`` and is not a positive integer.
+        ValueError: If any snap name is empty, blank, has leading or trailing whitespace, or
+            contains a comma; or if ``limit`` is not ``None`` and is not a positive integer.
         NotFoundError: If a specified snap is not installed.
         AppNotFoundError: If a specified snap has no services.
     """
-    # NOTE: the names are joined into one comma-separated parameter, so a name that snapd's
-    # parser alters isn't the query the caller asked for: logs('') and logs(' ') would query
-    # every snap's logs, and logs('a,b') two snaps.
+    # NOTE: Snap names are joined into a single comma-separated query parameter.
+    # We reject unsafe names (containing a comma), and names that snapd would drop
+    # (empty or blank) or alter (leading/trailing whitespace).
     _utils.raise_if_not_comma_list_safe(snaps, label='snap name')
     if limit is None:
         # snapd treats n=-1 as "no limit": return all available log entries.

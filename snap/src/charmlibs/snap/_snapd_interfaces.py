@@ -42,8 +42,7 @@ def connect(plug: tuple[str, str], slot: tuple[str, str] | str | None = None) ->
             - ``None`` (the default), shorthand for ``('', '')``.
 
     Raises:
-        ValueError: if any part of ``plug`` or ``slot`` is blank. An empty part is meaningful
-            here, and is passed to snapd.
+        ValueError: if any part of ``plug`` or ``slot`` is blank (whitespace only).
         NotFoundError: if the plug snap or slot snap is not installed.
             Never raised for the system snap.
         APIError: if the plug is not fully specified (empty snap or plug name), if the named plug
@@ -63,7 +62,7 @@ def connect(plug: tuple[str, str], slot: tuple[str, str] | str | None = None) ->
     # NOTE: plug snap and plug name are required, we let snapd validate this.
     plug_snap, plug_name = _snap_and_name(plug)
     slot_snap, slot_name = _snap_and_name(slot)
-    # NOTE: an empty part is meaningful to snapd, so only blank parts are rejected here.
+    # NOTE: snapd treats empty parts as meaningful (auto-resolved), so we only reject blank here.
     _utils.raise_if_blank(plug_snap, label='plug snap name')
     _utils.raise_if_blank(plug_name, label='plug name')
     _utils.raise_if_blank(slot_snap, label='slot snap name')
@@ -117,8 +116,7 @@ def disconnect(
             so the interface reverts to snapd's default auto-connection policy on the next refresh.
 
     Raises:
-        ValueError: if any part of ``plug`` or ``slot`` is blank. An empty part is meaningful
-            here, and is passed to snapd.
+        ValueError: if any part of ``plug`` or ``slot`` is blank (whitespace only).
         NotFoundError: if the plug snap or slot snap is not installed.
             Never raised for the system snap.
         APIError: if neither ``plug`` nor ``slot`` names anything to disconnect, if the named plug
@@ -138,7 +136,7 @@ def disconnect(
     # We let snapd validate this.
     plug_snap, plug_name = _snap_and_name(plug)
     slot_snap, slot_name = _snap_and_name(slot)
-    # NOTE: an empty part is meaningful to snapd, so only blank parts are rejected here.
+    # NOTE: snapd treats empty parts as meaningful (auto-resolved), so we only reject blank here.
     _utils.raise_if_blank(plug_snap, label='plug snap name')
     _utils.raise_if_blank(plug_name, label='plug name')
     _utils.raise_if_blank(slot_snap, label='slot snap name')
@@ -165,11 +163,7 @@ def disconnect(
 
 
 def _snap_and_name(spec: tuple[str, str] | str | None) -> tuple[str, str]:
-    """Normalise one side of a connection to a ``(snap, name)`` pair of strings.
-
-    Either part may come back empty, which is meaningful to snapd: it selects the system snap, or
-    asks snapd to resolve that side of the connection. Callers reject blank parts themselves.
-    """
+    """Normalise a plug or slot spec to a ``(snap, name)`` pair of strings."""
     if spec is None:
         return '', ''
     if isinstance(spec, str):
