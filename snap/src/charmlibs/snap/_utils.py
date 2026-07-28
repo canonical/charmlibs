@@ -18,9 +18,13 @@ from __future__ import annotations
 
 import datetime
 import sys
+import typing
 import urllib.parse
 
 from . import _client, _errors
+
+if typing.TYPE_CHECKING:
+    from collections.abc import Collection
 
 
 def snap_path_segment(snap: str) -> str:
@@ -38,21 +42,10 @@ def snap_path_segment(snap: str) -> str:
     Encoding is still applied, so that characters such as ``?`` and ``#`` in a name are sent as
     part of the path instead of starting a query string or fragment.
     """
-    raise_if_snap_name_empty(snap)
+    raise_if_empty_or_blank(snap, label='snap name')
     if '/' in snap or snap in ('.', '..'):
         raise ValueError(f'snap name must be a single path segment, not {snap!r}')
     return urllib.parse.quote(snap, safe='')
-
-
-def raise_if_snap_name_empty(snap: str) -> None:
-    """Raise ValueError if the snap name is empty.
-
-    An empty snap name is a caller programming error, so we reject it before making a request
-    rather than passing it to snapd, whose response depends on the endpoint (anything from a
-    typed ``snap "" not found`` to a redirect with an empty body).
-    """
-    if not snap:
-        raise ValueError('snap name must not be empty')
 
 
 def check_installed_or_system(snap: str) -> _errors.NotFoundError | None:
@@ -158,3 +151,76 @@ def parse_timestamp(timestamp: str) -> datetime.datetime:
     # with zeros). E.g. '.13454' is 134540 μs, not 13454 μs. This matches fromisoformat in 3.11+.
     microseconds = datetime.timedelta(microseconds=int(ms[:6].ljust(6, '0')))
     return base + microseconds
+
+
+#############################################################
+# Rejecting values snapd can't use, before making a request #
+#############################################################
+
+
+def raise_if_empty_or_blank(values: str | Collection[str], *, label: str) -> None:
+    """Raise ValueError if a value is empty or contains only whitespace."""
+    values = _list(values)
+    for value in values:
+        problem = _empty(value) or _blank(value)
+        if problem:
+            raise ValueError(_message(label, problem, values))
+
+
+def raise_if_blank(values: str | Collection[str], *, label: str) -> None:
+    """Raise ValueError if a value is non-empty but contains only whitespace."""
+    values = _list(values)
+    for value in values:
+        problem = _blank(value)
+        if problem:
+            raise ValueError(_message(label, problem, values))
+
+
+def raise_if_not_comma_list_safe(values: str | Collection[str], *, label: str) -> None:
+    """Raise ValueError if a value would not survive snapd's comma-separated list parsing.
+
+    These values are joined by commas into one query parameter, making a value with a comma
+    indistinguishable from multiple values after our ``','.join``.
+
+    Snapd drops empty or blank values entirely (confusing when no values means "all"), and
+    silently strips leading and trailing whitespace (breaking ``get(s, [k])[k]``).
+    """
+    values = _list(values)
+    for value in values:
+        problem = _empty(value) or _blank(value) or _comma(value) or _padding(value)
+        if problem:
+            raise ValueError(_message(label, problem, values))
+
+
+def _list(values: str | Collection[str]) -> list[str]:
+    return [values] if isinstance(values, str) else list(values)
+
+
+def _empty(value: str) -> str | None:
+    if not value:
+        return 'must not be empty'
+    return None
+
+
+def _blank(value: str) -> str | None:
+    if value and not value.strip():
+        return f'must not be blank: {value!r}'
+    return None
+
+
+def _comma(value: str) -> str | None:
+    if ',' in value:
+        return f'must not contain a comma: {value!r}'
+    return None
+
+
+def _padding(value: str) -> str | None:
+    if value != value.strip():
+        return f'must not have leading or trailing whitespace: {value!r}'
+    return None
+
+
+def _message(label: str, problem: str, values: list[str]) -> str:
+    if len(values) > 1:
+        return f'{label} {problem} (in {values!r})'
+    return f'{label} {problem}'

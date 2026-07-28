@@ -141,8 +141,7 @@
 /interfaces/kubeflow_dashboard_links/ruff.toml @canonical/mlops
 
 # /interfaces/ldap/
-/interfaces/ldap/interface/ @canonical/identity
-/interfaces/ldap/ruff.toml @canonical/identity
+/interfaces/ldap/ @canonical/identity
 
 # /interfaces/litmus_auth/
 /interfaces/litmus_auth/interface/ @canonical/tracing-and-profiling

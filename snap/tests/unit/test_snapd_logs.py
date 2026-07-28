@@ -159,21 +159,37 @@ class TestParseTimestamp:
         assert ts.hour == 16
 
 
-class TestEmptySnapName:
-    def test_empty_name_raises_value_error_without_request(self, mock_client: MockClient):
-        # An empty name is a caller error, and snapd wouldn't report it as one: it drops empty
-        # entries from 'names', so names='' silently widens the query to system-wide logs
-        # instead of failing (pinned by the functional tests). We reject it before the request.
-        with pytest.raises(ValueError, match='must not be empty'):
-            _snapd_logs.logs('')
+class TestUnsafeSnapName:
+    # The names are sent as one comma-separated query parameter, and snapd's parsing of it drops
+    # blank entries, splits on commas, and strips whitespace -- so a name it alters is silently
+    # not the query the caller asked for, rather than an error (pinned by the functional tests).
+    # We reject anything that parsing would alter before making the request.
+    @pytest.mark.parametrize(
+        ('name', 'match'),
+        [
+            ('', 'must not be empty'),
+            (' ', 'must not be blank'),
+            ('\t', 'must not be blank'),
+            (',', 'must not contain a comma'),
+            ('lxd,vlc', 'must not contain a comma'),
+            (' lxd', 'must not have leading or trailing whitespace'),
+            ('lxd\n', 'must not have leading or trailing whitespace'),
+        ],
+    )
+    def test_unsafe_name_raises_value_error_without_request(
+        self, mock_client: MockClient, name: str, match: str
+    ):
+        with pytest.raises(ValueError, match=match):
+            _snapd_logs.logs(name)
         mock_client.get_logs.assert_not_called()
 
-    def test_empty_name_among_valid_names_raises(self, mock_client: MockClient):
-        with pytest.raises(ValueError, match='must not be empty'):
-            _snapd_logs.logs('lxd', '')
+    @pytest.mark.parametrize('name', ['', ' ', 'lxd,vlc', ' lxd'])
+    def test_unsafe_name_among_valid_names_raises(self, mock_client: MockClient, name: str):
+        with pytest.raises(ValueError):
+            _snapd_logs.logs('lxd', name)
         mock_client.get_logs.assert_not_called()
 
-    def test_empty_name_validated_before_limit(self, mock_client: MockClient):
+    def test_name_validated_before_limit(self, mock_client: MockClient):
         with pytest.raises(ValueError, match='must not be empty'):
             _snapd_logs.logs('', limit=0)
         mock_client.get_logs.assert_not_called()

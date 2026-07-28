@@ -87,3 +87,30 @@ class TestEmptySnapName:
         with pytest.raises(ValueError, match='must not be empty'):
             func('', 'daemon')
         mock_client.post.assert_not_called()
+
+
+class TestEmptyOrBlankServiceName:
+    # An empty or blank service name builds a name like 'lxd.', which snapd reports as a service
+    # that doesn't exist -- loudly, but only after a round trip, and it aborts the whole request,
+    # so a valid service named alongside it isn't acted on either.
+    @pytest.mark.parametrize('func', _FUNCTIONS, ids=lambda f: f.__name__)
+    @pytest.mark.parametrize(('value', 'match'), [('', 'empty'), (' ', 'blank'), ('\t', 'blank')])
+    def test_raises_value_error_without_request(
+        self, mock_client: MockClient, func: Any, value: str, match: str
+    ):
+        with pytest.raises(ValueError, match=f'service name must not be {match}'):
+            func('lxd', value)
+        mock_client.post.assert_not_called()
+
+    @pytest.mark.parametrize('func', _FUNCTIONS, ids=lambda f: f.__name__)
+    def test_raises_among_valid_service_names(self, mock_client: MockClient, func: Any):
+        with pytest.raises(ValueError, match='service name must not be empty'):
+            func('lxd', 'daemon', '')
+        mock_client.post.assert_not_called()
+
+    @pytest.mark.parametrize('func', _FUNCTIONS, ids=lambda f: f.__name__)
+    def test_other_unusable_names_are_left_to_snapd(self, mock_client: MockClient, func: Any):
+        # The names go in a JSON body, so snapd sees them exactly as passed: a padded or
+        # comma-containing name is reported as the service it is, not silently altered.
+        func('lxd', ' daemon ')
+        assert mock_client.post.call_args.kwargs['body']['names'] == ['lxd. daemon ']

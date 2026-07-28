@@ -42,6 +42,7 @@ def connect(plug: tuple[str, str], slot: tuple[str, str] | str | None = None) ->
             - ``None`` (the default), shorthand for ``('', '')``.
 
     Raises:
+        ValueError: if any part of ``plug`` or ``slot`` is blank (whitespace only).
         NotFoundError: if the plug snap or slot snap is not installed.
             Never raised for the system snap.
         APIError: if the plug is not fully specified (empty snap or plug name), if the named plug
@@ -61,6 +62,11 @@ def connect(plug: tuple[str, str], slot: tuple[str, str] | str | None = None) ->
     # NOTE: plug snap and plug name are required, we let snapd validate this.
     plug_snap, plug_name = _snap_and_name(plug)
     slot_snap, slot_name = _snap_and_name(slot)
+    # NOTE: snapd treats empty parts as meaningful (auto-resolved), so we only reject blank here.
+    _utils.raise_if_blank(plug_snap, label='plug snap name')
+    _utils.raise_if_blank(plug_name, label='plug name')
+    _utils.raise_if_blank(slot_snap, label='slot snap name')
+    _utils.raise_if_blank(slot_name, label='slot name')
     data = {
         'action': 'connect',
         'plugs': [{'snap': plug_snap, 'plug': plug_name}],
@@ -110,6 +116,7 @@ def disconnect(
             so the interface reverts to snapd's default auto-connection policy on the next refresh.
 
     Raises:
+        ValueError: if any part of ``plug`` or ``slot`` is blank (whitespace only).
         NotFoundError: if the plug snap or slot snap is not installed.
             Never raised for the system snap.
         APIError: if neither ``plug`` nor ``slot`` names anything to disconnect, if the named plug
@@ -129,6 +136,11 @@ def disconnect(
     # We let snapd validate this.
     plug_snap, plug_name = _snap_and_name(plug)
     slot_snap, slot_name = _snap_and_name(slot)
+    # NOTE: snapd treats empty parts as meaningful (auto-resolved), so we only reject blank here.
+    _utils.raise_if_blank(plug_snap, label='plug snap name')
+    _utils.raise_if_blank(plug_name, label='plug name')
+    _utils.raise_if_blank(slot_snap, label='slot snap name')
+    _utils.raise_if_blank(slot_name, label='slot name')
     data: dict[str, Any] = {
         'action': 'disconnect',
         'plugs': [{'snap': plug_snap, 'plug': plug_name}],

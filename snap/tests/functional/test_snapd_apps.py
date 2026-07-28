@@ -264,3 +264,47 @@ def test_restart_snap_with_no_services_raises():
     with pytest.raises(_errors.AppNotFoundError) as ctx:
         _snapd_apps.restart('hello-world')
     assert ctx.value.kind == 'app-not-found'
+
+
+# ---------------------------------------------------------------------------
+# empty and blank service names
+#
+# The names go in a JSON body, so snapd sees a service name exactly as passed and reports it as
+# a service that doesn't exist -- loudly, but only after a round trip, and it aborts the whole
+# request, so a valid service named alongside it isn't acted on either. start, stop and restart
+# reject empty and blank names up front instead. These go through _client to pin snapd's side.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize('service', ['', ' ', '\t'])
+@pytest.mark.parametrize(
+    'func',
+    [_snapd_apps.start, _snapd_apps.stop, _snapd_apps.restart],
+    ids=['start', 'stop', 'restart'],
+)
+def test_empty_and_blank_service_names_raise_value_error(func: Any, service: str):
+    ensure_installed(_SNAP, classic=True)
+    with pytest.raises(ValueError, match='service name must not be'):
+        func(_SNAP, service)
+
+
+@pytest.mark.parametrize('service', ['', ' ', ' daemon '])
+def test_raw_api_unusable_service_name_is_not_found(service: str):
+    # snapd names the service verbatim, without stripping it, so a padded name is not resolved
+    # to the service it looks like -- it is simply a service that doesn't exist.
+    ensure_installed(_SNAP, classic=True)
+    with pytest.raises(_errors.AppNotFoundError) as ctx:
+        _client.post('/v2/apps', body={'action': 'restart', 'names': [f'{_SNAP}.{service}']})
+    assert ctx.value.kind == 'app-not-found'
+    assert f'has no service "{service}"' in ctx.value.message
+
+
+def test_raw_api_unusable_service_name_aborts_the_whole_request():
+    # A valid service named alongside an unusable one is not restarted: the request is rejected
+    # as a whole, which is why rejecting the name client-side loses nothing.
+    ensure_installed(_SNAP, classic=True)
+    with pytest.raises(_errors.AppNotFoundError):
+        _client.post(
+            '/v2/apps',
+            body={'action': 'restart', 'names': [f'{_SNAP}.', f'{_SNAP}.{_SERVICE}']},
+        )

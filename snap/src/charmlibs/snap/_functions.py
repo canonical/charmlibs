@@ -66,7 +66,7 @@ def ensure(
         Not guaranteed to be an actual :class:`bool`.
 
     Raises:
-        ValueError: if the snap name is empty or is not a single path segment.
+        ValueError: if the snap name is empty, blank, or is not a single path segment.
         NotFoundError: If the snap does not exist in the store.
         RevisionNotAvailableError: If the revision is not available on any channel.
         NeedsClassicError: If the snap requires ``classic=True``.

@@ -175,6 +175,70 @@ def test_alias_not_installed_snap_raises():
 
 
 # ---------------------------------------------------------------------------
+# empty and blank fields
+#
+# The three fields go in a JSON body, so snapd sees each exactly as passed and reports an
+# unusable one itself, naming it verbatim. alias() and unalias() still reject empty and blank
+# values up front, for the same reason as the rest of the library: they are caller errors, and
+# the app name is only reported once the change runs. These go through _client to pin what
+# snapd would have said.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize('value', ['', ' ', '\t'])
+def test_alias_rejects_empty_and_blank_fields(value: str):
+    ensure_installed(_SNAP)
+    for args in ((value, _APP, _ALIAS), (_SNAP, value, _ALIAS), (_SNAP, _APP, value)):
+        with pytest.raises(ValueError):
+            _snapd_aliases.alias(*args)
+    with pytest.raises(ValueError):
+        _snapd_aliases.unalias(value)
+
+
+@pytest.mark.parametrize('snap_name', ['', ' '])
+def test_raw_alias_empty_or_blank_snap_is_not_installed(snap_name: str):
+    # Neither is read as a snap that could exist, so both are reported the same way.
+    with pytest.raises(_errors.NotInstalledError) as ctx:
+        _client.post(
+            '/v2/aliases',
+            body={'action': 'alias', 'snap': snap_name, 'app': _APP, 'alias': _ALIAS},
+        )
+    assert ctx.value.kind == 'snap-not-installed'
+    assert ctx.value.value == snap_name
+
+
+@pytest.mark.parametrize('app', ['', ' '])
+def test_raw_alias_empty_or_blank_app_fails_the_change(app: str):
+    # The app name is not validated up front by snapd: the change is created and only fails once
+    # the alias is set up, which is a round trip and a change for a value that can never work.
+    ensure_installed(_SNAP)
+    _cleanup_alias()
+    with pytest.raises(_errors.ChangeError) as ctx:
+        _client.post(
+            '/v2/aliases', body={'action': 'alias', 'snap': _SNAP, 'app': app, 'alias': _ALIAS}
+        )
+    assert f'target application "{app}" does not exist' in ctx.value.message
+
+
+@pytest.mark.parametrize('alias_name', ['', ' '])
+def test_raw_alias_empty_or_blank_alias_is_invalid(alias_name: str):
+    ensure_installed(_SNAP)
+    with pytest.raises(_errors.APIError) as ctx:
+        _client.post(
+            '/v2/aliases',
+            body={'action': 'alias', 'snap': _SNAP, 'app': _APP, 'alias': alias_name},
+        )
+    assert ctx.value.message == f'invalid alias name: "{alias_name}"'
+
+
+@pytest.mark.parametrize('alias_name', ['', ' '])
+def test_raw_unalias_empty_or_blank_alias_is_not_found(alias_name: str):
+    with pytest.raises(_errors.APIError) as ctx:
+        _client.post('/v2/aliases', body={'action': 'unalias', 'alias': alias_name})
+    assert ctx.value.message == f'cannot find manual alias "{alias_name}" in any snap'
+
+
+# ---------------------------------------------------------------------------
 # unalias after snap removed — last because it removes the snap
 # ---------------------------------------------------------------------------
 

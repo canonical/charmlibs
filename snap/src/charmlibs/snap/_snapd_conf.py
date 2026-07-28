@@ -50,7 +50,8 @@ def get(snap: str, keys: Iterable[str] | None = None) -> dict[str, Any]:
         is installed. Each dotted key queried is returned as a top-level entry.
 
     Raises:
-        ValueError: if the snap name is empty or is not a single path segment.
+        ValueError: if the snap name is empty, blank, or is not a single path segment, or if a
+            key is empty, blank, or contains a comma or surrounding whitespace.
         TypeError: if ``keys`` is a string (must be a non-string iterable of strings, or ``None``).
         NotFoundError: if the snap is not installed. Never raised for ``system`` or ``core``,
             whose configuration is served whether or not the core snap is installed.
@@ -86,6 +87,9 @@ def get(snap: str, keys: Iterable[str] | None = None) -> dict[str, Any]:
             if error := _utils.check_installed_or_system(snap):
                 raise error
             return {}
+        # NOTE: snapd strips whitespace and drops empty keys. We make them an error up front so
+        # we correctly handle no specific keys requested, and so that get(s, [k])[k] holds.
+        _utils.raise_if_not_comma_list_safe(keys, label='config key')
         params = {'keys': ','.join(keys)}
     else:
         params = None
@@ -120,7 +124,8 @@ def unset(snap: str, keys: Iterable[str]) -> None:
             An empty iterable is still passed to snapd, and may trigger the snap's config hook.
 
     Raises:
-        ValueError: if the snap name is empty or is not a single path segment.
+        ValueError: if the snap name is empty, blank, or is not a single path segment,
+            or if a key is empty or blank.
         TypeError: if ``keys`` is a string (must be a non-string iterable of strings).
         NotFoundError: if the snap is not installed.
         ChangeError: if the snap's configure hook fails. This includes unsetting any
@@ -130,6 +135,9 @@ def unset(snap: str, keys: Iterable[str]) -> None:
     path = f'/v2/snaps/{_utils.snap_path_segment(snap)}/conf'
     if isinstance(keys, str):
         raise TypeError('keys must be an iterable of strings (not a string)')
+    keys = list(keys)
+    # NOTE: snapd rejects empty or blank keys. We reject them up front for symmetry with get().
+    _utils.raise_if_empty_or_blank(keys, label='config key')
     # NOTE: snap-not-found is returned for a missing snap, but not for system or core,
     # even if the core snap isn't installed -- configuration changes are still applied.
     # NOTE: Unset with no keys is a no-op (like set with an empty dict). We let snapd handle it.
@@ -148,14 +156,18 @@ def set(snap: str, config: dict[str, Any]) -> None:  # noqa: A001 (shadowing a P
             An empty mapping is accepted as a no-op.
 
     Raises:
-        ValueError: if the snap name is empty or is not a single path segment.
+        ValueError: if the snap name is empty, blank, or is not a single path segment, or if a
+            key in ``config`` is empty or blank.
         NotFoundError: if the snap is not installed.
         ChangeError: if the snap's configure hook fails. This includes setting any
             configuration on a snap that does not define a configure hook, and configuration
             rejected by a validating configure hook. A failed change is rolled back: no key
             from the request is applied.
     """
+    path = f'/v2/snaps/{_utils.snap_path_segment(snap)}/conf'
+    # NOTE: snapd rejects empty or blank keys. We reject them up front for symmetry with get().
+    _utils.raise_if_empty_or_blank(config, label='config key')
     # NOTE: snap-not-found is returned for a missing snap, but not for system or core,
     # even if the core snap isn't installed -- configuration changes are still applied.
     # NOTE: Set with an empty dict is a no-op. We let snapd handle it.
-    _client.put(f'/v2/snaps/{_utils.snap_path_segment(snap)}/conf', body=config)
+    _client.put(path, body=config)

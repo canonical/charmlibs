@@ -47,18 +47,42 @@ class TestGet:
         query = mock_client.get.call_args.kwargs['query']
         assert query == {'keys': 'a,b'}
 
-    def test_get_single_empty_string_key_sends_empty_keys_param(self, mock_client: MockClient):
-        # ['' ] doesn't match our own keys=[] short-circuit (`keys == []`), so it falls
-        # through to the query string as an empty 'keys' value. See the functional tests
-        # for what snapd actually does with that (spoiler: it's not the same as keys=[]).
-        mock_client.get.return_value = result_of('conf_lxd_all.json')
-        _snapd_conf.get('lxd', [''])
-        mock_client.get.assert_called_once_with('/v2/snaps/lxd/conf', query={'keys': ''})
+    # Keys that snapd's comma-separated list parser would alter are rejected before the request.
+    # A key that parses away to nothing is the dangerous one: it doesn't match our own keys=[]
+    # short-circuit (`keys == []`), so it used to reach snapd as an empty 'keys' value, which
+    # snapd reads as "no keys given" and answers with the whole configuration -- and, for a snap
+    # that isn't installed, with an empty result that get() returned instead of raising
+    # NotFoundError. See the functional tests for the snapd behaviour behind each case.
+    @pytest.mark.parametrize(
+        ('keys', 'match'),
+        [
+            ([''], 'must not be empty'),
+            (['', ''], 'must not be empty'),
+            (['a', ''], 'must not be empty'),
+            ([' '], 'must not be blank'),
+            (['\t'], 'must not be blank'),
+            (['a', ' '], 'must not be blank'),
+            ([','], 'must not contain a comma'),
+            (['a,b'], 'must not contain a comma'),
+            ([' a'], 'must not have leading or trailing whitespace'),
+            (['a '], 'must not have leading or trailing whitespace'),
+            (['\ta\n'], 'must not have leading or trailing whitespace'),
+        ],
+    )
+    def test_get_unsafe_keys_raise_value_error_without_request(
+        self, mock_client: MockClient, keys: list[str], match: str
+    ):
+        with pytest.raises(ValueError, match=match):
+            _snapd_conf.get('lxd', keys)
+        mock_client.get.assert_not_called()
 
-    def test_get_multiple_empty_string_keys_sends_comma_keys_param(self, mock_client: MockClient):
-        mock_client.get.return_value = result_of('conf_lxd_all.json')
-        _snapd_conf.get('lxd', ['', ''])
-        mock_client.get.assert_called_once_with('/v2/snaps/lxd/conf', query={'keys': ','})
+    @pytest.mark.parametrize('key', ['a', 'a.b', 'a-b', 'a b', 'a\u200bb', 'A_B', '1'])
+    def test_get_keys_that_survive_the_parser_are_sent(self, mock_client: MockClient, key: str):
+        # Only what snapd's parser would alter is rejected -- interior whitespace and zero-width
+        # characters survive it unchanged, so they're snapd's to reject, not ours.
+        mock_client.get.return_value = {key: 1}
+        _snapd_conf.get('lxd', [key])
+        mock_client.get.assert_called_once_with('/v2/snaps/lxd/conf', query={'keys': key})
 
     def test_get_returns_dict(self, mock_client: MockClient):
         mock_client.get.return_value = result_of('conf_lxd_all.json')
@@ -241,6 +265,40 @@ class TestUnsetAdditional:
         # unset() with a dotted-path key passes it as-is to the API.
         _snapd_conf.unset('lxd', ['parent.child'])
         mock_client.put.assert_called_once_with('/v2/snaps/lxd/conf', body={'parent.child': None})
+
+
+class TestSetAndUnsetKeys:
+    # set and unset send their keys in a JSON body rather than a comma-separated query parameter,
+    # so snapd sees them exactly as passed and rejects an unusable one itself. It only does so
+    # once the configure hook runs, though, reporting an empty key as an 'internal error' inside a
+    # ChangeError, so we reject empty and blank keys up front to match get().
+    @pytest.mark.parametrize(('key', 'match'), [('', 'empty'), (' ', 'blank'), ('\t', 'blank')])
+    def test_set_unusable_key_raises_value_error_without_request(
+        self, mock_client: MockClient, key: str, match: str
+    ):
+        with pytest.raises(ValueError, match=f'config key must not be {match}'):
+            _snapd_conf.set('lxd', {key: 'myval', 'valid-key': 'myval'})
+        mock_client.put.assert_not_called()
+
+    @pytest.mark.parametrize(('key', 'match'), [('', 'empty'), (' ', 'blank'), ('\t', 'blank')])
+    def test_unset_unusable_key_raises_value_error_without_request(
+        self, mock_client: MockClient, key: str, match: str
+    ):
+        with pytest.raises(ValueError, match=f'config key must not be {match}'):
+            _snapd_conf.unset('lxd', [key, 'valid-key'])
+        mock_client.put.assert_not_called()
+
+    @pytest.mark.parametrize('key', [' padded ', 'a,b'])
+    def test_other_unusable_keys_are_left_to_snapd(self, mock_client: MockClient, key: str):
+        # Unlike get(), nothing here alters the key in transit, so a key snapd will reject is
+        # snapd's to report -- it names the offending key and rolls the whole change back.
+        _snapd_conf.set('lxd', {key: 'myval'})
+        mock_client.put.assert_called_once_with('/v2/snaps/lxd/conf', body={key: 'myval'})
+
+    def test_unset_validates_keys_before_the_request(self, mock_client: MockClient):
+        # The keys are materialised to validate them, so a generator is still sent in full.
+        _snapd_conf.unset('lxd', (k for k in ('a', 'b')))
+        mock_client.put.assert_called_once_with('/v2/snaps/lxd/conf', body={'a': None, 'b': None})
 
 
 class TestConfigureHookFailure:
