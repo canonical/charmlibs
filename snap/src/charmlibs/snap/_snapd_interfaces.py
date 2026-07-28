@@ -42,8 +42,8 @@ def connect(plug: tuple[str, str], slot: tuple[str, str] | str | None = None) ->
             - ``None`` (the default), shorthand for ``('', '')``.
 
     Raises:
-        ValueError: if any part of ``plug`` or ``slot`` is blank (only whitespace). An empty
-            part is meaningful here, and is passed to snapd.
+        ValueError: if any part of ``plug`` or ``slot`` is blank. An empty part is meaningful
+            here, and is passed to snapd.
         NotFoundError: if the plug snap or slot snap is not installed.
             Never raised for the system snap.
         APIError: if the plug is not fully specified (empty snap or plug name), if the named plug
@@ -117,8 +117,8 @@ def disconnect(
             so the interface reverts to snapd's default auto-connection policy on the next refresh.
 
     Raises:
-        ValueError: if any part of ``plug`` or ``slot`` is blank (only whitespace). An empty
-            part is meaningful here, and is passed to snapd.
+        ValueError: if any part of ``plug`` or ``slot`` is blank. An empty part is meaningful
+            here, and is passed to snapd.
         NotFoundError: if the plug snap or slot snap is not installed.
             Never raised for the system snap.
         APIError: if neither ``plug`` nor ``slot`` names anything to disconnect, if the named plug
@@ -167,10 +167,8 @@ def disconnect(
 def _snap_and_name(spec: tuple[str, str] | str | None) -> tuple[str, str]:
     """Normalise one side of a connection to a ``(snap, name)`` pair of strings.
 
-    Either part may come back empty, which is meaningful to snapd here: it selects the system
-    snap, or asks snapd to resolve that side of the connection. Callers check the parts for
-    blankness themselves, since a blank part is not meaningful and would otherwise be reported
-    from in here rather than from the function the caller called.
+    Either part may come back empty, which is meaningful to snapd: it selects the system snap, or
+    asks snapd to resolve that side of the connection. Callers reject blank parts themselves.
     """
     if spec is None:
         return '', ''

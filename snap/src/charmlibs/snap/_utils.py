@@ -41,9 +41,6 @@ def snap_path_segment(snap: str) -> str:
 
     Encoding is still applied, so that characters such as ``?`` and ``#`` in a name are sent as
     part of the path instead of starting a query string or fragment.
-
-    Raises rather than returning the error, since it returns the encoded name. Callers that want
-    the error reported at their own frame should validate the name before calling this.
     """
     raise_if_empty_or_blank(snap, label='snap name')
     if '/' in snap or snap in ('.', '..'):
@@ -132,7 +129,7 @@ def raise_if_empty_or_blank(values: str | Collection[str], *, label: str) -> Non
     passing them to snapd, whose response depends on the endpoint (anything from a typed
     ``snap "" not found`` to a redirect with an empty body, or to being silently ignored).
 
-    Use :func:`raise_if_blank` instead where snapd gives an empty value a meaning of its own.
+    Use :func:`raise_if_blank` where snapd gives an empty value a meaning of its own.
     """
     values = _list(values)
     for value in values:
@@ -145,9 +142,8 @@ def raise_if_blank(values: str | Collection[str], *, label: str) -> None:
     """Raise ValueError if a value is non-empty but contains only whitespace.
 
     Separate from :func:`raise_if_empty_or_blank` for the interface functions, where an empty
-    value is meaningful -- it selects the system snap, or asks snapd to resolve that side of the
-    connection. A blank value is never meaningful anywhere: snapd either treats it as a name that
-    can't exist, or (on the endpoints that take a comma-separated list) discards it entirely.
+    value is meaningful. A blank value never is: snapd reads it as a name that can't exist, or
+    discards it entirely on the endpoints taking a comma-separated list.
     """
     values = _list(values)
     for value in values:
@@ -159,28 +155,20 @@ def raise_if_blank(values: str | Collection[str], *, label: str) -> None:
 def raise_if_not_comma_list_safe(values: str | Collection[str], *, label: str) -> None:
     """Raise ValueError if a value would not survive snapd's comma-separated list parsing.
 
-    Some snapd endpoints take several values in one query parameter, joined by commas. snapd
-    parses these with ``strutil.CommaSeparatedList``, which splits on commas, strips whitespace
-    from each field, and discards the empty ones. A value that doesn't survive that unchanged is
-    silently turned into something other than what the caller asked for, so we reject it here:
+    These values are joined by commas into one query parameter, which snapd parses with
+    ``strutil.CommaSeparatedList``: it splits on commas, strips each field, and discards the empty
+    ones. A value that doesn't survive that unchanged silently becomes a different request:
 
-    - an empty or blank value contributes no field at all, so the request means "all of them"
-      rather than "this one" -- ``logs('')`` would return the logs of every snap on the system.
-    - a value containing a comma contributes two or more fields, quietly querying values the
-      caller never named.
-    - a value padded with whitespace comes back stripped, so it addresses a different name than
-      the caller passed, and any result is keyed by the stripped name.
+    - an empty or blank value contributes no field, so the request means "all of them" --
+      ``logs('')`` would return the logs of every snap on the system.
+    - a value containing a comma contributes two or more fields.
+    - a padded value comes back stripped, addressing a different name than the caller passed.
 
-    Python's :meth:`str.strip` and the ``unicode.IsSpace`` that snapd's Go implementation strips
-    with agree on every whitespace character we've tested, including the ones they define
-    separately (U+0085, U+00A0, U+1680, U+2000, U+3000), and agree that zero-width characters
-    (U+200B, U+FEFF) are content rather than whitespace.
+    Python's :meth:`str.strip` and the ``unicode.IsSpace`` snapd strips with agree on every
+    whitespace character we've tested, so this mirrors snapd's rule rather than approximating it.
     """
-    # NOTE: each value is checked completely before moving on to the next, rather than checking
-    # every value for one kind of problem before the next kind. That keeps what's reported for a
-    # value independent of the other values: the same bad value is described the same way whatever
-    # it is passed alongside. The message names the whole collection, so a second problem later in
-    # it isn't hidden either way.
+    # NOTE: each value is checked completely before the next, so what's reported for a value
+    # doesn't depend on the others. The message names the whole collection either way.
     values = _list(values)
     for value in values:
         problem = _empty(value) or _blank(value) or _comma(value) or _padding(value)
@@ -191,9 +179,8 @@ def raise_if_not_comma_list_safe(values: str | Collection[str], *, label: str) -
 def _list(values: str | Collection[str]) -> list[str]:
     """Normalise the argument to the list of values to check.
 
-    A bare string is one value, not an iterable of one-character values. A dict becomes its keys,
-    which is both what the caller means and what keeps its values out of the error message: the
-    config a charm sets can hold secrets, and an error ends up in the Juju debug log.
+    A bare string is one value, not an iterable of one-character values. A mapping becomes its
+    keys, keeping its values out of the error message -- a charm's config can hold secrets.
     """
     return [values] if isinstance(values, str) else list(values)
 
@@ -208,9 +195,8 @@ def _empty(value: str) -> str | None:
 def _blank(value: str) -> str | None:
     """Describe a value that is not empty but is entirely whitespace.
 
-    The value is quoted, since a blank one is invisible otherwise, and a space and a tab read
-    identically in an error message. An empty value is left to :func:`_empty`, so that the checks
-    that accept one can leave that predicate out of their chain.
+    The value is quoted, since a blank one is invisible otherwise. An empty value is left to
+    :func:`_empty`, so the checks that accept one can leave that predicate out of their chain.
     """
     if value and not value.strip():
         return f'must not be blank: {value!r}'
@@ -234,11 +220,8 @@ def _padding(value: str) -> str | None:
 def _message(label: str, problem: str, values: list[str]) -> str:
     """Build the error message, naming the whole collection when there was more than one value.
 
-    Takes the normalised values, so a mapping has already become its keys and can't be rendered
-    with its own values: see :func:`_list`.
-
-    Returns the message rather than raising it, so that the raise happens in the raise_if_*
-    function and this doesn't add a frame to the traceback.
+    Takes normalised values, so a mapping has already become its keys: see :func:`_list`. Returns
+    rather than raising, so the raise happens in the caller and adds no traceback frame.
     """
     if len(values) > 1:
         return f'{label} {problem} (in {values!r})'

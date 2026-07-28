@@ -50,8 +50,8 @@ def get(snap: str, keys: Iterable[str] | None = None) -> dict[str, Any]:
         is installed. Each dotted key queried is returned as a top-level entry.
 
     Raises:
-        ValueError: if the snap name is empty, blank, or is not a single path segment, or if any
-            requested key is empty, blank, contains a comma, or is padded with whitespace.
+        ValueError: if the snap name is empty, blank, or is not a single path segment, or if a
+            key is empty, blank, or contains a comma or surrounding whitespace.
         TypeError: if ``keys`` is a string (must be a non-string iterable of strings, or ``None``).
         NotFoundError: if the snap is not installed. Never raised for ``system`` or ``core``,
             whose configuration is served whether or not the core snap is installed.
@@ -87,12 +87,10 @@ def get(snap: str, keys: Iterable[str] | None = None) -> dict[str, Any]:
             if error := _utils.check_installed_or_system(snap):
                 raise error
             return {}
-        # NOTE: the keys are sent as one comma-separated query parameter, so a key that snapd's
-        # parser alters is silently not the query the caller asked for. Keys that all parse away
-        # to nothing are the dangerous case: the request becomes a request for the whole
-        # configuration, which for a snap that isn't installed is answered with an empty result
-        # -- so without this check, get('absent-snap', ['']) returned {} instead of raising
-        # NotFoundError, because the probe below only runs for keys=None.
+        # NOTE: the keys are joined into one comma-separated parameter, so a key that snapd's
+        # parser alters isn't the query the caller asked for. Keys that all parse away are the
+        # worst case: the request becomes one for the whole config, so get('absent-snap', [''])
+        # returned {} rather than raising -- the probe below only runs for keys=None.
         _utils.raise_if_not_comma_list_safe(keys, label='config key')
         params = {'keys': ','.join(keys)}
     else:
@@ -128,8 +126,8 @@ def unset(snap: str, keys: Iterable[str]) -> None:
             An empty iterable is still passed to snapd, and may trigger the snap's config hook.
 
     Raises:
-        ValueError: if the snap name is empty, blank, or is not a single path segment, or if
-            any key is empty or blank.
+        ValueError: if the snap name is empty, blank, or is not a single path segment, or if a
+            key is empty or blank.
         TypeError: if ``keys`` is a string (must be a non-string iterable of strings).
         NotFoundError: if the snap is not installed.
         ChangeError: if the snap's configure hook fails. This includes unsetting any
@@ -140,9 +138,8 @@ def unset(snap: str, keys: Iterable[str]) -> None:
     if isinstance(keys, str):
         raise TypeError('keys must be an iterable of strings (not a string)')
     keys = list(keys)
-    # NOTE: snapd rejects these itself, but only once the configure hook runs, as a ChangeError
-    # reporting an 'internal error' for an empty key. We reject them up front, so that an
-    # unusable key is the same ValueError here as it is for get().
+    # NOTE: snapd rejects these itself, but only once the configure hook runs, and reports an
+    # empty key as an 'internal error'. We reject them up front, as get() does.
     _utils.raise_if_empty_or_blank(keys, label='config key')
     # NOTE: snap-not-found is returned for a missing snap, but not for system or core,
     # even if the core snap isn't installed -- configuration changes are still applied.
@@ -162,8 +159,8 @@ def set(snap: str, config: dict[str, Any]) -> None:  # noqa: A001 (shadowing a P
             An empty mapping is accepted as a no-op.
 
     Raises:
-        ValueError: if the snap name is empty, blank, or is not a single path segment, or if
-            any key in ``config`` is empty or blank.
+        ValueError: if the snap name is empty, blank, or is not a single path segment, or if a
+            key in ``config`` is empty or blank.
         NotFoundError: if the snap is not installed.
         ChangeError: if the snap's configure hook fails. This includes setting any
             configuration on a snap that does not define a configure hook, and configuration
