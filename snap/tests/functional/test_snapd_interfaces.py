@@ -460,3 +460,69 @@ def test_disconnect_empty_snap_with_unknown_name_reports_against_system_snap():
         _snapd_interfaces.disconnect(('', 'nonexistent-plug'))
     assert not ctx.value.kind
     assert 'snap "snapd" has no plug or slot named "nonexistent-plug"' in ctx.value.message
+
+
+# ---------------------------------------------------------------------------
+# blank values
+#
+# An empty value is meaningful here -- it selects the system snap, or asks snapd to resolve that
+# side -- so these functions are exempt from the library's empty-value contract. A blank value
+# gets none of that meaning from snapd: it is read as a name, and reported as a snap, plug, or
+# slot that doesn't exist. These tests pin that, and so the reason we reject it client-side.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize('value', [' ', '\t'])
+def test_connect_blank_values_raise_value_error(value: str):
+    with pytest.raises(ValueError, match='must not be blank'):
+        _snapd_interfaces.connect((value, _PLUG))
+    with pytest.raises(ValueError, match='must not be blank'):
+        _snapd_interfaces.connect((_SNAP, value))
+    with pytest.raises(ValueError, match='must not be blank'):
+        _snapd_interfaces.connect((_SNAP, _PLUG), (value, ''))
+    with pytest.raises(ValueError, match='must not be blank'):
+        _snapd_interfaces.connect((_SNAP, _PLUG), ('', value))
+    with pytest.raises(ValueError, match='must not be blank'):
+        _snapd_interfaces.connect((_SNAP, _PLUG), value)
+
+
+@pytest.mark.parametrize('value', [' ', '\t'])
+def test_disconnect_blank_values_raise_value_error(value: str):
+    with pytest.raises(ValueError, match='must not be blank'):
+        _snapd_interfaces.disconnect((value, _PLUG))
+    with pytest.raises(ValueError, match='must not be blank'):
+        _snapd_interfaces.disconnect((_SNAP, value))
+    with pytest.raises(ValueError, match='must not be blank'):
+        _snapd_interfaces.disconnect(slot=(value, _PLUG))
+    with pytest.raises(ValueError, match='must not be blank'):
+        _snapd_interfaces.disconnect(slot=(_SYSTEM_SNAP, value))
+
+
+def test_raw_api_blank_snap_is_not_the_system_snap():
+    # An empty snap is remapped to the system snap; a blank one is not, so it reaches the
+    # not-installed check as the name it is. This is the difference the client-side check
+    # protects: a blank value looks like the empty value it was probably meant to be.
+    with pytest.raises(_errors.APIError) as ctx:
+        _client.post(
+            '/v2/interfaces',
+            body={
+                'action': 'connect',
+                'plugs': [{'snap': ' ', 'plug': _PLUG}],
+                'slots': [{'snap': '', 'slot': ''}],
+            },
+        )
+    assert 'snap " " is not installed' in ctx.value.message
+
+
+def test_raw_api_blank_slot_name_is_not_resolved():
+    # An empty slot name asks snapd to resolve the slot; a blank one is looked up as a name.
+    with pytest.raises(_errors.APIError) as ctx:
+        _client.post(
+            '/v2/interfaces',
+            body={
+                'action': 'connect',
+                'plugs': [{'snap': _SNAP, 'plug': _PLUG}],
+                'slots': [{'snap': _SYSTEM_SNAP, 'slot': ' '}],
+            },
+        )
+    assert f'snap "{_SYSTEM_SNAP}" has no slot named " "' in ctx.value.message
