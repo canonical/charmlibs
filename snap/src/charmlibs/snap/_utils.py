@@ -53,17 +53,51 @@ def snap_path_segment(snap: str) -> str:
 
 
 # The checks below describe what is wrong with a value, and leave raising to the caller. Each
-# takes one value or an iterable of them (including a dict, whose keys are checked), and describes
-# the first that is unusable: a phrase to put after the name of the thing being checked -- "must
-# not be empty", "must not contain a comma: ',,'" -- or None if every value is fine. The caller
-# supplies the noun and any context it can add, so one check can say "config key must not be empty
-# (keys=['a', ''])" in one place and "snap name must not be empty" in another, without the check
-# knowing either.
+# takes one value or a collection of them (including a dict, whose keys are checked), and
+# describes the first that is unusable: a phrase to put after the name of the thing being checked
+# -- "must not be empty", "must not contain a comma: ',,'" -- or None if every value is fine. The
+# caller supplies the noun and any context it can add, so one check can say "config key must not
+# be empty (keys=['a', ''])" in one place and "snap name must not be empty" in another, without
+# the check knowing either.
 #
 # Returning rather than raising also keeps the traceback short. A charm's tracebacks end up in the
-# Juju debug log, where frames between the call and the error are noise for whoever reads them,
-# and these compose: check_comma_list defers to check_empty_or_blank, which defers to
-# check_blank. Raising from in here would put all of that in front of the reader.
+# Juju debug log, where frames between the call and the error are noise for whoever reads them.
+#
+# Each check spells out the rules it applies, as a chain of the single-value predicates below, so
+# that what it rejects can be read off the one function rather than traced through the others.
+
+
+def _empty(value: str) -> str | None:
+    """Describe an empty value, which is never a name, key, or alias snapd can use."""
+    if not value:
+        return 'must not be empty'
+    return None
+
+
+def _blank(value: str) -> str | None:
+    """Describe a value that is not empty but is entirely whitespace.
+
+    The value is quoted, since a blank one is invisible otherwise, and a space and a tab read
+    identically in an error message. An empty value is left to :func:`_empty`, so that the checks
+    that accept one can leave that predicate out of their chain.
+    """
+    if value and not value.strip():
+        return f'must not be blank: {value!r}'
+    return None
+
+
+def _comma(value: str) -> str | None:
+    """Describe a value containing a comma, which snapd would read as two values."""
+    if ',' in value:
+        return f'must not contain a comma: {value!r}'
+    return None
+
+
+def _padding(value: str) -> str | None:
+    """Describe a value with surrounding whitespace, which snapd would strip."""
+    if value != value.strip():
+        return f'must not have leading or trailing whitespace: {value!r}'
+    return None
 
 
 def check_empty_or_blank(values: str | Collection[str]) -> str | None:
@@ -79,9 +113,7 @@ def check_empty_or_blank(values: str | Collection[str]) -> str | None:
         # A bare string is one value, not an iterable of one-character values.
         values = [values]
     for value in values:
-        if not value:
-            return 'must not be empty'
-        if problem := check_blank(value):
+        if problem := (_empty(value) or _blank(value)):
             return problem
     return None
 
@@ -89,20 +121,17 @@ def check_empty_or_blank(values: str | Collection[str]) -> str | None:
 def check_blank(values: str | Collection[str]) -> str | None:
     """Describe why a value is unusable if it is non-empty but contains only whitespace.
 
-    Separate from :func:`check_empty_or_blank` for the interface functions, where an empty value is
-    meaningful -- it selects the system snap, or asks snapd to resolve that side of the
+    Separate from :func:`check_empty_or_blank` for the interface functions, where an empty value
+    is meaningful -- it selects the system snap, or asks snapd to resolve that side of the
     connection. A blank value is never meaningful anywhere: snapd either treats it as a name that
     can't exist, or (on the endpoints that take a comma-separated list) discards it entirely.
-
-    The value is quoted in the phrase, since a blank one is invisible otherwise, and a space and
-    a tab read identically in an error message.
     """
     if isinstance(values, str):
         # A bare string is one value, not an iterable of one-character values.
         values = [values]
     for value in values:
-        if value and not value.strip():
-            return f'must not be blank: {value!r}'
+        if problem := _blank(value):
+            return problem
     return None
 
 
@@ -135,12 +164,8 @@ def check_comma_list(values: str | Collection[str]) -> str | None:
     # it is passed alongside. The caller names the whole collection in the error, so a second
     # problem later in it isn't hidden either way.
     for value in values:
-        if problem := check_empty_or_blank(value):
+        if problem := (_empty(value) or _blank(value) or _comma(value) or _padding(value)):
             return problem
-        if ',' in value:
-            return f'must not contain a comma: {value!r}'
-        if value != value.strip():
-            return f'must not have leading or trailing whitespace: {value!r}'
     return None
 
 

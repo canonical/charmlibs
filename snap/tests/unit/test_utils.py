@@ -13,6 +13,8 @@ from charmlibs.snap import _utils
 from charmlibs.snap._errors import NotFoundError
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from conftest import MockClient
 
 
@@ -21,6 +23,30 @@ if TYPE_CHECKING:
 BLANK = [' ', '  ', '\t', '\n', '\r', '\x0b', '\x0c', '\x85', '\xa0', '\u1680', '\u2000', '\u3000']
 # Zero-width characters are content to both Python and snapd, not whitespace.
 ZERO_WIDTH = ['\u200b', '\ufeff']
+
+
+class TestPredicates:
+    # Each predicate answers one question about one value, so the checks below can spell out the
+    # rules they apply as a chain rather than deferring to each other.
+    @pytest.mark.parametrize(
+        ('predicate', 'value', 'expected'),
+        [
+            (_utils._empty, '', 'must not be empty'),
+            (_utils._empty, ' ', None),
+            (_utils._empty, 'a', None),
+            (_utils._blank, '', None),  # Left to _empty, so check_blank can omit it.
+            (_utils._blank, ' ', "must not be blank: ' '"),
+            (_utils._blank, 'a', None),
+            (_utils._comma, 'a,b', "must not contain a comma: 'a,b'"),
+            (_utils._comma, 'a', None),
+            (_utils._padding, ' a', "must not have leading or trailing whitespace: ' a'"),
+            (_utils._padding, 'a b', None),
+        ],
+    )
+    def test_predicate(
+        self, predicate: Callable[[str], str | None], value: str, expected: str | None
+    ):
+        assert predicate(value) == expected
 
 
 class TestEmptyOrBlank:
@@ -46,8 +72,8 @@ class TestEmptyOrBlank:
 
 
 class TestOneValueOrMany:
-    # Each check takes one value or an iterable of them, so the caller can hand over the whole
-    # collection it was given and keep the loop out of the call site.
+    # Each check takes one value or a collection of them, so the caller can hand over the
+    # whole collection it was given and keep the loop out of the call site.
     def test_a_bare_string_is_one_value_not_an_iterable_of_characters(self):
         # ' a' is not blank, but its characters are: iterating it would report the wrong problem.
         assert _utils.check_empty_or_blank(' a') is None
