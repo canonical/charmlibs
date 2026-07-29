@@ -81,7 +81,7 @@ def normalize_channel(channel: str) -> str:
     Channels may be specified as a track or risk only, or as "track/risk",
     "risk/branch", or "track/risk/branch". Snapd fills in the defaults and records the
     *resolved* value, so a channel must be normalized the same way before it can be
-    compared with the channel from :func:`info`.
+    compared with the channel from :func:`list_one`.
 
     This mirrors ``channel.Full`` in snapd: a lone risk gets the ``latest`` track, a lone
     track gets the ``stable`` risk, and a leading risk in a two part channel means the
@@ -113,7 +113,7 @@ def resolve_channel(channel: str, tracking: str) -> str:
 
     Args:
         channel: The requested channel, or an empty string to keep the tracked channel.
-        tracking: The channel the snap currently tracks, as reported by ``Info.tracking``.
+        tracking: The channel the snap currently tracks, as reported by ``InstalledInfo.tracking``.
             Empty for a snap that isn't installed, or was installed from a local file.
     """
     if not channel:
@@ -179,7 +179,7 @@ def raise_if_not_path_segment(snap: str) -> None:
     Percent-encoding alone is not enough to guarantee that:
 
     - snapd's router (gorilla/mux) matches on the *decoded* path, so ``%2F`` is still a path
-      separator to it: without this check ``info('hello-world/conf')`` would reach
+      separator to it: without this check ``list_one('hello-world/conf')`` would reach
       ``/v2/snaps/hello-world/conf`` and return that snap's configuration.
     - ``urllib.parse.quote`` leaves ``.`` unencoded, so a ``.`` or ``..`` name would still make
       the path non-canonical, which mux answers with a ``301`` to the cleaned path.

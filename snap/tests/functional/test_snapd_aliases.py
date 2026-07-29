@@ -12,7 +12,7 @@ import typing
 import pytest
 
 from charmlibs.snap import _client, _errors, _snapd_aliases
-from conftest import ensure_installed, ensure_removed
+from conftest import ensure_installed, ensure_installed_local, ensure_removed
 
 if typing.TYPE_CHECKING:
     from collections.abc import Mapping
@@ -23,6 +23,12 @@ _SNAP = 'test-snapd-tools'
 _APP = 'echo'
 _APP2 = 'cat'
 _ALIAS = 'test-functional-alias'
+
+# A second snap with a plain command, used only to claim _ALIAS first so that aliasing it to
+# _SNAP conflicts. Locally built (tests/functional/snaps): the test needs two distinct snaps
+# with an aliasable app, and nothing about the conflict depends on which snap the other is.
+_OTHER_SNAP = 'test-alias-snap'
+_OTHER_APP = 'hello'
 
 # A snap name that is never installed — used for error paths where any absent
 # snap produces the same error response, avoiding unnecessary remove operations.
@@ -147,18 +153,18 @@ def test_unalias_nonexistent_alias_raises():
 
 
 # ---------------------------------------------------------------------------
-# hello-world installed (test cross-snap alias conflicts)
+# a second snap installed (test cross-snap alias conflicts)
 # ---------------------------------------------------------------------------
 
 
 def test_alias_duplicate_name_different_snap_raises():
     # An alias name already claimed by another snap raises ChangeError.
     ensure_installed(_SNAP)
-    ensure_installed('hello-world')
+    ensure_installed_local(_OTHER_SNAP)
     _cleanup_alias()
     _snapd_aliases.alias(_SNAP, _APP, _ALIAS)
     with pytest.raises(_errors.ChangeError) as ctx:
-        _snapd_aliases.alias('hello-world', 'hello-world', _ALIAS)
+        _snapd_aliases.alias(_OTHER_SNAP, _OTHER_APP, _ALIAS)
     assert 'already enabled for' in ctx.value.message
     _cleanup_alias()
 

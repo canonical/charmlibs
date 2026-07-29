@@ -29,7 +29,7 @@ import pytest
 
 from charmlibs import snap
 from charmlibs.snap import _errors, _snapd_conf
-from conftest import ensure_installed, ensure_removed
+from conftest import ensure_installed, remove_core_blockers
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -45,14 +45,12 @@ def core_snap(request: pytest.FixtureRequest) -> Iterator[str]:
     pytest groups tests by this module-scoped parameter, so the core snap's install state is
     flipped at most once per state, not once per test.
 
-    In the 'absent' state we remove the core snap after removing any snap that has it as a base
-    (a base-less snap like hello-world or test-snapd-with-configure, installed by other modules,
-    otherwise blocks removal). A failed removal is deliberately left to error loudly rather than
-    skip: if a base-less snap we don't manage is installed, that's worth surfacing so we can
-    handle it explicitly.
+    In the 'absent' state we remove the core snap after removing every snap that is held by
+    it (remove_core_blockers asks snapd which those are, so this doesn't need updating when
+    another module starts using a new snap). A failed removal is left to error loudly.
     """
     if request.param == 'absent':
-        ensure_removed('hello-world', 'test-snapd-with-configure')
+        remove_core_blockers()
         snap.remove('core')  # Errors loudly if an unmanaged snap still depends on core.
         yield request.param
         ensure_installed('core')
@@ -128,7 +126,7 @@ def test_removing_core_snap_deletes_stored_system_config():
     ensure_installed('core')  # Ensure installed, so its removal actually deletes stored config.
     _snapd_conf.set('system', {_OPTION: 3})
     assert _snapd_conf.get('system', [_OPTION]) == {_OPTION: 3}
-    ensure_removed('hello-world')  # Base-less; would otherwise block core removal.
+    remove_core_blockers()  # Base-less snaps would otherwise block core removal.
     snap.remove('core')
     try:
         # Removal deleted the stored option...
