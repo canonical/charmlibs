@@ -18,7 +18,7 @@ from charmlibs.snap import _client, _functions
 from charmlibs.snap import _snapd_snaps as _snapd
 
 if typing.TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Iterable
     from typing import ParamSpec, TypeVar
 
     _P = ParamSpec('_P')
@@ -74,6 +74,44 @@ def ensure_removed(*snaps: str) -> None:
 def ensure_installed(*snaps: str, channel: str | None = None, classic: bool = False) -> None:
     for snap_name in snaps:
         retry_on_rate_limit(snap.ensure)(snap_name, channel=channel, classic=classic, update=False)
+
+
+# Test helper for the parts of `snap list` the library deliberately doesn't implement: listing
+# several snaps in one request, and listing every installed revision rather than just the current
+# one. list_one covers the single-snap case charms actually need, and these calls are local and
+# cheap, so a charm wanting several can loop -- which is why this lives here and not in the API.
+def _list(  # pyright: ignore[reportUnusedFunction] (imported by the test modules)
+    snaps: str | Iterable[str] | None,
+    *,
+    all: bool = False,  # noqa: A002 (shadowing a Python builtin)
+) -> list[_snapd.InstalledInfo]:
+    """List installed snaps, as `snap list` does.
+
+    Args:
+        snaps: Snap names to list, as a single name or an iterable of names. If ``None``, every
+            installed snap is listed. If an empty iterable, nothing is listed.
+        all: If ``True``, list every installed revision of each snap rather than only the current
+            one, as `snap list --all` does. A snap keeps its previous revision after a refresh,
+            so a name can appear more than once and the result is no longer one entry per snap.
+
+    Unlike `snap list`, a name that isn't installed is not an error: /v2/snaps filters rather
+    than failing, and nothing here reconstructs the error the CLI would print. That, and the
+    per-revision result shape under ``all``, are the two reasons this isn't library API.
+    """
+    query: dict[str, str] = {}
+    if snaps is not None:
+        names = [snaps] if isinstance(snaps, str) else list(snaps)
+        # NOTE: An empty 'snaps' value is not "no snaps" to snapd -- it parses away, leaving the
+        # unfiltered query, which answers with every installed snap. So no names means no request.
+        if not names:
+            return []
+        query['snaps'] = ','.join(names)
+    if all:
+        query['select'] = 'all'
+    result = _client.get('/v2/snaps', query=query or None)
+    assert isinstance(result, list)
+    result = typing.cast('list[dict[str, str]]', result)
+    return [_snapd.InstalledInfo._from_dict(info_dict) for info_dict in result]
 
 
 @functools.cache  # Cached to avoid repeated store queries.

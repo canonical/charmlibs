@@ -12,28 +12,22 @@ tests that inherently install/remove as part of the test logic.
 from __future__ import annotations
 
 import datetime
-import typing
+from typing import cast
 
 import pytest
 
 from charmlibs.snap import _client, _errors
 from charmlibs.snap import _snapd_snaps as _snapd
-from conftest import ensure_installed, ensure_removed, list_channels, retry_on_rate_limit
+from conftest import _list, ensure_installed, ensure_removed, list_channels, retry_on_rate_limit
 
 # A snap name that is never installed — used for error paths where any absent
 # snap produces the same error response, avoiding unnecessary remove operations.
 _ABSENT_SNAP = 'this-snap-does-not-exist-xyz-abc-123'
 
 
-# Test helper and possible future candidate for library public API.
-# _list_snaps is an independent oracle (hits /v2/snaps) for the info()/missing-ok tests.
-# list_channels (from conftest) sources store channel/revision info for install/refresh tests.
-def _list_snaps() -> list[_snapd.InstalledInfo]:
-    """List all installed snaps."""
-    info_dicts = _client.get('/v2/snaps')
-    assert isinstance(info_dicts, list)
-    info_dicts = typing.cast('list[dict[str, str]]', info_dicts)
-    return [_snapd.InstalledInfo._from_dict(info_dict) for info_dict in info_dicts]
+# _list (from conftest) is an independent oracle (hits /v2/snaps) for the list_one and
+# missing-ok tests. list_channels (also conftest) sources store channel/revision info for the
+# install and refresh tests.
 
 
 # ---------------------------------------------------------------------------
@@ -48,8 +42,9 @@ def test_list_one_installed():
     assert info.tracking
     assert info.revision
     assert info.version
-    # Independent oracle: /v2/snaps (list) should agree with /v2/snaps/{snap} (info).
-    assert 'hello-world' in {s.name for s in _list_snaps()}
+    # Independent oracle: the /v2/snaps collection should agree with the /v2/snaps/{snap} that
+    # list_one reads.
+    assert 'hello-world' in {s.name for s in _list(None)}
 
 
 def test_list_one_fields():
@@ -152,7 +147,7 @@ def test_remove():
 def test_list_one_missing_raises():
     ensure_removed('hello-world')
     # Independent oracle: the snap really is absent from /v2/snaps.
-    assert 'hello-world' not in {s.name for s in _list_snaps()}
+    assert 'hello-world' not in {s.name for s in _list(None)}
     with pytest.raises(_errors.NotFoundError) as ctx:
         _snapd.list_one('hello-world')
     assert ctx.value.kind == 'snap-not-found'
@@ -183,7 +178,7 @@ def test_refresh_not_installed_raises_base_snap_error():
 
 
 def test_hold_not_installed_raises_snap_not_found_error():
-    # hold() calls info() first, which raises NotFoundError with a proper kind.
+    # hold() calls list_one() first, which raises NotFoundError with a proper kind.
     ensure_removed('hello-world')
     with pytest.raises(_errors.NotFoundError) as ctx:
         _snapd.hold('hello-world')
@@ -316,3 +311,80 @@ def test_refresh_revision_already_installed_still_refreshes():
     current = _snapd.list_one('hello-world').revision
     result = retry_on_rate_limit(_snapd.refresh)('hello-world', revision=current)
     assert result is True
+
+
+# ---------------------------------------------------------------------------
+# /v2/snaps as a collection — what `snap list` does that the library doesn't
+#
+# list_one is per-snap and reports only the current revision. The endpoint can do more: name
+# several snaps in one request, and (with select=all) report every revision installed. Both are
+# exercised through the _list test helper rather than library API, and the tests below pin the
+# snapd behaviour that keeps them out of it.
+# ---------------------------------------------------------------------------
+
+
+def test_refresh_retains_the_previous_revision():
+    # A refresh doesn't discard the revision it replaced: snapd keeps it installed but inactive.
+    # So `snap list --all` reports the snap twice and names are no longer unique -- which is why
+    # `all` would change the shape of any plural result, and stays a test-only concern here.
+    ensure_removed('hello-world')
+    current = str(list_channels('hello-world')['latest/stable'].revision)
+    previous = str(int(current) - 1)
+    retry_on_rate_limit(_snapd.install)('hello-world', revision=previous)
+    retry_on_rate_limit(_snapd.refresh)('hello-world', revision=current)
+    # The current revision is all that list_one and an unqualified list report.
+    assert _snapd.list_one('hello-world').revision == current
+    assert [i.revision for i in _list('hello-world')] == [current]
+    # The replaced revision is still installed, and only all=True reveals it.
+    assert sorted(i.revision for i in _list('hello-world', all=True)) == sorted([
+        previous,
+        current,
+    ])
+
+
+def test_list_several_snaps_in_one_request():
+    ensure_installed('hello-world')
+    ensure_installed('charmcraft', classic=True)
+    listed = {i.name: i for i in _list(['hello-world', 'charmcraft'])}
+    assert set(listed) == {'hello-world', 'charmcraft'}
+    # The collection agrees with the per-snap endpoint list_one reads.
+    for name, info in listed.items():
+        assert info.revision == _snapd.list_one(name).revision
+
+
+def test_list_bare_name_and_single_element_list_agree():
+    ensure_installed('hello-world')
+    assert [i.name for i in _list('hello-world')] == [i.name for i in _list(['hello-world'])]
+
+
+def test_list_absent_snap_is_filtered_rather_than_an_error():
+    # snapd filters instead of failing, so an absent name is simply missing from the result with
+    # nothing to distinguish it from one that was never asked for. A plural API would have to
+    # reconstruct the error client-side; list_one gets snapd's own, which is the shape we keep.
+    ensure_installed('hello-world')
+    assert [i.name for i in _list(['hello-world', _ABSENT_SNAP])] == ['hello-world']
+    assert _list(_ABSENT_SNAP) == []
+    with pytest.raises(_errors.NotFoundError):
+        _snapd.list_one(_ABSENT_SNAP)
+
+
+def test_list_no_names_lists_nothing_but_none_lists_everything():
+    ensure_installed('hello-world')
+    assert _list([]) == []
+    assert _list(None) != []
+
+
+def test_raw_api_empty_snaps_value_lists_everything():
+    # The trap the helper avoids by making no request at all: snapd drops empty entries when it
+    # parses 'snaps', so an empty value leaves the unfiltered query and answers with every
+    # installed snap. Passing one through would turn a request for no snaps into a request for
+    # all of them -- the same quirk the conf 'keys' and logs 'names' parameters have.
+    #
+    # Compared by name: snapd does not return these in a stable order.
+    ensure_installed('hello-world')
+    everything = {i.name for i in _list(None)}
+    assert everything
+    result = _client.get('/v2/snaps', query={'snaps': ''})
+    assert isinstance(result, list)
+    unfiltered = cast('list[dict[str, str]]', result)
+    assert {s['name'] for s in unfiltered} == everything
