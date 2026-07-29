@@ -36,7 +36,7 @@ def alias(snap: str, app: str, alias: str) -> None:
 
     Raises:
         ValueError: if the snap name, app name, or alias is empty or blank.
-        NotInstalledError: if the snap is not installed.
+        NotFoundError: if the snap is not installed.
         ChangeError: if the alias name is already claimed by a different snap,
             conflicts with the command namespace of an installed snap,
             or if the specified app does not exist within the snap.

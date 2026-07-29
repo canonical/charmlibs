@@ -441,13 +441,23 @@ def test_all_errors_mapped():
         'BadResponseError',
         'ChangeError',
     }
-    expected = sorted(
+    expected = {
         name
         for name in dir(charmlibs.snap._errors)
         if name.endswith('Error') and name not in unmapped
-    )
-    actual = sorted(cls.__name__ for cls in _client._ERRORS.values())
+    }
+    # A set, not a sorted list: a type may be reached by more than one kind. NotFoundError is,
+    # deliberately -- snapd reports an absent snap as 'snap-not-found' on most endpoints and
+    # 'snap-not-installed' on remove and alias, and the library raises one type for both.
+    actual = {cls.__name__ for cls in _client._ERRORS.values()}
     assert actual == expected
+
+
+def test_both_absent_snap_kinds_map_to_not_found():
+    # The fold that lets a caller catch "the snap isn't there" without knowing which endpoint
+    # the operation uses. Both kinds are real: see the functional tests for captured responses.
+    assert _client._ERRORS['snap-not-found'] is NotFoundError
+    assert _client._ERRORS['snap-not-installed'] is NotFoundError
 
 
 # ---------------------------------------------------------------------------

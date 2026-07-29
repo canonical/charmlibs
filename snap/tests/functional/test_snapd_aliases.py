@@ -175,7 +175,10 @@ def test_alias_duplicate_name_different_snap_raises():
 
 
 def test_alias_not_installed_snap_raises():
-    with pytest.raises(_errors.NotInstalledError) as ctx:
+    # snapd answers with the 'snap-not-installed' kind here, rather than the 'snap-not-found' it
+    # uses on most endpoints. Both mean the snap isn't there, so both raise NotFoundError -- a
+    # caller catching an absent snap doesn't have to know which endpoint alias happens to use.
+    with pytest.raises(_errors.NotFoundError) as ctx:
         _snapd_aliases.alias(_ABSENT_SNAP, 'hello', 'test-not-installed-alias')
     assert ctx.value.kind == 'snap-not-installed'
 
@@ -204,7 +207,7 @@ def test_alias_rejects_empty_and_blank_fields(value: str):
 @pytest.mark.parametrize('snap_name', ['', ' '])
 def test_raw_alias_empty_or_blank_snap_is_not_installed(snap_name: str):
     # Neither is read as a snap that could exist, so both are reported the same way.
-    with pytest.raises(_errors.NotInstalledError) as ctx:
+    with pytest.raises(_errors.NotFoundError) as ctx:
         _client.post(
             '/v2/aliases',
             body={'action': 'alias', 'snap': snap_name, 'app': _APP, 'alias': _ALIAS},

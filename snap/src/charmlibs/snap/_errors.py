@@ -136,15 +136,16 @@ class AppNotFoundError(APIError):
 
 
 class NotFoundError(APIError):
-    """Raised via the API when a snap is not found.
+    """Raised when a snap is not found.
 
     Depending on the operation, this means not found in the store (for example install),
     or not installed on the system (for example configuration operations).
+
+    snapd reports an absent snap inconsistently -- with the ``snap-not-found`` kind, with the
+    ``snap-not-installed`` kind, or as an error with no kind at all, depending on the endpoint.
+    The library raises this one type in every case, so that a caller can catch "the snap isn't
+    there" without knowing which endpoint the operation happens to use.
     """
-
-
-class NotInstalledError(APIError):
-    """Raised via the API when a snap is not installed on the system."""
 
 
 class NeedsClassicError(APIError):

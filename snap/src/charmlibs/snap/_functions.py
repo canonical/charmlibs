@@ -53,8 +53,11 @@ def ensure(
             ``revision`` to control which channel the snap tracks -- otherwise a newly
             installed snap tracks ``latest/stable``, whichever channel the revision was
             found on.
-        classic: If ``True``, install or refresh the snap with classic confinement. Required
-            for snaps that use classic confinement.
+        classic: Grants permission to install or refresh a revision that requires classic
+            confinement, which snapd refuses to do without it. It does not select the
+            confinement: that is a property of the revision, declared in the snap itself. So
+            it is never on its own a reason to refresh an already-installed snap, and the
+            confinement a snap currently has is not compared against it.
         update: If ``True`` (default), refresh the snap when it is already installed on the
             requested channel. If ``False``, leave an already-correct snap untouched.
 

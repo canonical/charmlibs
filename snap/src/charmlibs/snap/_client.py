@@ -274,7 +274,9 @@ _ERRORS = {
     'snap-channel-not-available': _errors.ChannelNotAvailableError,
     'snap-needs-classic': _errors.NeedsClassicError,
     'snap-not-found': _errors.NotFoundError,
-    'snap-not-installed': _errors.NotInstalledError,
+    # Folded into NotFoundError: snapd uses this kind for remove and alias, and 'snap-not-found'
+    # elsewhere, for the same condition. See NotFoundError.
+    'snap-not-installed': _errors.NotFoundError,
     'snap-no-update-available': _errors._NoUpdatesAvailableError,
     'snap-revision-not-available': _errors.RevisionNotAvailableError,
     'interfaces-unchanged': _errors._InterfacesUnchangedError,
