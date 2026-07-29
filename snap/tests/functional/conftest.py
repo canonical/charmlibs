@@ -7,10 +7,13 @@
 from __future__ import annotations
 
 import functools
+import json
 import logging
 import random
 import time
 import typing
+import uuid
+from pathlib import Path
 from typing import Any
 
 from charmlibs import snap
@@ -23,6 +26,15 @@ if typing.TYPE_CHECKING:
 
     _P = ParamSpec('_P')
     _T = TypeVar('_T')
+
+# Snaps built from source by setup.sh before the suite runs. Tests prefer these to store snaps
+# wherever they need some capability of a snap rather than a particular snap, so that the suite
+# neither downloads hundreds of megabytes nor depends on a real-world snap keeping its shape.
+SNAPS_DIR = Path(__file__).parent / 'snaps'
+
+# Bases whose snaps are held by the core snap: core when declared, and no base at all, since a
+# snap that declares none gets core implicitly. snapd omits 'base' from /v2/snaps in that case.
+_CORE_BASES = frozenset({None, 'core'})
 
 # Enable debug logging from snap library during tests.
 handler = logging.StreamHandler()
@@ -112,6 +124,111 @@ def _list(  # pyright: ignore[reportUnusedFunction] (imported by the test module
     assert isinstance(result, list)
     result = typing.cast('list[dict[str, str]]', result)
     return [_snapd.InstalledInfo._from_dict(info_dict) for info_dict in result]
+
+
+def snaps_holding_core() -> list[str]:
+    """Return the installed app snaps that hold the core snap, and so block its removal.
+
+    An app snap is held by core when it runs on it: when it declares ``base: core``, or declares
+    no base at all and so gets core implicitly. Only apps are considered, so that a base, os,
+    snapd, gadget or kernel snap is never a candidate for removal no matter what it declares --
+    none of those is something a test installed, and the last two would be catastrophic to remove.
+
+    snapd is asked rather than a list being kept here on purpose: which snaps are installed
+    depends on what every other module has done, so a hand-maintained list goes stale as soon as
+    a test starts using a new snap -- and it fails far from the change, as an unrelated core test
+    reporting 'snap is being used by snaps ...'.
+    """
+    # Raw dicts rather than _list(None): the base and type fields this reads aren't on
+    # InstalledInfo, which carries what `snap list` prints.
+    snaps = _client.get('/v2/snaps')
+    assert isinstance(snaps, list)
+    snaps = typing.cast('list[dict[str, Any]]', snaps)
+    return [s['name'] for s in snaps if s.get('type') == 'app' and s.get('base') in _CORE_BASES]
+
+
+def remove_core_blockers() -> None:
+    """Remove every installed snap that would block removal of the core snap.
+
+    Removes whatever is holding core rather than a fixed set, so this keeps working as modules
+    add and drop snaps. Functional tests are already destructive to the machine they run on
+    (hence the workshop container), so removing a snap the suite didn't install is acceptable.
+    """
+    ensure_removed(*snaps_holding_core())
+
+
+# ---------------------------------------------------------------------------
+# Provisional ack and install_local implementations
+#
+# Built directly on _client internals: sideloading and assertion upload are not yet part of the
+# library's public API. Kept here rather than in a test module because several modules install
+# locally-built snaps.
+# ---------------------------------------------------------------------------
+
+
+def ack(assertions_data: bytes) -> None:
+    """Upload assertion(s) to snapd's local database (POST /v2/assertions)."""
+    response = _client._request('POST', '/v2/assertions', data=assertions_data)
+    response_dict = json.loads(response.read())
+    if response_dict.get('type') == 'error':
+        raise _client._make_error(response_dict)
+
+
+def install_local(path: Path, *, dangerous: bool = False, classic: bool = False) -> None:
+    """Install a local snap file via the snapd sideload API (POST /v2/snaps)."""
+    boundary = uuid.uuid4().hex
+    crlf = b'\r\n'
+
+    def form_field(name: str, value: str) -> bytes:
+        return b''.join([
+            b'--',
+            boundary.encode(),
+            crlf,
+            b'Content-Disposition: form-data; name="',
+            name.encode(),
+            b'"',
+            crlf,
+            crlf,
+            value.encode(),
+            crlf,
+        ])
+
+    body = [
+        b'--',
+        boundary.encode(),
+        crlf,
+        b'Content-Disposition: form-data; name="snap"; filename="',
+        path.name.encode(),
+        b'"',
+        crlf,
+        b'Content-Type: application/octet-stream',
+        crlf,
+        crlf,
+        path.read_bytes(),
+        crlf,
+    ]
+    if dangerous:
+        body.append(form_field('dangerous', 'true'))
+    if classic:
+        body.append(form_field('classic', 'true'))
+    body.extend([b'--', boundary.encode(), b'--', crlf])
+
+    headers = {
+        'Accept': 'application/json',
+        'Content-Type': f'multipart/form-data; boundary={boundary}',
+    }
+    response = _client._request('POST', '/v2/snaps', headers=headers, data=b''.join(body))
+    response_dict = json.loads(response.read())
+    if response_dict.get('type') == 'error':
+        raise _client._make_error(response_dict)
+    _client._Change(response_dict['change']).wait()
+
+
+def ensure_installed_local(name: str, *, version: str = '1.0', classic: bool = False) -> None:
+    """Ensure a snap built from ``SNAPS_DIR`` is installed, sideloading it if it is absent."""
+    if _functions._installed_info(name) is not None:
+        return
+    install_local(SNAPS_DIR / f'{name}_{version}.snap', dangerous=True, classic=classic)
 
 
 @functools.cache  # Cached to avoid repeated store queries.

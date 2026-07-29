@@ -11,8 +11,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 from charmlibs.snap import _client, _errors, _snapd_conf
-from conftest import ensure_installed, ensure_removed
-from test_snapd_local import SNAPS_DIR, install_local
+from conftest import SNAPS_DIR, ensure_installed, ensure_removed, install_local
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -21,6 +20,8 @@ if TYPE_CHECKING:
 # Defined in https://github.com/canonical/snapd/tree/master/tests/lib/snaps
 # Only published on latest/edge.
 _SNAP = 'test-snapd-with-configure'
+# A snap with no configure hook, so it can never hold configuration.
+_NO_HOOK_SNAP = 'test-snapd-tools'
 # A key prefix we use to avoid colliding with any other configuration on the snap.
 _KEY = 'test-functional-key'
 _KEY2 = 'test-functional-key2'
@@ -214,10 +215,10 @@ def test_raw_get_all_not_installed_snap_returns_empty_dict():
 
 
 def test_get_all_installed_snap_with_no_config_returns_empty_dict():
-    # hello-world has no configure hook, so it can never have configuration. Unlike the CLI
-    # (`snap get hello-world` errors with 'has no configuration'), get() returns an empty dict.
-    ensure_installed('hello-world')
-    assert _snapd_conf.get('hello-world') == {}
+    # The snap has no configure hook, so it can never have configuration. Unlike the CLI
+    # (`snap get <snap>` errors with 'has no configuration'), get() returns an empty dict.
+    ensure_installed(_NO_HOOK_SNAP)
+    assert _snapd_conf.get(_NO_HOOK_SNAP) == {}
 
 
 # ---------------------------------------------------------------------------
@@ -552,17 +553,17 @@ def test_unset_dotted_path_no_error():
 
 
 def test_set_no_configure_hook_raises_change_error():
-    # set/unset run the snap's configure hook as an async change. hello-world has no
+    # set/unset run the snap's configure hook as an async change. This snap has no
     # configure hook, so snapd fails the change and we surface it as a ChangeError.
-    ensure_installed('hello-world')
+    ensure_installed(_NO_HOOK_SNAP)
     with pytest.raises(_errors.ChangeError):
-        _snapd_conf.set('hello-world', {'any-key': 'value'})
+        _snapd_conf.set(_NO_HOOK_SNAP, {'any-key': 'value'})
 
 
 def test_unset_no_configure_hook_raises_change_error():
-    ensure_installed('hello-world')
+    ensure_installed(_NO_HOOK_SNAP)
     with pytest.raises(_errors.ChangeError):
-        _snapd_conf.unset('hello-world', ['any-key'])
+        _snapd_conf.unset(_NO_HOOK_SNAP, ['any-key'])
 
 
 def test_set_empty_dict_no_configure_hook_is_noop():
@@ -570,8 +571,8 @@ def test_set_empty_dict_no_configure_hook_is_noop():
     # when there is nothing to set (Optional: len(patch) == 0), so a missing hook is not an
     # error and the change completes as a no-op. Contrast test_set_no_configure_hook_*, where a
     # non-empty patch on the same hook-less snap does raise.
-    ensure_installed('hello-world')
-    _snapd_conf.set('hello-world', {})  # Should not raise.
+    ensure_installed(_NO_HOOK_SNAP)
+    _snapd_conf.set(_NO_HOOK_SNAP, {})  # Should not raise.
 
 
 # ---------------------------------------------------------------------------
@@ -621,12 +622,12 @@ def test_rejected_set_rolls_back_entire_transaction(configure_snap: None):
 # These names are rejected before a request is made. Without that, an empty name builds
 # '/v2/snaps//conf', which snapd answers with an empty-bodied 301 to '/v2/snaps/conf' -- a
 # BadResponseError about invalid JSON, indistinguishable from a transport fault. A name with a
-# path separator is worse: snapd's router decodes '%2F' before matching, so get('lxd/conf') would
-# have read '/v2/snaps/lxd/conf' -- another snap's configuration. See tests/functional/test_client
-# for both behaviours against the raw client.
+# path separator is worse: snapd's router decodes '%2F' before matching, so get('<snap>/conf')
+# would have read '/v2/snaps/<snap>/conf' -- another snap's configuration. See
+# tests/functional/test_client for both behaviours against the raw client.
 
 
-@pytest.mark.parametrize('snap', ['', '.', '..', 'lxd/conf'])
+@pytest.mark.parametrize('snap', ['', '.', '..', 'test-configure-snap/conf'])
 def test_conf_invalid_snap_name_raises_value_error(snap: str):
     with pytest.raises(ValueError):
         _snapd_conf.get(snap)
