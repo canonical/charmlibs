@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 # /v2/snaps/{snap}
 
 
-class Info:
+class InstalledInfo:
     def __init__(
         self,
         name: str,
@@ -98,17 +98,19 @@ class Info:
         return self._hold
 
 
-def info(snap: str) -> Info:
-    """Get information about an installed snap.
+def list_one(snap: str) -> InstalledInfo:
+    """Get information about a single installed snap.
 
-    This function implements the semantics of the `snap list` command,
-    restricted to a single snap.
+    This function implements the semantics of the ``snap list`` command, restricted to a single
+    snap: it reports the local state of an installed snap and never queries the snap store.
+    It is named for that command rather than ``snap info``, which reports what the store offers
+    for a snap -- the channels available and their revisions -- and is not implemented here.
 
     Args:
         snap: the name of the snap.
 
     Returns:
-        An Info object with information about the snap.
+        An :class:`InstalledInfo` object with information about the snap.
 
     Raises:
         ValueError: if the snap name is empty or is not a single path segment.
@@ -118,7 +120,7 @@ def info(snap: str) -> Info:
     info_dict = _client.get(f'/v2/snaps/{_utils.snap_path_segment(snap)}')
     assert isinstance(info_dict, dict)
     info_dict = typing.cast('dict[str, str]', info_dict)
-    return Info._from_dict(info_dict)
+    return InstalledInfo._from_dict(info_dict)
 
 
 def install(
@@ -298,7 +300,7 @@ def hold(snap: str, duration: datetime.timedelta | int | float | None = None) ->
     data = {'action': 'hold', 'hold-level': 'general', 'time': until}
     # NOTE: The API returns an error with no 'kind' when holding a non-installed snap.
     # The CLI raises an error in this case, so we pre-emptively check if the snap is installed.
-    info(snap)  # Raise NotFoundError if not installed.
+    list_one(snap)  # Raise NotFoundError if not installed.
     _client.post(path, body=data)
 
 

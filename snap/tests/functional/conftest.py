@@ -67,7 +67,7 @@ def retry_on_rate_limit(func: Callable[_P, _T]) -> Callable[_P, _T]:
 
 def ensure_removed(*snaps: str) -> None:
     for snap_name in snaps:
-        if _functions._get_info(snap_name) is not None:
+        if _functions._installed_info(snap_name) is not None:
             snap.remove(snap_name)
 
 
@@ -77,7 +77,7 @@ def ensure_installed(*snaps: str, channel: str | None = None, classic: bool = Fa
 
 
 @functools.cache  # Cached to avoid repeated store queries.
-def list_channels(snap: str) -> dict[str, _snapd.Info]:
+def list_channels(snap: str) -> dict[str, _snapd.InstalledInfo]:
     """List information about all channels of a snap available in the store.
 
     Sources channel/revision info from the store, so that tests can assert against the
@@ -93,6 +93,11 @@ def list_channels(snap: str) -> dict[str, _snapd.Info]:
     # Store results are keyed by channel and have no tracking channel, so the key is supplied as
     # both: Info.tracking reads 'tracking-channel', which only an installed snap has.
     return {
-        k: _snapd.Info._from_dict({'name': snap, 'channel': k, 'tracking-channel': k, **v})
+        k: _snapd.InstalledInfo._from_dict({
+            'name': snap,
+            'channel': k,
+            'tracking-channel': k,
+            **v,
+        })
         for k, v in channels.items()
     }

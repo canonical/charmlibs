@@ -33,7 +33,7 @@ _CALLS: dict[str, Callable[[str], object]] = {
     'get': lambda v: snap.get(v),
     'get (key)': lambda v: snap.get('lxd', [v]),
     'hold': lambda v: snap.hold(v),
-    'info': lambda v: snap.info(v),
+    'list_one': lambda v: snap.list_one(v),
     'install': lambda v: snap.install(v),
     'logs': lambda v: snap.logs(v),
     'refresh': lambda v: snap.refresh(v),
@@ -154,7 +154,7 @@ _MAX_FRAMES = 3
 
 # ensure is a composition of the other public functions rather than a call to an endpoint of its
 # own, and doesn't check the snap name itself: whichever function it reaches first does it. That
-# leaves the deepest traceback in the library -- ensure, its _get_info probe, info,
+# leaves the deepest traceback in the library -- ensure, its _installed_info probe, list_one,
 # snap_path_segment and the check -- which is the price of not duplicating the check in a layer
 # that doesn't own it.
 _COMPOSITE_FUNCTIONS = {'ensure'}

@@ -2,7 +2,7 @@
 # Copyright 2026 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-"""Functional tests for _snapd_snaps: info, install, remove, refresh, hold, unhold.
+"""Functional tests for _snapd_snaps: list_one, install, remove, refresh, hold, unhold.
 
 Tests are ordered to minimise snap install/remove churn.  All tests that need
 hello-world *installed* run first, then all tests that need it *removed*, then
@@ -28,12 +28,12 @@ _ABSENT_SNAP = 'this-snap-does-not-exist-xyz-abc-123'
 # Test helper and possible future candidate for library public API.
 # _list_snaps is an independent oracle (hits /v2/snaps) for the info()/missing-ok tests.
 # list_channels (from conftest) sources store channel/revision info for install/refresh tests.
-def _list_snaps() -> list[_snapd.Info]:
+def _list_snaps() -> list[_snapd.InstalledInfo]:
     """List all installed snaps."""
     info_dicts = _client.get('/v2/snaps')
     assert isinstance(info_dicts, list)
     info_dicts = typing.cast('list[dict[str, str]]', info_dicts)
-    return [_snapd.Info._from_dict(info_dict) for info_dict in info_dicts]
+    return [_snapd.InstalledInfo._from_dict(info_dict) for info_dict in info_dicts]
 
 
 # ---------------------------------------------------------------------------
@@ -41,9 +41,9 @@ def _list_snaps() -> list[_snapd.Info]:
 # ---------------------------------------------------------------------------
 
 
-def test_info_installed():
+def test_list_one_installed():
     ensure_installed('hello-world')
-    info = _snapd.info('hello-world')
+    info = _snapd.list_one('hello-world')
     assert info.name == 'hello-world'
     assert info.tracking
     assert info.revision
@@ -52,9 +52,9 @@ def test_info_installed():
     assert 'hello-world' in {s.name for s in _list_snaps()}
 
 
-def test_info_fields():
+def test_list_one_fields():
     ensure_installed('hello-world')
-    info = _snapd.info('hello-world')
+    info = _snapd.list_one('hello-world')
     assert info.classic is False
     assert info.hold is None
 
@@ -69,7 +69,7 @@ def test_refresh_no_updates_returns_false():
     ensure_installed('hello-world', channel='latest/stable')
     result = retry_on_rate_limit(_snapd.refresh)('hello-world', channel='latest/stable')
     assert result is False
-    assert _snapd.info('hello-world').tracking == 'latest/stable'
+    assert _snapd.list_one('hello-world').tracking == 'latest/stable'
 
 
 def test_refresh_channel():
@@ -77,7 +77,7 @@ def test_refresh_channel():
     # Pre-flight: confirm the target channel exists before refreshing to it.
     assert 'latest/candidate' in list_channels('hello-world')
     retry_on_rate_limit(_snapd.refresh)('hello-world', channel='latest/candidate')
-    info = _snapd.info('hello-world')
+    info = _snapd.list_one('hello-world')
     assert info.tracking == 'latest/candidate'
 
 
@@ -99,7 +99,7 @@ def test_hold_with_duration():
     ensure_installed('hello-world')
     try:
         _snapd.hold('hello-world', duration=datetime.timedelta(days=2))
-        info = _snapd.info('hello-world')
+        info = _snapd.list_one('hello-world')
         assert info.hold is not None
         assert info.hold - datetime.datetime.now().astimezone() > datetime.timedelta(days=1)
     finally:
@@ -110,7 +110,7 @@ def test_hold_forever():
     ensure_installed('hello-world')
     try:
         _snapd.hold('hello-world')
-        info = _snapd.info('hello-world')
+        info = _snapd.list_one('hello-world')
         # When held forever, snapd returns a far-future timestamp.
         assert info.hold is not None
     finally:
@@ -130,9 +130,9 @@ def test_hold_already_held_no_error():
 def test_unhold():
     ensure_installed('hello-world')
     _snapd.hold('hello-world')
-    assert _snapd.info('hello-world').hold is not None
+    assert _snapd.list_one('hello-world').hold is not None
     _snapd.unhold('hello-world')
-    assert _snapd.info('hello-world').hold is None
+    assert _snapd.list_one('hello-world').hold is None
 
 
 def test_remove():
@@ -140,7 +140,7 @@ def test_remove():
     ensure_installed('hello-world')
     _snapd.remove('hello-world')
     with pytest.raises(_errors.NotFoundError):
-        _snapd.info('hello-world')
+        _snapd.list_one('hello-world')
 
 
 # ---------------------------------------------------------------------------
@@ -149,12 +149,12 @@ def test_remove():
 # ---------------------------------------------------------------------------
 
 
-def test_info_missing_raises():
+def test_list_one_missing_raises():
     ensure_removed('hello-world')
     # Independent oracle: the snap really is absent from /v2/snaps.
     assert 'hello-world' not in {s.name for s in _list_snaps()}
     with pytest.raises(_errors.NotFoundError) as ctx:
-        _snapd.info('hello-world')
+        _snapd.list_one('hello-world')
     assert ctx.value.kind == 'snap-not-found'
 
 
@@ -219,7 +219,7 @@ def test_install_revision_not_available_raises():
 def test_install():
     ensure_removed('hello-world')
     retry_on_rate_limit(_snapd.install)('hello-world')
-    info = _snapd.info('hello-world')
+    info = _snapd.list_one('hello-world')
     assert info.name == 'hello-world'
     assert info.tracking == 'latest/stable'
     # The installed revision should match the store's current latest/stable revision.
@@ -231,7 +231,7 @@ def test_install_channel():
     # Pre-flight: confirm the target channel actually exists in the store.
     assert 'latest/candidate' in list_channels('hello-world')
     retry_on_rate_limit(_snapd.install)('hello-world', channel='latest/candidate')
-    info = _snapd.info('hello-world')
+    info = _snapd.list_one('hello-world')
     assert info.tracking == 'latest/candidate'
 
 
@@ -242,7 +242,7 @@ def test_install_revision():
     current = int(list_channels('hello-world')['latest/stable'].revision)
     previous = current - 1
     retry_on_rate_limit(_snapd.install)('hello-world', revision=previous)
-    info = _snapd.info('hello-world')
+    info = _snapd.list_one('hello-world')
     assert info.revision == str(previous)
 
 
@@ -261,7 +261,7 @@ def test_install_needs_classic_raises():
 def test_install_classic():
     ensure_removed('charmcraft')
     retry_on_rate_limit(_snapd.install)('charmcraft', classic=True)
-    info = _snapd.info('charmcraft')
+    info = _snapd.list_one('charmcraft')
     assert info.classic is True
 
 
@@ -282,7 +282,7 @@ def test_install_channel_and_revision():
     ensure_removed('hello-world')
     edge = list_channels('hello-world')['latest/edge'].revision
     retry_on_rate_limit(_snapd.install)('hello-world', channel='latest/edge', revision=edge)
-    info = _snapd.info('hello-world')
+    info = _snapd.list_one('hello-world')
     assert info.revision == edge
     assert info.tracking == 'latest/edge'
 
@@ -304,7 +304,7 @@ def test_refresh_channel_and_revision():
     ensure_installed('hello-world', channel='latest/stable')
     edge = list_channels('hello-world')['latest/edge'].revision
     retry_on_rate_limit(_snapd.refresh)('hello-world', channel='latest/edge', revision=edge)
-    info = _snapd.info('hello-world')
+    info = _snapd.list_one('hello-world')
     assert info.revision == edge
     assert info.tracking == 'latest/edge'
 
@@ -313,6 +313,6 @@ def test_refresh_revision_already_installed_still_refreshes():
     # Snapd runs a full refresh when a revision is specified, even if that revision is already
     # installed, so refresh reports that it did something. ensure() relies on knowing this.
     ensure_installed('hello-world')
-    current = _snapd.info('hello-world').revision
+    current = _snapd.list_one('hello-world').revision
     result = retry_on_rate_limit(_snapd.refresh)('hello-world', revision=current)
     assert result is True

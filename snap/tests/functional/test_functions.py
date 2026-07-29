@@ -27,7 +27,7 @@ _ABSENT_SNAP = 'this-snap-does-not-exist-xyz-abc-123'
 
 def test_ensure_revision_no_op_if_same_revision():
     ensure_installed('hello-world')
-    current_revision = _snapd.info('hello-world').revision
+    current_revision = _snapd.list_one('hello-world').revision
     result = _functions.ensure('hello-world', revision=int(current_revision))
     assert result is False
 
@@ -36,18 +36,18 @@ def test_ensure_revision_no_op_if_same_revision_and_update_true():
     # update is ignored when a revision is specified: the revision fully determines which
     # revision to be on, so there's nothing to update to.
     ensure_installed('hello-world')
-    current_revision = _snapd.info('hello-world').revision
+    current_revision = _snapd.list_one('hello-world').revision
     result = _functions.ensure('hello-world', revision=int(current_revision), update=True)
     assert result is False
 
 
 def test_ensure_revision_refreshes_on_different_revision():
     ensure_installed('hello-world')
-    original_revision = _snapd.info('hello-world').revision
+    original_revision = _snapd.list_one('hello-world').revision
     older_revision = int(original_revision) - 1
     did_something = _functions.ensure('hello-world', revision=older_revision)
     assert did_something is True
-    assert _snapd.info('hello-world').revision == str(older_revision)
+    assert _snapd.list_one('hello-world').revision == str(older_revision)
 
 
 def test_ensure_no_op_update_false():
@@ -72,7 +72,7 @@ def test_ensure_refreshes_on_different_channel():
     ensure_installed('hello-world', channel='latest/stable')
     did_something = _functions.ensure('hello-world', channel='latest/candidate')
     assert did_something is True
-    assert _snapd.info('hello-world').tracking == 'latest/candidate'
+    assert _snapd.list_one('hello-world').tracking == 'latest/candidate'
 
 
 def test_ensure_no_updates_available_returns_false():
@@ -91,7 +91,7 @@ def test_ensure_revision_installs_if_not_present():
     ensure_removed('hello-world')
     did_something = _functions.ensure('hello-world', revision=28)
     assert did_something is True
-    assert _snapd.info('hello-world').revision == '28'
+    assert _snapd.list_one('hello-world').revision == '28'
 
 
 def test_ensure_revision_without_channel_tracks_latest_stable():
@@ -100,7 +100,7 @@ def test_ensure_revision_without_channel_tracks_latest_stable():
     # one -- moves the snap to latest/stable's revision.
     ensure_removed('hello-world')
     _functions.ensure('hello-world', revision=28)
-    info = _snapd.info('hello-world')
+    info = _snapd.list_one('hello-world')
     assert info.revision == '28'
     assert info.tracking == 'latest/stable'
 
@@ -110,7 +110,7 @@ def test_ensure_channel_and_revision_installs_and_tracks_channel():
     edge = list_channels('hello-world')['latest/edge'].revision
     did_something = _functions.ensure('hello-world', channel='latest/edge', revision=edge)
     assert did_something is True
-    info = _snapd.info('hello-world')
+    info = _snapd.list_one('hello-world')
     assert info.revision == edge
     assert info.tracking == 'latest/edge'
 
@@ -134,7 +134,7 @@ def test_ensure_same_revision_different_channel_switches_tracking():
     _functions.ensure('hello-world', channel='latest/edge', revision=revision)
     did_something = _functions.ensure('hello-world', channel='latest/stable', revision=revision)
     assert did_something is True
-    info = _snapd.info('hello-world')
+    info = _snapd.list_one('hello-world')
     assert info.revision == revision
     assert info.tracking == 'latest/stable'
 
@@ -143,19 +143,19 @@ def test_ensure_installs_if_not_present():
     ensure_removed('hello-world')
     did_something = _functions.ensure('hello-world')
     assert did_something is True
-    assert _snapd.info('hello-world').name == 'hello-world'
+    assert _snapd.list_one('hello-world').name == 'hello-world'
 
 
 def test_ensure_installs_at_default_channel():
     ensure_removed('hello-world')
     _functions.ensure('hello-world')
-    assert _snapd.info('hello-world').tracking == 'latest/stable'
+    assert _snapd.list_one('hello-world').tracking == 'latest/stable'
 
 
 def test_ensure_installs_at_specified_channel():
     ensure_removed('hello-world')
     _functions.ensure('hello-world', channel='latest/candidate')
-    assert _snapd.info('hello-world').tracking == 'latest/candidate'
+    assert _snapd.list_one('hello-world').tracking == 'latest/candidate'
 
 
 # ---------------------------------------------------------------------------
@@ -194,7 +194,7 @@ def test_ensure_revision_installs_classic():
     channel = 'latest/stable' if 'latest/stable' in channels else next(iter(channels))
     revision = channels[channel].revision
     _functions.ensure('charmcraft', channel=channel, revision=revision, classic=True)
-    info = _snapd.info('charmcraft')
+    info = _snapd.list_one('charmcraft')
     assert info.classic is True
     assert info.revision == revision
 
@@ -208,7 +208,7 @@ def test_ensure_needs_classic_raises():
 def test_ensure_installs_classic():
     ensure_removed('charmcraft')
     _functions.ensure('charmcraft', classic=True)
-    assert _snapd.info('charmcraft').classic is True
+    assert _snapd.list_one('charmcraft').classic is True
 
 
 # ---------------------------------------------------------------------------
@@ -230,7 +230,7 @@ def test_ensure_empty_channel_installs_on_default_channel() -> None:
     ensure_removed('hello-world')
     did_something = _functions.ensure('hello-world', channel='')
     assert did_something is True
-    assert _snapd.info('hello-world').tracking == 'latest/stable'
+    assert _snapd.list_one('hello-world').tracking == 'latest/stable'
 
 
 def test_ensure_empty_channel_refreshes_when_installed() -> None:

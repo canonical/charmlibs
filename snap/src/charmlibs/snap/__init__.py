@@ -18,7 +18,7 @@ Use :func:`ensure` to ensure that a snap is installed, optionally on a specific 
 or revision.
 
 Manually manage snap installation with :func:`install`, :func:`refresh`, and :func:`remove`.
-Use :func:`info` to query the current state of an installed snap.
+Use :func:`list_one` to query the current state of an installed snap.
 
 Also manage:
 
@@ -86,10 +86,10 @@ from ._snapd_logs import (
     logs,
 )
 from ._snapd_snaps import (
-    Info,
+    InstalledInfo,
     hold,
-    info,
     install,
+    list_one,
     refresh,
     remove,
     unhold,
@@ -104,7 +104,7 @@ __all__ = [
     'ChannelNotAvailableError',
     'ConnectionError',
     'Error',
-    'Info',
+    'InstalledInfo',
     'LogEntry',
     'NeedsClassicError',
     'NotFoundError',
@@ -118,8 +118,8 @@ __all__ = [
     'ensure',
     'get',
     'hold',
-    'info',
     'install',
+    'list_one',
     'logs',
     'refresh',
     'remove',
