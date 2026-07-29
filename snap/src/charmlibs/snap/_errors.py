@@ -138,10 +138,12 @@ class AppNotFoundError(APIError):
 class NotFoundError(APIError):
     """Raised when a snap is not found.
 
-    The operation determines which sense is meant. :func:`install` looks the snap up in the
-    store, so this means the store doesn't offer it; :func:`ensure` inherits that when the snap
-    isn't already installed. Every other function operates on an installed snap, so this means
-    the snap isn't installed on the system.
+    The operation usually determines which sense is meant. :func:`install` looks the snap up in
+    the store, so this means the store doesn't offer it; most other functions operate on an
+    installed snap, so it means the snap isn't installed on the system.
+
+    :func:`refresh` is the exception, and :func:`ensure` inherits that: a refresh needs the snap
+    to be both installed and still offered by the store, so either can be what's missing.
 
     The two are not distinguished by type, because snapd doesn't distinguish them either: it
     sends the same ``snap-not-found`` kind for both, and the snap name as ``value`` for both.

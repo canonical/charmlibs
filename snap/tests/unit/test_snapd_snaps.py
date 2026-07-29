@@ -302,6 +302,24 @@ class TestRefreshNotInstalled:
             _snapd.refresh('hello-world')
         assert ctx.value is original
 
+    def test_store_sense_not_found_is_reraised_unchanged(self, mock_client: MockClient):
+        # The case the probe must not get wrong: refreshing an installed snap that the store no
+        # longer offers is itself a NotFoundError, with the store's 'snap not found' message.
+        # Since the probe's own error is also a NotFoundError, a probe that raised
+        # unconditionally would silently swap the store's error for a "not installed" one that
+        # is untrue. It doesn't: the probe finds the snap, so snapd's error is re-raised as is.
+        # snapd's path to this is pinned by its own daemon/errors_test.go -- a single-snap
+        # SnapActionError{Refresh: ErrSnapNotFound} unwraps to a 404 'snap-not-found'.
+        original = NotFoundError(
+            'snap not found', kind='snap-not-found', value='hello-world', status_code=404
+        )
+        mock_client.post.side_effect = original
+        mock_client.get.return_value = _MINIMAL_INFO_DICT
+        with pytest.raises(NotFoundError) as ctx:
+            _snapd.refresh('hello-world')
+        assert ctx.value is original
+        assert ctx.value.message == 'snap not found'  # Not the probe's 'snap not installed'.
+
     def test_typed_errors_are_reraised_unchanged(self, mock_client: MockClient):
         # A refresh failure snapd does classify keeps its own type once the probe finds the snap.
         original = ChannelNotAvailableError(
