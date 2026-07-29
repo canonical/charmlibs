@@ -179,6 +179,22 @@ def test_get_not_installed_snap_raises_not_found():
     with pytest.raises(_errors.NotFoundError) as ctx:
         _snapd_conf.get(_ABSENT_SNAP, ['any-key'])
     assert ctx.value.kind == 'snap-not-found'
+    # get() raises snapd's own /v2/snaps/{snap} probe error unchanged: a terse message with the
+    # snap name in value, which str() surfaces as 'snap not installed (<snap>)'. This reads
+    # differently from set/unset (whose PUT error names the snap in the message) -- we pass each
+    # endpoint's wording through rather than hand-building an error to normalise them.
+    assert ctx.value.message == 'snap not installed'
+    assert str(ctx.value.value) == _ABSENT_SNAP
+    assert str(ctx.value) == f'snap not installed ({_ABSENT_SNAP})'
+
+
+def test_get_not_installed_snap_error_is_not_chained():
+    # snapd's misleading option-not-found error is suppressed ('raise ... from None'), so the
+    # traceback is a single error and doesn't expose the internal /v2/snaps/{snap} probe.
+    with pytest.raises(_errors.NotFoundError) as ctx:
+        _snapd_conf.get(_ABSENT_SNAP, ['any-key'])
+    assert ctx.value.__cause__ is None
+    assert ctx.value.__suppress_context__
 
 
 def test_get_all_not_installed_snap_raises_not_found():
@@ -188,6 +204,10 @@ def test_get_all_not_installed_snap_raises_not_found():
     with pytest.raises(_errors.NotFoundError) as ctx:
         _snapd_conf.get(_ABSENT_SNAP)
     assert ctx.value.kind == 'snap-not-found'
+    assert ctx.value.message == 'snap not installed'
+    assert str(ctx.value) == f'snap not installed ({_ABSENT_SNAP})'
+    # No error was being handled when this was raised, so there's nothing to chain.
+    assert ctx.value.__context__ is None
 
 
 def test_raw_get_all_not_installed_snap_returns_empty_dict():
@@ -226,23 +246,63 @@ def test_get_empty_keys_not_installed_snap_raises_not_found():
     with pytest.raises(_errors.NotFoundError) as ctx:
         _snapd_conf.get(_ABSENT_SNAP, [])
     assert ctx.value.kind == 'snap-not-found'
+    assert ctx.value.message == 'snap not installed'
+    assert str(ctx.value) == f'snap not installed ({_ABSENT_SNAP})'
 
 
-def test_get_keys_of_only_empty_strings_returns_full_config():
-    # Undocumented snapd quirk, not a decision this library makes: keys=[''] and
-    # keys=['', ''] are NOT the same as our own keys=[] contract above. keys=[] is caught
-    # by our own `keys == []` check before any network call is made, but a list containing
-    # only empty strings doesn't match that check, so it falls through to being joined into
-    # the 'keys' query parameter -- '' and ',' respectively. snapd's own parsing of that
-    # query string treats both the same as no 'keys' param at all, so the full config comes
-    # back, equivalent to keys=None rather than keys=[].
+@pytest.mark.parametrize('keys', [[''], ['', ''], [' '], ['\t'], [','], ['a,b'], [' a'], ['a\n']])
+def test_get_keys_that_snapd_would_alter_raise_value_error(keys: list[str]):
+    # The public contract: a key that snapd's 'keys' parsing would alter is a ValueError rather
+    # than a request. The tests below pin what that parsing does, and so what these would mean.
+    with pytest.raises(ValueError):
+        _snapd_conf.get(_SNAP, keys)
+
+
+@pytest.mark.parametrize('keys', ['', ',', ' ', '\t', '\xa0', ' , '])
+def test_raw_get_keys_that_parse_away_returns_the_full_config(keys: str):
+    # Undocumented snapd quirk, and the reason get() rejects these rather than passing them
+    # through: keys=[''] and keys=[' '] are NOT the same as our own keys=[] contract above.
+    # keys=[] is caught by our own `keys == []` check before any network call is made, but a
+    # list whose keys all parse away doesn't match that check, so it used to fall through to
+    # being joined into the 'keys' query parameter. snapd's parsing of that treats it the same
+    # as no 'keys' param at all, so the full config comes back -- keys=None, not keys=[].
     ensure_installed(_SNAP, channel='latest/edge')
     _snapd_conf.set(_SNAP, {_KEY: 'value'})
     full_config = _snapd_conf.get(_SNAP)
     assert full_config != {}
-    assert _snapd_conf.get(_SNAP, ['']) == full_config
-    assert _snapd_conf.get(_SNAP, ['', '']) == full_config
+    assert _client.get(f'/v2/snaps/{_SNAP}/conf', query={'keys': keys}) == full_config
     _cleanup()
+
+
+def test_raw_get_keys_that_parse_away_hide_a_not_installed_snap():
+    # The same quirk on a snap that isn't installed, which is what made this a bug rather than a
+    # surprise: snapd answers a request for the whole configuration with an empty result whether
+    # or not the snap exists, and get()'s not-installed probe only runs for keys=None. A key that
+    # parsed away therefore turned a NotFoundError into an empty dict. Rejecting the key makes
+    # the request unmakeable; this pins the snapd behaviour that made it wrong.
+    assert _client.get(f'/v2/snaps/{_ABSENT_SNAP}/conf', query={'keys': ''}) == {}
+    with pytest.raises(ValueError):
+        _snapd_conf.get(_ABSENT_SNAP, [''])
+
+
+def test_raw_get_padded_key_returns_the_stripped_key():
+    # Whitespace is stripped from each key, so a padded key addresses the key it names once
+    # stripped, and the result is keyed by the stripped name -- meaning result[' key '] would
+    # raise KeyError on a request that appeared to succeed.
+    ensure_installed(_SNAP, channel='latest/edge')
+    _snapd_conf.set(_SNAP, {_KEY: 'value'})
+    assert _client.get(f'/v2/snaps/{_SNAP}/conf', query={'keys': f' {_KEY} '}) == {_KEY: 'value'}
+    _cleanup()
+
+
+def test_raw_get_comma_in_a_key_queries_two_keys():
+    # A comma inside one key is not escaped by url-encoding it: snapd decodes the parameter
+    # before splitting, so one key becomes two. This is why a comma is rejected.
+    ensure_installed(_SNAP, channel='latest/edge')
+    _snapd_conf.set(_SNAP, {_KEY: 'value', _KEY2: 'value2'})
+    result = _client.get(f'/v2/snaps/{_SNAP}/conf', query={'keys': f'{_KEY},{_KEY2}'})
+    assert result == {_KEY: 'value', _KEY2: 'value2'}
+    _cleanup(_KEY2)
 
 
 # ---------------------------------------------------------------------------
@@ -301,12 +361,17 @@ def test_set_not_installed_snap_raises_snap_not_found(config: dict[str, Any]):
     with pytest.raises(_errors.NotFoundError) as ctx:
         _snapd_conf.set(_ABSENT_SNAP, config)
     assert ctx.value.kind == 'snap-not-found'
+    # set/unset surface snapd's PUT error directly, which names the snap in the message. get()
+    # differs -- it raises the terse /v2/snaps probe error (name in value) -- because snapd words
+    # its two endpoints differently and we pass each through rather than normalising them.
+    assert ctx.value.message == f'snap "{_ABSENT_SNAP}" is not installed'
 
 
 def test_unset_not_installed_snap_raises_snap_not_found():
     with pytest.raises(_errors.NotFoundError) as ctx:
         _snapd_conf.unset(_ABSENT_SNAP, ['test-key'])
     assert ctx.value.kind == 'snap-not-found'
+    assert ctx.value.message == f'snap "{_ABSENT_SNAP}" is not installed'
 
 
 # ---------------------------------------------------------------------------
@@ -331,6 +396,79 @@ def test_set_empty_dict_is_noop():
     _snapd_conf.set(_SNAP, {_KEY: 'before-empty-set'})
     _snapd_conf.set(_SNAP, {})
     assert _get_one(_SNAP, _KEY) == 'before-empty-set'
+    _cleanup()
+
+
+# ---------------------------------------------------------------------------
+# set and unset: keys snapd cannot use
+#
+# These go in a JSON body rather than the 'keys' query parameter, so nothing alters them in
+# transit and snapd reports an unusable key itself. It only does so once the configure hook
+# runs, though, and calls an empty key an 'internal error', so set() and unset() reject empty
+# and blank keys up front. These tests go through _client to pin what snapd would have said.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize('key', ['', ' ', '\t'])
+@pytest.mark.parametrize('func', [_snapd_conf.set, _snapd_conf.unset], ids=['set', 'unset'])
+def test_set_and_unset_reject_empty_and_blank_keys(func: Any, key: str):
+    ensure_installed(_SNAP, channel='latest/edge')
+    with pytest.raises(ValueError):
+        func(_SNAP, {key: 'value'} if func is _snapd_conf.set else [key])
+
+
+@pytest.mark.parametrize(
+    ('key', 'expected'),
+    [
+        ('', 'internal error: key cannot be an empty string'),
+        (' ', 'invalid option name: " "'),
+        ('\t', 'invalid option name: "\\t"'),
+        (' padded ', 'invalid option name: " padded "'),
+        ('a,b', 'invalid option name: "a,b"'),
+    ],
+)
+def test_raw_put_unusable_key_fails_the_change(key: str, expected: str):
+    # snapd names the offending key verbatim, without stripping it, and fails the whole change.
+    # The empty key is the odd one out: it's reported as an internal error rather than as an
+    # invalid option name, which is the message a caller would otherwise have had to read.
+    ensure_installed(_SNAP, channel='latest/edge')
+    with pytest.raises(_errors.ChangeError) as ctx:
+        _client.put(f'/v2/snaps/{_SNAP}/conf', body={key: 'value'})
+    assert expected in ctx.value.message
+
+
+# A key with an empty dotted segment is neither empty nor blank, so it isn't guarded client-side
+# and reaches snapd -- which splits it on dots and blames the empty segment, naming a value the
+# caller never passed. These go through the public API rather than _client, since that is how a
+# caller reaches them.
+
+
+@pytest.mark.parametrize('key', ['a.', '.a', 'a..b', '.'])
+def test_get_key_with_an_empty_dotted_segment_raises(key: str):
+    # On the read side this is at least immediate: a synchronous APIError, no change, no hook.
+    ensure_installed(_SNAP, channel='latest/edge')
+    with pytest.raises(_errors.APIError) as ctx:
+        _snapd_conf.get(_SNAP, [key])
+    assert not ctx.value.kind
+    assert ctx.value.message == 'invalid option name: ""'
+
+
+@pytest.mark.parametrize('key', ['a.', '.a', 'a..b', '.'])
+def test_set_key_with_an_empty_dotted_segment_fails_the_change(key: str):
+    # On the write side it costs a round trip and a configure hook run before failing.
+    ensure_installed(_SNAP, channel='latest/edge')
+    with pytest.raises(_errors.ChangeError) as ctx:
+        _snapd_conf.set(_SNAP, {key: 'value'})
+    assert 'invalid option name: ""' in ctx.value.message
+
+
+def test_raw_put_unusable_key_rolls_back_the_valid_keys():
+    # The change is all-or-nothing, so a valid key sent alongside an unusable one is not applied.
+    ensure_installed(_SNAP, channel='latest/edge')
+    _snapd_conf.set(_SNAP, {_KEY: 'before'})
+    with pytest.raises(_errors.ChangeError):
+        _client.put(f'/v2/snaps/{_SNAP}/conf', body={'': 'value', _KEY: 'after'})
+    assert _get_one(_SNAP, _KEY) == 'before'
     _cleanup()
 
 
@@ -420,3 +558,28 @@ def test_rejected_set_rolls_back_entire_transaction(configure_snap: None):
         _snapd_conf.set('test-configure-snap', {'good-key': 'after', 'bad-key': 'x'})
     assert _snapd_conf.get('test-configure-snap', ['good-key']) == {'good-key': 'before'}
     _snapd_conf.unset('test-configure-snap', ['good-key'])
+
+
+# ---------------------------------------------------------------------------
+# empty and non-canonical snap names -> ValueError
+# ---------------------------------------------------------------------------
+# These names are rejected before a request is made. Without that, an empty name builds
+# '/v2/snaps//conf', which snapd answers with an empty-bodied 301 to '/v2/snaps/conf' -- a
+# BadResponseError about invalid JSON, indistinguishable from a transport fault. A name with a
+# path separator is worse: snapd's router decodes '%2F' before matching, so get('lxd/conf') would
+# have read '/v2/snaps/lxd/conf' -- another snap's configuration. See tests/functional/test_client
+# for both behaviours against the raw client.
+
+
+@pytest.mark.parametrize('snap', ['', '.', '..', 'lxd/conf'])
+def test_conf_invalid_snap_name_raises_value_error(snap: str):
+    with pytest.raises(ValueError):
+        _snapd_conf.get(snap)
+    with pytest.raises(ValueError):
+        _snapd_conf.get(snap, [_KEY])
+    with pytest.raises(ValueError):
+        _snapd_conf.get(snap, [])  # The installed-snap probe path.
+    with pytest.raises(ValueError):
+        _snapd_conf.set(snap, {_KEY: 'x'})
+    with pytest.raises(ValueError):
+        _snapd_conf.unset(snap, [_KEY])

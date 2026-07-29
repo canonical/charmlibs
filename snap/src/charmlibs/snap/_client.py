@@ -147,11 +147,12 @@ def _request(
     )
     opener = urllib.request.OpenerDirector()
     opener.add_handler(_client_sockets.UnixSocketHandler(_SOCKET_PATH))
-    opener.add_handler(urllib.request.HTTPRedirectHandler())
     # We need to handle HTTP errors ourselves, since the response body contains meaningful info,
     # so we don't add HTTPErrorProcessor or HTTPDefaultErrorHandler, which would raise too early.
+    # Without HTTPErrorProcessor, urllib never dispatches 3xx to HTTPRedirectHandler either.
+    # We don't expect redirects, so we manually convert 3xx responses into errors below.
     try:
-        return opener.open(request, timeout=_REQUEST_TIMEOUT)
+        response = opener.open(request, timeout=_REQUEST_TIMEOUT)
     except TimeoutError:
         raise _errors.TimeoutError(
             f'Request to snapd timed out after {_REQUEST_TIMEOUT}s: {method} {path}',
@@ -170,6 +171,20 @@ def _request(
             kind='charmlibs-snap-connection-error',
             value='',
         ) from e
+    if 300 <= response.status < 400:  # 3xx responses.
+        # snapd itself never redirects, aside from path canonicalisation -- for example,
+        # paths containing '//', '/./' or '/../' get a 301 to the cleaned path.
+        # We validate and encode the inputs we interpolate into paths, so we only make requests
+        # to canonical paths. A redirect here means a bug on our side or a change in snapd.
+        location = response.getheader('Location')
+        raise _errors.BadResponseError(
+            message=f'Unexpected redirect for path {path!r} to {location!r}',
+            kind='charmlibs-snap-unexpected-redirect',
+            value=location or '',
+            status_code=response.status,
+            status=response.reason,
+        )
+    return response
 
 
 def _decode(response: http.client.HTTPResponse) -> object | _Change:

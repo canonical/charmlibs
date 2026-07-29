@@ -85,5 +85,28 @@ def test_snap_error():
     assert 'the-value' in r
     assert '400' in r
     assert 'Bad Request' in r
-    # str() is just the message
-    assert str(err) == 'the message'
+    # str() appends a string value that adds information the message doesn't already carry.
+    assert str(err) == 'the message (the-value)'
+
+
+@pytest.mark.parametrize(
+    ('message', 'value', 'expected'),
+    [
+        ('snap not installed', 'hello-world', 'snap not installed (hello-world)'),
+        # Not appended when the value appears in the message.
+        (
+            'snap "hello-world" is not installed',
+            'hello-world',
+            'snap "hello-world" is not installed',
+        ),
+        ('boom', '', 'boom'),  # Not appended when the value is empty.
+        # Not appended when the value is not a string.
+        (
+            'snap "lxd" has no "k" configuration option',
+            {'SnapName': 'lxd', 'Key': 'k'},
+            'snap "lxd" has no "k" configuration option',
+        ),
+    ],
+)
+def test_str_appends_informative_string_value(message: str, value: object, expected: str):
+    assert str(_errors.Error(message, kind='some-kind', value=value)) == expected

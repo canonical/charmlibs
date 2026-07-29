@@ -18,44 +18,115 @@ from __future__ import annotations
 
 import datetime
 import sys
+import typing
+import urllib.parse
 
-from . import _client
+from . import _client, _errors
+
+if typing.TYPE_CHECKING:
+    from collections.abc import Collection
 
 
-def raise_if_snap_not_installed_or_system(snap: str) -> None:
-    """Raise NotFoundError if the snap is not installed, unless it names a system snap.
+def snap_path_segment(snap: str) -> str:
+    """Validate a snap name and encode it for use as a single URL path segment.
 
-    snapd treats ``'system'`` as an alias for ``'core'`` on its config endpoints, and remaps both
-    ``'system'`` and ``'core'`` to the always-present snapd snap on its interface endpoints, so
-    operations on these names succeed whether or not the core snap is installed. For those names
-    the installed check is skipped; for any other name this probes ``/v2/snaps/{snap}``, which
-    raises :class:`NotFoundError` if the snap is not installed.
+    Raises ValueError if the name is empty or would not be a single, canonical path segment.
+    Percent-encoding alone is not enough to guarantee that:
+
+    - snapd's router (gorilla/mux) matches on the *decoded* path, so ``%2F`` is still a path
+      separator to it: without this check ``info('hello-world/conf')`` would reach
+      ``/v2/snaps/hello-world/conf`` and return that snap's configuration.
+    - ``urllib.parse.quote`` leaves ``.`` unencoded, so a ``.`` or ``..`` name would still make
+      the path non-canonical, which mux answers with a ``301`` to the cleaned path.
+
+    Encoding is still applied, so that characters such as ``?`` and ``#`` in a name are sent as
+    part of the path instead of starting a query string or fragment.
+    """
+    raise_if_empty_or_blank(snap, label='snap name')
+    if '/' in snap or snap in ('.', '..'):
+        raise ValueError(f'snap name must be a single path segment, not {snap!r}')
+    return urllib.parse.quote(snap, safe='')
+
+
+def check_installed_or_system(snap: str) -> _errors.NotFoundError | None:
+    """Return NotFoundError if the snap is not installed or a system/core alias.
+
+    Returns ``None`` when the snap is installed, and for the ``system``/``core`` aliases, which
+    snapd handles config and interfaces for whether or not the core snap is installed as a snap.
+    Check if this system handling is appropriate if using this function with other snapd endpoints.
+    Otherwise probes ``GET /v2/snaps/{snap}`` and returns snapd's own :class:`NotFoundError` when
+    it reports the snap absent, ready for the caller to ``raise``.
+
+    Raises ValueError for a name that can't be used as a path segment (see
+    :func:`snap_path_segment`). Callers that reach this from an exception handler must skip
+    empty names, so that a ValueError can't mask the error they're classifying.
     """
     # NOTE: snapd's conf endpoints treat 'system' as an alias for 'core', and interface requests
     # remap 'system'/'core' to the snapd snap, so both names are served without the core snap.
     # /v2/snaps/system always 404s (a hardcoded alias, not a real snap) and /v2/snaps/core 404s
-    # when the core snap is absent, so probing either would turn a working call into NotFoundError.
+    # when the core snap is absent, so probing either would report a working call as not installed.
     if snap in ('system', 'core'):
-        return
-    _client.get(f'/v2/snaps/{snap}')  # Raises NotFoundError if the snap isn't installed.
+        return None
+    path = f'/v2/snaps/{snap_path_segment(snap)}'
+    try:
+        _client.get(path)
+    except _errors.NotFoundError as e:
+        return e.with_traceback(None)  # Clean error with no traceback for the caller to raise.
+    return None
+
+
+RISKS = ('stable', 'candidate', 'beta', 'edge')
 
 
 def normalize_channel(channel: str) -> str:
-    """Normalize a snap channel string to the form "track/risk".
+    """Normalize a snap channel string to the form snapd reports it in.
 
-    Channels may be specified as track or risk only, or as "track/risk" or "track/risk/branch".
-    Snapd uses default values internally, but will record the *requested* value in the snap info.
-    This function normalizes channels with no "/" to the form "track/risk" for easier comparison.
+    Channels may be specified as a track or risk only, or as "track/risk",
+    "risk/branch", or "track/risk/branch". Snapd fills in the defaults and records the
+    *resolved* value, so a channel must be normalized the same way before it can be
+    compared with the channel from :func:`info`.
+
+    This mirrors ``channel.Full`` in snapd: a lone risk gets the ``latest`` track, a lone
+    track gets the ``stable`` risk, and a leading risk in a two part channel means the
+    second part is a branch rather than a risk, so the ``latest`` track is filled in.
+    """
+    components = [c for c in channel.split('/') if c]
+    if not components:
+        return ''
+    if len(components) == 1:
+        # Either a risk, which takes the default track, or a track, which takes the default risk.
+        return f'latest/{components[0]}' if components[0] in RISKS else f'{components[0]}/stable'
+    if len(components) == 2 and components[0] in RISKS:
+        # "risk/branch", which takes the default track.
+        return f'latest/{components[0]}/{components[1]}'
+    return '/'.join(components)
+
+
+def resolve_channel(channel: str, tracking: str) -> str:
+    """Resolve a requested channel against the channel a snap currently tracks.
+
+    Returns the channel that snapd would end up tracking, so that a caller can tell whether
+    a requested channel is the one already tracked, without making a request to snapd.
+
+    A channel that starts with a risk inherits the track the snap is on, rather than the
+    default ``latest`` track. For example, refreshing a snap that tracks ``3.6/stable`` to
+    ``edge`` gives ``3.6/edge``, not ``latest/edge``. A channel that names a track doesn't
+    inherit the risk, so refreshing that same snap to ``4.0`` gives ``4.0/stable``. This
+    mirrors ``channel.Resolve`` in snapd.
+
+    Args:
+        channel: The requested channel, or an empty string to keep the tracked channel.
+        tracking: The channel the snap currently tracks, as reported by ``Info.tracking``.
+            Empty for a snap that isn't installed, or was installed from a local file.
     """
     if not channel:
-        return ''
-    if '/' not in channel:
-        if channel not in ('edge', 'beta', 'candidate', 'stable'):
-            # Track only, append default risk.
-            return f'{channel}/stable'
-        # Risk only, prepend default track.
-        return f'latest/{channel}'
-    return channel
+        return tracking
+    # A track can only be inherited from a channel that has one. The channel reported by snapd
+    # is always normalized, so this is only empty for a snap with no channel to inherit from.
+    track = tracking.partition('/')[0] if '/' in tracking else ''
+    if track and channel.partition('/')[0] in RISKS:
+        channel = f'{track}/{channel}'
+    return normalize_channel(channel)
 
 
 def parse_timestamp(timestamp: str) -> datetime.datetime:
@@ -80,3 +151,76 @@ def parse_timestamp(timestamp: str) -> datetime.datetime:
     # with zeros). E.g. '.13454' is 134540 μs, not 13454 μs. This matches fromisoformat in 3.11+.
     microseconds = datetime.timedelta(microseconds=int(ms[:6].ljust(6, '0')))
     return base + microseconds
+
+
+#############################################################
+# Rejecting values snapd can't use, before making a request #
+#############################################################
+
+
+def raise_if_empty_or_blank(values: str | Collection[str], *, label: str) -> None:
+    """Raise ValueError if a value is empty or contains only whitespace."""
+    values = _list(values)
+    for value in values:
+        problem = _empty(value) or _blank(value)
+        if problem:
+            raise ValueError(_message(label, problem, values))
+
+
+def raise_if_blank(values: str | Collection[str], *, label: str) -> None:
+    """Raise ValueError if a value is non-empty but contains only whitespace."""
+    values = _list(values)
+    for value in values:
+        problem = _blank(value)
+        if problem:
+            raise ValueError(_message(label, problem, values))
+
+
+def raise_if_not_comma_list_safe(values: str | Collection[str], *, label: str) -> None:
+    """Raise ValueError if a value would not survive snapd's comma-separated list parsing.
+
+    These values are joined by commas into one query parameter, making a value with a comma
+    indistinguishable from multiple values after our ``','.join``.
+
+    Snapd drops empty or blank values entirely (confusing when no values means "all"), and
+    silently strips leading and trailing whitespace (breaking ``get(s, [k])[k]``).
+    """
+    values = _list(values)
+    for value in values:
+        problem = _empty(value) or _blank(value) or _comma(value) or _padding(value)
+        if problem:
+            raise ValueError(_message(label, problem, values))
+
+
+def _list(values: str | Collection[str]) -> list[str]:
+    return [values] if isinstance(values, str) else list(values)
+
+
+def _empty(value: str) -> str | None:
+    if not value:
+        return 'must not be empty'
+    return None
+
+
+def _blank(value: str) -> str | None:
+    if value and not value.strip():
+        return f'must not be blank: {value!r}'
+    return None
+
+
+def _comma(value: str) -> str | None:
+    if ',' in value:
+        return f'must not contain a comma: {value!r}'
+    return None
+
+
+def _padding(value: str) -> str | None:
+    if value != value.strip():
+        return f'must not have leading or trailing whitespace: {value!r}'
+    return None
+
+
+def _message(label: str, problem: str, values: list[str]) -> str:
+    if len(values) > 1:
+        return f'{label} {problem} (in {values!r})'
+    return f'{label} {problem}'

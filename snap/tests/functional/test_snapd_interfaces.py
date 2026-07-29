@@ -329,29 +329,46 @@ def test_disconnect_all_empty_raises():
 # ---------------------------------------------------------------------------
 
 
-# The probe hits /v2/snaps/{name}, whose not-found error carries a generic message
-# ('snap not installed') and puts the snap name in `value` (unlike the /v2/interfaces message).
+# The probe hits /v2/snaps/{name}, whose not-found error carries a terse message
+# ('snap not installed') with the snap name in `value`. connect/disconnect raise that error
+# unchanged; str() surfaces the name as 'snap not installed (<snap>)'. This reads differently
+# from snapd's /v2/interfaces wording, which we deliberately don't reconstruct.
 
 
 def test_connect_not_installed_snap_raises_not_found():
     with pytest.raises(_errors.NotFoundError) as ctx:
         _snapd_interfaces.connect((_ABSENT_SNAP, 'home'))
     assert ctx.value.kind == 'snap-not-found'
-    assert _ABSENT_SNAP in str(ctx.value.value)
+    assert str(ctx.value.value) == _ABSENT_SNAP
+    assert ctx.value.message == 'snap not installed'
+    assert str(ctx.value) == f'snap not installed ({_ABSENT_SNAP})'
+
+
+def test_connect_not_installed_snap_error_is_not_chained():
+    # The original API error is suppressed ('raise ... from None'), so the traceback is a single
+    # error naming the snap, with no 'During handling of the above exception' probe noise.
+    with pytest.raises(_errors.NotFoundError) as ctx:
+        _snapd_interfaces.connect((_ABSENT_SNAP, 'home'))
+    assert ctx.value.__cause__ is None
+    assert ctx.value.__suppress_context__
 
 
 def test_disconnect_not_installed_snap_raises_not_found():
     with pytest.raises(_errors.NotFoundError) as ctx:
         _snapd_interfaces.disconnect((_ABSENT_SNAP, 'home'))
     assert ctx.value.kind == 'snap-not-found'
-    assert _ABSENT_SNAP in str(ctx.value.value)
+    assert str(ctx.value.value) == _ABSENT_SNAP
+    assert ctx.value.message == 'snap not installed'
+    assert str(ctx.value) == f'snap not installed ({_ABSENT_SNAP})'
 
 
 def test_connect_slot_snap_not_installed_raises_not_found():
     with pytest.raises(_errors.NotFoundError) as ctx:
         _snapd_interfaces.connect((_SNAP, _PLUG), (_ABSENT_SNAP, _PLUG))
     assert ctx.value.kind == 'snap-not-found'
-    assert _ABSENT_SNAP in str(ctx.value.value)
+    assert str(ctx.value.value) == _ABSENT_SNAP
+    assert ctx.value.message == 'snap not installed'
+    assert str(ctx.value) == f'snap not installed ({_ABSENT_SNAP})'
 
 
 # ---------------------------------------------------------------------------
@@ -432,3 +449,80 @@ def test_disconnect_plug_snap_checked_before_slot_snap():
     assert ctx.value.kind == 'snap-not-found'
     assert _ABSENT_SNAP in str(ctx.value.value)
     assert _ABSENT_SNAP_2 not in str(ctx.value.value)
+
+
+def test_disconnect_empty_snap_with_unknown_name_reports_against_system_snap():
+    # The 'empty snap means the system snap' remap also applies to a name that doesn't exist:
+    # snapd resolves the empty snap to 'snapd' first, so the error names snapd rather than the
+    # empty string. Surprising, but it's the same remap the tests above rely on, and snap names
+    # are meaningful when empty here, so disconnect doesn't reject them client-side.
+    with pytest.raises(_errors.APIError) as ctx:
+        _snapd_interfaces.disconnect(('', 'nonexistent-plug'))
+    assert not ctx.value.kind
+    assert 'snap "snapd" has no plug or slot named "nonexistent-plug"' in ctx.value.message
+
+
+# ---------------------------------------------------------------------------
+# blank values
+#
+# An empty value is meaningful here -- it selects the system snap, or asks snapd to resolve that
+# side -- so these functions are exempt from the library's empty-value contract. A blank value
+# gets none of that meaning from snapd: it is read as a name, and reported as a snap, plug, or
+# slot that doesn't exist. These tests pin that, and so the reason we reject it client-side.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize('value', [' ', '\t'])
+def test_connect_blank_values_raise_value_error(value: str):
+    with pytest.raises(ValueError, match='must not be blank'):
+        _snapd_interfaces.connect((value, _PLUG))
+    with pytest.raises(ValueError, match='must not be blank'):
+        _snapd_interfaces.connect((_SNAP, value))
+    with pytest.raises(ValueError, match='must not be blank'):
+        _snapd_interfaces.connect((_SNAP, _PLUG), (value, ''))
+    with pytest.raises(ValueError, match='must not be blank'):
+        _snapd_interfaces.connect((_SNAP, _PLUG), ('', value))
+    with pytest.raises(ValueError, match='must not be blank'):
+        _snapd_interfaces.connect((_SNAP, _PLUG), value)
+
+
+@pytest.mark.parametrize('value', [' ', '\t'])
+def test_disconnect_blank_values_raise_value_error(value: str):
+    with pytest.raises(ValueError, match='must not be blank'):
+        _snapd_interfaces.disconnect((value, _PLUG))
+    with pytest.raises(ValueError, match='must not be blank'):
+        _snapd_interfaces.disconnect((_SNAP, value))
+    with pytest.raises(ValueError, match='must not be blank'):
+        _snapd_interfaces.disconnect(slot=(value, _PLUG))
+    with pytest.raises(ValueError, match='must not be blank'):
+        _snapd_interfaces.disconnect(slot=(_SYSTEM_SNAP, value))
+
+
+def test_raw_api_blank_snap_is_not_the_system_snap():
+    # An empty snap is remapped to the system snap; a blank one is not, so it reaches the
+    # not-installed check as the name it is. This is the difference the client-side check
+    # protects: a blank value looks like the empty value it was probably meant to be.
+    with pytest.raises(_errors.APIError) as ctx:
+        _client.post(
+            '/v2/interfaces',
+            body={
+                'action': 'connect',
+                'plugs': [{'snap': ' ', 'plug': _PLUG}],
+                'slots': [{'snap': '', 'slot': ''}],
+            },
+        )
+    assert 'snap " " is not installed' in ctx.value.message
+
+
+def test_raw_api_blank_slot_name_is_not_resolved():
+    # An empty slot name asks snapd to resolve the slot; a blank one is looked up as a name.
+    with pytest.raises(_errors.APIError) as ctx:
+        _client.post(
+            '/v2/interfaces',
+            body={
+                'action': 'connect',
+                'plugs': [{'snap': _SNAP, 'plug': _PLUG}],
+                'slots': [{'snap': _SYSTEM_SNAP, 'slot': ' '}],
+            },
+        )
+    assert f'snap "{_SYSTEM_SNAP}" has no slot named " "' in ctx.value.message

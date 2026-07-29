@@ -68,6 +68,15 @@ class Error(Exception):
         """
         return str(self._value)
 
+    def __str__(self) -> str:
+        # Surface `value` when it adds information the message doesn't already carry.
+        # Most useful for NotFoundError, with message 'snap not installed' and value '<snap>'.
+        # Skip OptionNotFoundError's non-string value, which is redundant with its message.
+        value = self._value
+        if isinstance(value, str) and value and value not in self._message:
+            return f'{self._message} ({value})'
+        return self._message
+
     def __repr__(self) -> str:
         return (
             f'{type(self).__module__}.{type(self).__name__}('
