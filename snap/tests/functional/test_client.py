@@ -26,15 +26,18 @@ from conftest import (
     retry_on_rate_limit,
 )
 
+# Snapd's own test snaps from the store, for the paths that need a real store snap: one to
+# install and refresh, and the smallest classic-confined one for the classic error path.
+# Published by snapd: https://github.com/canonical/snapd/tree/master/tests/lib/snaps
+_STORE_SNAP = 'test-snapd-tools'
+_CLASSIC_SNAP = 'test-snapd-classic-confinement'
+
 # Locally-built snaps (tests/functional/snaps) stand in wherever a test needs some capability
 # of a snap rather than a particular snap: one that accepts configuration, one that runs a
 # service, and one with no apps at all.
 _CONF_SNAP = 'test-configure-snap'
 _SERVICE_SNAP = 'test-service-snap'
 _NO_SERVICES_SNAP = 'test-snap'
-# The smallest classic-confined snap in the store, for the classic-confinement error path.
-# Published by snapd: https://github.com/canonical/snapd/tree/master/tests/lib/snaps
-_CLASSIC_SNAP = 'test-snapd-classic-confinement'
 
 # A snap name that is never installed — used for error paths where any absent
 # snap produces the same error response, avoiding unnecessary remove operations.
@@ -42,61 +45,61 @@ _ABSENT_SNAP = 'this-snap-does-not-exist-xyz-abc-123'
 
 
 # ---------------------------------------------------------------------------
-# hello-world INSTALLED — tests that need the snap present
+# store snap INSTALLED — tests that need the snap present
 # ---------------------------------------------------------------------------
 
 
 def test_get_returns_dict():
     # A sync GET for a snap returns a dict result.
-    ensure_installed('hello-world')
-    result = _client.get('/v2/snaps/hello-world')
+    ensure_installed(_STORE_SNAP)
+    result = _client.get(f'/v2/snaps/{_STORE_SNAP}')
     assert isinstance(result, dict)
-    assert result['name'] == 'hello-world'
+    assert result['name'] == _STORE_SNAP
 
 
 def test_post_sync_error_snap_already_installed():
-    ensure_installed('hello-world')
+    ensure_installed(_STORE_SNAP)
     with pytest.raises(_errors._AlreadyInstalledError) as ctx:
-        _client.post('/v2/snaps/hello-world', body={'action': 'install'})
+        _client.post(f'/v2/snaps/{_STORE_SNAP}', body={'action': 'install'})
     assert ctx.value.kind == 'snap-already-installed'
 
 
 def test_post_sync_error_app_not_found():
-    ensure_installed('hello-world')
+    ensure_installed(_STORE_SNAP)
     with pytest.raises(_errors.AppNotFoundError) as ctx:
         _client.post(
-            '/v2/apps', body={'action': 'start', 'names': ['hello-world.nonexistentservice']}
+            '/v2/apps', body={'action': 'start', 'names': [f'{_STORE_SNAP}.nonexistentservice']}
         )
     assert ctx.value.kind == 'app-not-found'
 
 
 def test_post_sync_error_no_kind():
     # An invalid action returns an error with no 'kind'.
-    ensure_installed('hello-world')
+    ensure_installed(_STORE_SNAP)
     with pytest.raises(_errors.Error) as ctx:
-        _client.post('/v2/snaps/hello-world', body={'action': 'invalid-action'})
+        _client.post(f'/v2/snaps/{_STORE_SNAP}', body={'action': 'invalid-action'})
     assert not ctx.value.kind
     assert not isinstance(ctx.value, _errors.BadResponseError)
 
 
 def test_post_snap_no_update_available():
     # snap-no-update-available is raised (not suppressed) at the _client level.
-    ensure_installed('hello-world', channel='latest/stable')
+    ensure_installed(_STORE_SNAP, channel='latest/stable')
     with pytest.raises(_errors._NoUpdatesAvailableError) as ctx:
         retry_on_rate_limit(_client.post)(
-            '/v2/snaps/hello-world', body={'action': 'refresh', 'channel': 'latest/stable'}
+            f'/v2/snaps/{_STORE_SNAP}', body={'action': 'refresh', 'channel': 'latest/stable'}
         )
     assert ctx.value.kind == 'snap-no-update-available'
 
 
 def test_post_waits_for_async_change():
     # POST for an async operation waits until the change completes and does not raise.
-    # Last hello-world test — leaves the snap removed.
-    ensure_installed('hello-world')
-    _client.post('/v2/snaps/hello-world', body={'action': 'remove'})
+    # Last test needing the store snap — leaves it removed.
+    ensure_installed(_STORE_SNAP)
+    _client.post(f'/v2/snaps/{_STORE_SNAP}', body={'action': 'remove'})
     # Verify the snap is actually gone.
     with pytest.raises(_errors.NotFoundError):
-        _client.get('/v2/snaps/hello-world')
+        _client.get(f'/v2/snaps/{_STORE_SNAP}')
 
 
 # ---------------------------------------------------------------------------

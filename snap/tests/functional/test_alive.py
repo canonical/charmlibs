@@ -17,7 +17,7 @@ from charmlibs.snap import _client
 def test_snap_store_reachable():
     # GET /v2/find hits the snap store; a non-empty result confirms both snapd
     # and the store are reachable.
-    result = _client.get('/v2/find', query={'q': 'hello-world'})
+    result = _client.get('/v2/find', query={'q': 'test-snapd-tools'})
     assert isinstance(result, list)
     result = typing.cast('list[dict[str, Any]]', result)
     assert len(result) > 0

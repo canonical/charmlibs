@@ -22,6 +22,10 @@ from conftest import SNAPS_DIR, ack, ensure_removed, install_local
 if TYPE_CHECKING:
     from pathlib import Path
 
+# A signed store snap, for the assertion (ack) tests: those need a snap whose assertions the
+# store will hand us, which a locally-built snap by definition has none of.
+_STORE_SNAP = 'test-snapd-tools'
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -55,23 +59,23 @@ def remove_test_classic_snap():
 
 
 @pytest.fixture(scope='session')
-def hello_world_download(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, Path]:
-    """Download hello-world snap and assertions once for the session."""
-    d = tmp_path_factory.mktemp('hello-world')
+def store_snap_download(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, Path]:
+    """Download a signed store snap and its assertions once for the session."""
+    d = tmp_path_factory.mktemp(_STORE_SNAP)
     subprocess.run(
-        ['snap', 'download', 'hello-world', '--channel=stable', f'--target-directory={d}'],
+        ['snap', 'download', _STORE_SNAP, '--channel=stable', f'--target-directory={d}'],
         check=True,
         capture_output=True,
     )
-    snap_file = next(d.glob('hello-world_*.snap'))
-    assert_file = next(d.glob('hello-world_*.assert'))
+    snap_file = next(d.glob(f'{_STORE_SNAP}_*.snap'))
+    assert_file = next(d.glob(f'{_STORE_SNAP}_*.assert'))
     return snap_file, assert_file
 
 
 @pytest.fixture(autouse=True)
-def remove_hello_world():
+def remove_store_snap():
     yield
-    ensure_removed('hello-world')
+    ensure_removed(_STORE_SNAP)
 
 
 # ---------------------------------------------------------------------------
@@ -135,15 +139,15 @@ def test_install_local_classic(classic_snap_v1: Path):
 # ---------------------------------------------------------------------------
 
 
-def test_ack_and_install(hello_world_download: tuple[Path, Path]):
-    snap_file, assert_file = hello_world_download
-    ensure_removed('hello-world')
+def test_ack_and_install(store_snap_download: tuple[Path, Path]):
+    snap_file, assert_file = store_snap_download
+    ensure_removed(_STORE_SNAP)
     ack(assert_file.read_bytes())
     install_local(snap_file)  # dangerous=False — assertions are in the DB.
-    assert _snapd.info('hello-world').name == 'hello-world'
+    assert _snapd.info(_STORE_SNAP).name == _STORE_SNAP
 
 
-def test_ack_is_idempotent(hello_world_download: tuple[Path, Path]):
-    _, assert_file = hello_world_download
+def test_ack_is_idempotent(store_snap_download: tuple[Path, Path]):
+    _, assert_file = store_snap_download
     ack(assert_file.read_bytes())
     ack(assert_file.read_bytes())  # Second call must not raise.
