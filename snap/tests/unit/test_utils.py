@@ -256,8 +256,6 @@ class TestSnapPathSegment:
 
 
 class TestAsList:
-    # A bare string is one value, not an iterable of its characters. Every function taking a
-    # 'one value or several' argument normalises it through here, so the rule is stated once.
     @pytest.mark.parametrize(
         ('values', 'expected'),
         [
@@ -267,17 +265,13 @@ class TestAsList:
             (['a', 'b'], ['a', 'b']),
             (('a', 'b'), ['a', 'b']),
             ({'a': 1, 'b': 2}, ['a', 'b']),  # A mapping iterates its keys.
+            # Callers iterate the values twice -- to validate them and then to send them -- so
+            # a one-shot iterable must come back materialised rather than passed through.
+            ((c for c in ('a', 'b')), ['a', 'b']),
         ],
     )
     def test_as_list(self, values: str | Iterable[str], expected: list[str]):
         assert _utils.as_list(values) == expected
-
-    def test_generator_is_materialised(self):
-        # The values are iterated more than once -- to validate them and then to send them -- so
-        # a generator must be consumed here rather than passed on.
-        generator = (c for c in ('a', 'b'))
-        assert _utils.as_list(generator) == ['a', 'b']
-        assert list(generator) == []
 
 
 class TestCheckInstalled:
