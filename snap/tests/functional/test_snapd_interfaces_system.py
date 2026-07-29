@@ -30,7 +30,7 @@ import pytest
 
 from charmlibs import snap
 from charmlibs.snap import _client, _errors, _snapd_interfaces
-from conftest import BASE_LESS_SNAPS, ensure_installed, ensure_removed
+from conftest import ensure_installed, ensure_removed, remove_core_blockers
 from test_snapd_local import SNAPS_DIR, install_local
 
 if TYPE_CHECKING:
@@ -58,12 +58,11 @@ def core_snap(request: pytest.FixtureRequest) -> Iterator[str]:
 
     pytest groups tests by this module-scoped parameter, so the core snap's install state is
     flipped at most once per state, not once per test. In the 'absent' state we first remove
-    every base-less snap other modules may have installed (see BASE_LESS_SNAPS in conftest),
-    which would otherwise block core removal; a failed removal is left to error loudly,
-    matching test_snapd_conf_system.
+    every snap held by core, which would otherwise block its removal; a failed removal is
+    left to error loudly, matching test_snapd_conf_system.
     """
     if request.param == 'absent':
-        ensure_removed(*BASE_LESS_SNAPS)
+        remove_core_blockers()
         snap.remove('core')  # Errors loudly if an unmanaged snap still depends on core.
         yield request.param
         ensure_installed('core')

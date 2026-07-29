@@ -32,16 +32,8 @@ if typing.TYPE_CHECKING:
 # neither downloads hundreds of megabytes nor depends on a real-world snap keeping its shape.
 SNAPS_DIR = Path(__file__).parent / 'snaps'
 
-# Snaps used by the suite that declare no base of their own, and so are held by the core snap.
-# snapd refuses to remove core while any of them is installed ("snap is being used by snaps ..."),
-# so the tests that remove core must remove these first. Listed here because the snaps are
-# installed by one module and removed by another; a snap that declares a base doesn't belong.
-BASE_LESS_SNAPS = (
-    'hello-world',
-    'test-snap',
-    'test-snapd-classic-confinement',
-    'test-snapd-with-configure',
-)
+# Snap types that are not held by the core snap even though they declare no base themselves.
+_BASE_LIKE_TYPES = frozenset({'base', 'os', 'snapd'})
 
 # Enable debug logging from snap library during tests.
 handler = logging.StreamHandler()
@@ -93,6 +85,33 @@ def ensure_removed(*snaps: str) -> None:
 def ensure_installed(*snaps: str, channel: str | None = None, classic: bool = False) -> None:
     for snap_name in snaps:
         retry_on_rate_limit(snap.ensure)(snap_name, channel=channel, classic=classic, update=False)
+
+
+def snaps_holding_core() -> list[str]:
+    """Return the installed snaps that hold the core snap, and so block its removal.
+
+    A snap is held by core when it declares no base of its own; base, os and snapd snaps declare
+    no base either but are not held by it. snapd is asked rather than a list being kept here on
+    purpose: which snaps are installed depends on what every other module has done, so a
+    hand-maintained list goes stale as soon as a test starts using a new snap -- and it fails far
+    from the change, as an unrelated core test reporting 'snap is being used by snaps ...'.
+    """
+    snaps = _client.get('/v2/snaps')
+    assert isinstance(snaps, list)
+    snaps = typing.cast('list[dict[str, Any]]', snaps)
+    return [
+        s['name'] for s in snaps if s.get('base') is None and s.get('type') not in _BASE_LIKE_TYPES
+    ]
+
+
+def remove_core_blockers() -> None:
+    """Remove every installed snap that would block removal of the core snap.
+
+    Removes whatever is holding core rather than a fixed set, so this keeps working as modules
+    add and drop snaps. Functional tests are already destructive to the machine they run on
+    (hence the workshop container), so removing a snap the suite didn't install is acceptable.
+    """
+    ensure_removed(*snaps_holding_core())
 
 
 # ---------------------------------------------------------------------------
