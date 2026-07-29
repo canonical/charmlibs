@@ -4,93 +4,23 @@
 
 """Functional tests for local snap installation via the snapd sideload API.
 
-Includes a provisional install_local implementation built directly on _client internals,
-exercising POST /v2/snaps with a multipart body.
+Exercises the provisional ack and install_local helpers in conftest, which are built directly
+on _client internals and POST /v2/snaps with a multipart body.
 """
 
 from __future__ import annotations
 
-import json
 import subprocess
-import uuid
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
-from charmlibs.snap import _client, _errors
+from charmlibs.snap import _errors
 from charmlibs.snap import _snapd_snaps as _snapd
-from conftest import ensure_removed
+from conftest import SNAPS_DIR, ack, ensure_removed, install_local
 
-SNAPS_DIR = Path(__file__).parent / 'snaps'
-
-
-# ---------------------------------------------------------------------------
-# Provisional ack implementation
-# ---------------------------------------------------------------------------
-
-
-def ack(assertions_data: bytes) -> None:
-    """Upload assertion(s) to snapd's local database (POST /v2/assertions)."""
-    response = _client._request('POST', '/v2/assertions', data=assertions_data)
-    response_dict = json.loads(response.read())
-    if response_dict.get('type') == 'error':
-        raise _client._make_error(response_dict)
-
-
-# ---------------------------------------------------------------------------
-# Provisional install_local implementation
-# ---------------------------------------------------------------------------
-
-
-def install_local(path: Path, *, dangerous: bool = False, classic: bool = False) -> None:
-    """Install a local snap file via the snapd sideload API (POST /v2/snaps)."""
-    boundary = uuid.uuid4().hex
-    crlf = b'\r\n'
-
-    def form_field(name: str, value: str) -> bytes:
-        return b''.join([
-            b'--',
-            boundary.encode(),
-            crlf,
-            b'Content-Disposition: form-data; name="',
-            name.encode(),
-            b'"',
-            crlf,
-            crlf,
-            value.encode(),
-            crlf,
-        ])
-
-    body = [
-        b'--',
-        boundary.encode(),
-        crlf,
-        b'Content-Disposition: form-data; name="snap"; filename="',
-        path.name.encode(),
-        b'"',
-        crlf,
-        b'Content-Type: application/octet-stream',
-        crlf,
-        crlf,
-        path.read_bytes(),
-        crlf,
-    ]
-    if dangerous:
-        body.append(form_field('dangerous', 'true'))
-    if classic:
-        body.append(form_field('classic', 'true'))
-    body.extend([b'--', boundary.encode(), b'--', crlf])
-
-    headers = {
-        'Accept': 'application/json',
-        'Content-Type': f'multipart/form-data; boundary={boundary}',
-    }
-    response = _client._request('POST', '/v2/snaps', headers=headers, data=b''.join(body))
-    response_dict = json.loads(response.read())
-    if response_dict.get('type') == 'error':
-        raise _client._make_error(response_dict)
-    _client._Change(response_dict['change']).wait()
-
+if TYPE_CHECKING:
+    from pathlib import Path
 
 # ---------------------------------------------------------------------------
 # Fixtures

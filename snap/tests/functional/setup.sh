@@ -9,3 +9,5 @@ mksquashfs "$SNAPS_DIR/test-snap-2.0" "$SNAPS_DIR/test-snap_2.0.snap" -noappend 
 mksquashfs "$SNAPS_DIR/test-classic-snap-1.0" "$SNAPS_DIR/test-classic-snap_1.0.snap" -noappend -comp xz -all-root -quiet
 mksquashfs "$SNAPS_DIR/test-configure-snap-1.0" "$SNAPS_DIR/test-configure-snap_1.0.snap" -noappend -comp xz -all-root -quiet
 mksquashfs "$SNAPS_DIR/test-interfaces-snap-1.0" "$SNAPS_DIR/test-interfaces-snap_1.0.snap" -noappend -comp xz -all-root -quiet
+mksquashfs "$SNAPS_DIR/test-service-snap-1.0" "$SNAPS_DIR/test-service-snap_1.0.snap" -noappend -comp xz -all-root -quiet
+mksquashfs "$SNAPS_DIR/test-other-service-snap-1.0" "$SNAPS_DIR/test-other-service-snap_1.0.snap" -noappend -comp xz -all-root -quiet

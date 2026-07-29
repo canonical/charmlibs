@@ -19,7 +19,22 @@ from typing import Any
 import pytest
 
 from charmlibs.snap import _client, _errors
-from conftest import ensure_installed, ensure_removed, retry_on_rate_limit
+from conftest import (
+    ensure_installed,
+    ensure_installed_local,
+    ensure_removed,
+    retry_on_rate_limit,
+)
+
+# Locally-built snaps (tests/functional/snaps) stand in wherever a test needs some capability
+# of a snap rather than a particular snap: one that accepts configuration, one that runs a
+# service, and one with no apps at all.
+_CONF_SNAP = 'test-configure-snap'
+_SERVICE_SNAP = 'test-service-snap'
+_NO_SERVICES_SNAP = 'test-snap'
+# The smallest classic-confined snap in the store, for the classic-confinement error path.
+# Published by snapd: https://github.com/canonical/snapd/tree/master/tests/lib/snaps
+_CLASSIC_SNAP = 'test-snapd-classic-confinement'
 
 # A snap name that is never installed — used for error paths where any absent
 # snap produces the same error response, avoiding unnecessary remove operations.
@@ -124,26 +139,26 @@ def test_get_logs_error_snap_not_found():
 
 
 # ---------------------------------------------------------------------------
-# charmcraft error path
+# classic confinement error path
 # ---------------------------------------------------------------------------
 
 
 def test_post_sync_error_snap_needs_classic():
-    ensure_removed('charmcraft')
+    ensure_removed(_CLASSIC_SNAP)
     with pytest.raises(_errors.NeedsClassicError) as ctx:
-        _client.post('/v2/snaps/charmcraft', body={'action': 'install'})
+        _client.post(f'/v2/snaps/{_CLASSIC_SNAP}', body={'action': 'install'})
     assert ctx.value.kind == 'snap-needs-classic'
 
 
 # ---------------------------------------------------------------------------
-# Tests using other snaps (lxd, kube-proxy, htop — kept installed)
+# Tests using locally-built snaps (kept installed)
 # ---------------------------------------------------------------------------
 
 
 def test_get_returns_list():
     # GET /v2/apps returns a list result.
-    ensure_installed('kube-proxy', classic=True)
-    result = _client.get('/v2/apps', query={'select': 'service', 'names': 'kube-proxy'})
+    ensure_installed_local(_SERVICE_SNAP)
+    result = _client.get('/v2/apps', query={'select': 'service', 'names': _SERVICE_SNAP})
     assert isinstance(result, list)
     result = typing.cast('list[dict[str, Any]]', result)
     assert len(result) > 0
@@ -151,32 +166,34 @@ def test_get_returns_list():
 
 def test_get_with_query_params():
     # Query parameters are passed through and affect the result.
-    ensure_installed('lxd')
+    ensure_installed_local(_CONF_SNAP)
     try:
         # Set two keys so we can retrieve a subset of them.
-        _client.put('/v2/snaps/lxd/conf', body={'test-key-a': 'alpha', 'test-key-b': 'beta'})
-        full = _client.get('/v2/snaps/lxd/conf')
+        _client.put(
+            f'/v2/snaps/{_CONF_SNAP}/conf', body={'test-key-a': 'alpha', 'test-key-b': 'beta'}
+        )
+        full = _client.get(f'/v2/snaps/{_CONF_SNAP}/conf')
         assert isinstance(full, dict)
         assert 'test-key-a' in full and 'test-key-b' in full
         # Request only one key via query params.
-        subset = _client.get('/v2/snaps/lxd/conf', query={'keys': 'test-key-a'})
+        subset = _client.get(f'/v2/snaps/{_CONF_SNAP}/conf', query={'keys': 'test-key-a'})
         assert isinstance(subset, dict)
         assert 'test-key-a' in subset
         assert 'test-key-b' not in subset
     finally:
         # Clean up.
-        _client.put('/v2/snaps/lxd/conf', body={'test-key-a': None, 'test-key-b': None})
+        _client.put(f'/v2/snaps/{_CONF_SNAP}/conf', body={'test-key-a': None, 'test-key-b': None})
 
 
 def test_post_async_change_error_raises_snap_change_error():
     # An async change that fails raises ChangeError.
-    ensure_installed('lxd')
+    ensure_installed_local(_CONF_SNAP)
     with pytest.raises(_errors.ChangeError):
         _client.post(
             '/v2/aliases',
             body={
                 'action': 'alias',
-                'snap': 'lxd',
+                'snap': _CONF_SNAP,
                 'app': 'nonexistent-app',
                 'alias': 'test-alias-func',
             },
@@ -185,38 +202,40 @@ def test_post_async_change_error_raises_snap_change_error():
 
 def test_put_waits_for_async_change():
     # PUT /v2/snaps/{snap}/conf is async and should complete without error.
-    ensure_installed('lxd')
+    ensure_installed_local(_CONF_SNAP)
     try:
-        _client.put('/v2/snaps/lxd/conf', body={'test-key-functional': 'test-value'})
-        result = _client.get('/v2/snaps/lxd/conf', query={'keys': 'test-key-functional'})
+        _client.put(f'/v2/snaps/{_CONF_SNAP}/conf', body={'test-key-functional': 'test-value'})
+        result = _client.get(f'/v2/snaps/{_CONF_SNAP}/conf', query={'keys': 'test-key-functional'})
         assert isinstance(result, dict)
         result = typing.cast('dict[str, Any]', result)
         assert result.get('test-key-functional') == 'test-value'
     finally:
         # Clean up.
-        _client.put('/v2/snaps/lxd/conf', body={'test-key-functional': None})
+        _client.put(f'/v2/snaps/{_CONF_SNAP}/conf', body={'test-key-functional': None})
 
 
 def test_put_no_body_raises():
     # PUT with no body (None) raises a base Error: snapd can't decode EOF as patch values.
-    ensure_installed('lxd')
+    ensure_installed_local(_CONF_SNAP)
     with pytest.raises(_errors.Error) as ctx:
-        _client.put('/v2/snaps/lxd/conf')
+        _client.put(f'/v2/snaps/{_CONF_SNAP}/conf')
     assert 'EOF' in ctx.value.message
     assert not ctx.value.kind
 
 
 def test_put_empty_body_succeeds():
     # PUT with an empty body dict ({}) is accepted by snapd and is a no-op.
-    ensure_installed('lxd')
-    _client.put('/v2/snaps/lxd/conf', body={})  # Should not raise.
+    ensure_installed_local(_CONF_SNAP)
+    _client.put(f'/v2/snaps/{_CONF_SNAP}/conf', body={})  # Should not raise.
 
 
 def test_poll_fails_fast_when_socket_missing():
     # Submit a real async change, then point the client at a missing socket while waiting on it.
     # A missing socket means snapd is absent, so the poll fails fast without retrying.
-    ensure_installed('lxd')
-    response = _client._json_request('PUT', '/v2/snaps/lxd/conf', body={'test-gone-key': 'value'})
+    ensure_installed_local(_CONF_SNAP)
+    response = _client._json_request(
+        'PUT', f'/v2/snaps/{_CONF_SNAP}/conf', body={'test-gone-key': 'value'}
+    )
     change = _client._decode(response)
     assert isinstance(change, _client._Change)
     try:
@@ -228,7 +247,7 @@ def test_poll_fails_fast_when_socket_missing():
     finally:
         # snapd is still processing the original change; wait for it before cleaning up.
         change.wait()
-        _client.put('/v2/snaps/lxd/conf', body={'test-gone-key': None})
+        _client.put(f'/v2/snaps/{_CONF_SNAP}/conf', body={'test-gone-key': None})
 
 
 # ---------------------------------------------------------------------------
@@ -261,12 +280,12 @@ def test_redirect_raises_bad_response_error(path: str, location: str):
 
 def test_percent_encoded_separator_still_reaches_another_endpoint():
     # Why snap names are validated and not merely percent-encoded: snapd's router matches on the
-    # *decoded* path, so '%2F' is still a path separator to it. A name of 'lxd/conf' encodes to a
-    # single segment on the wire, but reaches /v2/snaps/lxd/conf -- the snap's configuration.
-    ensure_installed('lxd')
+    # *decoded* path, so '%2F' is still a path separator to it. A name of '<snap>/conf' encodes
+    # to a single segment on the wire, but reaches /v2/snaps/<snap>/conf -- the configuration.
+    ensure_installed_local(_CONF_SNAP)
     try:
-        _client.put('/v2/snaps/lxd/conf', body={'test-key-encoded': 'alpha'})
-        segment = urllib.parse.quote('lxd/conf', safe='')
+        _client.put(f'/v2/snaps/{_CONF_SNAP}/conf', body={'test-key-encoded': 'alpha'})
+        segment = urllib.parse.quote(f'{_CONF_SNAP}/conf', safe='')
         assert '/' not in segment
         result = _client.get(f'/v2/snaps/{segment}')
         assert isinstance(result, dict)
@@ -274,19 +293,19 @@ def test_percent_encoded_separator_still_reaches_another_endpoint():
         assert result.get('test-key-encoded') == 'alpha'  # The conf, not the snap info.
         assert 'name' not in result
     finally:
-        _client.put('/v2/snaps/lxd/conf', body={'test-key-encoded': None})
+        _client.put(f'/v2/snaps/{_CONF_SNAP}/conf', body={'test-key-encoded': None})
 
 
 def test_get_logs_returns_list():
     # /v2/logs returns a list of dicts.
-    ensure_installed('kube-proxy', classic=True)
-    result = _client.get_logs(query={'names': 'kube-proxy', 'n': 5})
+    ensure_installed_local(_SERVICE_SNAP)
+    result = _client.get_logs(query={'names': _SERVICE_SNAP, 'n': 5})
     assert isinstance(result, list)
 
 
 def test_get_logs_error_app_not_found():
     # A snap with no services returns an app-not-found error via the log stream.
-    ensure_installed('htop')
+    ensure_installed_local(_NO_SERVICES_SNAP)
     with pytest.raises(_errors.AppNotFoundError) as ctx:
-        _client.get_logs(query={'names': 'htop', 'n': 10})
+        _client.get_logs(query={'names': _NO_SERVICES_SNAP, 'n': 10})
     assert ctx.value.kind == 'app-not-found'

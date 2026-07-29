@@ -11,8 +11,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 from charmlibs.snap import _client, _errors, _snapd_conf
-from conftest import ensure_installed, ensure_removed
-from test_snapd_local import SNAPS_DIR, install_local
+from conftest import SNAPS_DIR, ensure_installed, ensure_removed, install_local
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -566,12 +565,12 @@ def test_rejected_set_rolls_back_entire_transaction(configure_snap: None):
 # These names are rejected before a request is made. Without that, an empty name builds
 # '/v2/snaps//conf', which snapd answers with an empty-bodied 301 to '/v2/snaps/conf' -- a
 # BadResponseError about invalid JSON, indistinguishable from a transport fault. A name with a
-# path separator is worse: snapd's router decodes '%2F' before matching, so get('lxd/conf') would
-# have read '/v2/snaps/lxd/conf' -- another snap's configuration. See tests/functional/test_client
-# for both behaviours against the raw client.
+# path separator is worse: snapd's router decodes '%2F' before matching, so get('<snap>/conf')
+# would have read '/v2/snaps/<snap>/conf' -- another snap's configuration. See
+# tests/functional/test_client for both behaviours against the raw client.
 
 
-@pytest.mark.parametrize('snap', ['', '.', '..', 'lxd/conf'])
+@pytest.mark.parametrize('snap', ['', '.', '..', 'test-configure-snap/conf'])
 def test_conf_invalid_snap_name_raises_value_error(snap: str):
     with pytest.raises(ValueError):
         _snapd_conf.get(snap)

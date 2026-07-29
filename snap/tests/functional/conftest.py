@@ -7,10 +7,13 @@
 from __future__ import annotations
 
 import functools
+import json
 import logging
 import random
 import time
 import typing
+import uuid
+from pathlib import Path
 from typing import Any
 
 from charmlibs import snap
@@ -23,6 +26,22 @@ if typing.TYPE_CHECKING:
 
     _P = ParamSpec('_P')
     _T = TypeVar('_T')
+
+# Snaps built from source by setup.sh before the suite runs. Tests prefer these to store snaps
+# wherever they need some capability of a snap rather than a particular snap, so that the suite
+# neither downloads hundreds of megabytes nor depends on a real-world snap keeping its shape.
+SNAPS_DIR = Path(__file__).parent / 'snaps'
+
+# Snaps used by the suite that declare no base of their own, and so are held by the core snap.
+# snapd refuses to remove core while any of them is installed ("snap is being used by snaps ..."),
+# so the tests that remove core must remove these first. Listed here because the snaps are
+# installed by one module and removed by another; a snap that declares a base doesn't belong.
+BASE_LESS_SNAPS = (
+    'hello-world',
+    'test-snap',
+    'test-snapd-classic-confinement',
+    'test-snapd-with-configure',
+)
 
 # Enable debug logging from snap library during tests.
 handler = logging.StreamHandler()
@@ -74,6 +93,80 @@ def ensure_removed(*snaps: str) -> None:
 def ensure_installed(*snaps: str, channel: str | None = None, classic: bool = False) -> None:
     for snap_name in snaps:
         retry_on_rate_limit(snap.ensure)(snap_name, channel=channel, classic=classic, update=False)
+
+
+# ---------------------------------------------------------------------------
+# Provisional ack and install_local implementations
+#
+# Built directly on _client internals: sideloading and assertion upload are not yet part of the
+# library's public API. Kept here rather than in a test module because several modules install
+# locally-built snaps.
+# ---------------------------------------------------------------------------
+
+
+def ack(assertions_data: bytes) -> None:
+    """Upload assertion(s) to snapd's local database (POST /v2/assertions)."""
+    response = _client._request('POST', '/v2/assertions', data=assertions_data)
+    response_dict = json.loads(response.read())
+    if response_dict.get('type') == 'error':
+        raise _client._make_error(response_dict)
+
+
+def install_local(path: Path, *, dangerous: bool = False, classic: bool = False) -> None:
+    """Install a local snap file via the snapd sideload API (POST /v2/snaps)."""
+    boundary = uuid.uuid4().hex
+    crlf = b'\r\n'
+
+    def form_field(name: str, value: str) -> bytes:
+        return b''.join([
+            b'--',
+            boundary.encode(),
+            crlf,
+            b'Content-Disposition: form-data; name="',
+            name.encode(),
+            b'"',
+            crlf,
+            crlf,
+            value.encode(),
+            crlf,
+        ])
+
+    body = [
+        b'--',
+        boundary.encode(),
+        crlf,
+        b'Content-Disposition: form-data; name="snap"; filename="',
+        path.name.encode(),
+        b'"',
+        crlf,
+        b'Content-Type: application/octet-stream',
+        crlf,
+        crlf,
+        path.read_bytes(),
+        crlf,
+    ]
+    if dangerous:
+        body.append(form_field('dangerous', 'true'))
+    if classic:
+        body.append(form_field('classic', 'true'))
+    body.extend([b'--', boundary.encode(), b'--', crlf])
+
+    headers = {
+        'Accept': 'application/json',
+        'Content-Type': f'multipart/form-data; boundary={boundary}',
+    }
+    response = _client._request('POST', '/v2/snaps', headers=headers, data=b''.join(body))
+    response_dict = json.loads(response.read())
+    if response_dict.get('type') == 'error':
+        raise _client._make_error(response_dict)
+    _client._Change(response_dict['change']).wait()
+
+
+def ensure_installed_local(name: str, *, version: str = '1.0', classic: bool = False) -> None:
+    """Ensure a snap built from ``SNAPS_DIR`` is installed, sideloading it if it is absent."""
+    if _functions._get_info(name) is not None:
+        return
+    install_local(SNAPS_DIR / f'{name}_{version}.snap', dangerous=True, classic=classic)
 
 
 @functools.cache  # Cached to avoid repeated store queries.

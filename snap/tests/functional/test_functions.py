@@ -6,7 +6,7 @@
 
 Tests are ordered to minimise snap install/remove churn.  All tests that need
 hello-world *installed* run first, then install-from-removed tests, then error
-paths, with charmcraft tests grouped together.
+paths, with the classic-confinement tests grouped together.
 """
 
 import pytest
@@ -14,6 +14,11 @@ import pytest
 from charmlibs.snap import _errors, _functions
 from charmlibs.snap import _snapd_snaps as _snapd
 from conftest import ensure_installed, ensure_removed, list_channels
+
+# The smallest classic-confined snap in the store, used wherever a test needs classic
+# confinement rather than a particular snap. Published by snapd:
+# https://github.com/canonical/snapd/tree/master/tests/lib/snaps
+_CLASSIC_SNAP = 'test-snapd-classic-confinement'
 
 # A snap name that is never installed — used for error paths where any absent
 # snap produces the same error response, avoiding unnecessary remove operations.
@@ -184,31 +189,31 @@ def test_ensure_revision_not_on_channel_raises():
 
 
 # ---------------------------------------------------------------------------
-# charmcraft (classic) — grouped to minimise churn
+# classic confinement — grouped to minimise churn
 # ---------------------------------------------------------------------------
 
 
 def test_ensure_revision_installs_classic():
-    ensure_removed('charmcraft')
-    channels = list_channels('charmcraft')
+    ensure_removed(_CLASSIC_SNAP)
+    channels = list_channels(_CLASSIC_SNAP)
     channel = 'latest/stable' if 'latest/stable' in channels else next(iter(channels))
     revision = channels[channel].revision
-    _functions.ensure('charmcraft', channel=channel, revision=revision, classic=True)
-    info = _snapd.info('charmcraft')
+    _functions.ensure(_CLASSIC_SNAP, channel=channel, revision=revision, classic=True)
+    info = _snapd.info(_CLASSIC_SNAP)
     assert info.classic is True
     assert info.revision == revision
 
 
 def test_ensure_needs_classic_raises():
-    ensure_removed('charmcraft')
+    ensure_removed(_CLASSIC_SNAP)
     with pytest.raises(_errors.NeedsClassicError):
-        _functions.ensure('charmcraft')
+        _functions.ensure(_CLASSIC_SNAP)
 
 
 def test_ensure_installs_classic():
-    ensure_removed('charmcraft')
-    _functions.ensure('charmcraft', classic=True)
-    assert _snapd.info('charmcraft').classic is True
+    ensure_removed(_CLASSIC_SNAP)
+    _functions.ensure(_CLASSIC_SNAP, classic=True)
+    assert _snapd.info(_CLASSIC_SNAP).classic is True
 
 
 # ---------------------------------------------------------------------------

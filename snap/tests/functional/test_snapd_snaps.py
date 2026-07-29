@@ -20,6 +20,11 @@ from charmlibs.snap import _client, _errors
 from charmlibs.snap import _snapd_snaps as _snapd
 from conftest import ensure_installed, ensure_removed, list_channels, retry_on_rate_limit
 
+# The smallest classic-confined snap in the store, used wherever a test needs classic
+# confinement rather than a particular snap. Published by snapd:
+# https://github.com/canonical/snapd/tree/master/tests/lib/snaps
+_CLASSIC_SNAP = 'test-snapd-classic-confinement'
+
 # A snap name that is never installed — used for error paths where any absent
 # snap produces the same error response, avoiding unnecessary remove operations.
 _ABSENT_SNAP = 'this-snap-does-not-exist-xyz-abc-123'
@@ -247,21 +252,21 @@ def test_install_revision():
 
 
 # ---------------------------------------------------------------------------
-# charmcraft (classic) — grouped to minimise churn
+# classic confinement — grouped to minimise churn
 # ---------------------------------------------------------------------------
 
 
 def test_install_needs_classic_raises():
-    ensure_removed('charmcraft')
+    ensure_removed(_CLASSIC_SNAP)
     with pytest.raises(_errors.NeedsClassicError) as ctx:
-        retry_on_rate_limit(_snapd.install)('charmcraft')
+        retry_on_rate_limit(_snapd.install)(_CLASSIC_SNAP)
     assert ctx.value.kind == 'snap-needs-classic'
 
 
 def test_install_classic():
-    ensure_removed('charmcraft')
-    retry_on_rate_limit(_snapd.install)('charmcraft', classic=True)
-    info = _snapd.info('charmcraft')
+    ensure_removed(_CLASSIC_SNAP)
+    retry_on_rate_limit(_snapd.install)(_CLASSIC_SNAP, classic=True)
+    info = _snapd.info(_CLASSIC_SNAP)
     assert info.classic is True
 
 
