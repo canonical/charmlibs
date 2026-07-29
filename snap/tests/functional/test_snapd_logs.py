@@ -74,8 +74,19 @@ def test_logs_multiple_snaps():
     # Requesting logs for multiple snaps should not raise.
     ensure_installed_local(_SNAP)
     ensure_installed_local(_OTHER_SNAP)
-    entries = _snapd_logs.logs(_SNAP, _OTHER_SNAP, limit=10)
+    entries = _snapd_logs.logs([_SNAP, _OTHER_SNAP], limit=10)
     assert isinstance(entries, list)
+
+
+def test_logs_bare_name_and_single_element_list_agree():
+    # A bare string is one snap name, not an iterable of its characters, so it queries the same
+    # logs as the same name in a list. Compared by syslog identifier, since new entries are
+    # logged all the time.
+    ensure_installed_local(_SNAP)
+    from_string = {entry.sid for entry in _snapd_logs.logs(_SNAP, limit=None)}
+    from_list = {entry.sid for entry in _snapd_logs.logs([_SNAP], limit=None)}
+    assert from_string
+    assert from_list.issuperset(from_string)
 
 
 def test_logs_limit_zero_raises():
@@ -97,6 +108,27 @@ def test_logs_no_snap_args():
     # Calling logs() with no snap arguments returns system-wide logs.
     entries = _snapd_logs.logs(limit=3)
     assert isinstance(entries, list)
+
+
+# ---------------------------------------------------------------------------
+# snaps=[] ("no snaps") vs snaps=None ("system-wide")
+# ---------------------------------------------------------------------------
+
+
+def test_logs_empty_snaps_returns_no_entries():
+    # The distinction the tri-state exists for: an empty list of names must not widen into a
+    # request for every snap's logs, which is what dropping the 'names' parameter would do (and
+    # what snapd does with a 'names' value that parses away -- see the raw tests below).
+    ensure_installed_local(_SNAP)
+    assert _snapd_logs.logs([], limit=None) == []
+    assert _snapd_logs.logs(None, limit=None) != []
+
+
+def test_logs_empty_snaps_still_validates_the_limit():
+    # Arguments are validated even when there's no work to do, so a bad limit is an error either
+    # way rather than depending on how many snaps were named.
+    with pytest.raises(ValueError, match='positive integer or None'):
+        _snapd_logs.logs([], limit=0)
 
 
 # ---------------------------------------------------------------------------

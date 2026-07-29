@@ -24,6 +24,7 @@ from . import _client, _utils
 
 if typing.TYPE_CHECKING:
     import datetime
+    from collections.abc import Iterable
 
 logger = logging.getLogger(__name__)
 
@@ -76,13 +77,15 @@ class LogEntry:
         return f'{self._timestamp} {self._sid}[{self._pid}]: {self._message}'
 
 
-def logs(*snaps: str, limit: int | None = 10) -> list[LogEntry]:
+def logs(snaps: str | Iterable[str] | None = None, *, limit: int | None = 10) -> list[LogEntry]:
     """Retrieve recent log entries for one or more snaps.
 
     Log entries are returned in chronological order: oldest first, newest last.
 
     Args:
-        snaps: Snap names to retrieve logs for. If omitted, returns system-wide snap logs.
+        snaps: Snap names to retrieve logs for, as a single name or an iterable of names. If
+            ``None`` (the default), system-wide snap logs are returned. If an empty iterable,
+            no snaps are queried: an empty list is returned without making a request.
         limit: Maximum number of log entries to return. Must be a positive integer, or
             ``None`` to retrieve all available log entries (equivalent to ``snap logs -n all``).
 
@@ -96,11 +99,23 @@ def logs(*snaps: str, limit: int | None = 10) -> list[LogEntry]:
             contains a comma; or if ``limit`` is not ``None`` and is not a positive integer.
         NotFoundError: If a specified snap is not installed.
         AppNotFoundError: If a specified snap has no services.
+
+    ::
+
+        # System-wide snap logs.
+        logs()
+        # Logs for one snap.
+        logs('lxd')
+        # Logs for several.
+        logs(['lxd', 'kube-proxy'])
+        # Logs for no snaps at all: [], without a request.
+        logs([])
     """
     # NOTE: Snap names are joined into a single comma-separated query parameter.
     # We reject unsafe names (containing a comma), and names that snapd would drop
     # (empty or blank) or alter (leading/trailing whitespace).
-    _utils.raise_if_not_comma_list_safe(snaps, label='snap name')
+    snaps = None if snaps is None else _utils.as_list(snaps)
+    _utils.raise_if_not_comma_list_safe(snaps or (), label='snap name')
     if limit is None:
         # snapd treats n=-1 as "no limit": return all available log entries.
         n = -1
@@ -108,6 +123,12 @@ def logs(*snaps: str, limit: int | None = 10) -> list[LogEntry]:
         raise ValueError(f'limit must be a positive integer or None, not {limit!r}')
     else:
         n = limit
+    if snaps is not None and not snaps:
+        # NOTE: No snaps were named, so there are no logs to return. Unlike the /v2/apps
+        # functions, there's no separate snap argument left to check: the names are the whole
+        # request, so an empty request has nothing to be wrong about and makes no call.
+        # Arguments are still validated above, so a bad limit is an error either way.
+        return []
     query: dict[str, Any] = {'n': n}
     if snaps:
         query['names'] = ','.join(snaps)

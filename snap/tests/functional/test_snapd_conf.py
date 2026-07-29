@@ -284,6 +284,45 @@ def test_get_one_invalid_snap_name_raises_value_error(snap: str):
 
 
 # ---------------------------------------------------------------------------
+# get and unset: a bare string is one key
+#
+# A string is iterable, so a bare key would otherwise be split into single-character keys -- a
+# request for 'p', 'o', 'r', 't' rather than 'port'. Taking it as one key is what every caller
+# means by it, and is why the type checker accepting it (str is an Iterable[str]) is no longer a
+# trap. The result is still a dict, so reading one value is get_one(snap, key).
+# ---------------------------------------------------------------------------
+
+
+def test_get_bare_string_is_one_key():
+    ensure_installed(_SNAP, channel='latest/edge')
+    _snapd_conf.set(_SNAP, {_KEY: 'value'})
+    assert _snapd_conf.get(_SNAP, _KEY) == {_KEY: 'value'}
+    assert _snapd_conf.get(_SNAP, _KEY) == _snapd_conf.get(_SNAP, [_KEY])
+    _cleanup()
+
+
+def test_get_bare_string_dotted_key():
+    ensure_installed(_SNAP, channel='latest/edge')
+    _snapd_conf.set(_SNAP, {_KEY: {'nested': 'value'}})
+    assert _snapd_conf.get(_SNAP, f'{_KEY}.nested') == {f'{_KEY}.nested': 'value'}
+    _cleanup()
+
+
+def test_get_bare_string_is_validated_like_a_key_in_a_list():
+    # A comma in a single key would still become two keys once joined into the query parameter.
+    with pytest.raises(ValueError, match='must not contain a comma'):
+        _snapd_conf.get(_SNAP, f'{_KEY},{_KEY2}')
+
+
+def test_unset_bare_string_is_one_key():
+    ensure_installed(_SNAP, channel='latest/edge')
+    _snapd_conf.set(_SNAP, {_KEY: 'value'})
+    _snapd_conf.unset(_SNAP, _KEY)
+    with pytest.raises(_errors.OptionNotFoundError):
+        _snapd_conf.get(_SNAP, _KEY)
+
+
+# ---------------------------------------------------------------------------
 # get: keys=[] ("give me nothing") vs keys=None ("give me everything")
 # ---------------------------------------------------------------------------
 
@@ -634,8 +673,12 @@ def test_conf_invalid_snap_name_raises_value_error(snap: str):
     with pytest.raises(ValueError):
         _snapd_conf.get(snap, [_KEY])
     with pytest.raises(ValueError):
+        _snapd_conf.get(snap, _KEY)  # A bare string key.
+    with pytest.raises(ValueError):
         _snapd_conf.get(snap, [])  # The installed-snap probe path.
     with pytest.raises(ValueError):
         _snapd_conf.set(snap, {_KEY: 'x'})
     with pytest.raises(ValueError):
         _snapd_conf.unset(snap, [_KEY])
+    with pytest.raises(ValueError):
+        _snapd_conf.unset(snap, _KEY)  # A bare string key.
