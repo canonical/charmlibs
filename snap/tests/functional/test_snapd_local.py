@@ -86,7 +86,7 @@ def remove_store_snap():
 def test_install_local(snap_v1: Path):
     ensure_removed('test-snap')
     install_local(snap_v1, dangerous=True)
-    info = _snapd.info('test-snap')
+    info = _snapd.list_one('test-snap')
     assert info.name == 'test-snap'
     assert info.version == '1.0'
 
@@ -96,15 +96,15 @@ def test_install_local_already_installed(snap_v1: Path):
     ensure_removed('test-snap')
     install_local(snap_v1, dangerous=True)
     install_local(snap_v1, dangerous=True)  # Second call must succeed.
-    assert _snapd.info('test-snap').version == '1.0'
+    assert _snapd.list_one('test-snap').version == '1.0'
 
 
 def test_install_local_upgrades(snap_v1: Path, snap_v2: Path):
     ensure_removed('test-snap')
     install_local(snap_v1, dangerous=True)
-    assert _snapd.info('test-snap').version == '1.0'
+    assert _snapd.list_one('test-snap').version == '1.0'
     install_local(snap_v2, dangerous=True)
-    assert _snapd.info('test-snap').version == '2.0'
+    assert _snapd.list_one('test-snap').version == '2.0'
 
 
 def test_install_local_without_dangerous_raises(snap_v1: Path):
@@ -129,7 +129,7 @@ def test_install_local_classic_without_classic_flag_raises(classic_snap_v1: Path
 def test_install_local_classic(classic_snap_v1: Path):
     ensure_removed('test-classic-snap')
     install_local(classic_snap_v1, dangerous=True, classic=True)
-    info = _snapd.info('test-classic-snap')
+    info = _snapd.list_one('test-classic-snap')
     assert info.name == 'test-classic-snap'
     assert info.version == '1.0'
 
@@ -144,7 +144,7 @@ def test_ack_and_install(store_snap_download: tuple[Path, Path]):
     ensure_removed(_STORE_SNAP)
     ack(assert_file.read_bytes())
     install_local(snap_file)  # dangerous=False — assertions are in the DB.
-    assert _snapd.info(_STORE_SNAP).name == _STORE_SNAP
+    assert _snapd.list_one(_STORE_SNAP).name == _STORE_SNAP
 
 
 def test_ack_is_idempotent(store_snap_download: tuple[Path, Path]):

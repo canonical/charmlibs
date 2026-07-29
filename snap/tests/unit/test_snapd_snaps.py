@@ -45,9 +45,9 @@ _MINIMAL_INFO_DICT: dict[str, Any] = {
 }
 
 
-class TestInfoFromDict:
+class TestInstalledInfoFromDict:
     def test_basic_fields(self):
-        info = _snapd.Info._from_dict(_MINIMAL_INFO_DICT)
+        info = _snapd.InstalledInfo._from_dict(_MINIMAL_INFO_DICT)
         assert info.name == 'hello-world'
         assert info.version == '6.4'
         assert info.tracking == 'latest/stable'
@@ -56,14 +56,14 @@ class TestInfoFromDict:
         assert info.hold is None
 
     def test_local_revision(self):
-        info = _snapd.Info._from_dict({**_MINIMAL_INFO_DICT, 'revision': 'x1'})
+        info = _snapd.InstalledInfo._from_dict({**_MINIMAL_INFO_DICT, 'revision': 'x1'})
         assert info.revision == 'x1'
 
     def test_tracking_is_not_the_revision_source_channel(self):
         # 'channel' is the channel the installed revision came from, which can differ from the
         # channel the snap tracks -- installing a revision without a channel tracks
         # latest/stable but sources the revision from wherever it's available.
-        info = _snapd.Info._from_dict({
+        info = _snapd.InstalledInfo._from_dict({
             **_MINIMAL_INFO_DICT,
             'channel': 'edge',
             'tracking-channel': 'latest/stable',
@@ -73,20 +73,20 @@ class TestInfoFromDict:
     def test_tracking_empty_when_field_absent(self):
         # A snap installed from a local file tracks no channel: snapd omits the field entirely.
         info_dict = {k: v for k, v in _MINIMAL_INFO_DICT.items() if k != 'tracking-channel'}
-        info = _snapd.Info._from_dict({**info_dict, 'channel': ''})
+        info = _snapd.InstalledInfo._from_dict({**info_dict, 'channel': ''})
         assert info.tracking == ''
 
     @pytest.mark.parametrize('confinement', ['strict', 'devmode'])
     def test_non_classic_confinement(self, confinement: str):
-        info = _snapd.Info._from_dict({**_MINIMAL_INFO_DICT, 'confinement': confinement})
+        info = _snapd.InstalledInfo._from_dict({**_MINIMAL_INFO_DICT, 'confinement': confinement})
         assert info.classic is False
 
     def test_classic_confinement(self):
-        info = _snapd.Info._from_dict({**_MINIMAL_INFO_DICT, 'confinement': 'classic'})
+        info = _snapd.InstalledInfo._from_dict({**_MINIMAL_INFO_DICT, 'confinement': 'classic'})
         assert info.classic is True
 
     def test_hold_present(self):
-        info = _snapd.Info._from_dict(result_of('snap_info_hello_world_held.json'))
+        info = _snapd.InstalledInfo._from_dict(result_of('snap_info_hello_world_held.json'))
         assert info.hold is not None
         assert info.hold.year == 2318
 
@@ -99,34 +99,34 @@ class TestInfoFromDict:
             'enabled': True,
             'status': 'active',
         }
-        info = _snapd.Info._from_dict(info_dict)
+        info = _snapd.InstalledInfo._from_dict(info_dict)
         assert info.name == 'hello-world'
 
 
-class TestInfo:
-    def test_info_installed(self, mock_client: MockClient):
+class TestListOne:
+    def test_list_one_installed(self, mock_client: MockClient):
         mock_client.get.return_value = result_of('snap_info_hello_world.json')
-        info = _snapd.info('hello-world')
+        info = _snapd.list_one('hello-world')
         assert info.name == 'hello-world'
         assert info.revision == '29'
         mock_client.get.assert_called_once_with('/v2/snaps/hello-world')
 
-    def test_info_classic(self, mock_client: MockClient):
+    def test_list_one_classic(self, mock_client: MockClient):
         mock_client.get.return_value = result_of('snap_info_kube_proxy.json')
-        info = _snapd.info('kube-proxy')
+        info = _snapd.list_one('kube-proxy')
         assert info.classic is True
 
-    def test_info_with_hold(self, mock_client: MockClient):
+    def test_list_one_with_hold(self, mock_client: MockClient):
         mock_client.get.return_value = result_of('snap_info_hello_world_held.json')
-        info = _snapd.info('hello-world')
+        info = _snapd.list_one('hello-world')
         assert info.hold is not None
 
-    def test_info_missing_raises(self, mock_client: MockClient):
+    def test_list_one_missing_raises(self, mock_client: MockClient):
         mock_client.get.side_effect = _make_snap_not_found()
         with pytest.raises(NotFoundError):
-            _snapd.info('hello-world')
+            _snapd.list_one('hello-world')
 
-    def test_info_other_error_propagates(self, mock_client: MockClient):
+    def test_list_one_other_error_propagates(self, mock_client: MockClient):
         mock_client.get.side_effect = Error(
             'internal error',
             kind='internal-error',
@@ -135,7 +135,7 @@ class TestInfo:
             status='Internal Server Error',
         )
         with pytest.raises(Error):
-            _snapd.info('hello-world')
+            _snapd.list_one('hello-world')
 
 
 class TestInstall:
@@ -238,7 +238,7 @@ class TestRefresh:
 class TestHold:
     @pytest.fixture(autouse=True)
     def mock_info(self, monkeypatch: pytest.MonkeyPatch):
-        monkeypatch.setattr(_snapd, 'info', MagicMock())
+        monkeypatch.setattr(_snapd, 'list_one', MagicMock())
 
     def test_hold_forever_by_default(self, mock_client: MockClient):
         _snapd.hold('hello-world')
@@ -260,7 +260,7 @@ class TestHold:
 
     def test_hold_not_installed(self, mock_client: MockClient, monkeypatch: pytest.MonkeyPatch):
         snap_not_found = NotFoundError('', kind='snap-not-found', value='')
-        monkeypatch.setattr(_snapd, 'info', MagicMock(side_effect=snap_not_found))
+        monkeypatch.setattr(_snapd, 'list_one', MagicMock(side_effect=snap_not_found))
         with pytest.raises(NotFoundError):
             _snapd.hold('hello-world')
         mock_client.post.assert_not_called()
@@ -274,7 +274,7 @@ class TestUnhold:
         )
 
 
-_PATH_FUNCTIONS = [_snapd.info, _snapd.install, _snapd.remove, _snapd.refresh, _snapd.unhold]
+_PATH_FUNCTIONS = [_snapd.list_one, _snapd.install, _snapd.remove, _snapd.refresh, _snapd.unhold]
 
 
 class TestSnapNameInPath:
@@ -295,12 +295,12 @@ class TestSnapNameInPath:
     def test_hold_invalid_name_raises_value_error_without_request(
         self, mock_client: MockClient, monkeypatch: pytest.MonkeyPatch, snap: str
     ):
-        # hold() probes info() before posting; the name is validated before either request.
-        info = MagicMock()
-        monkeypatch.setattr(_snapd, 'info', info)
+        # hold() probes list_one() before posting; the name is validated before either request.
+        list_one = MagicMock()
+        monkeypatch.setattr(_snapd, 'list_one', list_one)
         with pytest.raises(ValueError):
             _snapd.hold(snap)
-        info.assert_not_called()
+        list_one.assert_not_called()
         mock_client.post.assert_not_called()
 
     def test_install_validates_name_before_building_body(self, mock_client: MockClient):
@@ -309,5 +309,5 @@ class TestSnapNameInPath:
 
     def test_name_is_percent_encoded(self, mock_client: MockClient):
         mock_client.get.return_value = {**_MINIMAL_INFO_DICT, 'name': 'hello world'}
-        _snapd.info('hello world')
+        _snapd.list_one('hello world')
         mock_client.get.assert_called_once_with('/v2/snaps/hello%20world')
