@@ -70,7 +70,9 @@ def ensure(
 
     Raises:
         ValueError: if the snap name is empty, blank, or is not a single path segment.
-        NotFoundError: If the snap does not exist in the store.
+        NotFoundError: If the snap is not installed and does not exist in the store. Also
+            raised, in its "not installed" sense, if the snap is removed between this function
+            checking whether it is installed and refreshing it.
         RevisionNotAvailableError: If the revision is not available on any channel.
         NeedsClassicError: If the snap requires ``classic=True``.
         ChannelNotAvailableError: If the channel is invalid or unavailable, or if the revision

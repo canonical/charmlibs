@@ -252,7 +252,8 @@ def refresh(
 
     Raises:
         ValueError: if the snap name is empty or is not a single path segment.
-        NotFoundError: if the snap is not installed.
+        NotFoundError: if the snap is not installed. See :class:`NotFoundError` for the other
+            sense this error can carry.
         RevisionNotAvailableError: if the specified revision is not available on any channel.
         ChannelNotAvailableError: if the specified channel is not available, or if the specified
             revision is not available on it.

@@ -138,13 +138,20 @@ class AppNotFoundError(APIError):
 class NotFoundError(APIError):
     """Raised when a snap is not found.
 
-    Depending on the operation, this means not found in the store (for example install),
-    or not installed on the system (for example configuration operations).
+    The operation determines which sense is meant. :func:`install` looks the snap up in the
+    store, so this means the store doesn't offer it; :func:`ensure` inherits that when the snap
+    isn't already installed. Every other function operates on an installed snap, so this means
+    the snap isn't installed on the system.
 
-    snapd reports an absent snap inconsistently -- with the ``snap-not-found`` kind, with the
-    ``snap-not-installed`` kind, or as an error with no kind at all, depending on the endpoint.
-    The library raises this one type in every case, so that a caller can catch "the snap isn't
-    there" without knowing which endpoint the operation happens to use.
+    The two are not distinguished by type, because snapd doesn't distinguish them either: it
+    sends the same ``snap-not-found`` kind for both, and the snap name as ``value`` for both.
+    Only ``message`` differs -- ``'snap not found'`` for the store, ``'snap not installed'``
+    for the system -- and matching on it is not recommended.
+
+    snapd also reports an absent snap inconsistently across its endpoints: with the
+    ``snap-not-found`` kind, with the ``snap-not-installed`` kind, or as an error with no kind
+    at all. The library raises this one type in every case, so that a caller can catch "the
+    snap isn't there" without knowing which endpoint the operation happens to use.
     """
 
 
