@@ -30,8 +30,13 @@ import pytest
 
 from charmlibs import snap
 from charmlibs.snap import _client, _errors, _snapd_interfaces
-from conftest import ensure_installed, ensure_removed, remove_core_blockers
-from test_snapd_local import SNAPS_DIR, install_local
+from conftest import (
+    SNAPS_DIR,
+    ensure_installed,
+    ensure_removed,
+    install_local,
+    remove_core_blockers,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterator

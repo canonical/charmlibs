@@ -18,8 +18,7 @@ from typing import Any
 import pytest
 
 from charmlibs.snap import _client, _errors, _snapd_interfaces
-from conftest import ensure_removed
-from test_snapd_local import SNAPS_DIR, install_local
+from conftest import SNAPS_DIR, ensure_removed, install_local
 
 # The local test snap and one of the plugs it declares. snapd auto-resolves the
 # mount-observe slot to the system snap.

@@ -32,8 +32,9 @@ if typing.TYPE_CHECKING:
 # neither downloads hundreds of megabytes nor depends on a real-world snap keeping its shape.
 SNAPS_DIR = Path(__file__).parent / 'snaps'
 
-# Snap types that are not held by the core snap even though they declare no base themselves.
-_BASE_LIKE_TYPES = frozenset({'base', 'os', 'snapd'})
+# Bases whose snaps are held by the core snap: core when declared, and no base at all, since a
+# snap that declares none gets core implicitly. snapd omits 'base' from /v2/snaps in that case.
+_CORE_BASES = frozenset({None, 'core'})
 
 # Enable debug logging from snap library during tests.
 handler = logging.StreamHandler()
@@ -88,20 +89,22 @@ def ensure_installed(*snaps: str, channel: str | None = None, classic: bool = Fa
 
 
 def snaps_holding_core() -> list[str]:
-    """Return the installed snaps that hold the core snap, and so block its removal.
+    """Return the installed app snaps that hold the core snap, and so block its removal.
 
-    A snap is held by core when it declares no base of its own; base, os and snapd snaps declare
-    no base either but are not held by it. snapd is asked rather than a list being kept here on
-    purpose: which snaps are installed depends on what every other module has done, so a
-    hand-maintained list goes stale as soon as a test starts using a new snap -- and it fails far
-    from the change, as an unrelated core test reporting 'snap is being used by snaps ...'.
+    An app snap is held by core when it runs on it: when it declares ``base: core``, or declares
+    no base at all and so gets core implicitly. Only apps are considered, so that a base, os,
+    snapd, gadget or kernel snap is never a candidate for removal no matter what it declares --
+    none of those is something a test installed, and the last two would be catastrophic to remove.
+
+    snapd is asked rather than a list being kept here on purpose: which snaps are installed
+    depends on what every other module has done, so a hand-maintained list goes stale as soon as
+    a test starts using a new snap -- and it fails far from the change, as an unrelated core test
+    reporting 'snap is being used by snaps ...'.
     """
     snaps = _client.get('/v2/snaps')
     assert isinstance(snaps, list)
     snaps = typing.cast('list[dict[str, Any]]', snaps)
-    return [
-        s['name'] for s in snaps if s.get('base') is None and s.get('type') not in _BASE_LIKE_TYPES
-    ]
+    return [s['name'] for s in snaps if s.get('type') == 'app' and s.get('base') in _CORE_BASES]
 
 
 def remove_core_blockers() -> None:

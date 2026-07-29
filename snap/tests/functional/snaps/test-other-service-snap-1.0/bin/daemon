@@ -1,23 +1,17 @@
 #!/bin/sh
-# Daemon for charmlibs.snap functional log tests.
-#
-# Emits a fixed burst of lines on startup so that log assertions have entries to read
-# immediately after the service starts, rather than depending on how chatty some real-world
-# snap happens to be. The burst is larger than the largest limit the tests ask for.
-#
-# It then ticks slowly forever. Staying alive is the point: a daemon that exits turns every
-# subsequent start into a systemd restart, which is what forced the tests to reset the unit's
-# failure counter between cases when a real snap's service was used.
+# Second daemon for charmlibs.snap functional log tests, so that multi-snap log queries have
+# two snaps to name. Behaves exactly like test-service-snap's daemon (see that script for why),
+# except that every line it logs says which of the two wrote it.
 set -e
 
 i=0
 while [ "$i" -lt 60 ]; do
     i=$((i + 1))
-    echo "test-service-snap startup entry $i"
+    echo "test-other-service-snap startup entry $i"
 done
 
 while true; do
     i=$((i + 1))
-    echo "test-service-snap tick $i"
+    echo "test-other-service-snap tick $i"
     sleep 5
 done
