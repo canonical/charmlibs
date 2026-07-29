@@ -115,9 +115,7 @@ def get(snap: str, keys: Iterable[str] | None = None) -> dict[str, Any]:
 def get_one(snap: str, key: str) -> Any:
     """Get the value of a single snap configuration key.
 
-    The single-value counterpart of :func:`get`, which always returns a dict so that it can
-    report several keys at once. Use this when one key is wanted and the dict would only be
-    unwrapped again.
+    ``get_one(snap, key)`` returns ``value``, while ``get(snap, key)`` returns ``{key: value}``.
 
     Args:
         snap: The name of the snap to read configuration from.
