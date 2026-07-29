@@ -32,6 +32,8 @@ _CALLS: dict[str, Callable[[str], object]] = {
     'ensure': lambda v: snap.ensure(v),
     'get': lambda v: snap.get(v),
     'get (key)': lambda v: snap.get('lxd', [v]),
+    'get_one': lambda v: snap.get_one(v, 'mykey'),
+    'get_one (key)': lambda v: snap.get_one('lxd', v),
     'hold': lambda v: snap.hold(v),
     'list_one': lambda v: snap.list_one(v),
     'install': lambda v: snap.install(v),
@@ -152,12 +154,15 @@ def test_error_is_raised_one_frame_below_the_function_the_caller_called():
 # it returns the encoded name and so has to call the check itself.
 _MAX_FRAMES = 3
 
-# ensure is a composition of the other public functions rather than a call to an endpoint of its
-# own, and doesn't check the snap name itself: whichever function it reaches first does it. That
-# leaves the deepest traceback in the library -- ensure, its _installed_info probe, list_one,
-# snap_path_segment and the check -- which is the price of not duplicating the check in a layer
-# that doesn't own it.
-_COMPOSITE_FUNCTIONS = {'ensure'}
+# Some public functions are compositions of other public functions rather than calls to an
+# endpoint of their own, and don't check their arguments themselves: whichever function they
+# reach first does it. That puts the check one or more frames deeper than the rule above
+# allows, which is the price of not duplicating the check in a layer that doesn't own it.
+#
+# ensure leaves the deepest traceback in the library -- ensure, its _installed_info probe,
+# list_one, snap_path_segment and the check. get_one delegates to get, which validates both
+# the snap name and the key before making a request.
+_COMPOSITE_FUNCTIONS = {'ensure', 'get_one'}
 
 
 @pytest.mark.parametrize('name', sorted(_CALLS) + sorted(_BLANK_ONLY_CALLS))

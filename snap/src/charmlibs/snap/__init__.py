@@ -24,7 +24,7 @@ Also manage:
 
 - Automatic refreshes with :func:`hold` and :func:`unhold`.
 - Services with :func:`start`, :func:`stop`, and :func:`restart`.
-- Config with :func:`get`, :func:`set`, and :func:`unset`.
+- Config with :func:`get`, :func:`get_one`, :func:`set`, and :func:`unset`.
 - Connections between snaps with :func:`connect` and :func:`disconnect`.
 - Application aliases with :func:`alias` and :func:`unalias`.
 
@@ -74,6 +74,7 @@ from ._snapd_apps import (
 )
 from ._snapd_conf import (
     get,
+    get_one,
     set,  # noqa: A004 (shadowing a Python builtin)
     unset,
 )
@@ -117,6 +118,7 @@ __all__ = [
     'disconnect',
     'ensure',
     'get',
+    'get_one',
     'hold',
     'install',
     'list_one',
