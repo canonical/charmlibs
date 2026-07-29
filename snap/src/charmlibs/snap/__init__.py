@@ -18,13 +18,13 @@ Use :func:`ensure` to ensure that a snap is installed, optionally on a specific 
 or revision.
 
 Manually manage snap installation with :func:`install`, :func:`refresh`, and :func:`remove`.
-Use :func:`info` to query the current state of an installed snap.
+Use :func:`list_one` to query the current state of an installed snap.
 
 Also manage:
 
 - Automatic refreshes with :func:`hold` and :func:`unhold`.
 - Services with :func:`start`, :func:`stop`, and :func:`restart`.
-- Config with :func:`get`, :func:`set`, and :func:`unset`.
+- Config with :func:`get`, :func:`get_one`, :func:`set`, and :func:`unset`.
 - Connections between snaps with :func:`connect` and :func:`disconnect`.
 - Application aliases with :func:`alias` and :func:`unalias`.
 
@@ -74,6 +74,7 @@ from ._snapd_apps import (
 )
 from ._snapd_conf import (
     get,
+    get_one,
     set,  # noqa: A004 (shadowing a Python builtin)
     unset,
 )
@@ -86,10 +87,10 @@ from ._snapd_logs import (
     logs,
 )
 from ._snapd_snaps import (
-    Info,
+    InstalledInfo,
     hold,
-    info,
     install,
+    list_one,
     refresh,
     remove,
     unhold,
@@ -104,7 +105,7 @@ __all__ = [
     'ChannelNotAvailableError',
     'ConnectionError',
     'Error',
-    'Info',
+    'InstalledInfo',
     'LogEntry',
     'NeedsClassicError',
     'NotFoundError',
@@ -117,9 +118,10 @@ __all__ = [
     'disconnect',
     'ensure',
     'get',
+    'get_one',
     'hold',
-    'info',
     'install',
+    'list_one',
     'logs',
     'refresh',
     'remove',

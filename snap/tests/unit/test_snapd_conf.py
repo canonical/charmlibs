@@ -220,6 +220,75 @@ class TestGetAbsentSnapProbe:
         mock_client.get.assert_called_once()
 
 
+class TestGetOne:
+    # get_one is get(snap, [key])[key], so its job is to make exactly the request get would and
+    # unwrap the result by one level. Everything else -- validation, the absent-snap probe, the
+    # errors -- is get's, and is covered above.
+    def test_get_one_returns_the_value(self, mock_client: MockClient):
+        mock_client.get.return_value = {'integer': 1}
+        assert _snapd_conf.get_one('lxd', 'integer') == 1
+
+    def test_get_one_makes_the_same_request_as_get(self, mock_client: MockClient):
+        mock_client.get.return_value = {'integer': 1}
+        _snapd_conf.get_one('lxd', 'integer')
+        mock_client.get.assert_called_once_with('/v2/snaps/lxd/conf', query={'keys': 'integer'})
+
+    def test_get_one_unwraps_by_one_level_only(self, mock_client: MockClient):
+        # A key naming a subtree keeps its structure; only the outer dict get built is removed.
+        mock_client.get.return_value = {'server': {'port': 8080}}
+        assert _snapd_conf.get_one('lxd', 'server') == {'port': 8080}
+
+    def test_get_one_dotted_key(self, mock_client: MockClient):
+        mock_client.get.return_value = {'server.port': 8080}
+        assert _snapd_conf.get_one('lxd', 'server.port') == 8080
+        assert mock_client.get.call_args.kwargs['query'] == {'keys': 'server.port'}
+
+    def test_get_one_option_not_found_propagates(self, mock_client: MockClient):
+        # The key is missing, so get raises before there is a dict to subscript: an
+        # OptionNotFoundError reaches the caller, never a KeyError.
+        mock_client.get.side_effect = OptionNotFoundError(
+            'snap "lxd" has no "mykey" configuration option',
+            kind='option-not-found',
+            value={'SnapName': 'lxd', 'Key': 'mykey'},
+        )
+        with pytest.raises(OptionNotFoundError):
+            _snapd_conf.get_one('lxd', 'mykey')
+
+    def test_get_one_not_installed_propagates(self, mock_client: MockClient):
+        mock_client.get.side_effect = NotFoundError(
+            'snap not installed', kind='snap-not-found', value='lxd'
+        )
+        with pytest.raises(NotFoundError):
+            _snapd_conf.get_one('lxd', 'mykey')
+
+    @pytest.mark.parametrize(
+        ('key', 'match'),
+        [
+            ('', 'must not be empty'),
+            (' ', 'must not be blank'),
+            (',', 'must not contain a comma'),
+            ('a,b', 'must not contain a comma'),
+            (' a', 'must not have leading or trailing whitespace'),
+        ],
+    )
+    def test_get_one_rejects_unusable_keys_without_request(
+        self, mock_client: MockClient, key: str, match: str
+    ):
+        # get's rejection of keys its query parameter would alter is what guarantees the result
+        # is keyed by exactly the key requested, and so that the subscript can't raise KeyError.
+        with pytest.raises(ValueError, match=match):
+            _snapd_conf.get_one('lxd', key)
+        mock_client.get.assert_not_called()
+
+    @pytest.mark.parametrize('snap', ['', '.', '..', 'hello-world/conf'])
+    def test_get_one_invalid_name_raises_value_error_without_request(
+        self, mock_client: MockClient, snap: str
+    ):
+        with pytest.raises(ValueError):
+            _snapd_conf.get_one(snap, 'mykey')
+        mock_client.get.assert_not_called()
+
+
 class TestSet:
     def test_set(self, mock_client: MockClient):
         _snapd_conf.set('lxd', {'mykey': 'myval'})

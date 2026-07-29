@@ -75,7 +75,7 @@ def ensure(
         ChangeError: If the install or refresh fails after starting (for example, a hook errors).
         Error: (or a subtype) if the snap could not be installed or refreshed for another reason.
     """
-    info = _get_info(snap)
+    info = _installed_info(snap)
     if info is None:  # Not installed.
         _snapd_snaps.install(snap, channel=channel, revision=revision, classic=classic)
         return True
@@ -97,9 +97,9 @@ def ensure(
     return _snapd_snaps.refresh(snap, channel=channel, classic=classic)
 
 
-def _get_info(snap: str) -> _snapd_snaps.Info | None:
-    """Get snap info, raising an error if the snap is not installed."""
+def _installed_info(snap: str) -> _snapd_snaps.InstalledInfo | None:
+    """Return the snap's local state, or None if it is not installed."""
     try:
-        return _snapd_snaps.info(snap)
+        return _snapd_snaps.list_one(snap)
     except _errors.NotFoundError:
         return None

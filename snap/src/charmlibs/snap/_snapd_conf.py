@@ -31,8 +31,8 @@ logger = logging.getLogger(__name__)
 # /v2/snaps/{snap}/conf
 
 
-# Getting one config value looks like get(s, [k])[k]. In future we could add a get_one(s) helper.
 # Get with keys=None returns the entire config, following the CLI (get_all is unnecessary).
+# Reading a single value is get_one, defined below in terms of this function.
 def get(snap: str, keys: Iterable[str] | None = None) -> dict[str, Any]:
     """Get snap configuration.
 
@@ -110,6 +110,39 @@ def get(snap: str, keys: Iterable[str] | None = None) -> dict[str, Any]:
         raise error
     assert isinstance(config, dict)
     return typing.cast('dict[str, Any]', config)
+
+
+def get_one(snap: str, key: str) -> Any:
+    """Get the value of a single snap configuration key.
+
+    ``get_one(snap, key)`` returns ``value``, while ``get(snap, key)`` returns ``{key: value}``.
+
+    Args:
+        snap: The name of the snap to read configuration from.
+        key: The configuration key to read. Nested options may be accessed with dotted notation,
+            for example ``'server.port'``.
+
+    Returns:
+        The configured value, which may be any JSON type, including a nested dict for a key
+        that names a subtree.
+
+    Raises:
+        ValueError: if the snap name is empty, blank, or is not a single path segment, or if the
+            key is empty, blank, or contains a comma or surrounding whitespace.
+        NotFoundError: if the snap is not installed. Never raised for ``system`` or ``core``,
+            whose configuration is served whether or not the core snap is installed.
+        OptionNotFoundError: if the key has no value stored in the snap's configuration. See
+            :func:`get` for why snapd cannot distinguish an unrecognised key from an unset one.
+
+    ::
+
+        get_one('foo', 'client')  # {'timeout': 30}
+        get_one('foo', 'client.timeout')  # 30
+    """
+    # NOTE: get() rejects any key its 'keys' query parameter would alter, and raises
+    # OptionNotFoundError for a key that isn't set, so the result is keyed by exactly the key
+    # requested and this subscript can't raise KeyError.
+    return get(snap, [key])[key]
 
 
 def unset(snap: str, keys: Iterable[str]) -> None:
