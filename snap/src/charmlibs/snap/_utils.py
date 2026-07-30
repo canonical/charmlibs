@@ -41,7 +41,7 @@ def snap_path_segment(snap: str) -> str:
 
 
 def check_installed(snap: str, *, skip_system: bool = False) -> _errors.NotInstalledError | None:
-    """Return snapd's own error if the snap is not installed, otherwise ``None``.
+    """Return an error if the snap is not installed, otherwise ``None``.
 
     Probes ``GET /v2/snaps/{snap}`` and returns the error snapd answers with when it reports the
     snap absent, as a :class:`NotInstalledError` ready for the caller to ``raise``.
@@ -68,7 +68,7 @@ def check_installed(snap: str, *, skip_system: bool = False) -> _errors.NotInsta
     try:
         _client.get(path)
     except _errors._NotFoundError as e:
-        # snap-not-found -> NotInstalledError: This endpoint reports local state only.
+        # snap-not-found -> NotInstalledError: This function queries local state only.
         return _errors.NotInstalledError._from(e)
     return None
 

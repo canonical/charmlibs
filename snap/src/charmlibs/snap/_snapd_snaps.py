@@ -120,7 +120,7 @@ def list_one(snap: str) -> InstalledInfo:
     try:
         info_dict = _client.get(f'/v2/snaps/{_utils.snap_path_segment(snap)}')
     except _errors._NotFoundError as e:
-        # snap-not-found -> NotInstalledError: This endpoint reports local state only.
+        # snap-not-found -> NotInstalledError: This queries local state only.
         raise _errors.NotInstalledError._from(e) from None
     assert isinstance(info_dict, dict)
     info_dict = typing.cast('dict[str, str]', info_dict)
@@ -149,13 +149,15 @@ def install(
             on, but the snap tracks ``latest/stable`` regardless, so a later refresh may move
             the snap to a different channel's revision. Pass ``channel`` as well to control
             which channel the snap tracks.
-        classic: Permission to install a revision that requires classic confinement, which
-            snapd refuses to install without it. Confinement is a property of the revision, not
-            something this selects, so it is ignored for a revision that doesn't require it.
+        classic: Permission to install a snap that requires classic confinement.
+            If a snap requires classic confinement and ``classic`` is not true,
+            a :class:`NeedsClassicError` is raised.
 
     Returns:
         A truthy value if the snap was installed, or a falsy value if it was already installed.
-        Not guaranteed to be an actual :class:`bool`.
+        Not guaranteed to be an actual :class:`bool`. Note that a falsy result doesn't mean the
+        snap is installed on the requested channel or revision, just that it was already installed
+        at all.
 
     Raises:
         ValueError: if the snap name is empty or is not a single path segment.
@@ -182,13 +184,15 @@ def install(
         data['revision'] = str(revision)
     if classic:
         data['classic'] = True
-    # NOTE: Unlike the API, the CLI doesn't error if it's already installed (just prints a msg).
     try:
         _client.post(path, body=data)
     except _errors._AlreadyInstalledError:
+        # NOTE: Following the CLI, don't error if the snap is already installed.
+        # This includes the case where the snap is installed on a different channel/revision.
         return False
     except _errors._NotFoundError as e:
-        # snap-not-found -> NotInStoreError: An installed snap answers already-installed.
+        # snap-not-found -> NotInStoreError: The snap not being installed wouldn't be an error,
+        # so 'not found' here means the store has no snap by that name.
         raise _errors.NotInStoreError._from(e) from None
     return True
 
@@ -213,12 +217,10 @@ def remove(snap: str, *, purge: bool = False) -> object:
     data: dict[str, Any] = {'action': 'remove'}
     if purge:
         data['purge'] = True
-    # NOTE: Unlike the API, the CLI doesn't error if the snap isn't installed: it prints a
-    # message and exits 0. So an absent snap is a falsy result here rather than an error.
+    # NOTE: Unlike the API, the CLI doesn't error if the snap isn't installed (just prints a msg).
     try:
         _client.post(path, body=data)
     except _errors._NotFoundError:
-        # snap-not-installed -> False: Absent either way, so there's nothing to remove.
         return False
     return True
 
@@ -246,9 +248,8 @@ def refresh(
 
             Without ``channel``, the snap keeps tracking its current channel, even if the
             revision was found on another one.
-        classic: Permission to refresh to a revision that requires classic confinement. Only
-            needed when the installed revision doesn't require it and the target does: a snap
-            already on classic confinement keeps it without this.
+        classic: Permission to refresh to a revision that requires classic confinement from
+            a revision that does not.
 
     Returns:
         A truthy value if the snap was refreshed, or a falsy value if no updates were available.
@@ -282,12 +283,12 @@ def refresh(
     except _errors._NoUpdatesAvailableError:
         return False
     except _errors.APIError as e:
-        # (no kind) -> NotInstalledError: snapd omits the kind when the snap isn't installed.
-        # snap-not-found -> NotInStoreError: A refresh reaches the store too, so the kind an
-        # install gets means the store is what's missing. The probe tells the two apart.
+        # NOTE: snapd sends an error with no 'kind' if the snap isn't installed.
+        # We convert to NotInstalledError here if the snap isn't installed.
         if error := _utils.check_installed(snap):
             raise error from None
-        if type(e) is _errors._NotFoundError:
+        # Otherwise, not-found-error -> NotInStoreError.
+        if type(e) is _errors._NotFoundError:  # 'is' to avoid matching subclasses.
             raise _errors.NotInStoreError._from(e) from None
         raise
     return True
@@ -320,11 +321,10 @@ def hold(snap: str, duration: datetime.timedelta | int | float | None = None) ->
             delta = datetime.timedelta(seconds=duration)
         until = (datetime.datetime.now(datetime.timezone.utc) + delta).isoformat()
     data = {'action': 'hold', 'hold-level': 'general', 'time': until}
-    # NOTE: As for refresh, snapd reports holding a snap that isn't installed with no 'kind'.
     try:
         _client.post(path, body=data)
     except _errors.APIError:
-        # (no kind) -> NotInstalledError: snapd omits the kind for an absent snap, as for refresh.
+        # NOTE: snapd sends an error with no 'kind' if the snap isn't installed.
         if error := _utils.check_installed(snap):
             raise error from None
         raise
@@ -333,8 +333,7 @@ def hold(snap: str, duration: datetime.timedelta | int | float | None = None) ->
 def unhold(snap: str) -> None:
     """Unhold a snap to allow it to be refreshed.
 
-    Does not raise if the snap is not installed or not held, following the snap CLI. A hold does
-    not survive removal, so an absent snap has no hold to clear.
+    Does not raise if the snap is not held, or if it is not installed (an absent snap is not held).
 
     Args:
         snap: The name of the snap to unhold.
@@ -344,8 +343,4 @@ def unhold(snap: str) -> None:
         ChangeError: If the unhold change fails after starting.
     """
     # NOTE: Neither the API nor CLI error if the snap isn't installed or held.
-    try:
-        _client.post(f'/v2/snaps/{_utils.snap_path_segment(snap)}', body={'action': 'unhold'})
-    except _errors._NotFoundError as e:
-        # snap-not-found -> NotInstalledError: Unholding acts on an installed snap.
-        raise _errors.NotInstalledError._from(e) from None
+    _client.post(f'/v2/snaps/{_utils.snap_path_segment(snap)}', body={'action': 'unhold'})

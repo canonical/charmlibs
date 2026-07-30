@@ -136,13 +136,13 @@ def _post_action(
     try:
         _client.post('/v2/apps', body=body)
     except _errors._NotFoundError as e:
-        # snap-not-found -> NotInstalledError: Only sent when the snap itself is named
-        # (services=None) and isn't installed.
+        # snap-not-found -> NotInstalledError: This endpoint operates on installed snaps.
+        # snapd sends snap-not-found when called with 'names': [snap] and the snap isn't installed.
         raise _errors.NotInstalledError._from(e) from None
     except _errors.AppNotFoundError:
-        # app-not-found -> NotInstalledError, if the snap is absent: snapd sends this kind for a
-        # named service that doesn't exist and for a named snap with no services at all, so probe.
-        # AppNotFoundError then means what it says: installed, but no such service.
+        # NOTE: snapd sends app-not-found when called with 'names': [snap.service] in two cases:
+        # 1. The snap is installed but has no service by that name.
+        # 2. The snap is not installed. We convert this case to NotInstalledError.
         if error := _utils.check_installed(snap):
             raise error from None
         raise

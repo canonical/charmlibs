@@ -75,8 +75,7 @@ def connect(plug: tuple[str, str], slot: tuple[str, str] | str | None = None) ->
     try:
         _client.post('/v2/interfaces', body=data)
     except _errors.APIError:
-        # (no kind) -> NotInstalledError: snapd reports an absent snap without a kind here,
-        # and blames the plug snap before the slot snap -- see _first_not_installed.
+        # Turn snapd's empty-kind 'snap is not installed' error into a typed NotInstalledError.
         if error := _first_not_installed(plug_snap, slot_snap):
             raise error from None
         raise
@@ -155,11 +154,9 @@ def disconnect(
     try:
         _client.post('/v2/interfaces', body=data)
     except _errors._InterfacesUnchangedError:
-        # interfaces-unchanged -> suppressed: Follow the snap CLI's lead.
-        pass
+        pass  # Follow the snap CLI's lead and suppress this error.
     except _errors.APIError:
-        # (no kind) -> NotInstalledError: snapd reports an absent snap without a kind here,
-        # and blames the plug snap before the slot snap -- see _first_not_installed.
+        # Turn snapd's empty-kind 'snap is not installed' error into a typed NotInstalledError.
         if error := _first_not_installed(plug_snap, slot_snap):
             raise error from None
         raise
@@ -175,12 +172,12 @@ def _snap_and_name(spec: tuple[str, str] | str | None) -> tuple[str, str]:
     return snap, name
 
 
-def _first_not_installed(plug_snap: str, slot_snap: str) -> _errors._NotFoundError | None:
-    """Return a _NotFoundError for the first named snap that is absent.
+def _first_not_installed(plug_snap: str, slot_snap: str) -> _errors.NotInstalledError | None:
+    """Return a NotInstalledError for the first named snap that is absent.
 
     snapd validates the plug snap before the slot snap (daemon/api_interfaces.go), reporting a
     not-installed snap as an empty-kind ``APIError`` before any plug/slot resolution. We probe the
-    named snaps in the same order -- plug snap first -- so the ``_NotFoundError`` names the same
+    named snaps in the same order -- plug snap first -- so the ``NotInstalledError`` names the same
     snap snapd would blame. Note the ``system``/``core`` aliases count as installed because snapd
     serves them without the core snap being installed. Empty (auto-resolved) sides are skipped.
     """
