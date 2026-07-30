@@ -140,7 +140,7 @@ def _post_action(
         # with the ambiguous 'snap-not-found' kind, while naming a service answers app-not-found
         # (handled below). This endpoint acts on installed snaps only, so the store is never the
         # subject and not-found can only mean not installed.
-        raise _errors.NotInstalledError._narrowed(e) from None
+        raise _errors.NotInstalledError._from(e) from None
     except _errors.AppNotFoundError:
         # NOTE: snapd answers app-not-found both for a snap that isn't installed and for a service
         # that an installed snap doesn't have. We probe /v2/snaps/{snap} so that an absent snap

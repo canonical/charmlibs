@@ -84,7 +84,7 @@ class Error(Exception):
         return self._message
 
     @classmethod
-    def _narrowed(cls, error: Error) -> Self:
+    def _from(cls, error: Error) -> Self:
         """Rebuild ``error`` as this more specific type, carrying every field across.
 
         The client raises the most specific type a response's ``kind`` identifies, which for an

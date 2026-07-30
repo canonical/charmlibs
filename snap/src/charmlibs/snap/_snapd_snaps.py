@@ -121,7 +121,7 @@ def list_one(snap: str) -> InstalledInfo:
         info_dict = _client.get(f'/v2/snaps/{_utils.snap_path_segment(snap)}')
     except _errors.NotFoundError as e:
         # This endpoint reports local state only, so not-found can only mean not installed.
-        raise _errors.NotInstalledError._narrowed(e) from None
+        raise _errors.NotInstalledError._from(e) from None
     assert isinstance(info_dict, dict)
     info_dict = typing.cast('dict[str, str]', info_dict)
     return InstalledInfo._from_dict(info_dict)
@@ -191,7 +191,7 @@ def install(
     except _errors.NotFoundError as e:
         # An install only fails this way when the store has nothing by that name: whether the
         # snap is installed isn't in question, since an installed one answers already-installed.
-        raise _errors.NotInStoreError._narrowed(e) from None
+        raise _errors.NotInStoreError._from(e) from None
     return True
 
 
@@ -298,7 +298,7 @@ def refresh(
         if error := _utils.check_installed(snap):
             raise error from None
         if type(e) is _errors.NotFoundError:
-            raise _errors.NotInStoreError._narrowed(e) from None
+            raise _errors.NotInStoreError._from(e) from None
         raise
     return True
 
@@ -359,4 +359,4 @@ def unhold(snap: str) -> None:
         _client.post(f'/v2/snaps/{_utils.snap_path_segment(snap)}', body={'action': 'unhold'})
     except _errors.NotFoundError as e:
         # Unholding acts on an installed snap; the store is never consulted.
-        raise _errors.NotInstalledError._narrowed(e) from None
+        raise _errors.NotInstalledError._from(e) from None

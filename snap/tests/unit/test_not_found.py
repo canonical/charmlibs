@@ -191,10 +191,10 @@ def test_narrowed_traceback_stops_at_the_library(name: str, mock_raw: MagicMock)
 
 @pytest.mark.parametrize('name', _RAISING)
 def test_narrowing_adds_no_frame_of_its_own(name: str, mock_raw: MagicMock):
-    # _narrowed builds the exception and returns before the raise, so it never appears itself.
+    # _from builds the exception and returns before the raise, so it never appears itself.
     with pytest.raises(NotFoundError) as ctx:
         _CALLS[name]()
-    assert not any('_narrowed' in f for f in _library_frames(ctx.value))
+    assert '_errors.py:_from' not in _library_frames(ctx.value)
 
 
 @pytest.mark.parametrize('name', _RAISING)
