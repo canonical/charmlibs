@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import logging
 
-from . import _client, _errors, _utils
+from . import _client, _utils
 
 logger = logging.getLogger(__name__)
 
