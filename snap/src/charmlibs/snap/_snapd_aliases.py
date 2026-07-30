@@ -48,9 +48,7 @@ def alias(snap: str, app: str, alias: str) -> None:
     try:
         _client.post('/v2/aliases', body=data)
     except _errors.NotFoundError as e:
-        # Aliasing acts on an installed snap's apps, so not-found can only mean not installed.
-        # snapd sends the unambiguous 'snap-not-installed' kind here, which the client already
-        # maps to the subclass; this narrows the ambiguous kind should snapd ever send it.
+        # Aliasing acts on an installed snap's apps; the store is never consulted.
         raise _errors.NotInstalledError._from(e) from None
 
 
@@ -71,5 +69,5 @@ def unalias(alias: str) -> None:
     try:
         _client.post('/v2/aliases', body=data)
     except _errors.NotFoundError as e:
-        # An alias only exists for an installed snap, so the store is never the subject here.
+        # An alias only exists for an installed snap.
         raise _errors.NotInstalledError._from(e) from None

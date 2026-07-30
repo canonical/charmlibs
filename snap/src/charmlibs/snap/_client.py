@@ -273,12 +273,10 @@ _ERRORS = {
     'option-not-found': _errors.OptionNotFoundError,
     'snap-channel-not-available': _errors.ChannelNotAvailableError,
     'snap-needs-classic': _errors.NeedsClassicError,
-    # NOTE: snapd sends this kind both for a snap missing from the system and for one missing
-    # from the store, so the kind alone can't say which. The client raises the base type and the
-    # function that made the request narrows it -- see NotFoundError and Error._from.
+    # NOTE: sent both for a snap missing from the system and for one missing from the store, so
+    # the caller narrows it to say which -- see NotFoundError.
     'snap-not-found': _errors.NotFoundError,
-    # Unambiguous: snapd only sends this kind for remove and alias, which both act on an
-    # installed snap, so it maps straight to the subclass with nothing left to decide.
+    # NOTE: only sent for remove and alias, which both act on an installed snap.
     'snap-not-installed': _errors.NotInstalledError,
     'snap-no-update-available': _errors._NoUpdatesAvailableError,
     'snap-revision-not-available': _errors.RevisionNotAvailableError,

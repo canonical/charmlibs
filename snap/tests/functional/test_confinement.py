@@ -4,23 +4,17 @@
 
 """Functional tests for what the ``classic`` argument does, and what it does not do.
 
-``classic`` is a grant of permission, not a choice of confinement. snapd decides confinement from
-the revision's own ``snap.yaml``, and uses the flag only to check the caller consented to a
-revision that requires classic confinement (``ensureInstallPreconditions`` in snapd's
-``overlord/snapstate/snapstate.go``):
+``classic`` is permission, not a choice of confinement. snapd takes confinement from the
+revision's own ``snap.yaml`` and uses the flag only to check the caller consented to a revision
+that requires it (``ensureInstallPreconditions`` in snapd's ``overlord/snapstate/snapstate.go``):
+an installed classic snap keeps classic confinement on refresh without the flag, and the flag is
+dropped for a revision that doesn't require it. So confinement follows the revision both ways,
+and no value of ``classic`` changes the confinement of a revision already installed -- which is
+why :func:`charmlibs.snap.ensure` doesn't compare it against a snap's current confinement.
 
-- an already classic-confined snap keeps classic confinement on refresh without the flag, because
-  snapd ORs the installed snap's classic flag into the requested one;
-- the flag is silently dropped for a revision that doesn't require classic confinement;
-- so confinement follows the revision in both directions, and no value of ``classic`` can change
-  the confinement of a revision that is already installed.
-
-This is why :func:`charmlibs.snap.ensure` doesn't compare ``classic`` against the confinement a
-snap currently has: a refresh triggered by that comparison could not change the outcome.
-
-These use locally-built snaps rather than the store, since what's needed is one snap name whose
-revisions differ in confinement -- ``test-conf-snap`` 1.0 is strict, 2.0 and 3.0 are classic. The
-sideload path reaches the same flag logic in snapd as a store install or refresh.
+These use locally-built snaps because what's needed is one snap name whose revisions differ in
+confinement: ``test-conf-snap`` 1.0 is strict, 2.0 and 3.0 are classic. Sideloading reaches the
+same flag logic in snapd as a store install or refresh.
 """
 
 from __future__ import annotations

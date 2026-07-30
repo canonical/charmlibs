@@ -53,11 +53,10 @@ def ensure(
             ``revision`` to control which channel the snap tracks -- otherwise a newly
             installed snap tracks ``latest/stable``, whichever channel the revision was
             found on.
-        classic: Grants permission to install or refresh a revision that requires classic
-            confinement, which snapd refuses to do without it. It does not select the
-            confinement: that is a property of the revision, declared in the snap itself. So
-            it is never on its own a reason to refresh an already-installed snap, and the
-            confinement a snap currently has is not compared against it.
+        classic: Permission to install or refresh a revision that requires classic confinement,
+            which snapd refuses to do without it. Confinement is a property of the revision, not
+            something this selects, so it is never on its own a reason to refresh a snap that is
+            already installed.
         update: If ``True`` (default), refresh the snap when it is already installed on the
             requested channel. If ``False``, leave an already-correct snap untouched.
 
@@ -70,11 +69,9 @@ def ensure(
 
     Raises:
         ValueError: if the snap name is empty, blank, or is not a single path segment.
-        NotInStoreError: If the store has no snap by that name, whether it was reached by
-            installing a snap that isn't present or by refreshing one the store has dropped.
-        NotInstalledError: If the snap is removed between this function checking whether it is
-            installed and refreshing it. Both are subclasses of :class:`NotFoundError`, which
-            can be caught instead when the distinction doesn't matter.
+        NotInStoreError: If the store has no snap by that name.
+        NotInstalledError: If the snap is removed between the check for whether it is installed
+            and the refresh.
         RevisionNotAvailableError: If the revision is not available on any channel.
         NeedsClassicError: If the snap requires ``classic=True``.
         ChannelNotAvailableError: If the channel is invalid or unavailable, or if the revision

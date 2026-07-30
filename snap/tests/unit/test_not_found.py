@@ -3,17 +3,13 @@
 
 """The library-wide contract for an absent snap: a subclass of NotFoundError, never the base.
 
-A snap operation can need the snap to be installed on the system, to be offered by the store, or
-both. snapd doesn't distinguish the two: it answers with the ``snap-not-found`` kind either way,
-with the same status code and the same value, so the response alone can't say which precondition
-failed. Only the message differs, and matching on it is not an option -- snapd words condition A
-three different ways (``'snap not installed'``, ``'snap "X" is not installed'``, ``'snap "X" not
-found'``) and condition B as ``'snap not found'``, which the third of those contains.
+snapd sends the same ``snap-not-found`` kind whether a snap is missing from the system or from the
+store, with the same status code and value -- only the message differs, and its wording varies by
+endpoint, so matching on it isn't an option. The client raises the base type and the function that
+made the request narrows it, since only that function knows what it asked for.
 
-So the client raises the base :class:`NotFoundError` for that kind, and the function that made the
-request narrows it: it knows which preconditions it needed. This module holds that rule to every
-public function, so that a caller can always tell "it isn't installed" from "the store doesn't
-have it" -- the distinction that makes composing these functions possible.
+These tests hold that rule to every public function, so a caller can always tell "it isn't
+installed" from "the store doesn't have it".
 """
 
 from __future__ import annotations
@@ -63,17 +59,15 @@ _CALLS: dict[str, Callable[[], object]] = {
 
 
 def test_every_public_function_is_accounted_for():
-    # A new public function has to be added here, so that whether it can report an absent snap --
-    # and as which sense -- is a decision someone made rather than one that defaulted.
+    # A new public function has to be added here, so which sense it reports is a decision.
     public = {name for name in snap.__all__ if inspect.isfunction(getattr(snap, name))}
     assert public == set(_CALLS)
 
 
 @pytest.mark.parametrize('name', sorted(_CALLS))
 def test_no_public_function_raises_the_base_type(name: str, mock_client: MockClient):
-    # Every client method raises the base, so whichever one a function reaches, and however many
-    # requests it makes, the error it lets out must name which precondition failed. Functions
-    # that swallow the error (remove) or never reach the client are fine -- the rule is only
+    # Every client method raises the base, so whichever a function reaches, the error it lets
+    # out must name which sense was meant. Swallowing it (remove) is fine -- the rule is only
     # about what escapes.
     error = NotFoundError('snap not found', kind='snap-not-found', value='lxd', status_code=404)
     for mock in (mock_client.get, mock_client.get_logs, mock_client.post, mock_client.put):
@@ -128,15 +122,13 @@ def test_functions_that_never_consult_the_store_report_the_local_sense(
 # ---------------------------------------------------------------------------
 # Traceback shape
 #
-# Narrowing raises a new exception, so its traceback starts at the library function that
-# narrowed rather than carrying the client's frames. That is deliberate: a classified error is
-# one the caller can act on, and the frames between the call and the raise are the same
-# boilerplate every time -- noise in the Juju debug log a charm's traceback ends up in. Nothing
-# is lost that isn't already on the exception (kind, message, value, status code) or in the
-# DEBUG log the client writes for every request.
+# Narrowing raises a new exception, so the traceback starts at the library function that
+# narrowed and doesn't carry the client's frames. Those frames are the same boilerplate every
+# time, and everything specific to the failure is on the exception itself, so dropping them
+# keeps a charm's traceback in the Juju debug log short.
 #
 # These mock the raw request layer rather than the client functions, so the real client frames
-# exist and their absence from the traceback is a fact about narrowing, not about the mock.
+# exist and their absence is a fact about narrowing rather than about the mock.
 # ---------------------------------------------------------------------------
 
 _SOURCE_DIR = pathlib.Path(snap.__file__).parent

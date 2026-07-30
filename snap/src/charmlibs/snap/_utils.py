@@ -44,8 +44,7 @@ def check_installed(snap: str, *, skip_system: bool = False) -> _errors.NotInsta
     """Return snapd's own error if the snap is not installed, otherwise ``None``.
 
     Probes ``GET /v2/snaps/{snap}`` and returns the error snapd answers with when it reports the
-    snap absent, narrowed to :class:`NotInstalledError`, ready for the caller to ``raise``. The
-    probe asks only about the local system, so the answer is never about the store.
+    snap absent, as a :class:`NotInstalledError` ready for the caller to ``raise``.
 
     Args:
         snap: The name of the snap to check.
@@ -69,12 +68,8 @@ def check_installed(snap: str, *, skip_system: bool = False) -> _errors.NotInsta
     try:
         _client.get(path)
     except _errors.NotFoundError as e:
-        # This endpoint asks only about the local system, so a not-found answer can only mean
-        # the snap isn't installed -- the store is never consulted and so never the subject.
-        # The client raises the base type for snapd's ambiguous 'snap-not-found' kind, and this
-        # is the narrowing for every probe site in the library.
-        # A fresh object, so it carries no traceback until the caller raises it: the probe's own
-        # frames never reach whoever asked, and the error surfaces from the caller's raise.
+        # This endpoint reports local state only, so not-found can only mean not installed. The
+        # fresh error carries no traceback, so the probe's frames don't reach the caller.
         return _errors.NotInstalledError._from(e)
     return None
 
