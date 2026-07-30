@@ -33,6 +33,7 @@ from charmlibs.snap._errors import (
     Error,
     NeedsClassicError,
     NotFoundError,
+    NotInstalledError,
     OptionNotFoundError,
     TimeoutError,  # noqa: A004 (shadowing a Python builtin)
     _AlreadyInstalledError,
@@ -441,23 +442,35 @@ def test_all_errors_mapped():
         'BadResponseError',
         'ChangeError',
     }
+    unmapped = unmapped | {
+        # Narrowed from NotFoundError by the function that made the request, never mapped from a
+        # kind: snapd has no kind that means "the store doesn't have it" as opposed to "it isn't
+        # installed". See NotFoundError and test_absent_snap_kinds below.
+        'NotInStoreError',
+    }
     expected = {
         name
         for name in dir(charmlibs.snap._errors)
         if name.endswith('Error') and name not in unmapped
     }
-    # A set, not a sorted list: a type may be reached by more than one kind. NotFoundError is,
-    # deliberately -- snapd reports an absent snap as 'snap-not-found' on most endpoints and
-    # 'snap-not-installed' on remove and alias, and the library raises one type for both.
+    # A set, not a sorted list: a type may be reached by more than one kind.
     actual = {cls.__name__ for cls in _client._ERRORS.values()}
     assert actual == expected
 
 
-def test_both_absent_snap_kinds_map_to_not_found():
-    # The fold that lets a caller catch "the snap isn't there" without knowing which endpoint
-    # the operation uses. Both kinds are real: see the functional tests for captured responses.
-    assert _client._ERRORS['snap-not-found'] is NotFoundError
-    assert _client._ERRORS['snap-not-installed'] is NotFoundError
+class TestAbsentSnapKinds:
+    # snapd has two kinds for an absent snap and they are not equally informative, so they don't
+    # map the same way. Both are real: see the functional tests for captured responses.
+    def test_ambiguous_kind_maps_to_the_base_type(self):
+        # 'snap-not-found' is sent both for a snap missing from the system and for one missing
+        # from the store, so the client can't tell which and raises the base for a caller that
+        # knows what it asked for to narrow.
+        assert _client._ERRORS['snap-not-found'] is NotFoundError
+
+    def test_unambiguous_kind_maps_straight_to_the_subclass(self):
+        # 'snap-not-installed' is only sent by remove and alias, which both act on an installed
+        # snap, so there is nothing left to decide and no narrowing needed at those call sites.
+        assert _client._ERRORS['snap-not-installed'] is NotInstalledError
 
 
 # ---------------------------------------------------------------------------

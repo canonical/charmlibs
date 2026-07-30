@@ -41,7 +41,7 @@ def start(snap: str, services: str | Iterable[str] | None = None, *, enable: boo
     Raises:
         ValueError: if the snap name is empty, blank, or is not a single path segment, or if a
             service name is empty or blank.
-        NotFoundError: if the snap is not installed.
+        NotInstalledError: if the snap is not installed.
         AppNotFoundError: if the snap is installed but has no service with a given name, or if
             all services were requested and the snap has no services at all.
         ChangeError: if the change fails (for example, the service fails to start).
@@ -74,7 +74,7 @@ def stop(snap: str, services: str | Iterable[str] | None = None, *, disable: boo
     Raises:
         ValueError: if the snap name is empty, blank, or is not a single path segment, or if a
             service name is empty or blank.
-        NotFoundError: if the snap is not installed.
+        NotInstalledError: if the snap is not installed.
         AppNotFoundError: if the snap is installed but has no service with a given name, or if
             all services were requested and the snap has no services at all.
         ChangeError: if the change fails (for example, the service fails to stop).
@@ -95,7 +95,7 @@ def restart(snap: str, services: str | Iterable[str] | None = None) -> None:
     Raises:
         ValueError: if the snap name is empty, blank, or is not a single path segment, or if a
             service name is empty or blank.
-        NotFoundError: if the snap is not installed.
+        NotInstalledError: if the snap is not installed.
         AppNotFoundError: if the snap is installed but has no service with a given name, or if
             all services were requested and the snap has no services at all.
         ChangeError: if the change fails (for example, the service fails to restart).
@@ -135,10 +135,16 @@ def _post_action(
     body: dict[str, Any] = {'action': action, 'names': names, **(extra or {})}
     try:
         _client.post('/v2/apps', body=body)
+    except _errors.NotFoundError as e:
+        # NOTE: naming the snap itself (services=None) for a snap that isn't installed answers
+        # with the ambiguous 'snap-not-found' kind, while naming a service answers app-not-found
+        # (handled below). This endpoint acts on installed snaps only, so the store is never the
+        # subject and not-found can only mean not installed.
+        raise _errors.NotInstalledError._narrowed(e) from None
     except _errors.AppNotFoundError:
         # NOTE: snapd answers app-not-found both for a snap that isn't installed and for a service
         # that an installed snap doesn't have. We probe /v2/snaps/{snap} so that an absent snap
-        # raises NotFoundError, as it does elsewhere in the library, which leaves AppNotFoundError
+        # raises NotInstalledError, as it does elsewhere in the library, leaving AppNotFoundError
         # meaning what it says: the snap is installed, but has no such service.
         if error := _utils.check_installed(snap):
             raise error from None

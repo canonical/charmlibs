@@ -108,9 +108,12 @@ def test_post_waits_for_async_change():
 
 
 def test_get_sync_error_snap_not_found():
-    # GET for an absent snap raises NotFoundError.
+    # The client raises the *base* NotFoundError for snapd's ambiguous 'snap-not-found' kind,
+    # leaving it to the function that made the request to say which sense was meant. These
+    # assertions pin that contract at the client layer; the library layer narrows it.
     with pytest.raises(_errors.NotFoundError) as ctx:
         _client.get(f'/v2/snaps/{_ABSENT_SNAP}')
+    assert type(ctx.value) is _errors.NotFoundError
     assert ctx.value.kind == 'snap-not-found'
     # This endpoint is what _utils.check_installed probes with; its message is terse, with the
     # snap name in `value`. get()/connect()/disconnect() raise this very error unchanged, relying
@@ -128,16 +131,18 @@ def test_get_sync_error_no_kind():
 
 
 def test_put_sync_error_snap_not_found():
-    # PUT conf on an absent snap raises NotFoundError.
+    # PUT conf on an absent snap raises the base type -- set()/unset() narrow it.
     with pytest.raises(_errors.NotFoundError) as ctx:
         _client.put(f'/v2/snaps/{_ABSENT_SNAP}/conf', body={'key': 'value'})
+    assert type(ctx.value) is _errors.NotFoundError
     assert ctx.value.kind == 'snap-not-found'
 
 
 def test_get_logs_error_snap_not_found():
-    # Requesting logs for an absent snap raises NotFoundError.
+    # Requesting logs for an absent snap raises the base type -- logs() narrows it.
     with pytest.raises(_errors.NotFoundError) as ctx:
         _client.get('/v2/logs', query={'names': _ABSENT_SNAP, 'n': 10})
+    assert type(ctx.value) is _errors.NotFoundError
     assert ctx.value.kind == 'snap-not-found'
 
 

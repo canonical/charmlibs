@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from charmlibs.snap import _utils
-from charmlibs.snap._errors import NotFoundError
+from charmlibs.snap._errors import NotFoundError, NotInstalledError
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
@@ -290,19 +290,37 @@ class TestCheckInstalled:
         # skip_system is for endpoints snapd serves under these names whether or not the core
         # snap is installed. Elsewhere -- /v2/apps -- they get no special treatment, so an
         # absent 'core' (and 'system', which is never a snap) is reported as not installed.
-        error = NotFoundError('snap not installed', kind='snap-not-found', value=snap)
-        mock_client.get.side_effect = error
-        assert _utils.check_installed(snap) is error
+        mock_client.get.side_effect = NotFoundError(
+            'snap not installed', kind='snap-not-found', value=snap
+        )
+        error = _utils.check_installed(snap)
+        assert type(error) is NotInstalledError
+        assert error.value == snap
         mock_client.get.assert_called_once_with(f'/v2/snaps/{snap}')
 
     def test_installed_snap_is_probed(self, mock_client: MockClient):
         assert _utils.check_installed('hello world') is None
         mock_client.get.assert_called_once_with('/v2/snaps/hello%20world')
 
-    def test_absent_snap_returns_not_found(self, mock_client: MockClient):
-        error = NotFoundError('snap not installed', kind='snap-not-found', value='hello-world')
-        mock_client.get.side_effect = error
-        assert _utils.check_installed('hello-world') is error
+    def test_absent_snap_returns_not_installed(self, mock_client: MockClient):
+        # The probe asks only about the local system, so the ambiguous base type the client
+        # raises for snapd's 'snap-not-found' kind is narrowed here, once, for every probe site.
+        mock_client.get.side_effect = NotFoundError(
+            'snap not installed', kind='snap-not-found', value='hello-world'
+        )
+        error = _utils.check_installed('hello-world')
+        assert type(error) is NotInstalledError
+        # Every field is carried across, so the caller raises snapd's own message and value.
+        assert error.message == 'snap not installed'
+        assert error.value == 'hello-world'
+        assert error.kind == 'snap-not-found'
+
+    def test_narrowed_error_has_no_traceback(self, mock_client: MockClient):
+        # The caller raises this error itself, so it must not carry the probe's frames.
+        mock_client.get.side_effect = NotFoundError('', kind='snap-not-found', value='x')
+        error = _utils.check_installed('hello-world')
+        assert error is not None
+        assert error.__traceback__ is None
 
 
 class TestNormalizeChannel:

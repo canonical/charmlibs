@@ -10,7 +10,7 @@ import pytest
 
 from charmlibs.snap import _functions
 from charmlibs.snap import _snapd_snaps as _snapd
-from charmlibs.snap._errors import NotFoundError
+from charmlibs.snap._errors import NotInstalledError
 
 
 def make_info(
@@ -54,7 +54,7 @@ class TestGetInfo:
         assert result is expected
 
     def test_not_installed_returns_none(self, mock_snapd: MockSnapd):
-        mock_snapd.list_one.side_effect = NotFoundError(
+        mock_snapd.list_one.side_effect = NotInstalledError(
             'snap "hello-world" is not installed',
             kind='snap-not-found',
             value='',

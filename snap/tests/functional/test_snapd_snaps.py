@@ -153,7 +153,7 @@ def test_remove():
     # Last test in the "installed" block — leaves the snap removed for the next block.
     ensure_installed(_SNAP)
     _snapd.remove(_SNAP)
-    with pytest.raises(_errors.NotFoundError):
+    with pytest.raises(_errors.NotInstalledError):
         _snapd.list_one(_SNAP)
 
 
@@ -167,7 +167,7 @@ def test_list_one_missing_raises():
     ensure_removed(_SNAP)
     # Independent oracle: the snap really is absent from /v2/snaps.
     assert _SNAP not in {s.name for s in _list(None)}
-    with pytest.raises(_errors.NotFoundError) as ctx:
+    with pytest.raises(_errors.NotInstalledError) as ctx:
         _snapd.list_one(_SNAP)
     assert ctx.value.kind == 'snap-not-found'
 
@@ -186,11 +186,13 @@ def test_remove_purge_not_installed_returns_false():
 
 
 def test_refresh_not_installed_raises_not_found():
-    # refresh() probes /v2/snaps/{snap} on failure and raises that probe's NotFoundError, so an
-    # absent snap is reported the same way here as everywhere else in the library.
+    # A refresh needs the snap installed and still offered by the store, so it's the one
+    # operation where both senses are reachable. snapd's answer here carries no kind at all, so
+    # refresh() probes /v2/snaps/{snap}: absent means the local sense.
     ensure_removed(_SNAP)
-    with pytest.raises(_errors.NotFoundError) as ctx:
+    with pytest.raises(_errors.NotInstalledError) as ctx:
         retry_on_rate_limit(_snapd.refresh)(_SNAP)
+    assert type(ctx.value) is _errors.NotInstalledError
     assert ctx.value.kind == 'snap-not-found'
 
 
@@ -207,7 +209,7 @@ def test_raw_refresh_not_installed_has_no_kind():
 def test_hold_not_installed_raises_not_found():
     # hold() has the same kindless response to deal with, and solves it the same way.
     ensure_removed(_SNAP)
-    with pytest.raises(_errors.NotFoundError) as ctx:
+    with pytest.raises(_errors.NotInstalledError) as ctx:
         _snapd.hold(_SNAP)
     assert ctx.value.kind == 'snap-not-found'
 
@@ -323,8 +325,14 @@ def test_install_classic():
 
 
 def test_install_nonexistent_snap_raises():
-    with pytest.raises(_errors.NotFoundError) as ctx:
+    # The other sense: an install can only fail this way because the store has nothing by that
+    # name. snapd sends the same ambiguous kind it uses for an absent local snap, and the
+    # message ('snap not found', with no snap name) is the only thing that differs -- which is
+    # why install classifies by what it asked for rather than by reading the message.
+    with pytest.raises(_errors.NotInStoreError) as ctx:
         retry_on_rate_limit(_snapd.install)(_ABSENT_SNAP)
+    assert type(ctx.value) is _errors.NotInStoreError
+    assert ctx.value.message == 'snap not found'
     assert ctx.value.kind == 'snap-not-found'
     assert ctx.value.value == _ABSENT_SNAP
 
@@ -422,7 +430,7 @@ def test_list_absent_snap_is_filtered_rather_than_an_error():
     ensure_installed(_SNAP)
     assert [i.name for i in _list([_SNAP, _ABSENT_SNAP])] == [_SNAP]
     assert _list(_ABSENT_SNAP) == []
-    with pytest.raises(_errors.NotFoundError):
+    with pytest.raises(_errors.NotInstalledError):
         _snapd.list_one(_ABSENT_SNAP)
 
 

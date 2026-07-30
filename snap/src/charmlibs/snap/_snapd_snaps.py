@@ -114,10 +114,14 @@ def list_one(snap: str) -> InstalledInfo:
 
     Raises:
         ValueError: if the snap name is empty or is not a single path segment.
-        NotFoundError: if the snap is not installed.
+        NotInstalledError: if the snap is not installed.
         Error: (or a subtype) if the information could not be retrieved for another reason.
     """
-    info_dict = _client.get(f'/v2/snaps/{_utils.snap_path_segment(snap)}')
+    try:
+        info_dict = _client.get(f'/v2/snaps/{_utils.snap_path_segment(snap)}')
+    except _errors.NotFoundError as e:
+        # This endpoint reports local state only, so not-found can only mean not installed.
+        raise _errors.NotInstalledError._narrowed(e) from None
     assert isinstance(info_dict, dict)
     info_dict = typing.cast('dict[str, str]', info_dict)
     return InstalledInfo._from_dict(info_dict)
@@ -156,7 +160,7 @@ def install(
 
     Raises:
         ValueError: if the snap name is empty or is not a single path segment.
-        NotFoundError: if the snap does not exist in the store.
+        NotInStoreError: if the store has no snap by that name.
         RevisionNotAvailableError: if the specified revision is not available on any channel.
         ChannelNotAvailableError: if the specified channel is not available, or if the specified
             revision is not available on it.
@@ -184,6 +188,10 @@ def install(
         _client.post(path, body=data)
     except _errors._AlreadyInstalledError:
         return False
+    except _errors.NotFoundError as e:
+        # An install only fails this way when the store has nothing by that name: whether the
+        # snap is installed isn't in question, since an installed one answers already-installed.
+        raise _errors.NotInStoreError._narrowed(e) from None
     return True
 
 
@@ -212,6 +220,9 @@ def remove(snap: str, *, purge: bool = False) -> object:
     try:
         _client.post(path, body=data)
     except _errors.NotFoundError:
+        # Either sense means the snap isn't on the system to remove, so there is nothing to
+        # report: snapd sends the unambiguous 'snap-not-installed' kind, and the base is caught
+        # too so that no unnarrowed error can escape a function that reports absence as falsy.
         return False
     return True
 
@@ -252,9 +263,9 @@ def refresh(
 
     Raises:
         ValueError: if the snap name is empty or is not a single path segment.
-        NotFoundError: if the snap is not installed, or if it is installed but the store no
-            longer offers it. Unusually for this library, both senses of the error are reachable
-            from one function -- see :class:`NotFoundError`.
+        NotInstalledError: if the snap is not installed.
+        NotInStoreError: if the snap is installed but the store no longer offers it. A refresh
+            needs both, so it is the one function where either can be what's missing.
         RevisionNotAvailableError: if the specified revision is not available on any channel.
         ChannelNotAvailableError: if the specified channel is not available, or if the specified
             revision is not available on it.
@@ -277,13 +288,17 @@ def refresh(
         _client.post(path, body=data)
     except _errors._NoUpdatesAvailableError:
         return False
-    except _errors.APIError:
-        # NOTE: snapd reports a refresh of a snap that isn't installed as an error with no 'kind',
-        # so there's nothing in the response to key off. We probe /v2/snaps/{snap} so that an
-        # absent snap raises NotFoundError, as it does elsewhere in the library, rather than a
-        # bare APIError the caller can't classify. Any other failure is re-raised unchanged.
+    except _errors.APIError as e:
+        # NOTE: A refresh needs the snap installed *and* still offered by the store, so it's the
+        # one operation where both senses of NotFoundError are reachable -- and snapd tells them
+        # apart badly. Not installed comes back with no 'kind' at all; withdrawn from the store
+        # comes back as the same ambiguous 'snap-not-found' an install gets. So we probe
+        # /v2/snaps/{snap}: absent means not installed, present means the store is what's
+        # missing. Any other failure is re-raised unchanged.
         if error := _utils.check_installed(snap):
             raise error from None
+        if type(e) is _errors.NotFoundError:
+            raise _errors.NotInStoreError._narrowed(e) from None
         raise
     return True
 
@@ -301,7 +316,7 @@ def hold(snap: str, duration: datetime.timedelta | int | float | None = None) ->
 
     Raises:
         ValueError: if the snap name is empty or is not a single path segment.
-        NotFoundError: If the snap is not installed.
+        NotInstalledError: If the snap is not installed.
         ChangeError: If the hold change fails after starting.
     """
     path = f'/v2/snaps/{_utils.snap_path_segment(snap)}'
@@ -340,4 +355,8 @@ def unhold(snap: str) -> None:
         ChangeError: If the unhold change fails after starting.
     """
     # NOTE: Neither the API nor CLI error if the snap isn't installed or held.
-    _client.post(f'/v2/snaps/{_utils.snap_path_segment(snap)}', body={'action': 'unhold'})
+    try:
+        _client.post(f'/v2/snaps/{_utils.snap_path_segment(snap)}', body={'action': 'unhold'})
+    except _errors.NotFoundError as e:
+        # Unholding acts on an installed snap; the store is never consulted.
+        raise _errors.NotInstalledError._narrowed(e) from None

@@ -14,7 +14,13 @@
 
 """Logical error types for responses from the snapd API."""
 
+from __future__ import annotations
+
 import builtins as _builtins
+import typing
+
+if typing.TYPE_CHECKING:
+    from typing_extensions import Self
 
 
 class Error(Exception):
@@ -77,6 +83,24 @@ class Error(Exception):
             return f'{self._message} ({value})'
         return self._message
 
+    @classmethod
+    def _narrowed(cls, error: Error) -> Self:
+        """Rebuild ``error`` as this more specific type, carrying every field across.
+
+        The client raises the most specific type a response's ``kind`` identifies, which for an
+        absent snap is only ever :class:`NotFoundError` -- snapd sends the same kind whether the
+        snap is missing from the system or from the store. The function that made the request
+        knows which it asked for, so it narrows the error rather than the client guessing. This
+        only ever moves down the hierarchy, so the data is carried over unchanged.
+        """
+        return cls(
+            error._message,
+            kind=error._kind,
+            value=error._value,
+            status_code=error._status_code,
+            status=error._status,
+        )
+
     def __repr__(self) -> str:
         return (
             f'{type(self).__module__}.{type(self).__name__}('
@@ -136,24 +160,40 @@ class AppNotFoundError(APIError):
 
 
 class NotFoundError(APIError):
-    """Raised when a snap is not found.
+    """Base class for a snap not being where an operation needed it.
 
-    The operation usually determines which sense is meant. :func:`install` looks the snap up in
-    the store, so this means the store doesn't offer it; most other functions operate on an
-    installed snap, so it means the snap isn't installed on the system.
+    A snap operation can need the snap to be installed on the system, to be offered by the snap
+    store, or both. These are independent -- a sideloaded snap is installed but not in the store,
+    and a snap withdrawn from the store stays installed -- so the library raises a subclass
+    naming which one was missing: :class:`NotInstalledError` or :class:`NotInStoreError`.
 
-    :func:`refresh` is the exception, and :func:`ensure` inherits that: a refresh needs the snap
-    to be both installed and still offered by the store, so either can be what's missing.
+    Catch this class to handle both at once, when the distinction doesn't matter. The library
+    doesn't raise it directly, so catching a subclass is always enough to be specific.
 
-    The two are not distinguished by type, because snapd doesn't distinguish them either: it
-    sends the same ``snap-not-found`` kind for both, and the snap name as ``value`` for both.
-    Only ``message`` differs -- ``'snap not found'`` for the store, ``'snap not installed'``
-    for the system -- and matching on it is not recommended.
-
-    snapd also reports an absent snap inconsistently across its endpoints: with the
+    snapd doesn't make this distinction itself. It reports an absent snap with the
     ``snap-not-found`` kind, with the ``snap-not-installed`` kind, or as an error with no kind
-    at all. The library raises this one type in every case, so that a caller can catch "the
-    snap isn't there" without knowing which endpoint the operation happens to use.
+    at all, depending on the endpoint -- and it uses ``snap-not-found`` for both senses, with
+    the same status code and the same ``value``. Only ``message`` differs, so the library
+    classifies by which operation was asked for rather than by matching on the message.
+    """
+
+
+class NotInstalledError(NotFoundError):
+    """Raised when a snap is not installed on the system.
+
+    Raised by every operation that acts on an installed snap: reading its state or config,
+    managing its services, connecting its interfaces, aliasing its apps, holding it, and
+    refreshing it.
+    """
+
+
+class NotInStoreError(NotFoundError):
+    """Raised when the snap store does not offer a snap by that name.
+
+    Raised by :func:`install`, and by :func:`refresh` for an installed snap the store no longer
+    offers. :func:`ensure` can raise it either way. Note this is about the name: a snap that
+    exists but has no revision on the requested channel raises
+    :class:`ChannelNotAvailableError` instead.
     """
 
 

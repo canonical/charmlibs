@@ -40,11 +40,12 @@ def snap_path_segment(snap: str) -> str:
     return urllib.parse.quote(snap, safe='')
 
 
-def check_installed(snap: str, *, skip_system: bool = False) -> _errors.NotFoundError | None:
-    """Return snapd's own NotFoundError if the snap is not installed, otherwise ``None``.
+def check_installed(snap: str, *, skip_system: bool = False) -> _errors.NotInstalledError | None:
+    """Return snapd's own error if the snap is not installed, otherwise ``None``.
 
-    Probes ``GET /v2/snaps/{snap}`` and returns the :class:`NotFoundError` snapd answers with when
-    it reports the snap absent, ready for the caller to ``raise``.
+    Probes ``GET /v2/snaps/{snap}`` and returns the error snapd answers with when it reports the
+    snap absent, narrowed to :class:`NotInstalledError`, ready for the caller to ``raise``. The
+    probe asks only about the local system, so the answer is never about the store.
 
     Args:
         snap: The name of the snap to check.
@@ -68,7 +69,12 @@ def check_installed(snap: str, *, skip_system: bool = False) -> _errors.NotFound
     try:
         _client.get(path)
     except _errors.NotFoundError as e:
-        return e.with_traceback(None)  # Clean error with no traceback for the caller to raise.
+        # This endpoint asks only about the local system, so a not-found answer can only mean
+        # the snap isn't installed -- the store is never consulted and so never the subject.
+        # The client raises the base type for snapd's ambiguous 'snap-not-found' kind, and this
+        # is the narrowing for every probe site in the library.
+        error = _errors.NotInstalledError._narrowed(e)
+        return error.with_traceback(None)  # Clean error with no traceback for the caller.
     return None
 
 

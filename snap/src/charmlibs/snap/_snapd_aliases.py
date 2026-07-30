@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import logging
 
-from . import _client, _utils
+from . import _client, _errors, _utils
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ def alias(snap: str, app: str, alias: str) -> None:
 
     Raises:
         ValueError: if the snap name, app name, or alias is empty or blank.
-        NotFoundError: if the snap is not installed.
+        NotInstalledError: if the snap is not installed.
         ChangeError: if the alias name is already claimed by a different snap,
             conflicts with the command namespace of an installed snap,
             or if the specified app does not exist within the snap.
@@ -45,7 +45,13 @@ def alias(snap: str, app: str, alias: str) -> None:
     _utils.raise_if_empty_or_blank(app, label='app name')
     _utils.raise_if_empty_or_blank(alias, label='alias')
     data = {'action': 'alias', 'snap': snap, 'app': app, 'alias': alias}
-    _client.post('/v2/aliases', body=data)
+    try:
+        _client.post('/v2/aliases', body=data)
+    except _errors.NotFoundError as e:
+        # Aliasing acts on an installed snap's apps, so not-found can only mean not installed.
+        # snapd sends the unambiguous 'snap-not-installed' kind here, which the client already
+        # maps to the subclass; this narrows the ambiguous kind should snapd ever send it.
+        raise _errors.NotInstalledError._narrowed(e) from None
 
 
 def unalias(alias: str) -> None:
@@ -62,4 +68,8 @@ def unalias(alias: str) -> None:
     """
     _utils.raise_if_empty_or_blank(alias, label='alias')
     data = {'action': 'unalias', 'alias': alias}
-    _client.post('/v2/aliases', body=data)
+    try:
+        _client.post('/v2/aliases', body=data)
+    except _errors.NotFoundError as e:
+        # An alias only exists for an installed snap, so the store is never the subject here.
+        raise _errors.NotInstalledError._narrowed(e) from None

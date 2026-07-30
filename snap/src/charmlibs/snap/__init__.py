@@ -55,6 +55,8 @@ from ._errors import (
     Error,
     NeedsClassicError,
     NotFoundError,
+    NotInstalledError,
+    NotInStoreError,
     OptionNotFoundError,
     RevisionNotAvailableError,
     TimeoutError,  # noqa: A004 (shadowing a Python builtin)
@@ -108,6 +110,8 @@ __all__ = [
     'LogEntry',
     'NeedsClassicError',
     'NotFoundError',
+    'NotInStoreError',
+    'NotInstalledError',
     'OptionNotFoundError',
     'RevisionNotAvailableError',
     'TimeoutError',

@@ -170,7 +170,7 @@ def test_get_option_not_found_value_contains_snap_and_key():
 def test_get_not_installed_snap_raises_not_found():
     # Config GET for a non-installed snap returns option-not-found (not snap-not-found), so
     # get() probes /v2/snaps/{snap} and raises NotFoundError, consistent with set and unset.
-    with pytest.raises(_errors.NotFoundError) as ctx:
+    with pytest.raises(_errors.NotInstalledError) as ctx:
         _snapd_conf.get(_ABSENT_SNAP, ['any-key'])
     assert ctx.value.kind == 'snap-not-found'
     # get() raises snapd's own /v2/snaps/{snap} probe error unchanged: a terse message with the
@@ -185,7 +185,7 @@ def test_get_not_installed_snap_raises_not_found():
 def test_get_not_installed_snap_error_is_not_chained():
     # snapd's misleading option-not-found error is suppressed ('raise ... from None'), so the
     # traceback is a single error and doesn't expose the internal /v2/snaps/{snap} probe.
-    with pytest.raises(_errors.NotFoundError) as ctx:
+    with pytest.raises(_errors.NotInstalledError) as ctx:
         _snapd_conf.get(_ABSENT_SNAP, ['any-key'])
     assert ctx.value.__cause__ is None
     assert ctx.value.__suppress_context__
@@ -195,7 +195,7 @@ def test_get_all_not_installed_snap_raises_not_found():
     # Config GET with no keys for a non-installed snap is a 200 with an empty result,
     # indistinguishable from an installed snap with no configuration, so get() probes
     # /v2/snaps/{snap} and raises NotFoundError instead of returning {}.
-    with pytest.raises(_errors.NotFoundError) as ctx:
+    with pytest.raises(_errors.NotInstalledError) as ctx:
         _snapd_conf.get(_ABSENT_SNAP)
     assert ctx.value.kind == 'snap-not-found'
     assert ctx.value.message == 'snap not installed'
@@ -263,7 +263,7 @@ def test_get_one_missing_key_raises_option_not_found():
 
 
 def test_get_one_not_installed_snap_raises_not_found():
-    with pytest.raises(_errors.NotFoundError) as ctx:
+    with pytest.raises(_errors.NotInstalledError) as ctx:
         _snapd_conf.get_one(_ABSENT_SNAP, 'any-key')
     assert ctx.value.kind == 'snap-not-found'
     assert ctx.value.message == 'snap not installed'
@@ -338,7 +338,7 @@ def test_get_empty_keys_returns_empty_dict():
 
 
 def test_get_empty_keys_not_installed_snap_raises_not_found():
-    with pytest.raises(_errors.NotFoundError) as ctx:
+    with pytest.raises(_errors.NotInstalledError) as ctx:
         _snapd_conf.get(_ABSENT_SNAP, [])
     assert ctx.value.kind == 'snap-not-found'
     assert ctx.value.message == 'snap not installed'
@@ -453,7 +453,7 @@ def test_unset_empty_keys_is_noop():
 # installed regardless of the patch contents, so both raise the same error.
 @pytest.mark.parametrize('config', [{'test-key': 'value'}, {}])
 def test_set_not_installed_snap_raises_snap_not_found(config: dict[str, Any]):
-    with pytest.raises(_errors.NotFoundError) as ctx:
+    with pytest.raises(_errors.NotInstalledError) as ctx:
         _snapd_conf.set(_ABSENT_SNAP, config)
     assert ctx.value.kind == 'snap-not-found'
     # set/unset surface snapd's PUT error directly, which names the snap in the message. get()
@@ -463,7 +463,7 @@ def test_set_not_installed_snap_raises_snap_not_found(config: dict[str, Any]):
 
 
 def test_unset_not_installed_snap_raises_snap_not_found():
-    with pytest.raises(_errors.NotFoundError) as ctx:
+    with pytest.raises(_errors.NotInstalledError) as ctx:
         _snapd_conf.unset(_ABSENT_SNAP, ['test-key'])
     assert ctx.value.kind == 'snap-not-found'
     assert ctx.value.message == f'snap "{_ABSENT_SNAP}" is not installed'

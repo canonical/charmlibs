@@ -151,7 +151,7 @@ def test_logs_snap_with_no_services_raises():
 
 def test_logs_not_installed_snap_raises():
     # Requesting logs for an uninstalled snap raises NotFoundError.
-    with pytest.raises(_errors.NotFoundError) as ctx:
+    with pytest.raises(_errors.NotInstalledError) as ctx:
         _snapd_logs.logs(_ABSENT_SNAP)
     assert ctx.value.kind == 'snap-not-found'
 

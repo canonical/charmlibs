@@ -16,6 +16,8 @@ from charmlibs.snap._errors import (
     ChannelNotAvailableError,
     Error,
     NotFoundError,
+    NotInstalledError,
+    NotInStoreError,
     _AlreadyInstalledError,
     _NoUpdatesAvailableError,
 )
@@ -122,9 +124,14 @@ class TestListOne:
         assert info.hold is not None
 
     def test_list_one_missing_raises(self, mock_client: MockClient):
+        # This endpoint reports local state only, so the ambiguous base type the client raises
+        # for snapd's 'snap-not-found' kind is narrowed to the only sense it can have here.
         mock_client.get.side_effect = _make_snap_not_found()
-        with pytest.raises(NotFoundError):
+        with pytest.raises(NotInstalledError) as ctx:
             _snapd.list_one('hello-world')
+        assert type(ctx.value) is NotInstalledError
+        assert ctx.value.message == 'snap "hello-world" is not installed'
+        assert ctx.value.__suppress_context__
 
     def test_list_one_other_error_propagates(self, mock_client: MockClient):
         mock_client.get.side_effect = Error(
@@ -170,6 +177,19 @@ class TestInstall:
         result = _snapd.install('hello-world')
         assert result is False
 
+    def test_install_absent_from_store_raises_not_in_store(self, mock_client: MockClient):
+        # An install can only fail this way because the store has nothing by that name: an
+        # installed snap answers already-installed, so being installed is never in question.
+        mock_client.post.side_effect = NotFoundError(
+            'snap not found', kind='snap-not-found', value='hello-world', status_code=404
+        )
+        with pytest.raises(NotInStoreError) as ctx:
+            _snapd.install('hello-world')
+        assert type(ctx.value) is NotInStoreError
+        assert ctx.value.message == 'snap not found'
+        assert ctx.value.value == 'hello-world'
+        assert ctx.value.__suppress_context__
+
 
 class TestRemove:
     def test_remove(self, mock_client: MockClient):
@@ -186,9 +206,9 @@ class TestRemove:
 
     @pytest.mark.parametrize('purge', [False, True])
     def test_remove_not_installed_returns_false(self, mock_client: MockClient, purge: bool):
-        # snapd answers a remove of an absent snap with the 'snap-not-installed' kind, which the
-        # client maps to NotFoundError along with every other way snapd says "it isn't there".
-        mock_client.post.side_effect = NotFoundError('', kind='snap-not-installed', value='')
+        # snapd answers a remove of an absent snap with the unambiguous 'snap-not-installed'
+        # kind, so the client maps it straight to the subclass with no narrowing needed here.
+        mock_client.post.side_effect = NotInstalledError('', kind='snap-not-installed', value='')
         assert _snapd.remove('hello-world', purge=purge) is False
 
     def test_remove_other_error_propagates(self, mock_client: MockClient):
@@ -276,9 +296,10 @@ class TestRefreshNotInstalled:
     def test_absent_snap_raises_not_found(self, mock_client: MockClient):
         mock_client.post.side_effect = self._kindless()
         mock_client.get.side_effect = self._snap_not_found()
-        with pytest.raises(NotFoundError) as ctx:
+        with pytest.raises(NotInstalledError) as ctx:
             _snapd.refresh('hello-world')
-        # snapd's own probe error is raised unchanged: terse message, snap name in value.
+        # snapd's own probe error, narrowed: terse message, snap name in value.
+        assert type(ctx.value) is NotInstalledError
         assert ctx.value.kind == 'snap-not-found'
         assert ctx.value.value == 'hello-world'
         assert str(ctx.value) == 'snap not installed (hello-world)'
@@ -302,23 +323,21 @@ class TestRefreshNotInstalled:
             _snapd.refresh('hello-world')
         assert ctx.value is original
 
-    def test_store_sense_not_found_is_reraised_unchanged(self, mock_client: MockClient):
-        # The case the probe must not get wrong: refreshing an installed snap that the store no
-        # longer offers is itself a NotFoundError, with the store's 'snap not found' message.
-        # Since the probe's own error is also a NotFoundError, a probe that raised
-        # unconditionally would silently swap the store's error for a "not installed" one that
-        # is untrue. It doesn't: the probe finds the snap, so snapd's error is re-raised as is.
+    def test_store_sense_narrows_to_not_in_store(self, mock_client: MockClient):
+        # The case the probe exists to tell apart: refreshing an installed snap the store no
+        # longer offers is the *other* sense of not-found, and snapd sends the same ambiguous
+        # kind for both. The probe finds the snap installed, so the store is what's missing.
         # snapd's path to this is pinned by its own daemon/errors_test.go -- a single-snap
         # SnapActionError{Refresh: ErrSnapNotFound} unwraps to a 404 'snap-not-found'.
-        original = NotFoundError(
+        mock_client.post.side_effect = NotFoundError(
             'snap not found', kind='snap-not-found', value='hello-world', status_code=404
         )
-        mock_client.post.side_effect = original
         mock_client.get.return_value = _MINIMAL_INFO_DICT
-        with pytest.raises(NotFoundError) as ctx:
+        with pytest.raises(NotInStoreError) as ctx:
             _snapd.refresh('hello-world')
-        assert ctx.value is original
+        assert type(ctx.value) is NotInStoreError
         assert ctx.value.message == 'snap not found'  # Not the probe's 'snap not installed'.
+        assert ctx.value.value == 'hello-world'
 
     def test_typed_errors_are_reraised_unchanged(self, mock_client: MockClient):
         # A refresh failure snapd does classify keeps its own type once the probe finds the snap.

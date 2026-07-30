@@ -43,7 +43,7 @@ def connect(plug: tuple[str, str], slot: tuple[str, str] | str | None = None) ->
 
     Raises:
         ValueError: if any part of ``plug`` or ``slot`` is blank (whitespace only).
-        NotFoundError: if the plug snap or slot snap is not installed.
+        NotInstalledError: if the plug snap or slot snap is not installed.
             Never raised for the system snap.
         APIError: if the plug is not fully specified (empty snap or plug name), if the named plug
             or slot does not exist, if the plug and slot interfaces do not match, or if the slot
@@ -117,7 +117,7 @@ def disconnect(
 
     Raises:
         ValueError: if any part of ``plug`` or ``slot`` is blank (whitespace only).
-        NotFoundError: if the plug snap or slot snap is not installed.
+        NotInstalledError: if the plug snap or slot snap is not installed.
             Never raised for the system snap.
         APIError: if neither ``plug`` nor ``slot`` names anything to disconnect, if the named plug
             or slot does not exist, or if the fully-specified plug and slot are not connected.
