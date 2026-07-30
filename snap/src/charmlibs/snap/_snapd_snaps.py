@@ -120,7 +120,7 @@ def list_one(snap: str) -> InstalledInfo:
     try:
         info_dict = _client.get(f'/v2/snaps/{_utils.snap_path_segment(snap)}')
     except _errors._NotFoundError as e:
-        # This endpoint reports local state only, so not-found can only mean not installed.
+        # snap-not-found -> NotInstalledError: This endpoint reports local state only.
         raise _errors.NotInstalledError._from(e) from None
     assert isinstance(info_dict, dict)
     info_dict = typing.cast('dict[str, str]', info_dict)
@@ -188,7 +188,7 @@ def install(
     except _errors._AlreadyInstalledError:
         return False
     except _errors._NotFoundError as e:
-        # An installed snap answers already-installed, so this can only be the store.
+        # snap-not-found -> NotInStoreError: An installed snap answers already-installed.
         raise _errors.NotInStoreError._from(e) from None
     return True
 
@@ -218,7 +218,8 @@ def remove(snap: str, *, purge: bool = False) -> object:
     try:
         _client.post(path, body=data)
     except _errors._NotFoundError:
-        return False  # Absent either way, so there's nothing to remove.
+        # snap-not-installed -> False: Absent either way, so there's nothing to remove.
+        return False
     return True
 
 
@@ -281,8 +282,9 @@ def refresh(
     except _errors._NoUpdatesAvailableError:
         return False
     except _errors.APIError as e:
-        # NOTE: A refresh needs the snap installed and still in the store, so both senses are
-        # reachable. Not installed comes back with no 'kind'; a store miss as 'snap-not-found'.
+        # (no kind) -> NotInstalledError: snapd omits the kind when the snap isn't installed.
+        # snap-not-found -> NotInStoreError: A refresh reaches the store too, so the kind an
+        # install gets means the store is what's missing. The probe tells the two apart.
         if error := _utils.check_installed(snap):
             raise error from None
         if type(e) is _errors._NotFoundError:
@@ -322,6 +324,7 @@ def hold(snap: str, duration: datetime.timedelta | int | float | None = None) ->
     try:
         _client.post(path, body=data)
     except _errors.APIError:
+        # (no kind) -> NotInstalledError: snapd omits the kind for an absent snap, as for refresh.
         if error := _utils.check_installed(snap):
             raise error from None
         raise
@@ -344,5 +347,5 @@ def unhold(snap: str) -> None:
     try:
         _client.post(f'/v2/snaps/{_utils.snap_path_segment(snap)}', body={'action': 'unhold'})
     except _errors._NotFoundError as e:
-        # Unholding acts on an installed snap; the store is never consulted.
+        # snap-not-found -> NotInstalledError: Unholding acts on an installed snap.
         raise _errors.NotInstalledError._from(e) from None

@@ -93,12 +93,11 @@ def get(snap: str, keys: str | Iterable[str] | None = None) -> dict[str, Any]:
     try:
         config = _client.get(path, query=params)
     except _errors._NotFoundError as e:
-        # The store is never consulted for configuration.
+        # snap-not-found -> NotInstalledError: The store is never consulted for config.
         raise _errors.NotInstalledError._from(e) from None
     except _errors.OptionNotFoundError:
-        # NOTE: snapd reports option-not-found both for a missing key and for a missing snap.
-        # The CLI returns 'error: snap "foo" has no "bar" configuration' in both cases.
-        # For symmetry with PUT (set/unset), we probe and raise NotInstalledError instead.
+        # option-not-found -> NotInstalledError, if the snap is absent: snapd sends this kind
+        # for a missing key and a missing snap alike, so probe. Keeps get consistent with PUT.
         if error := _utils.check_installed(snap, skip_system=True):
             raise error from None
         raise
@@ -182,7 +181,7 @@ def unset(snap: str, keys: str | Iterable[str]) -> None:
     try:
         _client.put(path, body=dict.fromkeys(keys))
     except _errors._NotFoundError as e:
-        # The store is never consulted for configuration.
+        # snap-not-found -> NotInstalledError: The store is never consulted for config.
         raise _errors.NotInstalledError._from(e) from None
 
 
@@ -215,5 +214,5 @@ def set(snap: str, config: dict[str, Any]) -> None:  # noqa: A001 (shadowing a P
     try:
         _client.put(path, body=config)
     except _errors._NotFoundError as e:
-        # The store is never consulted for configuration.
+        # snap-not-found -> NotInstalledError: The store is never consulted for config.
         raise _errors.NotInstalledError._from(e) from None

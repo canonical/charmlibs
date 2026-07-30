@@ -135,8 +135,7 @@ def logs(snaps: str | Iterable[str] | None = None, *, limit: int | None = 10) ->
     try:
         result = _client.get_logs(query=query)
     except _errors._NotFoundError as e:
-        # NOTE: /v2/logs resolves names against installed snaps, and answers one it can't
-        # resolve with 'snap-not-found'. The store is never consulted.
+        # snap-not-found -> NotInstalledError: Logs come from an installed snap's services.
         raise _errors.NotInstalledError._from(e) from None
     # A log entry looks like:
     # {'timestamp': '2026-02-27T03:01:19.488008Z',

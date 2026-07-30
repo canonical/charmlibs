@@ -75,7 +75,8 @@ def connect(plug: tuple[str, str], slot: tuple[str, str] | str | None = None) ->
     try:
         _client.post('/v2/interfaces', body=data)
     except _errors.APIError:
-        # Turn snapd's empty-kind 'snap is not installed' error into a typed _NotFoundError.
+        # (no kind) -> NotInstalledError: snapd reports an absent snap without a kind here,
+        # and blames the plug snap before the slot snap -- see _first_not_installed.
         if error := _first_not_installed(plug_snap, slot_snap):
             raise error from None
         raise
@@ -154,9 +155,11 @@ def disconnect(
     try:
         _client.post('/v2/interfaces', body=data)
     except _errors._InterfacesUnchangedError:
-        pass  # Follow the snap CLI's lead and suppress this error.
+        # interfaces-unchanged -> suppressed: Follow the snap CLI's lead.
+        pass
     except _errors.APIError:
-        # Turn snapd's empty-kind 'snap is not installed' error into a typed _NotFoundError.
+        # (no kind) -> NotInstalledError: snapd reports an absent snap without a kind here,
+        # and blames the plug snap before the slot snap -- see _first_not_installed.
         if error := _first_not_installed(plug_snap, slot_snap):
             raise error from None
         raise
