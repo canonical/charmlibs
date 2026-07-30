@@ -45,12 +45,8 @@ def alias(snap: str, app: str, alias: str) -> None:
     _utils.raise_if_empty_or_blank(app, label='app name')
     _utils.raise_if_empty_or_blank(alias, label='alias')
     data = {'action': 'alias', 'snap': snap, 'app': app, 'alias': alias}
-    try:
-        _client.post('/v2/aliases', body=data)
-    except _errors._NotFoundError as e:
-        # snap-not-found -> NotInstalledError: Aliasing acts on an installed snap's apps.
-        # Defensive: snapd sends snap-not-installed here, which is already this type.
-        raise _errors.NotInstalledError._from(e) from None
+    # NOTE: snapd sends snap-not-installed (NotInstalledError) if the snap is not installed.
+    _client.post('/v2/aliases', body=data)
 
 
 def unalias(alias: str) -> None:
