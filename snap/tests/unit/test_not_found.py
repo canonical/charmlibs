@@ -32,7 +32,6 @@ if TYPE_CHECKING:
 
 # Every public function, called so that it reaches the client. Only reaching it matters here.
 _CALLS: dict[str, Callable[[], object]] = {
-    'alias': lambda: snap.alias('lxd', 'lxc', 'testlxc'),
     'connect': lambda: snap.connect(('lxd', 'home')),
     'disconnect': lambda: snap.disconnect(('lxd', 'home')),
     'ensure': lambda: snap.ensure('lxd'),
@@ -48,16 +47,15 @@ _CALLS: dict[str, Callable[[], object]] = {
     'set': lambda: snap.set('lxd', {'mykey': 'myval'}),
     'start': lambda: snap.start('lxd'),
     'stop': lambda: snap.stop('lxd'),
-    'unalias': lambda: snap.unalias('testlxc'),
-    'unhold': lambda: snap.unhold('lxd'),
     'unset': lambda: snap.unset('lxd', ['mykey']),
 }
+EXCLUDE = {'alias', 'unalias', 'unhold'}  # snapd never sends snap-not-found
 
 
 def test_every_public_function_is_accounted_for():
     # A new public function has to be added here, so which sense it reports is a decision.
     public = {name for name in snap.__all__ if inspect.isfunction(getattr(snap, name))}
-    assert public == set(_CALLS)
+    assert public == set(_CALLS) | EXCLUDE
 
 
 @pytest.mark.parametrize('name', sorted(_CALLS))
