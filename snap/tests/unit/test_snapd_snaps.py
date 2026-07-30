@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
+from charmlibs.snap import _errors
 from charmlibs.snap import _snapd_snaps as _snapd
 from charmlibs.snap._errors import (
     APIError,
@@ -351,6 +352,36 @@ class TestRefreshNotInstalled:
         with pytest.raises(ChannelNotAvailableError) as ctx:
             _snapd.refresh('hello-world', channel='no-such-channel')
         assert ctx.value is original
+
+
+class TestProbeFailure:
+    # refresh and hold classify their kindless errors by making a second request. That request
+    # can fail on its own -- snapd restarting mid-operation is the realistic way -- and when it
+    # does, the probe's error wins, with the error it was classifying kept as its context.
+    # Chaining is deliberate: if snapd has become unreachable, that is the more fundamental
+    # problem and the one to report, and the original error is still there to be read.
+    @staticmethod
+    def _kindless() -> APIError:
+        return APIError('cannot refresh "hello-world"', kind='', value='', status_code=400)
+
+    @pytest.mark.parametrize('func', [_snapd.refresh, _snapd.hold], ids=['refresh', 'hold'])
+    def test_probe_failure_propagates_with_the_original_as_context(
+        self, mock_client: MockClient, func: Any
+    ):
+        original = self._kindless()
+        mock_client.post.side_effect = original
+        probe_failure = _errors.ConnectionError(
+            'Could not connect to snapd: socket not found',
+            kind='charmlibs-snap-socket-not-found',
+            value='',
+        )
+        mock_client.get.side_effect = probe_failure
+        with pytest.raises(_errors.ConnectionError) as ctx:
+            func('hello-world')
+        assert ctx.value is probe_failure
+        # Chained, not suppressed: the reader sees both errors.
+        assert ctx.value.__context__ is original
+        assert not ctx.value.__suppress_context__
 
 
 class TestHold:

@@ -19,11 +19,17 @@ have it" -- the distinction that makes composing these functions possible.
 from __future__ import annotations
 
 import inspect
+import json
+import pathlib
+import traceback
+from types import SimpleNamespace
 from typing import TYPE_CHECKING
+from unittest.mock import MagicMock
 
 import pytest
 
 from charmlibs import snap
+from charmlibs.snap import _client
 from charmlibs.snap._errors import NotFoundError, NotInStoreError
 
 if TYPE_CHECKING:
@@ -117,3 +123,85 @@ def test_functions_that_never_consult_the_store_report_the_local_sense(
         assert not isinstance(e, NotInStoreError), (
             f'{name} reported a missing store entry, but it never consults the store'
         )
+
+
+# ---------------------------------------------------------------------------
+# Traceback shape
+#
+# Narrowing raises a new exception, so its traceback starts at the library function that
+# narrowed rather than carrying the client's frames. That is deliberate: a classified error is
+# one the caller can act on, and the frames between the call and the raise are the same
+# boilerplate every time -- noise in the Juju debug log a charm's traceback ends up in. Nothing
+# is lost that isn't already on the exception (kind, message, value, status code) or in the
+# DEBUG log the client writes for every request.
+#
+# These mock the raw request layer rather than the client functions, so the real client frames
+# exist and their absence from the traceback is a fact about narrowing, not about the mock.
+# ---------------------------------------------------------------------------
+
+_SOURCE_DIR = pathlib.Path(snap.__file__).parent
+
+# Every function that reports an absent snap by raising. Only remove is excluded: it answers
+# absence with a falsy result rather than an error, so there is no traceback to check.
+_RAISING = sorted(set(_CALLS) - {'remove'})
+
+
+@pytest.fixture
+def mock_raw(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
+    """Patch _request so the real client decodes a genuine snapd error response."""
+    body = json.dumps({
+        'type': 'error',
+        'status-code': 404,
+        'status': 'Not Found',
+        'result': {'message': 'snap not found', 'kind': 'snap-not-found', 'value': 'lxd'},
+    }).encode()
+    response = SimpleNamespace(
+        read=lambda: body, status=404, reason='Not Found', url='http://localhost/v2/snaps/lxd'
+    )
+    mocked = MagicMock(return_value=response)
+    monkeypatch.setattr(_client, '_request', mocked)
+    return mocked
+
+
+def _library_frames(exc: BaseException) -> list[str]:
+    return [
+        f'{pathlib.Path(f.filename).name}:{f.name}'
+        for f in traceback.extract_tb(exc.__traceback__)
+        if pathlib.Path(f.filename).parent == _SOURCE_DIR
+    ]
+
+
+def test_the_client_really_does_add_frames(mock_raw: MagicMock):
+    # The control for the tests below: reaching the client unnarrowed leaves its frames in the
+    # traceback, so their absence afterwards is narrowing's doing and not the mock's.
+    with pytest.raises(NotFoundError) as ctx:
+        _client.get('/v2/snaps/lxd')
+    assert '_client.py:get' in _library_frames(ctx.value)
+
+
+@pytest.mark.parametrize('name', _RAISING)
+def test_narrowed_traceback_stops_at_the_library(name: str, mock_raw: MagicMock):
+    with pytest.raises(NotFoundError) as ctx:
+        _CALLS[name]()
+    frames = _library_frames(ctx.value)
+    assert not any(f.startswith('_client.py') for f in frames), frames
+    # Nor the probe's frames, for the functions that classify by making a second request.
+    assert not any(f.startswith('_utils.py') for f in frames), frames
+
+
+@pytest.mark.parametrize('name', _RAISING)
+def test_narrowing_adds_no_frame_of_its_own(name: str, mock_raw: MagicMock):
+    # _narrowed builds the exception and returns before the raise, so it never appears itself.
+    with pytest.raises(NotFoundError) as ctx:
+        _CALLS[name]()
+    assert not any('_narrowed' in f for f in _library_frames(ctx.value))
+
+
+@pytest.mark.parametrize('name', _RAISING)
+def test_narrowed_errors_are_not_chained(name: str, mock_raw: MagicMock):
+    # A single traceback: the error snapd sent is the error reported, only more specifically,
+    # so showing it twice would be noise rather than context.
+    with pytest.raises(NotFoundError) as ctx:
+        _CALLS[name]()
+    assert ctx.value.__cause__ is None
+    assert ctx.value.__suppress_context__
