@@ -32,6 +32,7 @@ from charmlibs.snap._errors import (
     ConnectionError,  # noqa: A004 (shadowing a Python builtin)
     Error,
     NeedsClassicError,
+    NotInstalledError,
     OptionNotFoundError,
     TimeoutError,  # noqa: A004 (shadowing a Python builtin)
     _AlreadyInstalledError,
@@ -117,6 +118,7 @@ class TestErrorResponses:
             ('snap-channel-not-available', ChannelNotAvailableError),
             ('snap-needs-classic', NeedsClassicError),
             ('snap-not-found', _NotFoundError),
+            ('snap-not-installed', NotInstalledError),
             ('some-unrecognised-kind', APIError),  # Unknown kinds fall back to the base type.
         ],
     )
