@@ -458,21 +458,6 @@ def test_all_errors_mapped():
     assert actual == expected
 
 
-class TestAbsentSnapKinds:
-    # snapd has two kinds for an absent snap and they are not equally informative, so they don't
-    # map the same way. Both are real: see the functional tests for captured responses.
-    def test_ambiguous_kind_maps_to_the_base_type(self):
-        # 'snap-not-found' is sent both for a snap missing from the system and for one missing
-        # from the store, so the client can't tell which and raises the base for a caller that
-        # knows what it asked for to narrow.
-        assert _client._ERRORS['snap-not-found'] is _NotFoundError
-
-    def test_unambiguous_kind_maps_straight_to_the_subclass(self):
-        # 'snap-not-installed' is only sent by remove and alias, which both act on an installed
-        # snap, so there is nothing left to decide and no narrowing needed at those call sites.
-        assert _client._ERRORS['snap-not-installed'] is NotInstalledError
-
-
 # ---------------------------------------------------------------------------
 # Tests against real snapd responses captured as fixtures.
 #
