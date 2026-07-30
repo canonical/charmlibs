@@ -32,11 +32,11 @@ from charmlibs.snap._errors import (
     ConnectionError,  # noqa: A004 (shadowing a Python builtin)
     Error,
     NeedsClassicError,
-    NotFoundError,
     NotInstalledError,
     OptionNotFoundError,
     TimeoutError,  # noqa: A004 (shadowing a Python builtin)
     _AlreadyInstalledError,
+    _NotFoundError,
     _NoUpdatesAvailableError,
 )
 from conftest import FIXTURES_DIR, load_fixture
@@ -117,7 +117,7 @@ class TestErrorResponses:
             ('option-not-found', OptionNotFoundError),
             ('snap-channel-not-available', ChannelNotAvailableError),
             ('snap-needs-classic', NeedsClassicError),
-            ('snap-not-found', NotFoundError),
+            ('snap-not-found', _NotFoundError),
             ('some-unrecognised-kind', APIError),  # Unknown kinds fall back to the base type.
         ],
     )
@@ -443,9 +443,9 @@ def test_all_errors_mapped():
         'ChangeError',
     }
     unmapped = unmapped | {
-        # Narrowed from NotFoundError by the function that made the request, never mapped from a
+        # Narrowed from _NotFoundError by the function that made the request, never mapped from a
         # kind: snapd has no kind that means "the store doesn't have it" as opposed to "it isn't
-        # installed". See NotFoundError and test_absent_snap_kinds below.
+        # installed". See _NotFoundError and test_absent_snap_kinds below.
         'NotInStoreError',
     }
     expected = {
@@ -465,7 +465,7 @@ class TestAbsentSnapKinds:
         # 'snap-not-found' is sent both for a snap missing from the system and for one missing
         # from the store, so the client can't tell which and raises the base for a caller that
         # knows what it asked for to narrow.
-        assert _client._ERRORS['snap-not-found'] is NotFoundError
+        assert _client._ERRORS['snap-not-found'] is _NotFoundError
 
     def test_unambiguous_kind_maps_straight_to_the_subclass(self):
         # 'snap-not-installed' is only sent by remove and alias, which both act on an installed

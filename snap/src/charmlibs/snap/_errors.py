@@ -76,7 +76,7 @@ class Error(Exception):
 
     def __str__(self) -> str:
         # Surface `value` when it adds information the message doesn't already carry.
-        # Most useful for NotFoundError, with message 'snap not installed' and value '<snap>'.
+        # Most useful for _NotFoundError, with message 'snap not installed' and value '<snap>'.
         # Skip OptionNotFoundError's non-string value, which is redundant with its message.
         value = self._value
         if isinstance(value, str) and value and value not in self._message:
@@ -151,20 +151,19 @@ class AppNotFoundError(APIError):
     """Raised via the API when a specified app is not found within an installed snap."""
 
 
-class NotFoundError(APIError):
-    """Base class for a snap not being where an operation needed it.
+class _NotFoundError(APIError):
+    """Base class for the senses of a snap not being found.
 
-    Installed and available are independent -- a snap installed from a file is not in the store
-    -- so the library raises :class:`NotInstalledError` or :class:`NotInStoreError` to say which
-    was missing. Catch this class to handle either.
+    Not public and not raised: the client raises this when snapd's response doesn't say which
+    sense is meant, and the function that made the request narrows it to a public subclass.
     """
 
 
-class NotInstalledError(NotFoundError):
+class NotInstalledError(_NotFoundError):
     """Raised when a snap is not installed on the system."""
 
 
-class NotInStoreError(NotFoundError):
+class NotInStoreError(_NotFoundError):
     """Raised when the snap store has no snap by that name.
 
     A snap that exists but has no revision on the requested channel raises

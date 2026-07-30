@@ -97,7 +97,7 @@ def test_core_snap_state_matches_fixture(core_snap: str):
     try:
         _client.get('/v2/snaps/core')
         core_installed = True
-    except _errors.NotFoundError:
+    except _errors._NotFoundError:
         core_installed = False
     assert core_installed == (core_snap == 'installed')
 

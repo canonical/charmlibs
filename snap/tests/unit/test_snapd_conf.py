@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 from charmlibs.snap import _snapd_conf
-from charmlibs.snap._errors import ChangeError, NotFoundError, OptionNotFoundError
+from charmlibs.snap._errors import ChangeError, OptionNotFoundError, _NotFoundError
 from conftest import result_of
 
 if TYPE_CHECKING:
@@ -52,7 +52,7 @@ class TestGet:
     # short-circuit (`keys == []`), so it used to reach snapd as an empty 'keys' value, which
     # snapd reads as "no keys given" and answers with the whole configuration -- and, for a snap
     # that isn't installed, with an empty result that get() returned instead of raising
-    # NotFoundError. See the functional tests for the snapd behaviour behind each case.
+    # _NotFoundError. See the functional tests for the snapd behaviour behind each case.
     @pytest.mark.parametrize(
         ('keys', 'match'),
         [
@@ -134,10 +134,10 @@ class TestGetEmptyKeys:
         mock_client.get.assert_called_once_with('/v2/snaps/hello-world')
 
     def test_get_empty_keys_not_installed_raises_not_found(self, mock_client: MockClient):
-        mock_client.get.side_effect = NotFoundError(
+        mock_client.get.side_effect = _NotFoundError(
             'snap not installed', kind='snap-not-found', value='hello-world'
         )
-        with pytest.raises(NotFoundError) as ctx:
+        with pytest.raises(_NotFoundError) as ctx:
             _snapd_conf.get('hello-world', [])
         # snapd's own probe error is raised unchanged: terse message, snap name in value (which
         # str() surfaces). Not chained -- the probe's error was handled, not propagated.
@@ -155,7 +155,7 @@ class TestGetEmptyKeys:
 class TestGetAbsentSnapProbe:
     # The conf GET endpoint alone can't distinguish an absent snap from a missing key (or from
     # empty configuration), so get() probes /v2/snaps/{snap} on those paths to raise
-    # NotFoundError, consistent with set and unset. See the functional tests for captured
+    # _NotFoundError, consistent with set and unset. See the functional tests for captured
     # responses.
     # Built fresh per call, not shared: raising an exception mutates its __context__, and the
     # probe now re-raises snapd's own error object, so a shared instance would leak chaining
@@ -170,8 +170,8 @@ class TestGetAbsentSnapProbe:
         )
 
     @staticmethod
-    def _snap_not_found() -> NotFoundError:
-        return NotFoundError('snap not installed', kind='snap-not-found', value='hello-world')
+    def _snap_not_found() -> _NotFoundError:
+        return _NotFoundError('snap not installed', kind='snap-not-found', value='hello-world')
 
     def test_missing_key_on_installed_snap_reraises_option_not_found(
         self, mock_client: MockClient
@@ -187,7 +187,7 @@ class TestGetAbsentSnapProbe:
 
     def test_missing_key_on_absent_snap_raises_not_found(self, mock_client: MockClient):
         mock_client.get.side_effect = [self._option_not_found(), self._snap_not_found()]
-        with pytest.raises(NotFoundError) as ctx:
+        with pytest.raises(_NotFoundError) as ctx:
             _snapd_conf.get('hello-world', ['mykey'])
         assert ctx.value.message == 'snap not installed'
         assert ctx.value.value == 'hello-world'
@@ -199,7 +199,7 @@ class TestGetAbsentSnapProbe:
         # The misleading option-not-found error snapd sent for the absent snap is suppressed
         # ('raise ... from None'), so the user sees a single traceback.
         mock_client.get.side_effect = [self._option_not_found(), self._snap_not_found()]
-        with pytest.raises(NotFoundError) as ctx:
+        with pytest.raises(_NotFoundError) as ctx:
             _snapd_conf.get('hello-world', ['mykey'])
         assert ctx.value.__cause__ is None
         assert ctx.value.__suppress_context__
@@ -208,7 +208,7 @@ class TestGetAbsentSnapProbe:
         # check_installed clears the probe's traceback, so the re-raised error starts at get()'s
         # own raise and never walks back through the internal /v2/snaps/{snap} probe GET.
         mock_client.get.side_effect = [self._option_not_found(), self._snap_not_found()]
-        with pytest.raises(NotFoundError) as ctx:
+        with pytest.raises(_NotFoundError) as ctx:
             _snapd_conf.get('hello-world', ['mykey'])
         files = [frame.filename for frame in traceback.extract_tb(ctx.value.__traceback__)]
         assert not any(f.endswith('_utils.py') for f in files)
@@ -217,7 +217,7 @@ class TestGetAbsentSnapProbe:
         # A bare conf GET on an absent snap is a 200 with an empty result, so the probe is
         # what turns it into an error.
         mock_client.get.side_effect = [{}, self._snap_not_found()]
-        with pytest.raises(NotFoundError) as ctx:
+        with pytest.raises(_NotFoundError) as ctx:
             _snapd_conf.get('hello-world')
         assert ctx.value.message == 'snap not installed'
         assert str(ctx.value) == 'snap not installed (hello-world)'
@@ -280,10 +280,10 @@ class TestGetOne:
             _snapd_conf.get_one('lxd', 'mykey')
 
     def test_get_one_not_installed_propagates(self, mock_client: MockClient):
-        mock_client.get.side_effect = NotFoundError(
+        mock_client.get.side_effect = _NotFoundError(
             'snap not installed', kind='snap-not-found', value='lxd'
         )
-        with pytest.raises(NotFoundError):
+        with pytest.raises(_NotFoundError):
             _snapd_conf.get_one('lxd', 'mykey')
 
     @pytest.mark.parametrize(

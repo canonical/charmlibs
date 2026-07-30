@@ -16,10 +16,10 @@ from charmlibs.snap._errors import (
     APIError,
     ChannelNotAvailableError,
     Error,
-    NotFoundError,
     NotInstalledError,
     NotInStoreError,
     _AlreadyInstalledError,
+    _NotFoundError,
     _NoUpdatesAvailableError,
 )
 from conftest import result_of
@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 
 
 def _make_snap_not_found():
-    return NotFoundError(
+    return _NotFoundError(
         'snap "hello-world" is not installed',
         kind='snap-not-found',
         value='',
@@ -181,7 +181,7 @@ class TestInstall:
     def test_install_absent_from_store_raises_not_in_store(self, mock_client: MockClient):
         # An install can only fail this way because the store has nothing by that name: an
         # installed snap answers already-installed, so being installed is never in question.
-        mock_client.post.side_effect = NotFoundError(
+        mock_client.post.side_effect = _NotFoundError(
             'snap not found', kind='snap-not-found', value='hello-world', status_code=404
         )
         with pytest.raises(NotInStoreError) as ctx:
@@ -278,7 +278,7 @@ class TestRefresh:
 class TestRefreshNotInstalled:
     # snapd answers a refresh of an absent snap with an error carrying no 'kind', so there's
     # nothing in the response to key off: refresh probes /v2/snaps/{snap} to tell an absent snap
-    # apart from any other failure, and raises NotFoundError as the rest of the library does.
+    # apart from any other failure, and raises _NotFoundError as the rest of the library does.
     # Built fresh per call: raising an exception mutates its __context__, so a shared instance
     # would leak chaining state between tests.
     @staticmethod
@@ -291,8 +291,8 @@ class TestRefreshNotInstalled:
         )
 
     @staticmethod
-    def _snap_not_found() -> NotFoundError:
-        return NotFoundError('snap not installed', kind='snap-not-found', value='hello-world')
+    def _snap_not_found() -> _NotFoundError:
+        return _NotFoundError('snap not installed', kind='snap-not-found', value='hello-world')
 
     def test_absent_snap_raises_not_found(self, mock_client: MockClient):
         mock_client.post.side_effect = self._kindless()
@@ -310,7 +310,7 @@ class TestRefreshNotInstalled:
         # The unclassifiable error snapd sent is suppressed, so the user sees one traceback.
         mock_client.post.side_effect = self._kindless()
         mock_client.get.side_effect = self._snap_not_found()
-        with pytest.raises(NotFoundError) as ctx:
+        with pytest.raises(_NotFoundError) as ctx:
             _snapd.refresh('hello-world')
         assert ctx.value.__cause__ is None
         assert ctx.value.__suppress_context__
@@ -330,7 +330,7 @@ class TestRefreshNotInstalled:
         # kind for both. The probe finds the snap installed, so the store is what's missing.
         # snapd's path to this is pinned by its own daemon/errors_test.go -- a single-snap
         # SnapActionError{Refresh: ErrSnapNotFound} unwraps to a 404 'snap-not-found'.
-        mock_client.post.side_effect = NotFoundError(
+        mock_client.post.side_effect = _NotFoundError(
             'snap not found', kind='snap-not-found', value='hello-world', status_code=404
         )
         mock_client.get.return_value = _MINIMAL_INFO_DICT
@@ -408,17 +408,17 @@ class TestHold:
 
     def test_hold_not_installed(self, mock_client: MockClient):
         # As for refresh, snapd's error for holding an absent snap carries no 'kind', so hold
-        # probes /v2/snaps/{snap} and raises snapd's own NotFoundError from that probe.
+        # probes /v2/snaps/{snap} and raises snapd's own _NotFoundError from that probe.
         mock_client.post.side_effect = APIError(
             'cannot hold "hello-world": snap "hello-world" is not installed',
             kind='',
             value='',
             status_code=400,
         )
-        mock_client.get.side_effect = NotFoundError(
+        mock_client.get.side_effect = _NotFoundError(
             'snap not installed', kind='snap-not-found', value='hello-world'
         )
-        with pytest.raises(NotFoundError) as ctx:
+        with pytest.raises(_NotFoundError) as ctx:
             _snapd.hold('hello-world')
         assert str(ctx.value) == 'snap not installed (hello-world)'
         assert ctx.value.__suppress_context__

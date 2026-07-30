@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from charmlibs.snap import _utils
-from charmlibs.snap._errors import NotFoundError, NotInstalledError
+from charmlibs.snap._errors import NotInstalledError, _NotFoundError
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
@@ -290,7 +290,7 @@ class TestCheckInstalled:
         # skip_system is for endpoints snapd serves under these names whether or not the core
         # snap is installed. Elsewhere -- /v2/apps -- they get no special treatment, so an
         # absent 'core' (and 'system', which is never a snap) is reported as not installed.
-        mock_client.get.side_effect = NotFoundError(
+        mock_client.get.side_effect = _NotFoundError(
             'snap not installed', kind='snap-not-found', value=snap
         )
         error = _utils.check_installed(snap)
@@ -305,7 +305,7 @@ class TestCheckInstalled:
     def test_absent_snap_returns_not_installed(self, mock_client: MockClient):
         # The probe asks only about the local system, so the ambiguous base type the client
         # raises for snapd's 'snap-not-found' kind is narrowed here, once, for every probe site.
-        mock_client.get.side_effect = NotFoundError(
+        mock_client.get.side_effect = _NotFoundError(
             'snap not installed', kind='snap-not-found', value='hello-world'
         )
         error = _utils.check_installed('hello-world')
@@ -317,7 +317,7 @@ class TestCheckInstalled:
 
     def test_narrowed_error_has_no_traceback(self, mock_client: MockClient):
         # The caller raises this error itself, so it must not carry the probe's frames.
-        mock_client.get.side_effect = NotFoundError('', kind='snap-not-found', value='x')
+        mock_client.get.side_effect = _NotFoundError('', kind='snap-not-found', value='x')
         error = _utils.check_installed('hello-world')
         assert error is not None
         assert error.__traceback__ is None

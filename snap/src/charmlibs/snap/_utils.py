@@ -67,7 +67,7 @@ def check_installed(snap: str, *, skip_system: bool = False) -> _errors.NotInsta
     path = f'/v2/snaps/{snap_path_segment(snap)}'
     try:
         _client.get(path)
-    except _errors.NotFoundError as e:
+    except _errors._NotFoundError as e:
         # This endpoint reports local state only, so not-found can only mean not installed.
         return _errors.NotInstalledError._from(e)
     return None

@@ -320,10 +320,10 @@ def test_disconnect_all_empty_raises():
 
 
 # ---------------------------------------------------------------------------
-# not-installed snap -> typed NotFoundError (uses a never-installed name to avoid churn)
+# not-installed snap -> typed _NotFoundError (uses a never-installed name to avoid churn)
 #
 # snapd reports a not-installed snap as an empty-kind APIError ('snap "X" is not installed').
-# connect/disconnect probe the named snaps on error and re-raise as a typed NotFoundError
+# connect/disconnect probe the named snaps on error and re-raise as a typed _NotFoundError
 # (kind 'snap-not-found'), so callers can catch the type instead of matching the message.
 # ---------------------------------------------------------------------------
 
@@ -377,7 +377,7 @@ def test_connect_slot_snap_not_installed_raises_not_found():
 # (2) slot snap installed, (3) plug/slot exist and interfaces match. The raw-API tests pin that
 # native order (a not-installed snap is an empty-kind APIError, reported before a bad plug name,
 # and the plug snap is checked before the slot snap). The library tests then show connect and
-# disconnect convert the not-installed case into a typed NotFoundError WITHOUT inverting the order
+# disconnect convert the not-installed case into a typed _NotFoundError WITHOUT inverting the order
 # -- probing plug-snap before slot-snap names the same snap snapd blames, and callers no longer
 # see the yucky empty-kind 'is not installed' error.
 # ---------------------------------------------------------------------------
@@ -417,7 +417,7 @@ def test_raw_api_plug_snap_checked_before_slot_snap():
 
 
 def test_connect_slot_snap_not_installed_precedes_bad_plug():
-    # Library: the not-installed slot snap wins over the bad plug, surfaced as NotFoundError.
+    # Library: the not-installed slot snap wins over the bad plug, surfaced as _NotFoundError.
     with pytest.raises(_errors.NotInstalledError) as ctx:
         _snapd_interfaces.connect((_SNAP, 'nonexistent-plug'), (_ABSENT_SNAP, ''))
     assert ctx.value.kind == 'snap-not-found'

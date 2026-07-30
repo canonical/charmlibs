@@ -134,7 +134,7 @@ def logs(snaps: str | Iterable[str] | None = None, *, limit: int | None = 10) ->
         query['names'] = ','.join(snaps)
     try:
         result = _client.get_logs(query=query)
-    except _errors.NotFoundError as e:
+    except _errors._NotFoundError as e:
         # NOTE: /v2/logs resolves names against installed snaps, and answers one it can't
         # resolve with 'snap-not-found'. The store is never consulted.
         raise _errors.NotInstalledError._from(e) from None

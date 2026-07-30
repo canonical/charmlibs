@@ -193,7 +193,7 @@ def test_restart_nonexistent_service_raises():
 # Which error snapd answers with depends on the shape of the request. Naming the snap on its own
 # is a typed snap-not-found, but naming a service inside it is app-not-found -- the same kind it
 # uses for a service an installed snap doesn't have. start, stop and restart probe
-# /v2/snaps/{snap} on app-not-found, so an absent snap is a NotFoundError whichever way it was
+# /v2/snaps/{snap} on app-not-found, so an absent snap is a _NotFoundError whichever way it was
 # named, and AppNotFoundError is left meaning what it says. The raw responses are pinned below.
 # ---------------------------------------------------------------------------
 
@@ -269,7 +269,7 @@ def test_raw_api_installed_snap_without_the_service_is_indistinguishable():
 def test_raw_api_not_installed_snap_alone_is_snap_not_found():
     # Naming the snap on its own is not conflated: snapd resolves the name before it looks for
     # services, so this is already the error the library wants and no probe is made for it.
-    with pytest.raises(_errors.NotFoundError) as ctx:
+    with pytest.raises(_errors._NotFoundError) as ctx:
         _client.post('/v2/apps', body={'action': 'start', 'names': [_ABSENT_SNAP]})
     assert ctx.value.kind == 'snap-not-found'
     assert ctx.value.message == f'snap "{_ABSENT_SNAP}" not found'

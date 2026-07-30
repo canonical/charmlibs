@@ -1,7 +1,7 @@
 # Copyright 2026 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-"""The library-wide contract for an absent snap: a subclass of NotFoundError, never the base.
+"""The library-wide contract for an absent snap: a subclass of _NotFoundError, never the base.
 
 snapd sends the same ``snap-not-found`` kind whether a snap is missing from the system or from the
 store, and only the message differs, with wording that varies by endpoint. So the client raises
@@ -23,7 +23,7 @@ import pytest
 
 from charmlibs import snap
 from charmlibs.snap import _client
-from charmlibs.snap._errors import NotFoundError, NotInStoreError
+from charmlibs.snap._errors import NotInStoreError, _NotFoundError
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -63,14 +63,14 @@ def test_every_public_function_is_accounted_for():
 @pytest.mark.parametrize('name', sorted(_CALLS))
 def test_no_public_function_raises_the_base_type(name: str, mock_client: MockClient):
     # Swallowing the error (remove) is fine: the rule is only about what escapes.
-    error = NotFoundError('snap not found', kind='snap-not-found', value='lxd', status_code=404)
+    error = _NotFoundError('snap not found', kind='snap-not-found', value='lxd', status_code=404)
     for mock in (mock_client.get, mock_client.get_logs, mock_client.post, mock_client.put):
         mock.side_effect = error
     try:
         _CALLS[name]()
-    except NotFoundError as e:
-        assert type(e) is not NotFoundError, (
-            f'{name} let the base NotFoundError escape: narrow it to NotInstalledError or'
+    except _NotFoundError as e:
+        assert type(e) is not _NotFoundError, (
+            f'{name} let the base _NotFoundError escape: narrow it to NotInstalledError or'
             f' NotInStoreError, depending on which the operation needed.'
         )
 
@@ -78,12 +78,12 @@ def test_no_public_function_raises_the_base_type(name: str, mock_client: MockCli
 @pytest.mark.parametrize('name', sorted(_CALLS))
 def test_narrowing_preserves_snapds_own_fields(name: str, mock_client: MockClient):
     # Narrowing must carry snapd's own data across, not substitute a message of our own.
-    error = NotFoundError('snap not found', kind='snap-not-found', value='lxd', status_code=404)
+    error = _NotFoundError('snap not found', kind='snap-not-found', value='lxd', status_code=404)
     for mock in (mock_client.get, mock_client.get_logs, mock_client.post, mock_client.put):
         mock.side_effect = error
     try:
         _CALLS[name]()
-    except NotFoundError as e:
+    except _NotFoundError as e:
         assert e.message == 'snap not found'
         assert e.value == 'lxd'
         assert e.kind == 'snap-not-found'
@@ -99,12 +99,12 @@ def test_functions_that_never_consult_the_store_report_the_local_sense(
     name: str, mock_client: MockClient
 ):
     # The store is never asked, so it can never be what was missing.
-    error = NotFoundError('snap not found', kind='snap-not-found', value='lxd', status_code=404)
+    error = _NotFoundError('snap not found', kind='snap-not-found', value='lxd', status_code=404)
     for mock in (mock_client.get, mock_client.get_logs, mock_client.post, mock_client.put):
         mock.side_effect = error
     try:
         _CALLS[name]()
-    except NotFoundError as e:
+    except _NotFoundError as e:
         assert not isinstance(e, NotInStoreError), (
             f'{name} reported a missing store entry, but it never consults the store'
         )
@@ -154,14 +154,14 @@ def _library_frames(exc: BaseException) -> list[str]:
 
 def test_the_client_really_does_add_frames(mock_raw: MagicMock):
     # The control: unnarrowed, the client's frames are there, so their absence below is real.
-    with pytest.raises(NotFoundError) as ctx:
+    with pytest.raises(_NotFoundError) as ctx:
         _client.get('/v2/snaps/lxd')
     assert '_client.py:get' in _library_frames(ctx.value)
 
 
 @pytest.mark.parametrize('name', _RAISING)
 def test_narrowed_traceback_stops_at_the_library(name: str, mock_raw: MagicMock):
-    with pytest.raises(NotFoundError) as ctx:
+    with pytest.raises(_NotFoundError) as ctx:
         _CALLS[name]()
     frames = _library_frames(ctx.value)
     assert not any(f.startswith('_client.py') for f in frames), frames
@@ -172,7 +172,7 @@ def test_narrowed_traceback_stops_at_the_library(name: str, mock_raw: MagicMock)
 @pytest.mark.parametrize('name', _RAISING)
 def test_narrowing_adds_no_frame_of_its_own(name: str, mock_raw: MagicMock):
     # _from builds the exception and returns before the raise, so it never appears itself.
-    with pytest.raises(NotFoundError) as ctx:
+    with pytest.raises(_NotFoundError) as ctx:
         _CALLS[name]()
     assert '_errors.py:_from' not in _library_frames(ctx.value)
 
@@ -181,7 +181,7 @@ def test_narrowing_adds_no_frame_of_its_own(name: str, mock_raw: MagicMock):
 def test_narrowed_errors_are_not_chained(name: str, mock_raw: MagicMock):
     # The error snapd sent is the error reported, only more specifically, so showing it twice
     # would be noise rather than context.
-    with pytest.raises(NotFoundError) as ctx:
+    with pytest.raises(_NotFoundError) as ctx:
         _CALLS[name]()
     assert ctx.value.__cause__ is None
     assert ctx.value.__suppress_context__

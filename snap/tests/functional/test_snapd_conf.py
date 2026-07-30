@@ -169,7 +169,7 @@ def test_get_option_not_found_value_contains_snap_and_key():
 
 def test_get_not_installed_snap_raises_not_found():
     # Config GET for a non-installed snap returns option-not-found (not snap-not-found), so
-    # get() probes /v2/snaps/{snap} and raises NotFoundError, consistent with set and unset.
+    # get() probes /v2/snaps/{snap} and raises _NotFoundError, consistent with set and unset.
     with pytest.raises(_errors.NotInstalledError) as ctx:
         _snapd_conf.get(_ABSENT_SNAP, ['any-key'])
     assert ctx.value.kind == 'snap-not-found'
@@ -194,7 +194,7 @@ def test_get_not_installed_snap_error_is_not_chained():
 def test_get_all_not_installed_snap_raises_not_found():
     # Config GET with no keys for a non-installed snap is a 200 with an empty result,
     # indistinguishable from an installed snap with no configuration, so get() probes
-    # /v2/snaps/{snap} and raises NotFoundError instead of returning {}.
+    # /v2/snaps/{snap} and raises _NotFoundError instead of returning {}.
     with pytest.raises(_errors.NotInstalledError) as ctx:
         _snapd_conf.get(_ABSENT_SNAP)
     assert ctx.value.kind == 'snap-not-found'
@@ -209,7 +209,7 @@ def test_raw_get_all_not_installed_snap_returns_empty_dict():
     # keys) for a non-installed snap is a 200 with an empty result, NOT an error. This is what
     # makes an absent snap indistinguishable from an installed snap with no configuration, and
     # hence why get() must probe. Asserted at the _client level because get() converts it to
-    # NotFoundError; if snapd ever reported the absent snap directly here, this fails loudly
+    # _NotFoundError; if snapd ever reported the absent snap directly here, this fails loudly
     # rather than leaving get()'s probe branch as untested dead code.
     assert _client.get(f'/v2/snaps/{_ABSENT_SNAP}/conf') == {}
 
@@ -373,7 +373,7 @@ def test_raw_get_keys_that_parse_away_hide_a_not_installed_snap():
     # The same quirk on a snap that isn't installed, which is what made this a bug rather than a
     # surprise: snapd answers a request for the whole configuration with an empty result whether
     # or not the snap exists, and get()'s not-installed probe only runs for keys=None. A key that
-    # parsed away therefore turned a NotFoundError into an empty dict. Rejecting the key makes
+    # parsed away therefore turned a _NotFoundError into an empty dict. Rejecting the key makes
     # the request unmakeable; this pins the snapd behaviour that made it wrong.
     assert _client.get(f'/v2/snaps/{_ABSENT_SNAP}/conf', query={'keys': ''}) == {}
     with pytest.raises(ValueError):

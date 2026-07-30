@@ -135,7 +135,7 @@ def _post_action(
     body: dict[str, Any] = {'action': action, 'names': names, **(extra or {})}
     try:
         _client.post('/v2/apps', body=body)
-    except _errors.NotFoundError as e:
+    except _errors._NotFoundError as e:
         # NOTE: naming the snap itself (services=None) for an absent snap answers with
         # 'snap-not-found', while naming a service answers app-not-found (handled below).
         raise _errors.NotInstalledError._from(e) from None

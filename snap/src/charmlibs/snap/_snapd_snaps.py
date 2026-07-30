@@ -119,7 +119,7 @@ def list_one(snap: str) -> InstalledInfo:
     """
     try:
         info_dict = _client.get(f'/v2/snaps/{_utils.snap_path_segment(snap)}')
-    except _errors.NotFoundError as e:
+    except _errors._NotFoundError as e:
         # This endpoint reports local state only, so not-found can only mean not installed.
         raise _errors.NotInstalledError._from(e) from None
     assert isinstance(info_dict, dict)
@@ -187,7 +187,7 @@ def install(
         _client.post(path, body=data)
     except _errors._AlreadyInstalledError:
         return False
-    except _errors.NotFoundError as e:
+    except _errors._NotFoundError as e:
         # An installed snap answers already-installed, so this can only be the store.
         raise _errors.NotInStoreError._from(e) from None
     return True
@@ -217,7 +217,7 @@ def remove(snap: str, *, purge: bool = False) -> object:
     # message and exits 0. So an absent snap is a falsy result here rather than an error.
     try:
         _client.post(path, body=data)
-    except _errors.NotFoundError:
+    except _errors._NotFoundError:
         return False  # Absent either way, so there's nothing to remove.
     return True
 
@@ -285,7 +285,7 @@ def refresh(
         # reachable. Not installed comes back with no 'kind'; a store miss as 'snap-not-found'.
         if error := _utils.check_installed(snap):
             raise error from None
-        if type(e) is _errors.NotFoundError:
+        if type(e) is _errors._NotFoundError:
             raise _errors.NotInStoreError._from(e) from None
         raise
     return True
@@ -343,6 +343,6 @@ def unhold(snap: str) -> None:
     # NOTE: Neither the API nor CLI error if the snap isn't installed or held.
     try:
         _client.post(f'/v2/snaps/{_utils.snap_path_segment(snap)}', body={'action': 'unhold'})
-    except _errors.NotFoundError as e:
+    except _errors._NotFoundError as e:
         # Unholding acts on an installed snap; the store is never consulted.
         raise _errors.NotInstalledError._from(e) from None

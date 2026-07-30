@@ -150,7 +150,7 @@ def test_logs_snap_with_no_services_raises():
 
 
 def test_logs_not_installed_snap_raises():
-    # Requesting logs for an uninstalled snap raises NotFoundError.
+    # Requesting logs for an uninstalled snap raises _NotFoundError.
     with pytest.raises(_errors.NotInstalledError) as ctx:
         _snapd_logs.logs(_ABSENT_SNAP)
     assert ctx.value.kind == 'snap-not-found'
@@ -246,7 +246,7 @@ def test_comma_in_a_name_queries_two_snaps():
     # positional (swapping the names doesn't swap the error), so this pins only that the name
     # was split: the error is about one of the halves, never about the name as passed.
     names = f'{_ABSENT_SNAP},{_ABSENT_SNAP_2}'
-    with pytest.raises(_errors.NotFoundError) as ctx:
+    with pytest.raises(_errors._NotFoundError) as ctx:
         _client.get_logs(query={'n': -1, 'names': names})
     assert ctx.value.kind == 'snap-not-found'
     assert ctx.value.value in (_ABSENT_SNAP, _ABSENT_SNAP_2)
@@ -256,6 +256,6 @@ def test_comma_in_a_name_queries_two_snaps():
 def test_no_comma_in_a_name_is_one_snap():
     # The control for the test above: without a comma the whole string is one name, so an error
     # about a name as passed is what a comma-free name looks like.
-    with pytest.raises(_errors.NotFoundError) as ctx:
+    with pytest.raises(_errors._NotFoundError) as ctx:
         _client.get_logs(query={'n': -1, 'names': _ABSENT_SNAP})
     assert ctx.value.value == _ABSENT_SNAP

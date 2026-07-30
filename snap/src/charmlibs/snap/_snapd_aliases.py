@@ -47,7 +47,7 @@ def alias(snap: str, app: str, alias: str) -> None:
     data = {'action': 'alias', 'snap': snap, 'app': app, 'alias': alias}
     try:
         _client.post('/v2/aliases', body=data)
-    except _errors.NotFoundError as e:
+    except _errors._NotFoundError as e:
         # Aliasing acts on an installed snap's apps; the store is never consulted.
         raise _errors.NotInstalledError._from(e) from None
 
@@ -68,6 +68,6 @@ def unalias(alias: str) -> None:
     data = {'action': 'unalias', 'alias': alias}
     try:
         _client.post('/v2/aliases', body=data)
-    except _errors.NotFoundError as e:
+    except _errors._NotFoundError as e:
         # An alias only exists for an installed snap.
         raise _errors.NotInstalledError._from(e) from None
