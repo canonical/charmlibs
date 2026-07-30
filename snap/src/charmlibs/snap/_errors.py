@@ -152,10 +152,9 @@ class AppNotFoundError(APIError):
 
 
 class _NotFoundError(APIError):
-    """Base class for the senses of a snap not being found.
+    """Raised via the API when a snap is not found.
 
-    Not public and not raised: the client raises this when snapd's response doesn't say which
-    sense is meant, and the function that made the request narrows it to a public subclass.
+    Internal only: callers must narrow to either NotInstalledError or NotInStoreError.
     """
 
 
@@ -166,8 +165,7 @@ class NotInstalledError(_NotFoundError):
 class NotInStoreError(_NotFoundError):
     """Raised when the snap store has no snap by that name.
 
-    A snap that exists but has no revision on the requested channel raises
-    :class:`ChannelNotAvailableError` instead.
+    Distinct from :class:`ChannelNotAvailableError` and :class:`RevisionNotAvailableError`.
     """
 
 
