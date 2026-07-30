@@ -273,8 +273,8 @@ _ERRORS = {
     'option-not-found': _errors.OptionNotFoundError,
     'snap-channel-not-available': _errors.ChannelNotAvailableError,
     'snap-needs-classic': _errors.NeedsClassicError,
-    # NOTE: sent both for a snap missing from the system and for one missing from the store, so
-    # the caller narrows it to say which -- see NotFoundError.
+    # NOTE: ambiguous -- sent for a snap missing from the system or from the store, so the
+    # caller narrows it. See NotFoundError.
     'snap-not-found': _errors.NotFoundError,
     # NOTE: only sent for remove and alias, which both act on an installed snap.
     'snap-not-installed': _errors.NotInstalledError,

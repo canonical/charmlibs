@@ -218,7 +218,7 @@ def remove(snap: str, *, purge: bool = False) -> object:
     try:
         _client.post(path, body=data)
     except _errors.NotFoundError:
-        return False  # Absent either way, so there's nothing to remove and nothing to report.
+        return False  # Absent either way, so there's nothing to remove.
     return True
 
 
@@ -282,8 +282,7 @@ def refresh(
         return False
     except _errors.APIError as e:
         # NOTE: A refresh needs the snap installed and still in the store, so both senses are
-        # reachable. Not installed comes back with no 'kind'; withdrawn from the store comes back
-        # as 'snap-not-found'. Probe to tell them apart, and re-raise anything else unchanged.
+        # reachable. Not installed comes back with no 'kind'; a store miss as 'snap-not-found'.
         if error := _utils.check_installed(snap):
             raise error from None
         if type(e) is _errors.NotFoundError:
@@ -319,8 +318,7 @@ def hold(snap: str, duration: datetime.timedelta | int | float | None = None) ->
             delta = datetime.timedelta(seconds=duration)
         until = (datetime.datetime.now(datetime.timezone.utc) + delta).isoformat()
     data = {'action': 'hold', 'hold-level': 'general', 'time': until}
-    # NOTE: As for refresh, snapd reports holding a snap that isn't installed with no 'kind', so
-    # we probe to classify it. The probe runs on failure only.
+    # NOTE: As for refresh, snapd reports holding a snap that isn't installed with no 'kind'.
     try:
         _client.post(path, body=data)
     except _errors.APIError:

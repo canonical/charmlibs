@@ -154,10 +154,9 @@ class AppNotFoundError(APIError):
 class NotFoundError(APIError):
     """Base class for a snap not being where an operation needed it.
 
-    An operation may need the snap installed on the system, offered by the store, or both. These
-    are independent -- a snap installed from a file is not in the store -- so the library raises
-    :class:`NotInstalledError` or :class:`NotInStoreError` to say which was missing. Catch this
-    class to handle either.
+    Installed and available are independent -- a snap installed from a file is not in the store
+    -- so the library raises :class:`NotInstalledError` or :class:`NotInStoreError` to say which
+    was missing. Catch this class to handle either.
     """
 
 

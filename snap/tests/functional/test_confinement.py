@@ -12,9 +12,9 @@ dropped for a revision that doesn't require it. So confinement follows the revis
 and no value of ``classic`` changes the confinement of a revision already installed -- which is
 why :func:`charmlibs.snap.ensure` doesn't compare it against a snap's current confinement.
 
-These use locally-built snaps because what's needed is one snap name whose revisions differ in
-confinement: ``test-conf-snap`` 1.0 is strict, 2.0 and 3.0 are classic. Sideloading reaches the
-same flag logic in snapd as a store install or refresh.
+These need one snap name whose revisions differ in confinement, so they use locally-built snaps:
+``test-conf-snap`` 1.0 is strict, 2.0 and 3.0 are classic. Sideloading reaches the same flag
+logic in snapd as a store install or refresh.
 """
 
 from __future__ import annotations

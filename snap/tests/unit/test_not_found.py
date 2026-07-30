@@ -4,12 +4,9 @@
 """The library-wide contract for an absent snap: a subclass of NotFoundError, never the base.
 
 snapd sends the same ``snap-not-found`` kind whether a snap is missing from the system or from the
-store, with the same status code and value -- only the message differs, and its wording varies by
-endpoint, so matching on it isn't an option. The client raises the base type and the function that
-made the request narrows it, since only that function knows what it asked for.
-
-These tests hold that rule to every public function, so a caller can always tell "it isn't
-installed" from "the store doesn't have it".
+store, and only the message differs, with wording that varies by endpoint. So the client raises
+the base type and the function that made the request narrows it, since only that function knows
+what it asked for. These tests hold that rule to every public function.
 """
 
 from __future__ import annotations
@@ -33,8 +30,7 @@ if TYPE_CHECKING:
 
     from conftest import MockClient
 
-# Every public function, called so that it reaches the client. The arguments are the usable ones
-# from test_empty_or_blank.py's tables -- what matters here is only that a request is attempted.
+# Every public function, called so that it reaches the client. Only reaching it matters here.
 _CALLS: dict[str, Callable[[], object]] = {
     'alias': lambda: snap.alias('lxd', 'lxc', 'testlxc'),
     'connect': lambda: snap.connect(('lxd', 'home')),
@@ -66,9 +62,7 @@ def test_every_public_function_is_accounted_for():
 
 @pytest.mark.parametrize('name', sorted(_CALLS))
 def test_no_public_function_raises_the_base_type(name: str, mock_client: MockClient):
-    # Every client method raises the base, so whichever a function reaches, the error it lets
-    # out must name which sense was meant. Swallowing it (remove) is fine -- the rule is only
-    # about what escapes.
+    # Swallowing the error (remove) is fine: the rule is only about what escapes.
     error = NotFoundError('snap not found', kind='snap-not-found', value='lxd', status_code=404)
     for mock in (mock_client.get, mock_client.get_logs, mock_client.post, mock_client.put):
         mock.side_effect = error
@@ -83,8 +77,7 @@ def test_no_public_function_raises_the_base_type(name: str, mock_client: MockCli
 
 @pytest.mark.parametrize('name', sorted(_CALLS))
 def test_narrowing_preserves_snapds_own_fields(name: str, mock_client: MockClient):
-    # Narrowing rebuilds the error as a subclass, so it must carry snapd's own data across rather
-    # than substituting a message of the library's own.
+    # Narrowing must carry snapd's own data across, not substitute a message of our own.
     error = NotFoundError('snap not found', kind='snap-not-found', value='lxd', status_code=404)
     for mock in (mock_client.get, mock_client.get_logs, mock_client.post, mock_client.put):
         mock.side_effect = error
@@ -97,8 +90,7 @@ def test_narrowing_preserves_snapds_own_fields(name: str, mock_client: MockClien
         assert e._status_code == 404
 
 
-# The two senses, and which functions can report each. A function that consults the store can
-# report either; one that only ever acts on an installed snap can only report the local sense.
+# Only these consult the store, so only these can report the store sense.
 _STORE_SENSE = {'ensure', 'install', 'refresh'}
 
 
@@ -106,8 +98,7 @@ _STORE_SENSE = {'ensure', 'install', 'refresh'}
 def test_functions_that_never_consult_the_store_report_the_local_sense(
     name: str, mock_client: MockClient
 ):
-    # These act on an installed snap, so an absent snap can only mean it isn't installed --
-    # the store is never asked and so can never be what was missing.
+    # The store is never asked, so it can never be what was missing.
     error = NotFoundError('snap not found', kind='snap-not-found', value='lxd', status_code=404)
     for mock in (mock_client.get, mock_client.get_logs, mock_client.post, mock_client.put):
         mock.side_effect = error
@@ -122,10 +113,9 @@ def test_functions_that_never_consult_the_store_report_the_local_sense(
 # ---------------------------------------------------------------------------
 # Traceback shape
 #
-# Narrowing raises a new exception, so the traceback starts at the library function that
-# narrowed and doesn't carry the client's frames. Those frames are the same boilerplate every
-# time, and everything specific to the failure is on the exception itself, so dropping them
-# keeps a charm's traceback in the Juju debug log short.
+# Narrowing raises a new exception, so the traceback starts at the library function that narrowed
+# and drops the client's frames. Those frames are the same boilerplate every time, and everything
+# specific to the failure is on the exception itself.
 #
 # These mock the raw request layer rather than the client functions, so the real client frames
 # exist and their absence is a fact about narrowing rather than about the mock.
@@ -133,8 +123,7 @@ def test_functions_that_never_consult_the_store_report_the_local_sense(
 
 _SOURCE_DIR = pathlib.Path(snap.__file__).parent
 
-# Every function that reports an absent snap by raising. Only remove is excluded: it answers
-# absence with a falsy result rather than an error, so there is no traceback to check.
+# Only remove is excluded: it answers absence with a falsy result, so there is no traceback.
 _RAISING = sorted(set(_CALLS) - {'remove'})
 
 
@@ -164,8 +153,7 @@ def _library_frames(exc: BaseException) -> list[str]:
 
 
 def test_the_client_really_does_add_frames(mock_raw: MagicMock):
-    # The control for the tests below: reaching the client unnarrowed leaves its frames in the
-    # traceback, so their absence afterwards is narrowing's doing and not the mock's.
+    # The control: unnarrowed, the client's frames are there, so their absence below is real.
     with pytest.raises(NotFoundError) as ctx:
         _client.get('/v2/snaps/lxd')
     assert '_client.py:get' in _library_frames(ctx.value)
@@ -191,8 +179,8 @@ def test_narrowing_adds_no_frame_of_its_own(name: str, mock_raw: MagicMock):
 
 @pytest.mark.parametrize('name', _RAISING)
 def test_narrowed_errors_are_not_chained(name: str, mock_raw: MagicMock):
-    # A single traceback: the error snapd sent is the error reported, only more specifically,
-    # so showing it twice would be noise rather than context.
+    # The error snapd sent is the error reported, only more specifically, so showing it twice
+    # would be noise rather than context.
     with pytest.raises(NotFoundError) as ctx:
         _CALLS[name]()
     assert ctx.value.__cause__ is None

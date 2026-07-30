@@ -68,8 +68,7 @@ def check_installed(snap: str, *, skip_system: bool = False) -> _errors.NotInsta
     try:
         _client.get(path)
     except _errors.NotFoundError as e:
-        # This endpoint reports local state only, so not-found can only mean not installed. The
-        # fresh error carries no traceback, so the probe's frames don't reach the caller.
+        # This endpoint reports local state only, so not-found can only mean not installed.
         return _errors.NotInstalledError._from(e)
     return None
 

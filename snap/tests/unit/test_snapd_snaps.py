@@ -355,9 +355,8 @@ class TestRefreshNotInstalled:
 
 
 class TestProbeFailure:
-    # refresh and hold classify their kindless errors with a second request, which can fail on
-    # its own -- snapd restarting mid-operation, say. The probe's error then wins, chained to the
-    # error it was classifying: an unreachable snapd is the more fundamental problem to report,
+    # The probe can fail on its own -- snapd restarting mid-operation, say. Its error then wins,
+    # chained to the one it was classifying: an unreachable snapd is the more fundamental problem,
     # and the original is still there to read.
     @staticmethod
     def _kindless() -> APIError:

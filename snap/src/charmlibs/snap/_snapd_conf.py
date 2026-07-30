@@ -93,7 +93,7 @@ def get(snap: str, keys: str | Iterable[str] | None = None) -> dict[str, Any]:
     try:
         config = _client.get(path, query=params)
     except _errors.NotFoundError as e:
-        # Configuration is read from an installed snap; the store is never consulted.
+        # The store is never consulted for configuration.
         raise _errors.NotInstalledError._from(e) from None
     except _errors.OptionNotFoundError:
         # NOTE: snapd reports option-not-found both for a missing key and for a missing snap.
@@ -182,7 +182,7 @@ def unset(snap: str, keys: str | Iterable[str]) -> None:
     try:
         _client.put(path, body=dict.fromkeys(keys))
     except _errors.NotFoundError as e:
-        # Configuration is applied to an installed snap; the store is never consulted.
+        # The store is never consulted for configuration.
         raise _errors.NotInstalledError._from(e) from None
 
 
@@ -215,5 +215,5 @@ def set(snap: str, config: dict[str, Any]) -> None:  # noqa: A001 (shadowing a P
     try:
         _client.put(path, body=config)
     except _errors.NotFoundError as e:
-        # Configuration is applied to an installed snap; the store is never consulted.
+        # The store is never consulted for configuration.
         raise _errors.NotInstalledError._from(e) from None
