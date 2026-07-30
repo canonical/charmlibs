@@ -73,8 +73,9 @@ def check_installed(snap: str, *, skip_system: bool = False) -> _errors.NotInsta
         # the snap isn't installed -- the store is never consulted and so never the subject.
         # The client raises the base type for snapd's ambiguous 'snap-not-found' kind, and this
         # is the narrowing for every probe site in the library.
-        error = _errors.NotInstalledError._from(e)
-        return error.with_traceback(None)  # Clean error with no traceback for the caller.
+        # A fresh object, so it carries no traceback until the caller raises it: the probe's own
+        # frames never reach whoever asked, and the error surfaces from the caller's raise.
+        return _errors.NotInstalledError._from(e)
     return None
 
 
