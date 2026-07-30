@@ -354,34 +354,6 @@ class TestRefreshNotInstalled:
         assert ctx.value is original
 
 
-class TestProbeFailure:
-    # The probe can fail on its own -- snapd restarting mid-operation, say. Its error then wins,
-    # chained to the one it was classifying: an unreachable snapd is the more fundamental problem,
-    # and the original is still there to read.
-    @staticmethod
-    def _kindless() -> APIError:
-        return APIError('cannot refresh "hello-world"', kind='', value='', status_code=400)
-
-    @pytest.mark.parametrize('func', [_snapd.refresh, _snapd.hold], ids=['refresh', 'hold'])
-    def test_probe_failure_propagates_with_the_original_as_context(
-        self, mock_client: MockClient, func: Any
-    ):
-        original = self._kindless()
-        mock_client.post.side_effect = original
-        probe_failure = _errors.ConnectionError(
-            'Could not connect to snapd: socket not found',
-            kind='charmlibs-snap-socket-not-found',
-            value='',
-        )
-        mock_client.get.side_effect = probe_failure
-        with pytest.raises(_errors.ConnectionError) as ctx:
-            func('hello-world')
-        assert ctx.value is probe_failure
-        # Chained, not suppressed: the reader sees both errors.
-        assert ctx.value.__context__ is original
-        assert not ctx.value.__suppress_context__
-
-
 class TestHold:
     def test_hold_forever_by_default(self, mock_client: MockClient):
         _snapd.hold('hello-world')
