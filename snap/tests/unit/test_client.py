@@ -32,7 +32,6 @@ from charmlibs.snap._errors import (
     ConnectionError,  # noqa: A004 (shadowing a Python builtin)
     Error,
     NeedsClassicError,
-    NotInstalledError,
     OptionNotFoundError,
     TimeoutError,  # noqa: A004 (shadowing a Python builtin)
     _AlreadyInstalledError,

@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from charmlibs.snap import _errors
 from charmlibs.snap import _snapd_snaps as _snapd
 from charmlibs.snap._errors import (
     APIError,

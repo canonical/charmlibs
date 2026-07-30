@@ -12,17 +12,11 @@ what it asked for. These tests hold that rule to every public function.
 from __future__ import annotations
 
 import inspect
-import json
-import pathlib
-import traceback
-from types import SimpleNamespace
 from typing import TYPE_CHECKING
-from unittest.mock import MagicMock
 
 import pytest
 
 from charmlibs import snap
-from charmlibs.snap import _client
 from charmlibs.snap._errors import NotInStoreError, _NotFoundError
 
 if TYPE_CHECKING:
