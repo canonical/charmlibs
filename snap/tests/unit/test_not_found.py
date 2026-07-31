@@ -106,7 +106,7 @@ def test_does_not_raise(name: str, mock_client: MockClient):
 def test_refresh_also_raises_not_in_store_error(
     monkeypatch: pytest.MonkeyPatch, mock_client: MockClient
 ):
-    """Ensure raises NotInstalledError if both the refresh and the check_installed probe fail.
+    """Refresh raises NotInstalledError if both the refresh and the check_installed probe fail.
 
     If the refresh fails with _NotFoundError but check_installed succeeds,
     then we raise NotInStoreError instead.
