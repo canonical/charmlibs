@@ -13,7 +13,7 @@ import pytest
 
 from charmlibs.snap import _errors, _functions
 from charmlibs.snap import _snapd_snaps as _snapd
-from conftest import ensure_installed, ensure_removed, list_channels
+from conftest import ensure_installed_store, ensure_removed, list_channels
 
 # The smallest classic-confined snap in the store, used wherever a test needs classic
 # confinement rather than a particular snap. Published by snapd:
@@ -43,7 +43,7 @@ _ABSENT_SNAP = 'this-snap-does-not-exist-xyz-abc-123'
 
 
 def test_ensure_installed_revision_no_op_if_same_revision():
-    ensure_installed(_SNAP)
+    ensure_installed_store(_SNAP)
     current_revision = _snapd.list_one(_SNAP).revision
     result = _functions.ensure_installed(_SNAP, revision=int(current_revision))
     assert result is False
@@ -52,7 +52,7 @@ def test_ensure_installed_revision_no_op_if_same_revision():
 def test_ensure_installed_revision_no_op_if_same_revision_and_update_true():
     # update is ignored when a revision is specified: the revision fully determines which
     # revision to be on, so there's nothing to update to.
-    ensure_installed(_SNAP)
+    ensure_installed_store(_SNAP)
     current_revision = _snapd.list_one(_SNAP).revision
     result = _functions.ensure_installed(_SNAP, revision=int(current_revision), update=True)
     assert result is False
@@ -61,7 +61,7 @@ def test_ensure_installed_revision_no_op_if_same_revision_and_update_true():
 def test_ensure_installed_revision_refreshes_on_different_revision():
     # The target revision is taken from the alternate channel rather than by subtracting one
     # from the installed revision: adjacent revision numbers need not exist in the store.
-    ensure_installed(_SNAP, channel=_CHANNEL)
+    ensure_installed_store(_SNAP, channel=_CHANNEL)
     other_revision = list_channels(_SNAP)[_ALT_CHANNEL].revision
     assert _snapd.list_one(_SNAP).revision != other_revision
     did_something = _functions.ensure_installed(_SNAP, revision=int(other_revision))
@@ -70,32 +70,32 @@ def test_ensure_installed_revision_refreshes_on_different_revision():
 
 
 def test_ensure_installed_no_op_update_false():
-    ensure_installed(_SNAP, channel=_CHANNEL)
+    ensure_installed_store(_SNAP, channel=_CHANNEL)
     result = _functions.ensure_installed(_SNAP, channel=_CHANNEL, update=False)
     assert result is False
 
 
 def test_ensure_installed_no_op_normalized_channel():
-    ensure_installed(_SNAP, channel=_CHANNEL)
+    ensure_installed_store(_SNAP, channel=_CHANNEL)
     result = _functions.ensure_installed(_SNAP, channel='latest', update=False)
     assert result is False
 
 
 def test_ensure_installed_no_op_stable_normalized():
-    ensure_installed(_SNAP, channel=_CHANNEL)
+    ensure_installed_store(_SNAP, channel=_CHANNEL)
     result = _functions.ensure_installed(_SNAP, channel='stable', update=False)
     assert result is False
 
 
 def test_ensure_installed_refreshes_on_different_channel():
-    ensure_installed(_SNAP, channel=_CHANNEL)
+    ensure_installed_store(_SNAP, channel=_CHANNEL)
     did_something = _functions.ensure_installed(_SNAP, channel=_ALT_CHANNEL)
     assert did_something is True
     assert _snapd.list_one(_SNAP).tracking == _ALT_CHANNEL
 
 
 def test_ensure_installed_no_updates_available_returns_false():
-    ensure_installed(_SNAP, channel=_CHANNEL)
+    ensure_installed_store(_SNAP, channel=_CHANNEL)
     # Already up-to-date — no updates available.
     result = _functions.ensure_installed(_SNAP, channel=_CHANNEL)
     assert result is False
@@ -266,6 +266,6 @@ def test_ensure_installed_empty_channel_installs_on_default_channel() -> None:
 def test_ensure_installed_empty_channel_refreshes_when_installed() -> None:
     # channel='' is falsy, so ensure_installed skips the channel-mismatch branch
     # and falls through to the update-check refresh (no-op here).
-    ensure_installed(_SNAP, channel=_CHANNEL)
+    ensure_installed_store(_SNAP, channel=_CHANNEL)
     result = _functions.ensure_installed(_SNAP, channel='')
     assert result is False

@@ -103,7 +103,7 @@ def test_does_not_raise(name: str, mock_client: MockClient):
     CALLS[name]()  # Does not raise.
 
 
-def test_ensure_also_raises_not_in_store_error(
+def test_refresh_also_raises_not_in_store_error(
     monkeypatch: pytest.MonkeyPatch, mock_client: MockClient
 ):
     """Ensure raises NotInstalledError if both the refresh and the check_installed probe fail.

@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 from charmlibs.snap import _client, _errors, _snapd_conf
-from conftest import SNAPS_DIR, ensure_installed, ensure_removed, install_local
+from conftest import SNAPS_DIR, ensure_installed_store, ensure_removed, install_local
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -42,49 +42,49 @@ def _cleanup(*keys: str) -> None:
 
 
 def test_set_and_get_bool_true():
-    ensure_installed(_SNAP, channel='latest/edge')
+    ensure_installed_store(_SNAP, channel='latest/edge')
     _snapd_conf.set(_SNAP, {_KEY: True})
     assert _snapd_conf.get_one(_SNAP, _KEY) is True
     _cleanup()
 
 
 def test_set_and_get_bool_false():
-    ensure_installed(_SNAP, channel='latest/edge')
+    ensure_installed_store(_SNAP, channel='latest/edge')
     _snapd_conf.set(_SNAP, {_KEY: False})
     assert _snapd_conf.get_one(_SNAP, _KEY) is False
     _cleanup()
 
 
 def test_set_and_get_integer():
-    ensure_installed(_SNAP, channel='latest/edge')
+    ensure_installed_store(_SNAP, channel='latest/edge')
     _snapd_conf.set(_SNAP, {_KEY: 42})
     assert _snapd_conf.get_one(_SNAP, _KEY) == 42
     _cleanup()
 
 
 def test_set_and_get_float():
-    ensure_installed(_SNAP, channel='latest/edge')
+    ensure_installed_store(_SNAP, channel='latest/edge')
     _snapd_conf.set(_SNAP, {_KEY: 3.14})
     assert _snapd_conf.get_one(_SNAP, _KEY) == 3.14
     _cleanup()
 
 
 def test_set_and_get_string():
-    ensure_installed(_SNAP, channel='latest/edge')
+    ensure_installed_store(_SNAP, channel='latest/edge')
     _snapd_conf.set(_SNAP, {_KEY: 'hello'})
     assert _snapd_conf.get_one(_SNAP, _KEY) == 'hello'
     _cleanup()
 
 
 def test_set_and_get_list():
-    ensure_installed(_SNAP, channel='latest/edge')
+    ensure_installed_store(_SNAP, channel='latest/edge')
     _snapd_conf.set(_SNAP, {_KEY: [1, 2, 3]})
     assert _snapd_conf.get_one(_SNAP, _KEY) == [1, 2, 3]
     _cleanup()
 
 
 def test_set_and_get_dict():
-    ensure_installed(_SNAP, channel='latest/edge')
+    ensure_installed_store(_SNAP, channel='latest/edge')
     _snapd_conf.set(_SNAP, {_KEY: {'a': 1, 'b': 'two'}})
     assert _snapd_conf.get_one(_SNAP, _KEY) == {'a': 1, 'b': 'two'}
     # Dotted notation reads back a single nested value.
@@ -94,7 +94,7 @@ def test_set_and_get_dict():
 
 def test_set_null_unsets_key():
     # Setting a key to None (JSON null) unsets it at the top level.
-    ensure_installed(_SNAP, channel='latest/edge')
+    ensure_installed_store(_SNAP, channel='latest/edge')
     _snapd_conf.set(_SNAP, {_KEY: 'hello'})
     assert _snapd_conf.get(_SNAP, [_KEY]).get(_KEY) == 'hello'
     _snapd_conf.set(_SNAP, {_KEY: None})
@@ -110,7 +110,7 @@ def test_set_null_unsets_key():
 def test_get_all_keys():
     # get() with no keys returns all config as a dict. Nested values are returned in full:
     # the returned dict is keyed by top-level option, and each value keeps its full structure.
-    ensure_installed(_SNAP, channel='latest/edge')
+    ensure_installed_store(_SNAP, channel='latest/edge')
     _snapd_conf.set(_SNAP, {_KEY: 'value', _KEY2: {'nested': {'deep': 1}}})
     config = _snapd_conf.get(_SNAP)
     assert isinstance(config, dict)
@@ -123,7 +123,7 @@ def test_get_mixed_dotted_and_non_dotted_keys():
     # Requesting an option and a dotted sub-key of it returns both as separate entries:
     # the plain key yields the full subtree, the dotted key yields the leaf, keyed by the
     # literal dotted string. The two do not merge or collide.
-    ensure_installed(_SNAP, channel='latest/edge')
+    ensure_installed_store(_SNAP, channel='latest/edge')
     _snapd_conf.set(_SNAP, {_KEY: {'nested': 'value'}})
     result = _snapd_conf.get(_SNAP, [_KEY, f'{_KEY}.nested'])
     assert result == {_KEY: {'nested': 'value'}, f'{_KEY}.nested': 'value'}
@@ -131,7 +131,7 @@ def test_get_mixed_dotted_and_non_dotted_keys():
 
 
 def test_get_specific_keys_returns_subset():
-    ensure_installed(_SNAP, channel='latest/edge')
+    ensure_installed_store(_SNAP, channel='latest/edge')
     _snapd_conf.set(_SNAP, {_KEY: 'alpha', _KEY2: 'beta'})
     subset = _snapd_conf.get(_SNAP, [_KEY])
     assert _KEY in subset
@@ -140,7 +140,7 @@ def test_get_specific_keys_returns_subset():
 
 
 def test_get_multiple_specific_keys():
-    ensure_installed(_SNAP, channel='latest/edge')
+    ensure_installed_store(_SNAP, channel='latest/edge')
     _snapd_conf.set(_SNAP, {_KEY: 'alpha', _KEY2: 'beta'})
     result = _snapd_conf.get(_SNAP, [_KEY, _KEY2])
     assert result[_KEY] == 'alpha'
@@ -149,7 +149,7 @@ def test_get_multiple_specific_keys():
 
 
 def test_get_option_not_found_raises():
-    ensure_installed(_SNAP, channel='latest/edge')
+    ensure_installed_store(_SNAP, channel='latest/edge')
     with pytest.raises(_errors.OptionNotFoundError) as ctx:
         _snapd_conf.get(_SNAP, ['key-that-should-not-exist'])
     assert ctx.value.kind == 'option-not-found'
@@ -157,7 +157,7 @@ def test_get_option_not_found_raises():
 
 
 def test_get_option_not_found_value_contains_snap_and_key():
-    ensure_installed(_SNAP, channel='latest/edge')
+    ensure_installed_store(_SNAP, channel='latest/edge')
     with pytest.raises(_errors.OptionNotFoundError) as ctx:
         _snapd_conf.get(_SNAP, ['key-that-should-not-exist'])
     value = str(ctx.value.value)
@@ -217,7 +217,7 @@ def test_raw_get_all_not_installed_snap_returns_empty_dict():
 def test_get_all_installed_snap_with_no_config_returns_empty_dict():
     # The snap has no configure hook, so it can never have configuration. Unlike the CLI
     # (`snap get <snap>` errors with 'has no configuration'), get() returns an empty dict.
-    ensure_installed(_NO_HOOK_SNAP)
+    ensure_installed_store(_NO_HOOK_SNAP)
     assert _snapd_conf.get(_NO_HOOK_SNAP) == {}
 
 
@@ -231,7 +231,7 @@ def test_get_all_installed_snap_with_no_config_returns_empty_dict():
 
 
 def test_get_one_returns_the_value_not_a_dict():
-    ensure_installed(_SNAP, channel='latest/edge')
+    ensure_installed_store(_SNAP, channel='latest/edge')
     _snapd_conf.set(_SNAP, {_KEY: 'value'})
     assert _snapd_conf.get_one(_SNAP, _KEY) == 'value'
     assert _snapd_conf.get(_SNAP, [_KEY]) == {_KEY: 'value'}
@@ -241,14 +241,14 @@ def test_get_one_returns_the_value_not_a_dict():
 def test_get_one_returns_a_subtree_for_a_key_that_names_one():
     # A key naming a subtree yields the whole nested dict -- get_one unwraps get's result by
     # one level, it doesn't flatten the value.
-    ensure_installed(_SNAP, channel='latest/edge')
+    ensure_installed_store(_SNAP, channel='latest/edge')
     _snapd_conf.set(_SNAP, {_KEY: {'nested': {'deep': 1}}})
     assert _snapd_conf.get_one(_SNAP, _KEY) == {'nested': {'deep': 1}}
     _cleanup()
 
 
 def test_get_one_dotted_key_returns_the_leaf():
-    ensure_installed(_SNAP, channel='latest/edge')
+    ensure_installed_store(_SNAP, channel='latest/edge')
     _snapd_conf.set(_SNAP, {_KEY: {'nested': 'value'}})
     assert _snapd_conf.get_one(_SNAP, f'{_KEY}.nested') == 'value'
     _cleanup()
@@ -256,7 +256,7 @@ def test_get_one_dotted_key_returns_the_leaf():
 
 def test_get_one_missing_key_raises_option_not_found():
     # Never a KeyError: get raises before there is a dict to subscript.
-    ensure_installed(_SNAP, channel='latest/edge')
+    ensure_installed_store(_SNAP, channel='latest/edge')
     with pytest.raises(_errors.OptionNotFoundError) as ctx:
         _snapd_conf.get_one(_SNAP, 'key-that-should-not-exist')
     assert ctx.value.kind == 'option-not-found'
@@ -294,7 +294,7 @@ def test_get_one_invalid_snap_name_raises_value_error(snap: str):
 
 
 def test_get_bare_string_is_one_key():
-    ensure_installed(_SNAP, channel='latest/edge')
+    ensure_installed_store(_SNAP, channel='latest/edge')
     _snapd_conf.set(_SNAP, {_KEY: 'value'})
     assert _snapd_conf.get(_SNAP, _KEY) == {_KEY: 'value'}
     assert _snapd_conf.get(_SNAP, _KEY) == _snapd_conf.get(_SNAP, [_KEY])
@@ -302,7 +302,7 @@ def test_get_bare_string_is_one_key():
 
 
 def test_get_bare_string_dotted_key():
-    ensure_installed(_SNAP, channel='latest/edge')
+    ensure_installed_store(_SNAP, channel='latest/edge')
     _snapd_conf.set(_SNAP, {_KEY: {'nested': 'value'}})
     assert _snapd_conf.get(_SNAP, f'{_KEY}.nested') == {f'{_KEY}.nested': 'value'}
     _cleanup()
@@ -315,7 +315,7 @@ def test_get_bare_string_is_validated_like_a_key_in_a_list():
 
 
 def test_unset_bare_string_is_one_key():
-    ensure_installed(_SNAP, channel='latest/edge')
+    ensure_installed_store(_SNAP, channel='latest/edge')
     _snapd_conf.set(_SNAP, {_KEY: 'value'})
     _snapd_conf.unset(_SNAP, _KEY)
     with pytest.raises(_errors.OptionNotFoundError):
@@ -331,7 +331,7 @@ def test_get_empty_keys_returns_empty_dict():
     # keys=[] is a deliberate "no keys requested" query, distinct from the CLI-following
     # default of keys=None ("give me everything"). It never reaches the conf endpoint, but
     # still confirms the snap is installed before returning {}.
-    ensure_installed(_SNAP, channel='latest/edge')
+    ensure_installed_store(_SNAP, channel='latest/edge')
     _snapd_conf.set(_SNAP, {_KEY: 'value'})
     assert _snapd_conf.get(_SNAP, []) == {}
     _cleanup()
@@ -361,7 +361,7 @@ def test_raw_get_keys_that_parse_away_returns_the_full_config(keys: str):
     # list whose keys all parse away doesn't match that check, so it used to fall through to
     # being joined into the 'keys' query parameter. snapd's parsing of that treats it the same
     # as no 'keys' param at all, so the full config comes back -- keys=None, not keys=[].
-    ensure_installed(_SNAP, channel='latest/edge')
+    ensure_installed_store(_SNAP, channel='latest/edge')
     _snapd_conf.set(_SNAP, {_KEY: 'value'})
     full_config = _snapd_conf.get(_SNAP)
     assert full_config != {}
@@ -384,7 +384,7 @@ def test_raw_get_padded_key_returns_the_stripped_key():
     # Whitespace is stripped from each key, so a padded key addresses the key it names once
     # stripped, and the result is keyed by the stripped name -- meaning result[' key '] would
     # raise KeyError on a request that appeared to succeed.
-    ensure_installed(_SNAP, channel='latest/edge')
+    ensure_installed_store(_SNAP, channel='latest/edge')
     _snapd_conf.set(_SNAP, {_KEY: 'value'})
     assert _client.get(f'/v2/snaps/{_SNAP}/conf', query={'keys': f' {_KEY} '}) == {_KEY: 'value'}
     _cleanup()
@@ -393,7 +393,7 @@ def test_raw_get_padded_key_returns_the_stripped_key():
 def test_raw_get_comma_in_a_key_queries_two_keys():
     # A comma inside one key is not escaped by url-encoding it: snapd decodes the parameter
     # before splitting, so one key becomes two. This is why a comma is rejected.
-    ensure_installed(_SNAP, channel='latest/edge')
+    ensure_installed_store(_SNAP, channel='latest/edge')
     _snapd_conf.set(_SNAP, {_KEY: 'value', _KEY2: 'value2'})
     result = _client.get(f'/v2/snaps/{_SNAP}/conf', query={'keys': f'{_KEY},{_KEY2}'})
     assert result == {_KEY: 'value', _KEY2: 'value2'}
@@ -406,7 +406,7 @@ def test_raw_get_comma_in_a_key_queries_two_keys():
 
 
 def test_unset_key():
-    ensure_installed(_SNAP, channel='latest/edge')
+    ensure_installed_store(_SNAP, channel='latest/edge')
     _snapd_conf.set(_SNAP, {_KEY: 'hello'})
     assert _snapd_conf.get(_SNAP, [_KEY]).get(_KEY) == 'hello'
     _snapd_conf.unset(_SNAP, [_KEY])
@@ -416,18 +416,18 @@ def test_unset_key():
 
 def test_unset_nonexistent_key_no_error():
     # Unsetting a key that doesn't exist should not raise.
-    ensure_installed(_SNAP, channel='latest/edge')
+    ensure_installed_store(_SNAP, channel='latest/edge')
     _snapd_conf.unset(_SNAP, ['key-that-does-not-exist'])
 
 
 def test_unset_nonexistent_key_deeply_dotted_no_error():
     # Unsetting a dotted-path key that doesn't exist should not raise.
-    ensure_installed(_SNAP, channel='latest/edge')
+    ensure_installed_store(_SNAP, channel='latest/edge')
     _snapd_conf.unset(_SNAP, ['key-that-does-not-exist.nested.deep'])
 
 
 def test_unset_multiple_keys():
-    ensure_installed(_SNAP, channel='latest/edge')
+    ensure_installed_store(_SNAP, channel='latest/edge')
     _snapd_conf.set(_SNAP, {_KEY: 'val1', _KEY2: 'val2'})
     _snapd_conf.unset(_SNAP, [_KEY, _KEY2])
     with pytest.raises(_errors.OptionNotFoundError):
@@ -437,7 +437,7 @@ def test_unset_multiple_keys():
 
 
 def test_unset_empty_keys_is_noop():
-    ensure_installed(_SNAP, channel='latest/edge')
+    ensure_installed_store(_SNAP, channel='latest/edge')
     _snapd_conf.set(_SNAP, {_KEY: 'value'})
     _snapd_conf.unset(_SNAP, [])  # Should not raise, and should not touch existing config.
     assert _snapd_conf.get_one(_SNAP, _KEY) == 'value'
@@ -475,7 +475,7 @@ def test_unset_not_installed_snap_raises_snap_not_found():
 
 
 def test_set_multiple_keys_at_once():
-    ensure_installed(_SNAP, channel='latest/edge')
+    ensure_installed_store(_SNAP, channel='latest/edge')
     values: dict[str, Any] = {_KEY: 'v1', _KEY2: 'v2'}
     _snapd_conf.set(_SNAP, values)
     result = _snapd_conf.get(_SNAP, [_KEY, _KEY2])
@@ -487,7 +487,7 @@ def test_set_multiple_keys_at_once():
 def test_set_empty_dict_is_noop():
     # set(snap, {}) is a no-op — the API accepts an empty body without error, and existing
     # configuration is left untouched (an empty body does NOT unset all keys).
-    ensure_installed(_SNAP, channel='latest/edge')
+    ensure_installed_store(_SNAP, channel='latest/edge')
     _snapd_conf.set(_SNAP, {_KEY: 'before-empty-set'})
     _snapd_conf.set(_SNAP, {})
     assert _snapd_conf.get_one(_SNAP, _KEY) == 'before-empty-set'
@@ -507,7 +507,7 @@ def test_set_empty_dict_is_noop():
 @pytest.mark.parametrize('key', ['', ' ', '\t'])
 @pytest.mark.parametrize('func', [_snapd_conf.set, _snapd_conf.unset], ids=['set', 'unset'])
 def test_set_and_unset_reject_empty_and_blank_keys(func: Any, key: str):
-    ensure_installed(_SNAP, channel='latest/edge')
+    ensure_installed_store(_SNAP, channel='latest/edge')
     with pytest.raises(ValueError):
         func(_SNAP, {key: 'value'} if func is _snapd_conf.set else [key])
 
@@ -526,7 +526,7 @@ def test_raw_put_unusable_key_fails_the_change(key: str, expected: str):
     # snapd names the offending key verbatim, without stripping it, and fails the whole change.
     # The empty key is the odd one out: it's reported as an internal error rather than as an
     # invalid option name, which is the message a caller would otherwise have had to read.
-    ensure_installed(_SNAP, channel='latest/edge')
+    ensure_installed_store(_SNAP, channel='latest/edge')
     with pytest.raises(_errors.ChangeError) as ctx:
         _client.put(f'/v2/snaps/{_SNAP}/conf', body={key: 'value'})
     assert expected in ctx.value.message
@@ -541,7 +541,7 @@ def test_raw_put_unusable_key_fails_the_change(key: str, expected: str):
 @pytest.mark.parametrize('key', ['a.', '.a', 'a..b', '.'])
 def test_get_key_with_an_empty_dotted_segment_raises(key: str):
     # On the read side this is at least immediate: a synchronous APIError, no change, no hook.
-    ensure_installed(_SNAP, channel='latest/edge')
+    ensure_installed_store(_SNAP, channel='latest/edge')
     with pytest.raises(_errors.APIError) as ctx:
         _snapd_conf.get(_SNAP, [key])
     assert not ctx.value.kind
@@ -551,7 +551,7 @@ def test_get_key_with_an_empty_dotted_segment_raises(key: str):
 @pytest.mark.parametrize('key', ['a.', '.a', 'a..b', '.'])
 def test_set_key_with_an_empty_dotted_segment_fails_the_change(key: str):
     # On the write side it costs a round trip and a configure hook run before failing.
-    ensure_installed(_SNAP, channel='latest/edge')
+    ensure_installed_store(_SNAP, channel='latest/edge')
     with pytest.raises(_errors.ChangeError) as ctx:
         _snapd_conf.set(_SNAP, {key: 'value'})
     assert 'invalid option name: ""' in ctx.value.message
@@ -559,7 +559,7 @@ def test_set_key_with_an_empty_dotted_segment_fails_the_change(key: str):
 
 def test_raw_put_unusable_key_rolls_back_the_valid_keys():
     # The change is all-or-nothing, so a valid key sent alongside an unusable one is not applied.
-    ensure_installed(_SNAP, channel='latest/edge')
+    ensure_installed_store(_SNAP, channel='latest/edge')
     _snapd_conf.set(_SNAP, {_KEY: 'before'})
     with pytest.raises(_errors.ChangeError):
         _client.put(f'/v2/snaps/{_SNAP}/conf', body={'': 'value', _KEY: 'after'})
@@ -570,7 +570,7 @@ def test_raw_put_unusable_key_rolls_back_the_valid_keys():
 def test_get_mixed_keys_raises_option_not_found():
     # When some requested keys exist and some don't, the API raises option-not-found
     # for the first missing key rather than returning partial results.
-    ensure_installed(_SNAP, channel='latest/edge')
+    ensure_installed_store(_SNAP, channel='latest/edge')
     _snapd_conf.set(_SNAP, {_KEY: 'exists'})
     with pytest.raises(_errors.OptionNotFoundError) as ctx:
         _snapd_conf.get(_SNAP, [_KEY, 'key-that-does-not-exist-xyz'])
@@ -580,7 +580,7 @@ def test_get_mixed_keys_raises_option_not_found():
 
 def test_unset_dotted_path_no_error():
     # unset() accepts dotted-path keys and the API handles them without error.
-    ensure_installed(_SNAP, channel='latest/edge')
+    ensure_installed_store(_SNAP, channel='latest/edge')
     _snapd_conf.set(_SNAP, {_KEY: {'nested': 'value'}})
     _snapd_conf.unset(_SNAP, [f'{_KEY}.nested'])  # Should not raise.
     _cleanup()
@@ -594,13 +594,13 @@ def test_unset_dotted_path_no_error():
 def test_set_no_configure_hook_raises_change_error():
     # set/unset run the snap's configure hook as an async change. This snap has no
     # configure hook, so snapd fails the change and we surface it as a ChangeError.
-    ensure_installed(_NO_HOOK_SNAP)
+    ensure_installed_store(_NO_HOOK_SNAP)
     with pytest.raises(_errors.ChangeError):
         _snapd_conf.set(_NO_HOOK_SNAP, {'any-key': 'value'})
 
 
 def test_unset_no_configure_hook_raises_change_error():
-    ensure_installed(_NO_HOOK_SNAP)
+    ensure_installed_store(_NO_HOOK_SNAP)
     with pytest.raises(_errors.ChangeError):
         _snapd_conf.unset(_NO_HOOK_SNAP, ['any-key'])
 
@@ -610,7 +610,7 @@ def test_set_empty_dict_no_configure_hook_is_noop():
     # when there is nothing to set (Optional: len(patch) == 0), so a missing hook is not an
     # error and the change completes as a no-op. Contrast test_set_no_configure_hook_*, where a
     # non-empty patch on the same hook-less snap does raise.
-    ensure_installed(_NO_HOOK_SNAP)
+    ensure_installed_store(_NO_HOOK_SNAP)
     _snapd_conf.set(_NO_HOOK_SNAP, {})  # Should not raise.
 
 
