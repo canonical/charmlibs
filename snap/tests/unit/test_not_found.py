@@ -111,8 +111,12 @@ def test_ensure_also_raises_not_in_store_error(
     If the refresh fails with _NotFoundError but check_installed succeeds,
     then we raise NotInStoreError instead.
     """
+
+    def check_installed(*args: object, **kwargs: object):
+        return None
+
     error = _mock_error(mock_client)
-    monkeypatch.setattr(_utils, 'check_installed', lambda *args, **kwargs: None)
+    monkeypatch.setattr(_utils, 'check_installed', check_installed)
     with pytest.raises(_NotFoundError) as exc:
         CALLS['refresh']()
     e = exc.value
