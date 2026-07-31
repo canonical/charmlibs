@@ -222,6 +222,7 @@ class TestListOne:
             _snapd.list_one('hello-world')
         assert 'Unexpected response type' in ctx.value.message
         assert "'list'" in ctx.value.message
+        assert ctx.value.response == ['hello-world']
 
     @pytest.mark.parametrize('missing', ['name', 'version', 'revision', 'confinement'])
     def test_list_one_missing_field_raises_bad_response(
@@ -232,6 +233,7 @@ class TestListOne:
         with pytest.raises(BadResponseError) as ctx:
             _snapd.list_one('hello-world')
         assert missing in ctx.value.message  # Named by the KeyError repr.
+        assert ctx.value.response == info_dict  # The description we couldn't read.
         assert ctx.value.__suppress_context__
 
     def test_list_one_unparseable_hold_raises_bad_response(self, mock_client: MockClient):

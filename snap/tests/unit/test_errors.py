@@ -132,16 +132,27 @@ def test_str_appends_informative_string_value(message: str, value: object, expec
     assert str(_errors.APIError(message, kind='some-kind', value=value)) == expected
 
 
-class TestTruncated:
-    def test_short_detail_is_returned_whole(self):
-        assert _errors._truncated('boom') == 'boom'
+class TestBadResponseError:
+    """BadResponseError carries what snapd sent, for the caller to put in a bug report."""
 
-    def test_non_string_detail_is_stringified(self):
-        assert _errors._truncated({'a': 1}) == "{'a': 1}"
+    def test_response_is_public(self):
+        err = _errors.BadResponseError('boom', response={'unexpected': 'shape'})
+        assert err.response == {'unexpected': 'shape'}
 
-    def test_long_detail_is_truncated_and_sized(self):
-        detail = 'x' * (_errors._MAX_DETAIL + 1)
-        truncated = _errors._truncated(detail)
-        assert truncated.startswith('x' * _errors._MAX_DETAIL)
-        assert not truncated.startswith(detail)
-        assert str(len(detail)) in truncated
+    def test_response_is_read_only(self):
+        err = _errors.BadResponseError('boom', response='oops')
+        with pytest.raises(AttributeError):
+            err.response = ''  # pyright: ignore[reportAttributeAccessIssue]
+
+    def test_response_defaults_to_none(self):
+        # Not every bad response has anything to report beyond the message.
+        assert _errors.BadResponseError('boom').response is None
+
+    def test_response_is_not_appended_to_str(self):
+        # Unlike APIError's value: a whole response body doesn't belong in a charm's status.
+        assert str(_errors.BadResponseError('boom', response='oops')) == 'boom'
+
+    @pytest.mark.parametrize('response', ['oops', {'unexpected': 'shape'}, None])
+    def test_repr_contains_the_message_and_the_response(self, response: object):
+        r = repr(_errors.BadResponseError('boom', response=response))
+        assert r == f"charmlibs.snap._errors.BadResponseError('boom', response={response!r})"

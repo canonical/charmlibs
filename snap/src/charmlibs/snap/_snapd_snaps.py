@@ -155,6 +155,7 @@ def list_one(snap: str) -> InstalledInfo:
     if not isinstance(info_dict, dict):
         raise _errors.BadResponseError(
             message=f'Unexpected response type {type(info_dict).__name__!r} for snap {snap!r}, expected a "dict"',  # noqa: E501
+            response=info_dict,
         )
     info_dict = typing.cast('dict[str, str]', info_dict)
     try:
@@ -163,8 +164,8 @@ def list_one(snap: str) -> InstalledInfo:
         # A field we require is missing, or holds something we can't parse. Reported rather than
         # asserted, so that the documented contract -- every failure is an Error -- holds here too.
         raise _errors.BadResponseError(
-            message=f"Could not read snapd's description of snap {snap!r}: {e!r}: "
-            f'{_errors._truncated(info_dict)}'
+            message=f"Could not read snapd's description of snap {snap!r}: {e!r}",
+            response=info_dict,
         ) from None
 
 

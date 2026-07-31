@@ -53,6 +53,7 @@ class TestGet:
             _snapd_conf.get('lxd')
         assert 'Unexpected response type' in ctx.value.message
         assert "'list'" in ctx.value.message
+        assert ctx.value.response == ['integer']
         # Reported as a bad response, rather than probed as a possibly-absent snap.
         assert mock_client.get.call_count == 1
 

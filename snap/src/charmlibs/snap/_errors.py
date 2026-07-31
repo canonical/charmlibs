@@ -23,23 +23,6 @@ if typing.TYPE_CHECKING:
     from typing_extensions import Self
 
 
-_MAX_DETAIL = 200
-"""How much of an offending response a :class:`BadResponseError` message will quote."""
-
-
-def _truncated(detail: object) -> str:  # pyright: ignore[reportUnusedFunction]
-    """Render something snapd sent us for inclusion in a :class:`BadResponseError` message.
-
-    Errors outside the :class:`APIError` hierarchy carry no ``value``, so the message is the
-    only place the offending response can be recorded for a bug report. Long responses (the
-    log stream, for example) are truncated so that the message stays readable.
-    """
-    text = detail if isinstance(detail, str) else str(detail)
-    if len(text) <= _MAX_DETAIL:
-        return text
-    return f'{text[:_MAX_DETAIL]}... ({len(text)} characters)'
-
-
 class Error(Exception):
     """Base class for all library errors, not raised directly."""
 
@@ -65,8 +48,29 @@ class BadResponseError(Error):
     """Raised manually when the snapd API returns a response we don't understand.
 
     Callers will not be able to resolve this error directly. It means the library and snapd
-    disagree about the shape of a response, so it should be reported to the library maintainers.
+    disagree about the shape of a response, so it should be reported to the library maintainers,
+    along with :attr:`response` -- what snapd sent that the library could not read.
     """
+
+    def __init__(self, message: str, *, response: object = None):
+        super().__init__(message)
+        self._response = response
+
+    @property
+    def response(self) -> object:
+        """The part of snapd's response the library could not read, if any.
+
+        Typically a string for a response that wasn't valid JSON, or the decoded JSON value
+        for one that was well-formed but not what the library expected. ``None`` when the
+        message says all there is to say, as for an unexpected redirect.
+        """
+        return self._response
+
+    def __repr__(self) -> str:
+        return (
+            f'{type(self).__module__}.{type(self).__name__}('
+            f'{self.message!r}, response={self._response!r})'
+        )
 
 
 class ConnectionError(Error, _builtins.ConnectionError):  # noqa: A001 (shadowing a Python builtin)

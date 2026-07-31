@@ -278,21 +278,37 @@ class TestErrorResponses:
         assert str(exc_info.value) == 'no channel'
 
     @pytest.mark.parametrize(
-        ('response', 'message_fragment'),
+        ('response', 'message_fragment', 'expected_response'),
         [
-            (b'not json at all', 'Invalid JSON'),
-            (b'[1, 2, 3]', 'Unexpected response type'),
-            ({'status-code': 200, 'result': {}}, 'Missing expected key'),  # No 'type' key.
-            ({'type': 'sync', 'status-code': 200}, 'Missing expected key'),  # No 'result' key.
+            # Undecodable JSON is reported as the text snapd sent, decoded as best we can.
+            (b'not json at all', 'Invalid JSON', 'not json at all'),
+            # Well-formed JSON of the wrong shape is reported as the decoded value.
+            (b'[1, 2, 3]', 'Unexpected response type', [1, 2, 3]),
+            (
+                {'status-code': 200, 'result': {}},  # No 'type' key.
+                'Missing expected key',
+                {'status-code': 200, 'result': {}},
+            ),
+            (
+                {'type': 'sync', 'status-code': 200},  # No 'result' key.
+                'Missing expected key',
+                {'type': 'sync', 'status-code': 200},
+            ),
         ],
     )
     def test_malformed_response_raises_bad_response_error(
-        self, mock_raw: MagicMock, response: bytes | dict[str, Any], message_fragment: str
+        self,
+        mock_raw: MagicMock,
+        response: bytes | dict[str, Any],
+        message_fragment: str,
+        expected_response: object,
     ):
         mock_raw.return_value = _fake_response(response)
         with pytest.raises(BadResponseError) as exc_info:
             _client.get('/v2/snaps/hello-world')
         assert message_fragment in exc_info.value.message
+        # What snapd sent is kept for the caller to report to the library maintainers.
+        assert exc_info.value.response == expected_response
 
     @pytest.mark.parametrize('status', [200, 400, 404, 500])
     def test_non_redirect_status_is_decoded_from_the_body(
@@ -328,6 +344,8 @@ class TestErrorResponses:
         assert '/v2/snaps//conf' in exc_info.value.message  # The path we asked for.
         assert '/v2/snaps/conf' in exc_info.value.message  # Where snapd points us.
         assert '301' in exc_info.value.message  # The kind of redirect it is.
+        # The 301's body is empty, and the message already says everything there is to say.
+        assert exc_info.value.response is None
 
     def test_request_timeout_raises_snap_timeout_error(self, monkeypatch: pytest.MonkeyPatch):
         # Patch opener.open inside _request to raise TimeoutError, exercising the conversion.
@@ -522,6 +540,7 @@ class TestAsyncChange:
         with pytest.raises(BadResponseError) as exc_info:
             _client.post('/v2/snaps/hello-world', body={'action': 'hold'})
         assert 'Unexpected response type' in exc_info.value.message
+        assert exc_info.value.response == []
 
     @pytest.mark.parametrize('status', ['Undo', 'Undoing'])
     def test_async_undo_statuses_continue_polling(self, mock_raw: MagicMock, status: str):
@@ -607,8 +626,7 @@ class TestLogsEndpoint:
             _client.get_logs(query={'n': 10, 'names': 'lxd'})
         assert 'Invalid JSON' in exc_info.value.message
         assert 'some-path' in exc_info.value.message
-        # BadResponseError has no 'value' field, so the message carries what snapd sent.
-        assert 'some-bytes' in exc_info.value.message
+        assert exc_info.value.response == 'some-bytes'
 
 
 def test_all_errors_mapped():

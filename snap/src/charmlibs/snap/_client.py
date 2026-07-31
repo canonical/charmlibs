@@ -190,13 +190,14 @@ def _decode(response: http.client.HTTPResponse) -> object | _Change:
     try:
         response_dict: dict[str, Any] = json.loads(response_bytes)
     except json.JSONDecodeError as e:
-        body = _errors._truncated(response_bytes.decode(errors='replace'))
         raise _errors.BadResponseError(
-            message=f'Invalid JSON in response for path {_get_path(response)!r}: {e}: {body!r}'
+            message=f'Invalid JSON in response for path {_get_path(response)!r}: {e}',
+            response=response_bytes.decode(errors='replace'),
         ) from None
     if not isinstance(response_dict, dict):  # pyright: ignore[reportUnnecessaryIsInstance]
         raise _errors.BadResponseError(
             message=f"Unexpected response type {type(response_dict).__name__!r} for path {_get_path(response)!r}, expected a 'dict'",  # noqa: E501
+            response=response_dict,
         )
     try:
         match response_dict['type']:
@@ -207,10 +208,9 @@ def _decode(response: http.client.HTTPResponse) -> object | _Change:
             case _:
                 return response_dict['result']
     except KeyError as e:
-        body = _errors._truncated(response_dict)
         raise _errors.BadResponseError(
-            message=f'Missing expected key {e} in response for path '
-            f'{_get_path(response)!r}: {body}'
+            message=f'Missing expected key {e} in response for path {_get_path(response)!r}',
+            response=response_dict,
         ) from None
 
 
@@ -228,9 +228,9 @@ def _decode_logs(response: http.client.HTTPResponse) -> list[dict[str, str]]:
             if (s := line.decode().strip())
         ]
     except json.JSONDecodeError as e:
-        body = _errors._truncated(response_bytes.decode(errors='replace'))
         raise _errors.BadResponseError(
-            message=f'Invalid JSON in response for path {_get_path(response)!r}: {e}: {body!r}'
+            message=f'Invalid JSON in response for path {_get_path(response)!r}: {e}',
+            response=response_bytes.decode(errors='replace'),
         ) from None
     # Error responses are a single JSON object, which we wrapped in a list when decoding.
     if len(logs) == 1 and logs[0].get('type') == 'error':
@@ -351,5 +351,6 @@ class _Change:
         if not isinstance(result, dict):
             raise _errors.BadResponseError(
                 message=f'Unexpected response type {type(result).__name__} while waiting for change {self._id}',  # noqa: E501
+                response=result,
             )
         return typing.cast('dict[str, Any]', result)

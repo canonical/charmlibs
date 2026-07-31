@@ -285,6 +285,7 @@ def test_redirect_raises_bad_response_error(path: str, location: str):
     assert path in ctx.value.message  # The path we asked for.
     assert location in ctx.value.message  # Where snapd points us.
     assert 'Invalid JSON' not in ctx.value.message
+    assert ctx.value.response is None  # snapd sends an empty body with the redirect.
 
 
 def test_percent_encoded_separator_still_reaches_another_endpoint():
