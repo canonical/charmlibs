@@ -22,8 +22,6 @@ import re
 import typing
 from typing import Any
 
-import pytest
-
 from charmlibs.snap import _client, _snapd_logs, _utils
 from charmlibs.snap import _snapd_snaps as _snapd
 from conftest import ensure_installed_local
@@ -124,8 +122,7 @@ def test_log_timestamp_format():
     ensure_installed_local(_SERVICE_SNAP)
     result = _client.get_logs(query={'n': 5})
     entries = typing.cast('list[dict[str, Any]]', result)
-    if not entries:
-        pytest.skip('snapd reported no log entries to check the timestamp format of')
+    assert entries
     for entry in entries:
         parsed = _assert_parses(entry['timestamp'])
         assert parsed < datetime.datetime.now(tz=datetime.timezone.utc)
