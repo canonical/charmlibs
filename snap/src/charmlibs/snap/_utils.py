@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import datetime
 import re
+import sys
 import typing
 import urllib.parse
 
@@ -127,30 +128,48 @@ def resolve_channel(channel: str, tracking: str) -> str:
     return normalize_channel(channel)
 
 
-# Snapd marshals timestamps with Go's RFC3339Nano layout, which drops trailing zeros from the
-# fractional seconds -- so the fraction is 0 to 9 digits long -- and writes the timezone as 'Z'
-# when snapd's clock is UTC and as an offset such as '+13:00' when it isn't. Which of those two
-# forms a charm sees is decided by the machine's timezone, not by the Ubuntu base or the snapd
-# version (pinned by tests/functional/test_timestamps.py).
-_TIMESTAMP = re.compile(
-    r'(?P<datetime>\d{4}-\d{2}-\d{2}[Tt ]\d{2}:\d{2}:\d{2})'
-    r'(?:\.(?P<fraction>\d+))?'
-    r'(?P<timezone>[Zz]|[+-]\d{2}:\d{2})?'
-)
-
-
 def parse_timestamp(timestamp: str) -> datetime.datetime:
     """Parse a snapd timestamp string to a datetime object.
 
-    The timestamp is normalized before being handed to ``datetime.fromisoformat``, rather than
-    passed to it as-is, so that every supported Python parses snapd's timestamps identically.
-    On Python 3.10, ``fromisoformat`` rejects both the ``Z`` suffix and any fractional part that
-    isn't exactly 3 or 6 digits long, and snapd emits both.
-
-    Raises ValueError if the timestamp isn't in the format snapd sends, matching what
-    ``fromisoformat`` raises for a string it can't parse.
+    Raises ValueError for a string that can't be parsed, as ``datetime.fromisoformat`` does.
     """
-    match = _TIMESTAMP.fullmatch(timestamp)
+    if sys.version_info >= (3, 11):
+        return datetime.datetime.fromisoformat(timestamp)
+    return _parse_timestamp_310(timestamp)
+
+
+# Snapd marshals timestamps with Go's RFC3339Nano layout, which drops trailing zeros from the
+# fractional seconds -- so the fraction is 0 to 9 digits long, down to no fraction at all -- and
+# writes the timezone as 'Z' when snapd's clock is UTC and as an offset such as '+13:00' when it
+# isn't. Which of those two forms a charm sees is decided by the timezone of the machine snapd
+# runs on, not by the Ubuntu base or the snapd version (pinned by
+# tests/functional/test_timestamps.py).
+#
+# The date and time separator and the timezone are matched as fromisoformat matches them, which
+# is to say case sensitively: it rejects a lowercase 't' or 'z' on every version we support.
+_TIMESTAMP_310 = re.compile(
+    r'(?P<datetime>\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2})'
+    r'(?:\.(?P<fraction>\d+))?'
+    r'(?P<timezone>Z|[+-]\d{2}:\d{2})?'
+)
+
+
+def _parse_timestamp_310(timestamp: str) -> datetime.datetime:
+    """Parse the timestamps snapd sends on Python 3.10, where fromisoformat can't read them.
+
+    Python 3.10's ``fromisoformat`` rejects the ``Z`` suffix outright, and accepts a fractional
+    part only when it's exactly 3 or 6 digits long. Snapd sends ``Z``, and sends fractions of
+    every length from 0 to 9 digits, so the timestamp is normalized to a form 3.10 does read
+    rather than parsed by hand -- leaving the arithmetic, and the timezone, to the stdlib.
+
+    Delete this, and the branch in :func:`parse_timestamp`, once we require Python 3.11+.
+
+    This accepts what snapd sends, which is narrower than what ``fromisoformat`` accepts on
+    3.11+: a bare date, an offset without minutes, or the basic format with no separators is a
+    ValueError here and a datetime there. Snapd sends none of those, and the unit tests assert
+    that both paths agree on every form it does send.
+    """
+    match = _TIMESTAMP_310.fullmatch(timestamp)
     if match is None:
         raise ValueError(f'Invalid isoformat string: {timestamp!r}')
     # datetime supports microseconds only, so a longer fraction is truncated and a shorter one
@@ -158,10 +177,10 @@ def parse_timestamp(timestamp: str) -> datetime.datetime:
     # a fraction it accepts on 3.11+, so the two agree on the timestamps snapd sends.
     fraction = match['fraction']
     subsecond = '' if fraction is None else f'.{fraction[:6].ljust(6, "0")}'
-    # fromisoformat only learned to read 'Z' in 3.11, but has always read the offset it stands
-    # for. A timestamp with no timezone at all stays naive, as fromisoformat would leave it.
+    # 3.10's fromisoformat has always read the offset that 'Z' stands for, just not 'Z' itself.
+    # A timestamp with no timezone at all stays naive, as fromisoformat would leave it.
     timezone = match['timezone']
-    offset = '' if timezone is None else '+00:00' if timezone.upper() == 'Z' else timezone
+    offset = '' if timezone is None else '+00:00' if timezone == 'Z' else timezone
     return datetime.datetime.fromisoformat(f'{match["datetime"]}{subsecond}{offset}')
 
 
