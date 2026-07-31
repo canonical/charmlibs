@@ -85,7 +85,9 @@ def ensure_removed(*snaps: str) -> None:
 
 def ensure_installed(*snaps: str, channel: str | None = None, classic: bool = False) -> None:
     for snap_name in snaps:
-        retry_on_rate_limit(snap.ensure)(snap_name, channel=channel, classic=classic, update=False)
+        retry_on_rate_limit(snap.ensure_installed)(
+            snap_name, channel=channel, classic=classic, update=False
+        )
 
 
 # Test helper for the parts of `snap list` the library deliberately doesn't implement: listing

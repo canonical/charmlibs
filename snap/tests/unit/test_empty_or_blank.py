@@ -29,7 +29,7 @@ _CALLS: dict[str, Callable[[str], object]] = {
     'alias': lambda v: snap.alias(v, 'lxc', 'testlxc'),
     'alias (app)': lambda v: snap.alias('lxd', v, 'testlxc'),
     'alias (alias)': lambda v: snap.alias('lxd', 'lxc', v),
-    'ensure': lambda v: snap.ensure(v),
+    'ensure_installed': lambda v: snap.ensure_installed(v),
     'get': lambda v: snap.get(v),
     'get (key)': lambda v: snap.get('lxd', [v]),
     'get_one': lambda v: snap.get_one(v, 'mykey'),
@@ -162,10 +162,10 @@ _MAX_FRAMES = 3
 # reach first does it. That puts the check one or more frames deeper than the rule above
 # allows, which is the price of not duplicating the check in a layer that doesn't own it.
 #
-# ensure leaves the deepest traceback in the library -- ensure, its _installed_info probe,
-# list_one, snap_path_segment and the check. get_one delegates to get, which validates both
-# the snap name and the key before making a request.
-_COMPOSITE_FUNCTIONS = {'ensure', 'get_one'}
+# ensure_installed leaves the deepest traceback in the library -- ensure_installed, its
+# _installed_info probe, list_one, snap_path_segment and the check. get_one delegates to get,
+# which validates both the snap name and the key before making a request.
+_COMPOSITE_FUNCTIONS = {'ensure_installed', 'get_one'}
 
 
 @pytest.mark.parametrize('name', sorted(_CALLS) + sorted(_BLANK_ONLY_CALLS))

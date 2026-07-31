@@ -371,7 +371,8 @@ def test_refresh_channel_and_revision():
 
 def test_refresh_revision_already_installed_still_refreshes():
     # Snapd runs a full refresh when a revision is specified, even if that revision is already
-    # installed, so refresh reports that it did something. ensure() relies on knowing this.
+    # installed, so refresh reports that it did something. ensure_installed() relies on knowing
+    # this.
     ensure_installed(_SNAP)
     current = _snapd.list_one(_SNAP).revision
     result = retry_on_rate_limit(_snapd.refresh)(_SNAP, revision=current)
