@@ -142,8 +142,9 @@ def list_one(snap: str) -> InstalledInfo:
         An :class:`InstalledInfo` object with information about the snap.
 
     Raises:
-        ValueError: if the snap name is empty or is not a single path segment.
+        ValueError: if the snap name is empty, blank, or is not a single path segment.
         NotInstalledError: if the snap is not installed.
+        BadResponseError: if snapd's description of the snap isn't one we can read.
         Error: (or a subtype) if the information could not be retrieved for another reason.
     """
     try:
@@ -151,9 +152,23 @@ def list_one(snap: str) -> InstalledInfo:
     except _errors._NotFoundError as e:
         # snap-not-found -> NotInstalledError: This queries local state only.
         raise _errors.NotInstalledError._from(e) from None
-    assert isinstance(info_dict, dict)
+    if not isinstance(info_dict, dict):
+        raise _errors.BadResponseError(
+            message=f'Unexpected response type {type(info_dict).__name__!r} for snap {snap!r}, expected a "dict"',  # noqa: E501
+            kind='charmlibs-snap',
+            value=str(info_dict),
+        )
     info_dict = typing.cast('dict[str, str]', info_dict)
-    return InstalledInfo._from_dict(info_dict)
+    try:
+        return InstalledInfo._from_dict(info_dict)
+    except (KeyError, TypeError, ValueError) as e:
+        # A field we require is missing, or holds something we can't parse. Reported rather than
+        # asserted, so that the documented contract -- every failure is an Error -- holds here too.
+        raise _errors.BadResponseError(
+            message=f"Could not read snapd's description of snap {snap!r}: {e!r}",
+            kind='charmlibs-snap',
+            value=str(info_dict),
+        ) from None
 
 
 def install(
@@ -189,7 +204,7 @@ def install(
         at all.
 
     Raises:
-        ValueError: if the snap name is empty or is not a single path segment.
+        ValueError: if the snap name is empty, blank, or is not a single path segment.
         NotInStoreError: if the store has no snap by that name.
         RevisionNotAvailableError: if the specified revision is not available on any channel.
         ChannelNotAvailableError: if the specified channel is not available, or if the specified
@@ -238,7 +253,7 @@ def remove(snap: str, *, purge: bool = False) -> object:
         Not guaranteed to be an actual :class:`bool`.
 
     Raises:
-        ValueError: if the snap name is empty or is not a single path segment.
+        ValueError: if the snap name is empty, blank, or is not a single path segment.
         ChangeError: if the removal fails after starting (for example, a remove hook errors).
         Error: (or a subtype) if the snap could not be removed as requested.
     """
@@ -286,7 +301,7 @@ def refresh(
         revision is specified, even if that revision is already installed.
 
     Raises:
-        ValueError: if the snap name is empty or is not a single path segment.
+        ValueError: if the snap name is empty, blank, or is not a single path segment.
         NotInstalledError: if the snap is not installed.
         NotInStoreError: if the snap is installed but the store no longer offers it.
         RevisionNotAvailableError: if the specified revision is not available on any channel.
@@ -335,7 +350,7 @@ def hold(snap: str, duration: datetime.timedelta | int | float | None = None) ->
             (default), the snap is held indefinitely.
 
     Raises:
-        ValueError: if the snap name is empty or is not a single path segment.
+        ValueError: if the snap name is empty, blank, or is not a single path segment.
         NotInstalledError: If the snap is not installed.
         ChangeError: If the hold change fails after starting.
     """
@@ -368,7 +383,7 @@ def unhold(snap: str) -> None:
         snap: The name of the snap to unhold.
 
     Raises:
-        ValueError: if the snap name is empty or is not a single path segment.
+        ValueError: if the snap name is empty, blank, or is not a single path segment.
         ChangeError: If the unhold change fails after starting.
     """
     # NOTE: Neither the API nor CLI error if the snap isn't installed or held.
