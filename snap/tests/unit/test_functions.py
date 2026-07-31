@@ -65,10 +65,10 @@ class TestGetInfo:
         assert result is None
 
 
-class TestEnsureInstalls:
+class TestEnsureInstalledInstalls:
     def test_not_installed(self, mock_snapd: MockSnapd):
         mock_snapd.list_one.return_value = None
-        result = _functions.ensure('hello-world')
+        result = _functions.ensure_installed('hello-world')
         mock_snapd.install.assert_called_once_with(
             'hello-world', channel=None, revision=None, classic=False
         )
@@ -76,14 +76,14 @@ class TestEnsureInstalls:
 
     def test_not_installed_channel(self, mock_snapd: MockSnapd):
         mock_snapd.list_one.return_value = None
-        _functions.ensure('hello-world', channel='edge')
+        _functions.ensure_installed('hello-world', channel='edge')
         mock_snapd.install.assert_called_once_with(
             'hello-world', channel='edge', revision=None, classic=False
         )
 
     def test_not_installed_revision(self, mock_snapd: MockSnapd):
         mock_snapd.list_one.return_value = None
-        result = _functions.ensure('hello-world', revision=5)
+        result = _functions.ensure_installed('hello-world', revision=5)
         mock_snapd.install.assert_called_once_with(
             'hello-world', channel=None, revision=5, classic=False
         )
@@ -91,23 +91,23 @@ class TestEnsureInstalls:
 
     def test_not_installed_channel_and_revision(self, mock_snapd: MockSnapd):
         mock_snapd.list_one.return_value = None
-        _functions.ensure('hello-world', channel='edge', revision=5)
+        _functions.ensure_installed('hello-world', channel='edge', revision=5)
         mock_snapd.install.assert_called_once_with(
             'hello-world', channel='edge', revision=5, classic=False
         )
 
     def test_not_installed_classic(self, mock_snapd: MockSnapd):
         mock_snapd.list_one.return_value = None
-        _functions.ensure('hello-world', classic=True)
+        _functions.ensure_installed('hello-world', classic=True)
         mock_snapd.install.assert_called_once_with(
             'hello-world', channel=None, revision=None, classic=True
         )
 
 
-class TestEnsureChannel:
+class TestEnsureInstalledChannel:
     def test_installed_different_channel(self, mock_snapd: MockSnapd):
         mock_snapd.list_one.return_value = make_info(tracking='latest/stable')
-        result = _functions.ensure('hello-world', channel='edge')
+        result = _functions.ensure_installed('hello-world', channel='edge')
         mock_snapd.refresh.assert_called_once_with(
             'hello-world', channel='edge', revision=None, classic=False
         )
@@ -116,7 +116,7 @@ class TestEnsureChannel:
     def test_installed_same_channel_update_true(self, mock_snapd: MockSnapd):
         mock_snapd.list_one.return_value = make_info(tracking='latest/stable')
         mock_snapd.refresh.return_value = True
-        result = _functions.ensure('hello-world', channel='latest/stable')
+        result = _functions.ensure_installed('hello-world', channel='latest/stable')
         mock_snapd.refresh.assert_called_once_with(
             'hello-world', channel='latest/stable', classic=False
         )
@@ -124,19 +124,19 @@ class TestEnsureChannel:
 
     def test_installed_same_channel_update_false(self, mock_snapd: MockSnapd):
         mock_snapd.list_one.return_value = make_info(tracking='latest/stable')
-        result = _functions.ensure('hello-world', channel='latest/stable', update=False)
+        result = _functions.ensure_installed('hello-world', channel='latest/stable', update=False)
         mock_snapd.refresh.assert_not_called()
         assert result is False
 
     def test_installed_no_channel_update_false(self, mock_snapd: MockSnapd):
         mock_snapd.list_one.return_value = make_info()
-        result = _functions.ensure('hello-world', update=False)
+        result = _functions.ensure_installed('hello-world', update=False)
         mock_snapd.refresh.assert_not_called()
         assert result is False
 
     def test_installed_normalized_channel(self, mock_snapd: MockSnapd):
         mock_snapd.list_one.return_value = make_info(tracking='latest/stable')
-        result = _functions.ensure('hello-world', channel='stable', update=False)
+        result = _functions.ensure_installed('hello-world', channel='stable', update=False)
         mock_snapd.refresh.assert_not_called()
         assert result is False
 
@@ -144,13 +144,13 @@ class TestEnsureChannel:
         # 'edge' resolves to '3.6/edge' for a snap on the 3.6 track, not to 'latest/edge',
         # so a snap already on '3.6/edge' is left alone rather than refreshed every call.
         mock_snapd.list_one.return_value = make_info(tracking='3.6/edge')
-        result = _functions.ensure('hello-world', channel='edge', update=False)
+        result = _functions.ensure_installed('hello-world', channel='edge', update=False)
         mock_snapd.refresh.assert_not_called()
         assert result is False
 
     def test_risk_only_channel_inherits_track_when_different(self, mock_snapd: MockSnapd):
         mock_snapd.list_one.return_value = make_info(tracking='3.6/stable')
-        result = _functions.ensure('hello-world', channel='edge')
+        result = _functions.ensure_installed('hello-world', channel='edge')
         mock_snapd.refresh.assert_called_once_with(
             'hello-world', channel='edge', revision=None, classic=False
         )
@@ -159,35 +159,35 @@ class TestEnsureChannel:
     def test_no_updates_available_returns_false(self, mock_snapd: MockSnapd):
         mock_snapd.list_one.return_value = make_info(tracking='latest/stable')
         mock_snapd.refresh.return_value = False
-        result = _functions.ensure('hello-world', channel='latest/stable')
+        result = _functions.ensure_installed('hello-world', channel='latest/stable')
         assert result is False
 
     def test_empty_channel_treated_as_none(self, mock_snapd: MockSnapd):
         # channel='' is falsy, so it's treated the same as channel=None:
         # no channel-mismatch refresh, and with update=False no refresh at all.
         mock_snapd.list_one.return_value = make_info(tracking='latest/stable')
-        result = _functions.ensure('hello-world', channel='', update=False)
+        result = _functions.ensure_installed('hello-world', channel='', update=False)
         mock_snapd.refresh.assert_not_called()
         assert result is False
 
 
-class TestEnsureRevision:
+class TestEnsureInstalledRevision:
     def test_installed_same_revision(self, mock_snapd: MockSnapd):
         mock_snapd.list_one.return_value = make_info(revision=5)
-        result = _functions.ensure('hello-world', revision=5)
+        result = _functions.ensure_installed('hello-world', revision=5)
         mock_snapd.refresh.assert_not_called()
         assert result is False
 
     @pytest.mark.parametrize('revision', [5, '5'])
     def test_revision_may_be_int_or_str(self, mock_snapd: MockSnapd, revision: int | str):
         mock_snapd.list_one.return_value = make_info(revision=5)
-        result = _functions.ensure('hello-world', revision=revision)
+        result = _functions.ensure_installed('hello-world', revision=revision)
         mock_snapd.refresh.assert_not_called()
         assert result is False
 
     def test_installed_different_revision(self, mock_snapd: MockSnapd):
         mock_snapd.list_one.return_value = make_info(revision=5)
-        result = _functions.ensure('hello-world', revision=6)
+        result = _functions.ensure_installed('hello-world', revision=6)
         mock_snapd.refresh.assert_called_once_with(
             'hello-world', channel=None, revision=6, classic=False
         )
@@ -197,7 +197,7 @@ class TestEnsureRevision:
         # The revision is already installed, but the snap tracks the wrong channel, so it
         # still needs a refresh -- snapd moves the tracking channel without changing revision.
         mock_snapd.list_one.return_value = make_info(tracking='latest/stable', revision=5)
-        result = _functions.ensure('hello-world', channel='edge', revision=5)
+        result = _functions.ensure_installed('hello-world', channel='edge', revision=5)
         mock_snapd.refresh.assert_called_once_with(
             'hello-world', channel='edge', revision=5, classic=False
         )
@@ -207,18 +207,20 @@ class TestEnsureRevision:
     def test_update_ignored_when_revision_matches(self, mock_snapd: MockSnapd, update: bool):
         # A revision fully specifies what to install, so there's nothing to update to.
         mock_snapd.list_one.return_value = make_info(tracking='latest/stable', revision=5)
-        result = _functions.ensure('hello-world', channel='stable', revision=5, update=update)
+        result = _functions.ensure_installed(
+            'hello-world', channel='stable', revision=5, update=update
+        )
         mock_snapd.refresh.assert_not_called()
         assert result is False
 
 
-class TestEnsureClassic:
+class TestEnsureInstalledClassic:
     def test_classic_passed_to_refresh(self, mock_snapd: MockSnapd):
         mock_snapd.list_one.return_value = make_info(tracking='latest/stable')
-        _functions.ensure('hello-world', channel='edge', classic=True)
+        _functions.ensure_installed('hello-world', channel='edge', classic=True)
         assert mock_snapd.refresh.call_args.kwargs['classic'] is True
 
     def test_classic_passed_to_update_refresh(self, mock_snapd: MockSnapd):
         mock_snapd.list_one.return_value = make_info(tracking='latest/stable')
-        _functions.ensure('hello-world', channel='latest/stable', classic=True)
+        _functions.ensure_installed('hello-world', channel='latest/stable', classic=True)
         assert mock_snapd.refresh.call_args.kwargs['classic'] is True

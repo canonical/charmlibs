@@ -36,7 +36,7 @@ EXCLUDE = {'alias', 'unalias', 'unhold'}
 CALLS: dict[str, Callable[[], object]] = {
     'connect': lambda: snap.connect(('lxd', 'home')),
     'disconnect': lambda: snap.disconnect(('lxd', 'home')),
-    'ensure': lambda: snap.ensure('lxd'),
+    'ensure_installed': lambda: snap.ensure_installed('lxd'),
     'get': lambda: snap.get('lxd'),
     'get_one': lambda: snap.get_one('lxd', 'mykey'),
     'hold': lambda: snap.hold('lxd'),
@@ -52,7 +52,7 @@ CALLS: dict[str, Callable[[], object]] = {
     'unset': lambda: snap.unset('lxd', ['mykey']),
 }
 DOES_NOT_RAISE = {'remove'}  # catches _NotFoundError but doesn't raise
-RAISES_NOT_IN_STORE = {'ensure', 'install'}
+RAISES_NOT_IN_STORE = {'ensure_installed', 'install'}
 
 
 def _mock_error(mock_client: MockClient) -> _NotFoundError:
@@ -103,10 +103,10 @@ def test_does_not_raise(name: str, mock_client: MockClient):
     CALLS[name]()  # Does not raise.
 
 
-def test_ensure_also_raises_not_in_store_error(
+def test_refresh_also_raises_not_in_store_error(
     monkeypatch: pytest.MonkeyPatch, mock_client: MockClient
 ):
-    """Ensure raises NotInstalledError if both the refresh and the check_installed probe fail.
+    """Refresh raises NotInstalledError if both the refresh and the check_installed probe fail.
 
     If the refresh fails with _NotFoundError but check_installed succeeds,
     then we raise NotInStoreError instead.

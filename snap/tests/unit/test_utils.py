@@ -375,7 +375,7 @@ class TestResolveChannel:
 
     @pytest.mark.parametrize('channel', ['stable', 'candidate', 'beta', 'edge'])
     def test_resolving_the_tracked_channel_is_a_no_op(self, channel: str):
-        # ensure() relies on this to tell whether a requested channel is the one already
+        # ensure_installed() relies on this to tell whether a requested channel is the one
         # tracked, so resolving a snap's own channel must give that channel back unchanged.
         for track in ('latest', '3.6'):
             tracking = f'{track}/{channel}'

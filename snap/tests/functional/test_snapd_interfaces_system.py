@@ -32,7 +32,7 @@ from charmlibs import snap
 from charmlibs.snap import _client, _errors, _snapd_interfaces
 from conftest import (
     SNAPS_DIR,
-    ensure_installed,
+    ensure_installed_store,
     ensure_removed,
     install_local,
     remove_core_blockers,
@@ -70,9 +70,9 @@ def core_snap(request: pytest.FixtureRequest) -> Iterator[str]:
         remove_core_blockers()
         snap.remove('core')  # Errors loudly if an unmanaged snap still depends on core.
         yield request.param
-        ensure_installed('core')
+        ensure_installed_store('core')
     else:
-        ensure_installed('core')  # A no-op if already installed.
+        ensure_installed_store('core')  # A no-op if already installed.
         yield request.param
 
 

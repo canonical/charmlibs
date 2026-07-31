@@ -18,7 +18,13 @@ import pytest
 
 from charmlibs.snap import _client, _errors
 from charmlibs.snap import _snapd_snaps as _snapd
-from conftest import _list, ensure_installed, ensure_removed, list_channels, retry_on_rate_limit
+from conftest import (
+    _list,
+    ensure_installed_store,
+    ensure_removed,
+    list_channels,
+    retry_on_rate_limit,
+)
 
 # Snapd's own test snap, used for everything that needs real store semantics. Its two open
 # channels on the latest track carry *different* revisions (stable is newer than edge), so a
@@ -50,7 +56,7 @@ _ABSENT_SNAP = 'this-snap-does-not-exist-xyz-abc-123'
 
 
 def test_list_one_installed():
-    ensure_installed(_SNAP)
+    ensure_installed_store(_SNAP)
     info = _snapd.list_one(_SNAP)
     assert info.name == _SNAP
     assert info.tracking
@@ -62,20 +68,20 @@ def test_list_one_installed():
 
 
 def test_list_one_fields():
-    ensure_installed(_SNAP)
+    ensure_installed_store(_SNAP)
     info = _snapd.list_one(_SNAP)
     assert info.classic is False
     assert info.hold is None
 
 
 def test_install_already_installed_returns_false():
-    ensure_installed(_SNAP)
+    ensure_installed_store(_SNAP)
     result = _snapd.install(_SNAP)
     assert result is False
 
 
 def test_refresh_no_updates_returns_false():
-    ensure_installed(_SNAP, channel=_CHANNEL)
+    ensure_installed_store(_SNAP, channel=_CHANNEL)
     result = retry_on_rate_limit(_snapd.refresh)(_SNAP, channel=_CHANNEL)
     assert result is False
     assert _snapd.list_one(_SNAP).tracking == _CHANNEL
@@ -86,7 +92,7 @@ def test_refresh_channel():
     # revision, since the two channels hold different revisions. Asserting the revision as
     # well as the tracking is the point: a refresh that updated only the tracking would be
     # indistinguishable from a correct one if both channels held the same revision.
-    ensure_installed(_SNAP, channel=_CHANNEL)
+    ensure_installed_store(_SNAP, channel=_CHANNEL)
     channels = list_channels(_SNAP)
     assert channels[_CHANNEL].revision != channels[_ALT_CHANNEL].revision
     retry_on_rate_limit(_snapd.refresh)(_SNAP, channel=_ALT_CHANNEL)
@@ -96,21 +102,21 @@ def test_refresh_channel():
 
 
 def test_refresh_invalid_channel_raises():
-    ensure_installed(_SNAP)
+    ensure_installed_store(_SNAP)
     with pytest.raises(_errors.ChannelNotAvailableError) as ctx:
         retry_on_rate_limit(_snapd.refresh)(_SNAP, channel='garbage')
     assert ctx.value.kind == 'snap-channel-not-available'
 
 
 def test_refresh_revision_not_available_raises():
-    ensure_installed(_SNAP)
+    ensure_installed_store(_SNAP)
     with pytest.raises(_errors.RevisionNotAvailableError) as ctx:
         retry_on_rate_limit(_snapd.refresh)(_SNAP, revision=99999999)
     assert ctx.value.kind == 'snap-revision-not-available'
 
 
 def test_hold_with_duration():
-    ensure_installed(_SNAP)
+    ensure_installed_store(_SNAP)
     try:
         _snapd.hold(_SNAP, duration=datetime.timedelta(days=2))
         info = _snapd.list_one(_SNAP)
@@ -121,7 +127,7 @@ def test_hold_with_duration():
 
 
 def test_hold_forever():
-    ensure_installed(_SNAP)
+    ensure_installed_store(_SNAP)
     try:
         _snapd.hold(_SNAP)
         info = _snapd.list_one(_SNAP)
@@ -133,7 +139,7 @@ def test_hold_forever():
 
 def test_hold_already_held_no_error():
     # Holding an already-held snap is idempotent — no error is raised.
-    ensure_installed(_SNAP)
+    ensure_installed_store(_SNAP)
     try:
         _snapd.hold(_SNAP)
         _snapd.hold(_SNAP)  # Second hold should not raise.
@@ -142,7 +148,7 @@ def test_hold_already_held_no_error():
 
 
 def test_unhold():
-    ensure_installed(_SNAP)
+    ensure_installed_store(_SNAP)
     _snapd.hold(_SNAP)
     assert _snapd.list_one(_SNAP).hold is not None
     _snapd.unhold(_SNAP)
@@ -151,7 +157,7 @@ def test_unhold():
 
 def test_remove():
     # Last test in the "installed" block — leaves the snap removed for the next block.
-    ensure_installed(_SNAP)
+    ensure_installed_store(_SNAP)
     _snapd.remove(_SNAP)
     with pytest.raises(_errors.NotInstalledError):
         _snapd.list_one(_SNAP)
@@ -236,11 +242,11 @@ def test_unhold_not_installed_no_error():
 def test_hold_does_not_survive_removal():
     # Why unhold treats an absent snap as nothing to do rather than an error: removing a snap
     # takes its hold with it, so an absent snap cannot be holding back a refresh.
-    ensure_installed(_SNAP)
+    ensure_installed_store(_SNAP)
     _snapd.hold(_SNAP)
     assert _snapd.list_one(_SNAP).hold is not None
     _snapd.remove(_SNAP)
-    ensure_installed(_SNAP)
+    ensure_installed_store(_SNAP)
     assert _snapd.list_one(_SNAP).hold is None
     ensure_removed(_SNAP)
 
@@ -361,7 +367,7 @@ def test_install_revision_not_on_channel_raises():
 
 
 def test_refresh_channel_and_revision():
-    ensure_installed(_SNAP, channel=_CHANNEL)
+    ensure_installed_store(_SNAP, channel=_CHANNEL)
     edge = list_channels(_SNAP)[_ALT_CHANNEL].revision
     retry_on_rate_limit(_snapd.refresh)(_SNAP, channel=_ALT_CHANNEL, revision=edge)
     info = _snapd.list_one(_SNAP)
@@ -371,8 +377,9 @@ def test_refresh_channel_and_revision():
 
 def test_refresh_revision_already_installed_still_refreshes():
     # Snapd runs a full refresh when a revision is specified, even if that revision is already
-    # installed, so refresh reports that it did something. ensure() relies on knowing this.
-    ensure_installed(_SNAP)
+    # installed, so refresh reports that it did something. ensure_installed() relies on knowing
+    # this.
+    ensure_installed_store(_SNAP)
     current = _snapd.list_one(_SNAP).revision
     result = retry_on_rate_limit(_snapd.refresh)(_SNAP, revision=current)
     assert result is True
@@ -409,8 +416,8 @@ def test_refresh_retains_the_previous_revision():
 
 
 def test_list_several_snaps_in_one_request():
-    ensure_installed(_SNAP)
-    ensure_installed(_CLASSIC_SNAP, classic=True)
+    ensure_installed_store(_SNAP)
+    ensure_installed_store(_CLASSIC_SNAP, classic=True)
     listed = {i.name: i for i in _list([_SNAP, _CLASSIC_SNAP])}
     assert set(listed) == {_SNAP, _CLASSIC_SNAP}
     # The collection agrees with the per-snap endpoint list_one reads.
@@ -419,7 +426,7 @@ def test_list_several_snaps_in_one_request():
 
 
 def test_list_bare_name_and_single_element_list_agree():
-    ensure_installed(_SNAP)
+    ensure_installed_store(_SNAP)
     assert [i.name for i in _list(_SNAP)] == [i.name for i in _list([_SNAP])]
 
 
@@ -427,7 +434,7 @@ def test_list_absent_snap_is_filtered_rather_than_an_error():
     # snapd filters instead of failing, so an absent name is simply missing from the result with
     # nothing to distinguish it from one that was never asked for. A plural API would have to
     # reconstruct the error client-side; list_one gets snapd's own, which is the shape we keep.
-    ensure_installed(_SNAP)
+    ensure_installed_store(_SNAP)
     assert [i.name for i in _list([_SNAP, _ABSENT_SNAP])] == [_SNAP]
     assert _list(_ABSENT_SNAP) == []
     with pytest.raises(_errors.NotInstalledError):
@@ -435,7 +442,7 @@ def test_list_absent_snap_is_filtered_rather_than_an_error():
 
 
 def test_list_no_names_lists_nothing_but_none_lists_everything():
-    ensure_installed(_SNAP)
+    ensure_installed_store(_SNAP)
     assert _list([]) == []
     assert _list(None) != []
 
@@ -447,7 +454,7 @@ def test_raw_api_empty_snaps_value_lists_everything():
     # all of them -- the same quirk the conf 'keys' and logs 'names' parameters have.
     #
     # Compared by name: snapd does not return these in a stable order.
-    ensure_installed(_SNAP)
+    ensure_installed_store(_SNAP)
     everything = {i.name for i in _list(None)}
     assert everything
     result = _client.get('/v2/snaps', query={'snaps': ''})

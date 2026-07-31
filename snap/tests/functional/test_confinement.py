@@ -10,7 +10,8 @@ that requires it (``ensureInstallPreconditions`` in snapd's ``overlord/snapstate
 an installed classic snap keeps classic confinement on refresh without the flag, and the flag is
 dropped for a revision that doesn't require it. So confinement follows the revision both ways,
 and no value of ``classic`` changes the confinement of a revision already installed -- which is
-why :func:`charmlibs.snap.ensure` doesn't compare it against a snap's current confinement.
+why :func:`charmlibs.snap.ensure_installed` doesn't compare it against a snap's current
+confinement.
 
 These need one snap name whose revisions differ in confinement, so they use locally-built snaps:
 ``test-conf-snap`` 1.0 is strict, 2.0 and 3.0 are classic. Sideloading reaches the same flag
@@ -91,12 +92,12 @@ def test_flag_is_silently_dropped_for_a_strict_revision():
     assert snap.list_one(_SNAP).classic is False
 
 
-def test_ensure_does_not_refresh_an_installed_snap_to_change_confinement():
+def test_ensure_installed_does_not_refresh_an_installed_snap_to_change_confinement():
     # The library-level consequence: a strict snap that is already on the requested revision is
     # left alone even when classic=True is passed, because a refresh could not make it classic.
     install_local(_STRICT, dangerous=True)
     revision = snap.list_one(_SNAP).revision
-    assert snap.ensure(_SNAP, revision=revision, classic=True) is False
+    assert snap.ensure_installed(_SNAP, revision=revision, classic=True) is False
     info = snap.list_one(_SNAP)
     assert info.revision == revision
     assert info.classic is False

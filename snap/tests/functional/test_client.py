@@ -20,8 +20,8 @@ import pytest
 
 from charmlibs.snap import _client, _errors
 from conftest import (
-    ensure_installed,
     ensure_installed_local,
+    ensure_installed_store,
     ensure_removed,
     retry_on_rate_limit,
 )
@@ -51,21 +51,21 @@ _ABSENT_SNAP = 'this-snap-does-not-exist-xyz-abc-123'
 
 def test_get_returns_dict():
     # A sync GET for a snap returns a dict result.
-    ensure_installed(_STORE_SNAP)
+    ensure_installed_store(_STORE_SNAP)
     result = _client.get(f'/v2/snaps/{_STORE_SNAP}')
     assert isinstance(result, dict)
     assert result['name'] == _STORE_SNAP
 
 
 def test_post_sync_error_snap_already_installed():
-    ensure_installed(_STORE_SNAP)
+    ensure_installed_store(_STORE_SNAP)
     with pytest.raises(_errors._AlreadyInstalledError) as ctx:
         _client.post(f'/v2/snaps/{_STORE_SNAP}', body={'action': 'install'})
     assert ctx.value.kind == 'snap-already-installed'
 
 
 def test_post_sync_error_app_not_found():
-    ensure_installed(_STORE_SNAP)
+    ensure_installed_store(_STORE_SNAP)
     with pytest.raises(_errors.AppNotFoundError) as ctx:
         _client.post(
             '/v2/apps', body={'action': 'start', 'names': [f'{_STORE_SNAP}.nonexistentservice']}
@@ -75,7 +75,7 @@ def test_post_sync_error_app_not_found():
 
 def test_post_sync_error_no_kind():
     # An invalid action returns an error with no 'kind'.
-    ensure_installed(_STORE_SNAP)
+    ensure_installed_store(_STORE_SNAP)
     with pytest.raises(_errors.Error) as ctx:
         _client.post(f'/v2/snaps/{_STORE_SNAP}', body={'action': 'invalid-action'})
     assert not ctx.value.kind
@@ -84,7 +84,7 @@ def test_post_sync_error_no_kind():
 
 def test_post_snap_no_update_available():
     # snap-no-update-available is raised (not suppressed) at the _client level.
-    ensure_installed(_STORE_SNAP, channel='latest/stable')
+    ensure_installed_store(_STORE_SNAP, channel='latest/stable')
     with pytest.raises(_errors._NoUpdatesAvailableError) as ctx:
         retry_on_rate_limit(_client.post)(
             f'/v2/snaps/{_STORE_SNAP}', body={'action': 'refresh', 'channel': 'latest/stable'}
@@ -95,7 +95,7 @@ def test_post_snap_no_update_available():
 def test_post_waits_for_async_change():
     # POST for an async operation waits until the change completes and does not raise.
     # Last test needing the store snap — leaves it removed.
-    ensure_installed(_STORE_SNAP)
+    ensure_installed_store(_STORE_SNAP)
     _client.post(f'/v2/snaps/{_STORE_SNAP}', body={'action': 'remove'})
     # Verify the snap is actually gone.
     with pytest.raises(_errors._NotFoundError):
