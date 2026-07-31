@@ -35,6 +35,16 @@ from . import _client_sockets, _errors
 
 logger = logging.getLogger(__name__)
 
+# The transport failures that reach us untranslated once a request is on the wire. urllib only
+# wraps failures from opening the connection and sending the request (AbstractHTTPHandler.do_open
+# wraps those in URLError); anything that goes wrong while snapd is answering comes back out of
+# http.client as-is, in two flavours the tests pin down against a real socket:
+# - OSError, when the connection breaks (a ConnectionResetError if snapd aborts, or
+#   http.client.RemoteDisconnected, which subclasses both, if it closes cleanly).
+# - http.client.HTTPException, when the connection delivers something unusable
+#   (http.client.IncompleteRead for a body cut short, which is *not* an OSError).
+_TRANSPORT_ERRORS = (OSError, http.client.HTTPException)
+
 # Defined in the snap application itself under dirs/dirs.go as SnapdSocket.
 _SOCKET_PATH = '/run/snapd.socket'
 # Timeout for a single request.
@@ -143,7 +153,41 @@ def _request(
         headers=headers or {},
         data=data,
     )
-    response = _open(request)
+    opener = urllib.request.OpenerDirector()
+    opener.add_handler(_client_sockets.UnixSocketHandler(_SOCKET_PATH))
+    # We need to handle HTTP errors ourselves, since the response body contains meaningful info,
+    # so we don't add HTTPErrorProcessor or HTTPDefaultErrorHandler, which would raise too early.
+    # Without HTTPErrorProcessor, urllib never dispatches 3xx to HTTPRedirectHandler either.
+    # We don't expect redirects, so we manually convert 3xx responses into errors below.
+    try:
+        response = opener.open(request, timeout=_REQUEST_TIMEOUT)
+    except TimeoutError:
+        raise _errors.TimeoutError(
+            f'Request to snapd timed out after {_REQUEST_TIMEOUT}s: {method} {path}',
+            kind='charmlibs-snap-request-timeout',
+            value='',
+        ) from None
+    except urllib.error.URLError as e:
+        if e.args and isinstance(e.args[0], FileNotFoundError):
+            raise _errors.SocketNotFoundError(
+                f'Could not connect to snapd: socket not found at {_SOCKET_PATH!r}',
+                kind='charmlibs-snap-socket-not-found',
+                value='',
+            ) from None
+        raise _errors.ConnectionError(
+            str(e.reason),
+            kind='charmlibs-snap-connection-error',
+            value='',
+        ) from e
+    except _TRANSPORT_ERRORS as e:
+        # See _TRANSPORT_ERRORS: a failure while snapd answers isn't wrapped by urllib, most
+        # visibly when snapd restarts after accepting the request. Without this the error would
+        # escape the library's hierarchy, and _retry_json_get wouldn't retry it.
+        raise _errors.ConnectionError(
+            f'Connection to snapd lost: {method} {path}: {e}',
+            kind='charmlibs-snap-connection-error',
+            value='',
+        ) from e
     if 300 <= response.status < 400:  # 3xx responses.
         # snapd itself never redirects, aside from path canonicalisation -- for example,
         # paths containing '//', '/./' or '/../' get a 301 to the cleaned path.
@@ -231,72 +275,12 @@ def _decode_logs(response: http.client.HTTPResponse) -> list[dict[str, str]]:
     return logs
 
 
-#############
-# transport #
-#############
-
-
-# The transport failures that reach us untranslated. urllib only wraps failures from opening the
-# connection and sending the request (AbstractHTTPHandler.do_open wraps those in URLError);
-# anything that goes wrong while snapd is answering comes back out of http.client as-is, in two
-# flavours the tests pin down against a real socket:
-# - OSError, when the connection breaks (a ConnectionResetError if snapd aborts, or
-#   http.client.RemoteDisconnected, which subclasses both, if it closes cleanly).
-# - http.client.HTTPException, when the connection delivers something unusable
-#   (http.client.IncompleteRead for a body cut short, which is *not* an OSError).
-_TRANSPORT_ERRORS = (OSError, http.client.HTTPException)
-
-
-def _open(request: urllib.request.Request) -> http.client.HTTPResponse:
-    """Send a prepared request over the snapd socket, returning the raw HTTPResponse.
-
-    Every way the connection can fail is translated here, so that :func:`_request` deals only
-    with responses snapd actually sent, and callers only ever see an :class:`_errors.Error`.
-    """
-    opener = urllib.request.OpenerDirector()
-    opener.add_handler(_client_sockets.UnixSocketHandler(_SOCKET_PATH))
-    # We need to handle HTTP errors ourselves, since the response body contains meaningful info,
-    # so we don't add HTTPErrorProcessor or HTTPDefaultErrorHandler, which would raise too early.
-    # Without HTTPErrorProcessor, urllib never dispatches 3xx to HTTPRedirectHandler either.
-    # We don't expect redirects, so _request converts 3xx responses into errors itself.
-    target = f'{request.get_method()} {urllib.parse.urlparse(request.full_url).path}'
-    try:
-        return opener.open(request, timeout=_REQUEST_TIMEOUT)
-    except TimeoutError:
-        raise _errors.TimeoutError(
-            f'Request to snapd timed out after {_REQUEST_TIMEOUT}s: {target}',
-            kind='charmlibs-snap-request-timeout',
-            value='',
-        ) from None
-    except urllib.error.URLError as e:
-        if e.args and isinstance(e.args[0], FileNotFoundError):
-            raise _errors.SocketNotFoundError(
-                f'Could not connect to snapd: socket not found at {_SOCKET_PATH!r}',
-                kind='charmlibs-snap-socket-not-found',
-                value='',
-            ) from None
-        raise _errors.ConnectionError(
-            str(e.reason),
-            kind='charmlibs-snap-connection-error',
-            value='',
-        ) from e
-    except _TRANSPORT_ERRORS as e:
-        # See _TRANSPORT_ERRORS: a failure while snapd answers isn't wrapped by urllib, most
-        # visibly when snapd restarts after accepting the request. Without this the error would
-        # escape the library's hierarchy, and _retry_json_get wouldn't retry it.
-        raise _errors.ConnectionError(
-            f'Connection to snapd lost: {target}: {e}',
-            kind='charmlibs-snap-connection-error',
-            value='',
-        ) from e
-
-
 def _read(response: http.client.HTTPResponse) -> bytes:
     """Read a response body, translating a transport failure mid-read into a library error.
 
-    The body is read after :func:`_open` returns, so the translation it does doesn't cover this:
-    snapd going away between sending the headers and finishing the body would otherwise surface
-    as one of the raw :data:`_TRANSPORT_ERRORS`, outside the library's error hierarchy.
+    The body is read after :func:`_request` returns, so the translation it does doesn't cover
+    this: snapd going away between sending the headers and finishing the body would otherwise
+    surface as one of the raw :data:`_TRANSPORT_ERRORS`, outside the library's error hierarchy.
     A body cut short is the :class:`http.client.IncompleteRead` case specifically -- snapd
     promised a Content-Length it then didn't deliver.
     """
