@@ -35,18 +35,8 @@ from . import _client_sockets, _errors
 
 logger = logging.getLogger(__name__)
 
-# The transport failures that reach us untranslated once a request is on the wire. urllib only
-# wraps failures from opening the connection and sending the request (AbstractHTTPHandler.do_open
-# wraps those in URLError); anything that goes wrong while snapd is answering comes back out of
-# http.client as-is, in two flavours:
-# - OSError, when the connection breaks: a ConnectionResetError if snapd aborts, or
-#   http.client.RemoteDisconnected (which subclasses it) if snapd closes cleanly.
-# - http.client.HTTPException, when the connection delivers something unusable: IncompleteRead
-#   for a body cut short, BadStatusLine or LineTooLong for an answer that isn't HTTP. These are
-#   *not* OSErrors, so catching OSError alone would let them escape.
-# Both flavours can arise at either point we touch the socket -- sending the request in _request
-# and reading the body in _read -- so both use this tuple. All four combinations are pinned
-# against a real socket in tests/unit/test_client.py::TestSnapdGoingAwayMidRequest.
+# urllib wraps failures from opening the connection and sending the request in URLError,
+# but if a connection breaks we can get an OSError, or an HTTPException on a truncated response.
 _TRANSPORT_ERRORS = (OSError, http.client.HTTPException)
 
 # Defined in the snap application itself under dirs/dirs.go as SnapdSocket.
@@ -184,9 +174,6 @@ def _request(
             value='',
         ) from e
     except _TRANSPORT_ERRORS as e:
-        # See _TRANSPORT_ERRORS: a failure while snapd answers isn't wrapped by urllib, most
-        # visibly when snapd restarts after accepting the request. Without this the error would
-        # escape the library's hierarchy, and _retry_json_get wouldn't retry it.
         raise _errors.ConnectionError(
             f'Connection to snapd lost: {method} {path}: {e}',
             kind='charmlibs-snap-connection-error',
@@ -280,14 +267,7 @@ def _decode_logs(response: http.client.HTTPResponse) -> list[dict[str, str]]:
 
 
 def _read(response: http.client.HTTPResponse) -> bytes:
-    """Read a response body, translating a transport failure mid-read into a library error.
-
-    The body is read after :func:`_request` returns, so the translation it does doesn't cover
-    this: snapd going away between sending the headers and finishing the body would otherwise
-    surface as one of the raw :data:`_TRANSPORT_ERRORS`, outside the library's error hierarchy.
-    A body cut short is the :class:`http.client.IncompleteRead` case specifically -- snapd
-    promised a Content-Length it then didn't deliver.
-    """
+    """Read a response body, translating a transport failure mid-read into a library error."""
     try:
         return response.read()
     except TimeoutError:
