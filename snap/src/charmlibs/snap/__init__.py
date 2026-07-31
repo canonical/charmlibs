@@ -31,18 +31,29 @@ Also manage:
 Exceptions
 ----------
 
-All functions will raise a :class:`Error` subclass if the snapd API returns an error response.
+All errors raised due to interactions with the snapd API are subclasses of :class:`Error`.
+Callers may trigger regular Python exceptions (e.g. :class:`ValueError`) when passing
+invalid arguments to library functions.
 
+All functions will raise a :class:`APIError` (or a subclass) if snapd returns an error response.
 Functions will raise specific subclasses where possible to allow callers to handle logical errors.
 Check the documentation for each function for details on which exceptions it may raise.
 
-The :class:`APIError` subclass will be raised if the snapd API returns a malformed response.
-Callers will not be able to resolve this error directly, but may want to catch it for logging,
-or to trigger retries if the error may be transient. If retries are not successful,
-user intervention may be required.
+Separately from the :class:`APIError` hierarchy (but inheriting from :class:`Error`),
+the library may also raise the following exceptions:
 
-A :class:`ConnectionError` indicates a failure to connect to the snapd socket at all. In this case
-something is badly wrong with the system, and user intervention is almost certainly required.
+A :class:`TimeoutError` indicates that the snapd API did not respond in a timely manner.
+This may be transient, due to the snap store infrastructure being under load, and the library
+makes some efforts to retry operations. Callers may catch this error to layer their own retry
+logic on top, or report a transient failure to the user.
+
+A :class:`ConnectionError` indicates other transport level failures, and may require user action.
+For example, :class:`SocketNotFoundError` indicates that the library was unable to connect to the
+snapd socket at all, which usually means snapd is not installed on the system.
+
+A :class:`BadResponseError` is raised if the snapd API returns a response the library does not
+understand. Callers will not be able to resolve this error directly, and should report it to the
+library maintainers.
 """
 
 from ._errors import (
