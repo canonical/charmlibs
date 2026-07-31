@@ -38,11 +38,15 @@ logger = logging.getLogger(__name__)
 # The transport failures that reach us untranslated once a request is on the wire. urllib only
 # wraps failures from opening the connection and sending the request (AbstractHTTPHandler.do_open
 # wraps those in URLError); anything that goes wrong while snapd is answering comes back out of
-# http.client as-is, in two flavours the tests pin down against a real socket:
-# - OSError, when the connection breaks (a ConnectionResetError if snapd aborts, or
-#   http.client.RemoteDisconnected, which subclasses both, if it closes cleanly).
-# - http.client.HTTPException, when the connection delivers something unusable
-#   (http.client.IncompleteRead for a body cut short, which is *not* an OSError).
+# http.client as-is, in two flavours:
+# - OSError, when the connection breaks: a ConnectionResetError if snapd aborts, or
+#   http.client.RemoteDisconnected (which subclasses it) if snapd closes cleanly.
+# - http.client.HTTPException, when the connection delivers something unusable: IncompleteRead
+#   for a body cut short, BadStatusLine or LineTooLong for an answer that isn't HTTP. These are
+#   *not* OSErrors, so catching OSError alone would let them escape.
+# Both flavours can arise at either point we touch the socket -- sending the request in _request
+# and reading the body in _read -- so both use this tuple. All four combinations are pinned
+# against a real socket in tests/unit/test_client.py::TestSnapdGoingAwayMidRequest.
 _TRANSPORT_ERRORS = (OSError, http.client.HTTPException)
 
 # Defined in the snap application itself under dirs/dirs.go as SnapdSocket.

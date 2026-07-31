@@ -12,6 +12,7 @@ import json
 import logging
 import pathlib
 import socket
+import struct
 import tempfile
 import threading
 import time
@@ -71,16 +72,32 @@ _RECV_SIZE = 4096
 _ABORT_DELAY = 0.2
 
 
+def _abort(conn: socket.socket) -> None:
+    """Reset the connection instead of closing it cleanly, the way an aborting peer does.
+
+    Closing while the peer's data sits unread in the receive buffer makes the kernel send RST
+    rather than FIN, so the client gets ECONNRESET -- the errno 104 a live snapd was seen to
+    produce when it goes away mid-request. SO_LINGER with a zero timeout forces the same for a
+    connection whose request we did read.
+    """
+    conn.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))
+
+
 def _serve(server: socket.socket, behaviours: tuple[str, ...]) -> None:
     for behaviour in behaviours:
         conn, _ = server.accept()
         with conn:
             if behaviour == 'abort':
-                # Close with the request still sitting unread in the receive buffer: the kernel
-                # then resets the connection rather than closing it cleanly, so the client gets
-                # ECONNRESET -- the errno 104 a live snapd was seen to produce when it goes away
-                # after accepting a request.
+                # Never read the request, so closing on it resets the connection. The wait is
+                # only to let the request land in the buffer first.
                 time.sleep(_ABORT_DELAY)
+                continue
+            if behaviour == 'reset_mid_body':
+                # Answer with headers the client can parse, then reset while it reads the body,
+                # so the failure lands in _read rather than _request. Again, don't read.
+                conn.sendall(b'HTTP/1.1 200 OK\r\nContent-Length: 100000\r\n\r\n' + b'x' * 10)
+                time.sleep(_ABORT_DELAY)
+                _abort(conn)
                 continue
             conn.recv(_RECV_SIZE)  # Read the request, so the failure is in our answer, not theirs.
             if behaviour == 'close':
@@ -89,6 +106,10 @@ def _serve(server: socket.socket, behaviours: tuple[str, ...]) -> None:
                 # Promise more body than we send, so read() raises http.client.IncompleteRead.
                 conn.sendall(b'HTTP/1.1 200 OK\r\nContent-Length: 100\r\n\r\n{"type": "sync"')
                 continue
+            if behaviour == 'not_http':
+                # Something that isn't snapd on the socket: http.client.BadStatusLine.
+                conn.sendall(b'this is not a status line\r\n\r\n')
+                continue
             body = json.dumps({'type': 'sync', 'result': {'foo': 'bar'}}).encode()
             conn.sendall(
                 b'HTTP/1.1 200 OK\r\nContent-Length: '
@@ -96,6 +117,25 @@ def _serve(server: socket.socket, behaviours: tuple[str, ...]) -> None:
                 + b'\r\n\r\n'
                 + body
             )
+
+
+# Each failure a peer can hand us once the request is on the wire: the behaviour that provokes
+# it, the raw error urllib lets through, and which of the two places we touch the socket it
+# surfaces from -- 'sending' for _request (which covers h.getresponse()), 'reading' for _read.
+#
+# Both flavours of _client._TRANSPORT_ERRORS arise at both places, which is why both except arms
+# need the whole tuple: 'not_http' is the pure-HTTPException case that catching OSError alone
+# would miss in _request, and 'reset_mid_body' the pure-OSError case that catching HTTPException
+# alone would miss in _read. RemoteDisconnected subclasses ConnectionResetError, so the 'abort'
+# expectation holds whether or not the request lands unread in time to make the reset the
+# kernel-level kind.
+_FAILURES = [
+    ('abort', builtins.ConnectionResetError, 'sending'),
+    ('close', http.client.RemoteDisconnected, 'sending'),
+    ('not_http', http.client.BadStatusLine, 'sending'),
+    ('truncated_body', http.client.IncompleteRead, 'reading'),
+    ('reset_mid_body', builtins.ConnectionResetError, 'reading'),
+]
 
 
 @contextlib.contextmanager
@@ -368,37 +408,37 @@ class TestSnapdGoingAwayMidRequest:
     pin down both halves: that urllib really does let each failure through, and that the library
     converts it. The first half is the premise, so it's asserted rather than assumed -- if a
     future Python starts wrapping these, these tests fail and those arms can go.
+
+    See _FAILURES for the cases and why each one is there.
     """
 
-    @pytest.mark.parametrize(
-        ('behaviour', 'raw_type'),
-        [
-            # RemoteDisconnected subclasses ConnectionResetError, so this assertion holds whether
-            # or not the request lands unread in time to make the reset the kernel-level kind.
-            ('abort', builtins.ConnectionResetError),
-            ('close', http.client.RemoteDisconnected),
-            ('truncated_body', http.client.IncompleteRead),
-        ],
-    )
+    @pytest.mark.parametrize(('behaviour', 'raw_type', 'stage'), _FAILURES)
     def test_urllib_lets_the_failure_through_untranslated(
-        self, behaviour: str, raw_type: type[BaseException]
+        self, behaviour: str, raw_type: type[BaseException], stage: str
     ):
         with _snapd_that(behaviour) as socket_path:
             opener = urllib.request.OpenerDirector()
             opener.add_handler(_client_sockets.UnixSocketHandler(socket_path))
             request = urllib.request.Request('http://localhost/v2/snaps/hello-world')
             with pytest.raises(raw_type) as exc_info:
-                opener.open(request, timeout=10).read()
-        # Not a URLError, so the URLError arm can't catch these...
-        assert not isinstance(exc_info.value, urllib.error.URLError)
-        # ...and IncompleteRead isn't even an OSError, so catching OSError alone would miss it.
+                response = opener.open(request, timeout=10)
+                # Getting this far means urllib parsed a response, so the failure is in the body.
+                assert stage == 'reading'
+                response.read()
+        if stage == 'sending':
+            assert not isinstance(exc_info.value, urllib.error.URLError)
         assert isinstance(exc_info.value, _client._TRANSPORT_ERRORS)
 
-    @pytest.mark.parametrize('behaviour', ['abort', 'close', 'truncated_body'])
+    @pytest.mark.parametrize(('behaviour', 'raw_type', 'stage'), _FAILURES)
     def test_the_library_translates_the_failure(
-        self, behaviour: str, monkeypatch: pytest.MonkeyPatch
+        self,
+        behaviour: str,
+        raw_type: type[BaseException],
+        stage: str,
+        monkeypatch: pytest.MonkeyPatch,
     ):
-        # Budget 0 so the GET isn't retried: one connection is all the server offers.
+        # Budget 0 so the GET isn't retried: one connection is all the server offers. (A failure
+        # while reading the body isn't retried anyway -- that happens after _retry_json_get.)
         monkeypatch.setattr(_client, '_CONNECTION_RETRY_BUDGET', 0)
         monkeypatch.setattr(_client.time, 'sleep', MagicMock())
         with _snapd_that(behaviour) as socket_path:
@@ -408,6 +448,8 @@ class TestSnapdGoingAwayMidRequest:
         assert exc_info.value.kind == 'charmlibs-snap-connection-error'
         # The socket existed and accepted us, so this isn't the snapd-not-installed case.
         assert not isinstance(exc_info.value, SocketNotFoundError)
+        # The raw error is kept as the cause, so a charm's traceback still shows what broke.
+        assert isinstance(exc_info.value.__cause__, raw_type)
 
     def test_the_failure_is_retried_on_a_get(self, monkeypatch: pytest.MonkeyPatch):
         # Translating these is what puts them in front of the GET retry, and snapd restarting
