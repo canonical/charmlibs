@@ -158,7 +158,7 @@ class TestGetEmptyKeys:
         # snapd's own probe error is raised unchanged: terse message, snap name in value (which
         # str() surfaces). Not chained -- the probe's error was handled, not propagated.
         assert ctx.value.message == 'snap not installed'
-        assert ctx.value.value == 'hello-world'
+        assert ctx.value._value == 'hello-world'
         assert str(ctx.value) == 'snap not installed (hello-world)'
         assert ctx.value.__context__ is None
 
@@ -206,7 +206,7 @@ class TestGetAbsentSnapProbe:
         with pytest.raises(_NotFoundError) as ctx:
             _snapd_conf.get('hello-world', ['mykey'])
         assert ctx.value.message == 'snap not installed'
-        assert ctx.value.value == 'hello-world'
+        assert ctx.value._value == 'hello-world'
         assert str(ctx.value) == 'snap not installed (hello-world)'
 
     def test_missing_key_on_absent_snap_does_not_chain_option_not_found(

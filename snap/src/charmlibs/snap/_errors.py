@@ -23,6 +23,23 @@ if typing.TYPE_CHECKING:
     from typing_extensions import Self
 
 
+_MAX_DETAIL = 200
+"""How much of an offending response a :class:`BadResponseError` message will quote."""
+
+
+def _truncated(detail: object) -> str:  # pyright: ignore[reportUnusedFunction]
+    """Render something snapd sent us for inclusion in a :class:`BadResponseError` message.
+
+    Errors outside the :class:`APIError` hierarchy carry no ``value``, so the message is the
+    only place the offending response can be recorded for a bug report. Long responses (the
+    log stream, for example) are truncated so that the message stays readable.
+    """
+    text = detail if isinstance(detail, str) else str(detail)
+    if len(text) <= _MAX_DETAIL:
+        return text
+    return f'{text[:_MAX_DETAIL]}... ({len(text)} characters)'
+
+
 class Error(Exception):
     """Base class for all library errors, not raised directly."""
 
@@ -190,10 +207,7 @@ class _InterfacesUnchangedError(APIError):  # pyright: ignore[reportUnusedClass]
 
 
 class OptionNotFoundError(APIError):
-    """Raised via the API when the specified snap config option is not found.
-
-    ``OptionNotFoundError.value`` looks like ``"{'SnapName': 'hello-world', 'Key': 'foo'}"``.
-    """
+    """Raised via the API when the specified snap config option is not found."""
 
 
 class ChangeError(APIError):

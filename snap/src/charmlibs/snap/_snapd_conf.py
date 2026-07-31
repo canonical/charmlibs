@@ -106,8 +106,6 @@ def get(snap: str, keys: str | Iterable[str] | None = None) -> dict[str, Any]:
     if not isinstance(config, dict):
         raise _errors.BadResponseError(
             message=f'Unexpected response type {type(config).__name__!r} for the configuration of snap {snap!r}, expected a "dict"',  # noqa: E501
-            kind='charmlibs-snap',
-            value=str(config),
         )
     config = typing.cast('dict[str, Any]', config)
     # Empty result when all config was requested: error if the snap isn't installed.

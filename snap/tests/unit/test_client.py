@@ -240,8 +240,8 @@ class TestErrorResponses:
         assert type(exc_info.value) is expected_type  # Exact type, not a subclass.
         # Fields from the response body are preserved on the exception.
         assert exc_info.value.message == 'boom'
-        assert exc_info.value.kind == kind
-        assert exc_info.value.value == 'the-value'
+        assert exc_info.value._kind == kind
+        assert exc_info.value._value == 'the-value'
         assert exc_info.value._status_code == 400
 
     def test_error_missing_kind_and_value_use_defaults(self, mock_raw: MagicMock):
@@ -255,11 +255,11 @@ class TestErrorResponses:
         with pytest.raises(APIError) as exc_info:
             _client.get('/v2/snaps/hello-world')
         assert type(exc_info.value) is APIError  # Missing kind falls back to the base type.
-        assert exc_info.value.kind == ''
-        assert exc_info.value.value == ''
+        assert exc_info.value._kind == ''
+        assert exc_info.value._value == ''
 
-    def test_error_converts_value_to_str(self, mock_raw: MagicMock):
-        # snap-channel-not-available returns a rich dict as 'value'.
+    def test_error_keeps_non_string_value(self, mock_raw: MagicMock):
+        # snap-channel-not-available returns a rich dict as 'value', which is kept as decoded.
         value = {'channel': 'garbage', 'snap-name': 'hello-world'}
         mock_raw.return_value = _fake_response({
             'type': 'error',
@@ -273,7 +273,9 @@ class TestErrorResponses:
         })
         with pytest.raises(ChannelNotAvailableError) as exc_info:
             _client.get('/v2/snaps/hello-world')
-        assert exc_info.value.value == str(value)
+        assert exc_info.value._value == value
+        # A non-string value isn't appended to str(), which would be unreadable.
+        assert str(exc_info.value) == 'no channel'
 
     @pytest.mark.parametrize(
         ('response', 'message_fragment'),
@@ -323,11 +325,9 @@ class TestErrorResponses:
         )
         with pytest.raises(BadResponseError) as exc_info:
             _client.get('/v2/snaps//conf')
-        assert exc_info.value.kind == 'charmlibs-snap-unexpected-redirect'
         assert '/v2/snaps//conf' in exc_info.value.message  # The path we asked for.
         assert '/v2/snaps/conf' in exc_info.value.message  # Where snapd points us.
-        assert exc_info.value.value == '/v2/snaps/conf'
-        assert exc_info.value._status_code == 301
+        assert '301' in exc_info.value.message  # The kind of redirect it is.
 
     def test_request_timeout_raises_snap_timeout_error(self, monkeypatch: pytest.MonkeyPatch):
         # Patch opener.open inside _request to raise TimeoutError, exercising the conversion.
@@ -338,8 +338,8 @@ class TestErrorResponses:
         )
         with pytest.raises(TimeoutError) as exc_info:
             _client.get('/v2/snaps/hello-world')
-        assert exc_info.value.kind == 'charmlibs-snap-request-timeout'
-        assert isinstance(exc_info.value, TimeoutError)
+        assert 'timed out' in exc_info.value.message
+        assert isinstance(exc_info.value, builtins.TimeoutError)
 
     def test_socket_not_found_raises_socket_not_found_error(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
@@ -351,7 +351,7 @@ class TestErrorResponses:
         monkeypatch.setattr(_client.time, 'sleep', sleep)
         with pytest.raises(SocketNotFoundError) as exc_info:
             _client.get('/v2/snaps/hello-world')
-        assert exc_info.value.kind == 'charmlibs-snap-socket-not-found'
+        assert 'does-not-exist' in exc_info.value.message  # The socket path we looked for.
         # Callers that only care that snapd was unreachable can catch ConnectionError.
         assert isinstance(exc_info.value, ConnectionError)
         sleep.assert_not_called()
@@ -362,7 +362,8 @@ class TestErrorResponses:
         mock_raw.return_value = response
         with pytest.raises(TimeoutError) as exc_info:
             _client.get('/v2/snaps/hello-world')
-        assert exc_info.value.kind == 'charmlibs-snap-request-timeout'
+        # The failure was reading the body, not making the request.
+        assert 'reading snapd response' in exc_info.value.message
 
     def test_connection_error_retries_then_raises(self, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setattr(_client, '_CONNECTION_RETRY_BUDGET', 0)
@@ -375,7 +376,7 @@ class TestErrorResponses:
         )
         with pytest.raises(ConnectionError) as exc_info:
             _client.get('/v2/snaps/hello-world')
-        assert exc_info.value.kind == 'charmlibs-snap-connection-error'
+        assert 'connection refused' in exc_info.value.message  # urllib's reason, passed through.
         # A reachable-but-failing socket isn't the socket-missing case.
         assert not isinstance(exc_info.value, SocketNotFoundError)
         # Budget is 0, so the first failure is past the deadline: no retry sleep.
@@ -387,9 +388,7 @@ class TestErrorResponses:
         # A transient connection failure on a GET is retried, then the retry succeeds.
         monkeypatch.setattr(_client.time, 'sleep', MagicMock())
         mock_raw.side_effect = [
-            ConnectionError(
-                'connection refused', kind='charmlibs-snap-connection-error', value=''
-            ),
+            ConnectionError('connection refused'),
             _fake_response({'type': 'sync', 'result': {'foo': 'bar'}}),
         ]
         assert _client.get('/v2/snaps/hello-world') == {'foo': 'bar'}
@@ -442,7 +441,10 @@ class TestSnapdGoingAwayMidRequest:
             monkeypatch.setattr(_client, '_SOCKET_PATH', socket_path)
             with pytest.raises(ConnectionError) as exc_info:
                 _client.get('/v2/snaps/hello-world')
-        assert exc_info.value.kind == 'charmlibs-snap-connection-error'
+        # A raw ConnectionResetError would satisfy pytest.raises above, since the library's
+        # ConnectionError subclasses the builtin -- check the failure really was translated.
+        assert isinstance(exc_info.value, Error)
+        assert 'Connection to snapd lost' in exc_info.value.message
         # The socket existed and accepted us, so this isn't the snapd-not-installed case.
         assert not isinstance(exc_info.value, SocketNotFoundError)
         # The raw error is kept as the cause, so a charm's traceback still shows what broke.
@@ -494,9 +496,9 @@ class TestAsyncChange:
         ]
         with pytest.raises(ChangeError) as exc_info:
             _client.post('/v2/aliases', body={'action': 'alias'})
-        assert exc_info.value.kind == 'charmlibs-snap-change-error'
+        assert exc_info.value._kind == 'charmlibs-snap-change-error'
         assert exc_info.value.message == 'install failed'  # Taken from the 'err' field.
-        assert exc_info.value.value == '42'  # The change id.
+        assert exc_info.value._value == '42'  # The change id.
 
     def test_async_wait_status_logs_warning(self, mock_raw: MagicMock, caplog: LogCaptureFixture):
         wait: dict[str, Any] = {
@@ -549,9 +551,7 @@ class TestAsyncChange:
             _fake_response({'type': 'async', 'change': '42'}),
             # _request translates urllib errors into ConnectionError; mock that here since
             # the patch replaces _request (below that translation).
-            ConnectionError(
-                'connection refused', kind='charmlibs-snap-connection-error', value=''
-            ),
+            ConnectionError('connection refused'),
             _fake_response(done),
         ]
         _client.post('/v2/snaps/hello-world', body={'action': 'hold'})  # Should not raise.
@@ -567,9 +567,7 @@ class TestAsyncChange:
         mock_raw.side_effect = [
             _fake_response({'type': 'async', 'change': '42'}),
             # poll fails past the retry budget (see note above re: ConnectionError).
-            ConnectionError(
-                'connection refused', kind='charmlibs-snap-connection-error', value=''
-            ),
+            ConnectionError('connection refused'),
         ]
         with pytest.raises(ConnectionError):
             _client.post('/v2/snaps/hello-world', body={'action': 'hold'})
@@ -583,7 +581,7 @@ class TestAsyncChange:
         ]
         with pytest.raises(ChangeError) as exc_info:
             _client.post('/v2/snaps/hello-world', body={'action': 'hold'})
-        assert exc_info.value.kind == 'charmlibs-snap-change-unknown'
+        assert exc_info.value._kind == 'charmlibs-snap-change-unknown'
         assert 'Fake' in exc_info.value.message
 
 
@@ -599,9 +597,9 @@ class TestLogsEndpoint:
     def test_logs_error_response_raises(self, mock_raw: MagicMock):
         raw = (FIXTURES_DIR / 'app_not_found_raw.bin').read_bytes()
         mock_raw.return_value = _fake_response(raw)
-        with pytest.raises(Error) as exc_info:
+        with pytest.raises(APIError) as exc_info:
             _client.get_logs(query={'n': 10, 'names': 'hello-world'})
-        assert exc_info.value.kind == 'app-not-found'
+        assert exc_info.value._kind == 'app-not-found'
 
     def test_logs_malformed_response_raises_bad_response_error(self, mock_raw: MagicMock):
         mock_raw.return_value = _fake_response(b'some-bytes', url='http://foo/some-path')
@@ -609,7 +607,8 @@ class TestLogsEndpoint:
             _client.get_logs(query={'n': 10, 'names': 'lxd'})
         assert 'Invalid JSON' in exc_info.value.message
         assert 'some-path' in exc_info.value.message
-        assert exc_info.value.value == 'some-bytes'
+        # BadResponseError has no 'value' field, so the message carries what snapd sent.
+        assert 'some-bytes' in exc_info.value.message
 
 
 def test_all_errors_mapped():
@@ -676,8 +675,8 @@ class TestRealErrorFixtures:
         exc = exc_info.value
         assert type(exc) is expected_type  # Exact type, not a subclass.
         assert exc.message == result['message']
-        assert exc.kind == result.get('kind', '')
-        assert exc.value == str(result.get('value', ''))
+        assert exc._kind == result.get('kind', '')
+        assert exc._value == result.get('value', '')
         assert exc._status_code == envelope['status-code']
 
 
@@ -704,6 +703,6 @@ class TestRealChangeFixtures:
         ]
         with pytest.raises(ChangeError) as exc_info:
             _client.post('/v2/aliases', body={'action': 'alias'})
-        assert exc_info.value.kind == 'charmlibs-snap-change-error'
+        assert exc_info.value._kind == 'charmlibs-snap-change-error'
         assert exc_info.value.message == change['err']  # Message comes from the 'err' field.
-        assert exc_info.value.value == str(async_envelope['change'])  # The polled change id.
+        assert exc_info.value._value == str(async_envelope['change'])  # The polled change id.
