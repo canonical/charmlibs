@@ -108,16 +108,12 @@ class InstalledInfo:
 
         A held snap is not automatically refreshed, but can be manually refreshed.
 
-        Snapd has no distinct value for an indefinite hold, such as the one :func:`hold` places
-        by default: it records the hold as ending after Go's maximum duration, so this is a
-        timestamp roughly 292 years after the hold was placed.
+        For an indefinite hold, snapd reports a timestamp roughly 292 years after the hold was
+        placed (Go's maximum duration), which is hopefully sufficient.
         """
         return self._hold
 
     def __repr__(self) -> str:
-        # The hold is rendered as a timestamp string rather than as a datetime repr, which keeps
-        # the repr readable and still lets it be evaluated to reconstruct an equal object: it's
-        # the form snapd sends, which is the form __init__ takes.
         hold = None if self.hold is None else self.hold.isoformat()
         return (
             f'{type(self).__name__}('
