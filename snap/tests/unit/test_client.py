@@ -140,11 +140,8 @@ _FAILURES = [
 
 @contextlib.contextmanager
 def _snapd_that(*behaviours: str) -> Iterator[str]:
-    """Serve one connection per behaviour on a real unix socket, and yield its path.
-
-    The socket lives directly under the system temp dir rather than pytest's tmp_path, because
-    a unix socket path has to fit in sockaddr_un (108 bytes) and pytest's paths are long.
-    """
+    """Serve one connection per behaviour on a real unix socket, and yield its path."""
+    # pytest's tmp_paths are too long -- a unix socket path has to fit in sockaddr_un (108 bytes).
     with tempfile.TemporaryDirectory() as tmp:
         socket_path = str(pathlib.Path(tmp) / 's')
         server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
