@@ -46,7 +46,7 @@ class InstalledInfo:
     ):
         self._name = name
         self._classic = classic
-        self._tracking = _utils.normalize_channel(tracking)
+        self._tracking = tracking
         self._revision = str(revision)
         self._version = version
         self._hold = _utils.parse_timestamp(hold) if isinstance(hold, str) else hold
