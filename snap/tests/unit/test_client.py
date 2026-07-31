@@ -6,8 +6,15 @@
 from __future__ import annotations
 
 import builtins
+import contextlib
+import http.client
 import json
 import logging
+import pathlib
+import socket
+import tempfile
+import threading
+import time
 import urllib.error
 import urllib.request
 from types import SimpleNamespace
@@ -17,12 +24,13 @@ from unittest.mock import MagicMock
 import pytest
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from pathlib import Path
 
     from pytest import LogCaptureFixture
 
 import charmlibs.snap._errors
-from charmlibs.snap import _client
+from charmlibs.snap import _client, _client_sockets
 from charmlibs.snap._errors import (
     APIError,
     AppNotFoundError,
@@ -53,6 +61,64 @@ def _fake_response(
     if isinstance(data, (dict, list)):
         data = json.dumps(data).encode()
     return SimpleNamespace(read=lambda: data, status=status, reason=reason, url=url)
+
+
+# A fake snapd on a real unix socket, used by TestSnapdGoingAwayMidRequest below. Each name is
+# one connection's worth of behaviour; a server is given one per connection it should accept.
+_RECV_SIZE = 4096
+# Long enough for the client's request to land in the receive buffer before we close on it.
+# Only the 'abort' behaviour waits, and only to make the reset the *unread* kind (see below).
+_ABORT_DELAY = 0.2
+
+
+def _serve(server: socket.socket, behaviours: tuple[str, ...]) -> None:
+    for behaviour in behaviours:
+        conn, _ = server.accept()
+        with conn:
+            if behaviour == 'abort':
+                # Close with the request still sitting unread in the receive buffer: the kernel
+                # then resets the connection rather than closing it cleanly, so the client gets
+                # ECONNRESET -- the errno 104 a live snapd was seen to produce when it goes away
+                # after accepting a request.
+                time.sleep(_ABORT_DELAY)
+                continue
+            conn.recv(_RECV_SIZE)  # Read the request, so the failure is in our answer, not theirs.
+            if behaviour == 'close':
+                continue  # Close without answering at all.
+            if behaviour == 'truncated_body':
+                # Promise more body than we send, so read() raises http.client.IncompleteRead.
+                conn.sendall(b'HTTP/1.1 200 OK\r\nContent-Length: 100\r\n\r\n{"type": "sync"')
+                continue
+            body = json.dumps({'type': 'sync', 'result': {'foo': 'bar'}}).encode()
+            conn.sendall(
+                b'HTTP/1.1 200 OK\r\nContent-Length: '
+                + str(len(body)).encode()
+                + b'\r\n\r\n'
+                + body
+            )
+
+
+@contextlib.contextmanager
+def _snapd_that(*behaviours: str) -> Iterator[str]:
+    """Serve one connection per behaviour on a real unix socket, and yield its path.
+
+    The socket lives directly under the system temp dir rather than pytest's tmp_path, because
+    a unix socket path has to fit in sockaddr_un (108 bytes) and pytest's paths are long.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        socket_path = str(pathlib.Path(tmp) / 's')
+        server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        # Bound and listening before we yield, so the client can't connect before we're ready.
+        server.bind(socket_path)
+        server.listen(len(behaviours))
+        server.settimeout(10)  # Don't hang the suite if the client never connects.
+        thread = threading.Thread(target=_serve, args=(server, behaviours), daemon=True)
+        thread.start()
+        try:
+            yield socket_path
+        finally:
+            thread.join(timeout=10)
+            server.close()
 
 
 @pytest.fixture
@@ -253,51 +319,6 @@ class TestErrorResponses:
         assert isinstance(exc_info.value, ConnectionError)
         sleep.assert_not_called()
 
-    def test_reset_while_receiving_response_raises_snap_connection_error(
-        self, monkeypatch: pytest.MonkeyPatch
-    ):
-        # urllib wraps failures from sending the request, but lets a failure from
-        # h.getresponse() through raw -- most visibly a reset when snapd restarts after
-        # accepting the request. We translate it, so it stays inside the library's hierarchy.
-        monkeypatch.setattr(_client, '_CONNECTION_RETRY_BUDGET', 0)
-        monkeypatch.setattr(_client.time, 'sleep', MagicMock())
-        monkeypatch.setattr(
-            urllib.request.OpenerDirector,
-            'open',
-            MagicMock(side_effect=builtins.ConnectionResetError(104, 'Connection reset by peer')),
-        )
-        with pytest.raises(ConnectionError) as exc_info:
-            _client.get('/v2/snaps/hello-world')
-        assert exc_info.value.kind == 'charmlibs-snap-connection-error'
-        assert 'Connection to snapd lost' in exc_info.value.message
-
-    def test_reset_while_receiving_response_is_retried(self, monkeypatch: pytest.MonkeyPatch):
-        # Being a library ConnectionError, it also reaches the GET retry -- the whole point of
-        # that retry is snapd restarting mid-operation, which is how this error arises.
-        monkeypatch.setattr(_client.time, 'sleep', MagicMock())
-        opener = MagicMock(
-            side_effect=[
-                builtins.ConnectionResetError(104, 'Connection reset by peer'),
-                _fake_response({'type': 'sync', 'result': {'foo': 'bar'}}),
-            ]
-        )
-        monkeypatch.setattr(urllib.request.OpenerDirector, 'open', opener)
-        assert _client.get('/v2/snaps/hello-world') == {'foo': 'bar'}
-        assert opener.call_count == 2
-
-    def test_reset_while_reading_body_raises_snap_connection_error(self, mock_raw: MagicMock):
-        # The body is read after _request returns, so it needs translating separately.
-        response = _fake_response({'type': 'sync', 'result': {}})
-        response.read = MagicMock(
-            side_effect=builtins.ConnectionResetError(104, 'Connection reset by peer')
-        )
-        mock_raw.return_value = response
-        with pytest.raises(ConnectionError) as exc_info:
-            _client.get('/v2/snaps/hello-world')
-        assert exc_info.value.kind == 'charmlibs-snap-connection-error'
-        assert 'while reading response' in exc_info.value.message
-        assert '/v2/snaps/hello-world' in exc_info.value.message
-
     def test_timeout_while_reading_body_raises_snap_timeout_error(self, mock_raw: MagicMock):
         response = _fake_response({'type': 'sync', 'result': {}})
         response.read = MagicMock(side_effect=builtins.TimeoutError('timed out'))
@@ -305,16 +326,6 @@ class TestErrorResponses:
         with pytest.raises(TimeoutError) as exc_info:
             _client.get('/v2/snaps/hello-world')
         assert exc_info.value.kind == 'charmlibs-snap-request-timeout'
-
-    def test_reset_while_reading_logs_body_raises_snap_connection_error(self, mock_raw: MagicMock):
-        response = _fake_response(b'')
-        response.read = MagicMock(
-            side_effect=builtins.ConnectionResetError(104, 'Connection reset by peer')
-        )
-        mock_raw.return_value = response
-        with pytest.raises(ConnectionError) as exc_info:
-            _client.get_logs(query={'n': 10, 'names': 'lxd'})
-        assert exc_info.value.kind == 'charmlibs-snap-connection-error'
 
     def test_connection_error_retries_then_raises(self, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setattr(_client, '_CONNECTION_RETRY_BUDGET', 0)
@@ -346,6 +357,71 @@ class TestErrorResponses:
         ]
         assert _client.get('/v2/snaps/hello-world') == {'foo': 'bar'}
         assert mock_raw.call_count == 2
+
+
+class TestSnapdGoingAwayMidRequest:
+    """Transport failures reproduced against a real unix socket, not a mocked opener.
+
+    urllib only wraps failures from opening the connection and sending the request, in
+    AbstractHTTPHandler.do_open. Anything that goes wrong while the peer is *answering* reaches
+    us untranslated, which is what the except arms in _request and _read exist for. These tests
+    pin down both halves: that urllib really does let each failure through, and that the library
+    converts it. The first half is the premise, so it's asserted rather than assumed -- if a
+    future Python starts wrapping these, these tests fail and those arms can go.
+    """
+
+    @pytest.mark.parametrize(
+        ('behaviour', 'raw_type'),
+        [
+            # RemoteDisconnected subclasses ConnectionResetError, so this assertion holds whether
+            # or not the request lands unread in time to make the reset the kernel-level kind.
+            ('abort', builtins.ConnectionResetError),
+            ('close', http.client.RemoteDisconnected),
+            ('truncated_body', http.client.IncompleteRead),
+        ],
+    )
+    def test_urllib_lets_the_failure_through_untranslated(
+        self, behaviour: str, raw_type: type[BaseException]
+    ):
+        with _snapd_that(behaviour) as socket_path:
+            opener = urllib.request.OpenerDirector()
+            opener.add_handler(_client_sockets.UnixSocketHandler(socket_path))
+            request = urllib.request.Request('http://localhost/v2/snaps/hello-world')
+            with pytest.raises(raw_type) as exc_info:
+                opener.open(request, timeout=10).read()
+        # Not a URLError, so the URLError arm can't catch these...
+        assert not isinstance(exc_info.value, urllib.error.URLError)
+        # ...and IncompleteRead isn't even an OSError, so catching OSError alone would miss it.
+        assert isinstance(exc_info.value, _client._TRANSPORT_ERRORS)
+
+    @pytest.mark.parametrize('behaviour', ['abort', 'close', 'truncated_body'])
+    def test_the_library_translates_the_failure(
+        self, behaviour: str, monkeypatch: pytest.MonkeyPatch
+    ):
+        # Budget 0 so the GET isn't retried: one connection is all the server offers.
+        monkeypatch.setattr(_client, '_CONNECTION_RETRY_BUDGET', 0)
+        monkeypatch.setattr(_client.time, 'sleep', MagicMock())
+        with _snapd_that(behaviour) as socket_path:
+            monkeypatch.setattr(_client, '_SOCKET_PATH', socket_path)
+            with pytest.raises(ConnectionError) as exc_info:
+                _client.get('/v2/snaps/hello-world')
+        assert exc_info.value.kind == 'charmlibs-snap-connection-error'
+        # The socket existed and accepted us, so this isn't the snapd-not-installed case.
+        assert not isinstance(exc_info.value, SocketNotFoundError)
+
+    def test_the_failure_is_retried_on_a_get(self, monkeypatch: pytest.MonkeyPatch):
+        # Translating these is what puts them in front of the GET retry, and snapd restarting
+        # mid-operation -- exactly this failure -- is what that retry exists for.
+        monkeypatch.setattr(_client.time, 'sleep', MagicMock())
+        with _snapd_that('abort', 'ok') as socket_path:
+            monkeypatch.setattr(_client, '_SOCKET_PATH', socket_path)
+            assert _client.get('/v2/snaps/hello-world') == {'foo': 'bar'}
+
+    def test_a_healthy_socket_still_works(self, monkeypatch: pytest.MonkeyPatch):
+        # The control: the same fake snapd answering properly goes through the untouched path.
+        with _snapd_that('ok') as socket_path:
+            monkeypatch.setattr(_client, '_SOCKET_PATH', socket_path)
+            assert _client.get('/v2/snaps/hello-world') == {'foo': 'bar'}
 
 
 class TestAsyncChange:
