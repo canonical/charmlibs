@@ -249,7 +249,7 @@ def test_poll_fails_fast_when_socket_missing():
     try:
         with pytest.MonkeyPatch.context() as mp:
             mp.setattr(_client, '_SOCKET_PATH', '/run/this-snapd-socket-does-not-exist.socket')
-            with pytest.raises(_errors.ConnectionError) as ctx:
+            with pytest.raises(_errors.SocketNotFoundError) as ctx:
                 change.wait()
         assert ctx.value.kind == 'charmlibs-snap-socket-not-found'
     finally:

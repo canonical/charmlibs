@@ -61,6 +61,7 @@ def get(snap: str, keys: str | Iterable[str] | None = None) -> dict[str, Any]:
             snap doesn't recognise, a key that was never set, and a key that was unset. Any
             defaults a snap applies internally are invisible here unless its configure hook has
             stored them with ``snapctl set``.
+        BadResponseError: if snapd answers with something other than a configuration mapping.
 
     ::
 
@@ -102,6 +103,13 @@ def get(snap: str, keys: str | Iterable[str] | None = None) -> dict[str, Any]:
         if error := _utils.check_installed(snap, skip_system=True):
             raise error from None
         raise
+    if not isinstance(config, dict):
+        raise _errors.BadResponseError(
+            message=f'Unexpected response type {type(config).__name__!r} for the configuration of snap {snap!r}, expected a "dict"',  # noqa: E501
+            kind='charmlibs-snap',
+            value=str(config),
+        )
+    config = typing.cast('dict[str, Any]', config)
     # Empty result when all config was requested: error if the snap isn't installed.
     if (
         (not config)
@@ -112,8 +120,7 @@ def get(snap: str, keys: str | Iterable[str] | None = None) -> dict[str, Any]:
         # The CLI returns 'error: snap "foo" has no configuration' for a missing snap.
         # For symmetry with PUT (set/unset), we raise NotInstalledError for a missing snap.
         raise error
-    assert isinstance(config, dict)
-    return typing.cast('dict[str, Any]', config)
+    return config
 
 
 def get_one(snap: str, key: str) -> Any:
@@ -137,6 +144,7 @@ def get_one(snap: str, key: str) -> Any:
             whose configuration is served whether or not the core snap is installed.
         OptionNotFoundError: if the key has no value stored in the snap's configuration. See
             :func:`get` for why snapd cannot distinguish an unrecognised key from an unset one.
+        BadResponseError: if snapd answers with something other than a configuration mapping.
 
     ::
 

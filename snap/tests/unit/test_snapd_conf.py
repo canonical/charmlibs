@@ -11,7 +11,12 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 from charmlibs.snap import _snapd_conf
-from charmlibs.snap._errors import ChangeError, OptionNotFoundError, _NotFoundError
+from charmlibs.snap._errors import (
+    BadResponseError,
+    ChangeError,
+    OptionNotFoundError,
+    _NotFoundError,
+)
 from conftest import result_of
 
 if TYPE_CHECKING:
@@ -39,6 +44,17 @@ class TestGet:
         _snapd_conf.get('lxd', ['a', 'b'])
         query = mock_client.get.call_args.kwargs['query']
         assert query == {'keys': 'a,b'}
+
+    def test_get_non_dict_raises_bad_response(self, mock_client: MockClient):
+        # snapd answering with the wrong shape is a library-level error, not an AssertionError:
+        # asserts are stripped under python -O, and wouldn't be an Error subclass anyway.
+        mock_client.get.return_value = ['integer']
+        with pytest.raises(BadResponseError) as ctx:
+            _snapd_conf.get('lxd')
+        assert 'Unexpected response type' in ctx.value.message
+        assert "'list'" in ctx.value.message
+        # Reported as a bad response, rather than probed as a possibly-absent snap.
+        assert mock_client.get.call_count == 1
 
     def test_get_accepts_arbitrary_iterable(self, mock_client: MockClient):
         # keys need not be a list -- any non-string iterable of strings works.

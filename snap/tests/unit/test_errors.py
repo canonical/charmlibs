@@ -17,6 +17,7 @@ _NON_API_ERROR_TYPES = frozenset({
     _errors.Error,
     _errors.BadResponseError,
     _errors.ConnectionError,
+    _errors.SocketNotFoundError,
     _errors.TimeoutError,
 })
 
@@ -54,6 +55,11 @@ class TestErrorHierarchy:
     def test_timeout_and_connection_errors_subclass_builtins(self):
         assert issubclass(_errors.TimeoutError, builtins.TimeoutError)
         assert issubclass(_errors.ConnectionError, builtins.ConnectionError)
+        assert issubclass(_errors.SocketNotFoundError, builtins.ConnectionError)
+
+    def test_socket_not_found_subclasses_connection_error(self):
+        # Callers that only care that snapd was unreachable can catch ConnectionError.
+        assert issubclass(_errors.SocketNotFoundError, _errors.ConnectionError)
 
 
 def test_snap_error():

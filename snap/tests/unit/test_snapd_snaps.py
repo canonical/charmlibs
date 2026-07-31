@@ -13,6 +13,7 @@ import pytest
 from charmlibs.snap import _snapd_snaps as _snapd
 from charmlibs.snap._errors import (
     APIError,
+    BadResponseError,
     ChannelNotAvailableError,
     Error,
     NotInstalledError,
@@ -132,6 +133,31 @@ class TestListOne:
         assert type(ctx.value) is NotInstalledError
         assert ctx.value.message == 'snap "hello-world" is not installed'
         assert ctx.value.__suppress_context__
+
+    def test_list_one_non_dict_raises_bad_response(self, mock_client: MockClient):
+        # snapd answering with the wrong shape is a library-level error, not an AssertionError:
+        # asserts are stripped under python -O, and wouldn't be an Error subclass anyway.
+        mock_client.get.return_value = ['hello-world']
+        with pytest.raises(BadResponseError) as ctx:
+            _snapd.list_one('hello-world')
+        assert 'Unexpected response type' in ctx.value.message
+        assert "'list'" in ctx.value.message
+
+    @pytest.mark.parametrize('missing', ['name', 'version', 'revision', 'confinement'])
+    def test_list_one_missing_field_raises_bad_response(
+        self, mock_client: MockClient, missing: str
+    ):
+        info_dict = {k: v for k, v in _MINIMAL_INFO_DICT.items() if k != missing}
+        mock_client.get.return_value = info_dict
+        with pytest.raises(BadResponseError) as ctx:
+            _snapd.list_one('hello-world')
+        assert missing in ctx.value.message  # Named by the KeyError repr.
+        assert ctx.value.__suppress_context__
+
+    def test_list_one_unparseable_hold_raises_bad_response(self, mock_client: MockClient):
+        mock_client.get.return_value = {**_MINIMAL_INFO_DICT, 'hold': 'not-a-timestamp'}
+        with pytest.raises(BadResponseError):
+            _snapd.list_one('hello-world')
 
     def test_list_one_other_error_propagates(self, mock_client: MockClient):
         mock_client.get.side_effect = Error(
