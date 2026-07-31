@@ -147,8 +147,20 @@ def _repr_fields(info: object) -> list[tuple[str | None, str]]:
         {k: v for k, v in _MINIMAL_INFO_DICT.items() if k != 'tracking-channel'},
         # A held snap: the hold is a timezone aware datetime rather than None.
         result_of('snap_info_hello_world_held.json'),
+        # The hold as snapd sends it from a machine that isn't on UTC, and one that landed on a
+        # whole second. Both are timestamps the repr has to write in a form __init__ reads back
+        # unchanged, on Python 3.10 as much as on 3.11+ (see TestParseTimestamp).
+        {**_MINIMAL_INFO_DICT, 'hold': '2318-08-04T16:25:39.803472+13:00'},
+        {**_MINIMAL_INFO_DICT, 'hold': '2318-08-04T16:25:39Z'},
     ],
-    ids=['minimal', 'classic-local-revision', 'no-tracking-channel', 'held'],
+    ids=[
+        'minimal',
+        'classic-local-revision',
+        'no-tracking-channel',
+        'held',
+        'held-with-offset',
+        'held-on-a-whole-second',
+    ],
 )
 class TestInstalledInfoRepr:
     def test_repr_has_every_public_field_in_order(self, info_dict: dict[str, Any]):

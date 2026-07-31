@@ -7,13 +7,11 @@ from __future__ import annotations
 
 import datetime
 import logging
-import sys
 from typing import TYPE_CHECKING
 
 import pytest
 
 from charmlibs.snap import LogEntry, _snapd_logs
-from charmlibs.snap._utils import parse_timestamp
 from conftest import result_of
 
 if TYPE_CHECKING:
@@ -127,49 +125,6 @@ class TestLogs:
         assert repr(entry.sid) in r
         assert repr(entry.pid) in r
         assert repr(entry.message) in r
-
-
-class TestParseTimestamp:
-    def test_z_suffix(self):
-        ts = parse_timestamp('2026-02-27T03:01:19.488008Z')
-        assert ts.year == 2026
-        assert ts.month == 2
-        assert ts.day == 27
-        assert ts.hour == 3
-
-    def test_z_suffix_microseconds(self):
-        ts = parse_timestamp('2026-02-27T03:01:19.488008Z')
-        assert ts.microsecond == 488008
-
-    def test_z_suffix_utc(self):
-        ts = parse_timestamp('2026-02-27T03:01:19.488008Z')
-        assert ts.tzinfo is not None
-        assert ts.utcoffset() == datetime.timedelta(0)
-
-    def test_z_suffix_high_precision(self):
-        # 7-digit fraction should be truncated to 6 without error.
-        ts = parse_timestamp('2026-02-27T03:01:19.4880089Z')
-        assert ts.microsecond == 488008
-
-    def test_z_suffix_short_fraction(self):
-        # 5-digit fraction should be left-padded to 6 digits (0.13454 s = 134540 μs).
-        ts = parse_timestamp('2026-02-27T03:01:19.13454Z')
-        assert ts.microsecond == 134540
-
-    def test_z_suffix_four_digit_fraction(self):
-        # 4-digit fraction: 0.0033 s = 3300 μs.
-        ts = parse_timestamp('2026-02-27T03:01:19.0033Z')
-        assert ts.microsecond == 3300
-
-    @pytest.mark.skipif(
-        sys.version_info < (3, 11),
-        reason='fromisoformat does not support offset suffixes on Python 3.10',
-    )
-    def test_offset_suffix(self):
-        ts = parse_timestamp('2026-02-27T16:01:19.488008+13:00')
-        assert ts.tzinfo is not None
-        assert ts.utcoffset() == datetime.timedelta(hours=13)
-        assert ts.hour == 16
 
 
 class TestSnapsArgument:

@@ -116,14 +116,9 @@ class InstalledInfo:
 
     def __repr__(self) -> str:
         # The hold is rendered as a timestamp string rather than as a datetime repr, which keeps
-        # the repr readable and still lets it be evaluated to reconstruct an equal object: this
-        # is the format __init__ accepts, in the UTC form _utils.parse_timestamp reads on every
-        # supported Python (its fallback for 3.10 doesn't handle an offset).
-        if self.hold is None:
-            hold = None
-        else:
-            utc = self.hold.astimezone(datetime.timezone.utc)
-            hold = f'{utc.isoformat(timespec="microseconds").removesuffix("+00:00")}Z'
+        # the repr readable and still lets it be evaluated to reconstruct an equal object: it's
+        # the form snapd sends, which is the form __init__ takes.
+        hold = None if self.hold is None else self.hold.isoformat()
         return (
             f'{type(self).__name__}('
             f'{self.name!r}'
