@@ -17,7 +17,7 @@
 from . import _errors, _snapd_snaps, _utils
 
 
-def ensure(
+def ensure_installed(
     snap: str,
     channel: str | None = None,
     *,

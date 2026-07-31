@@ -61,7 +61,7 @@ from ._errors import (
     TimeoutError,  # noqa: A004 (shadowing a Python builtin)
 )
 from ._functions import (
-    ensure,
+    ensure_installed,
 )
 from ._snapd_aliases import (
     alias,
@@ -116,7 +116,7 @@ __all__ = [
     'alias',
     'connect',
     'disconnect',
-    'ensure',
+    'ensure_installed',
     'get',
     'get_one',
     'hold',
