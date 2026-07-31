@@ -133,20 +133,21 @@ def parse_timestamp(timestamp: str) -> datetime.datetime:
 
     Raises ValueError for a string that can't be parsed, as ``datetime.fromisoformat`` does.
     """
-    if sys.version_info >= (3, 11):
-        return datetime.datetime.fromisoformat(timestamp)
-    return _parse_timestamp_310(timestamp)
+    if sys.version_info < (3, 11):
+        return _parse_timestamp_310(timestamp)
+    return datetime.datetime.fromisoformat(timestamp)
+
+
+def _parse_timestamp_310(timestamp: str) -> datetime.datetime:
+    """Parse the timestamps snapd sends on Python 3.10, where fromisoformat can't read them."""
+    return datetime.datetime.fromisoformat(_normalize_timestamp_310(timestamp))
 
 
 # Snapd marshals timestamps with Go's RFC3339Nano layout, which drops trailing zeros from the
 # fractional seconds -- so the fraction is 0 to 9 digits long, down to no fraction at all -- and
 # writes the timezone as 'Z' when snapd's clock is UTC and as an offset such as '+13:00' when it
 # isn't. Which of those two forms a charm sees is decided by the timezone of the machine snapd
-# runs on, not by the Ubuntu base or the snapd version (pinned by
-# tests/functional/test_timestamps.py).
-#
-# The date and time separator and the timezone are matched as fromisoformat matches them, which
-# is to say case sensitively: it rejects a lowercase 't' or 'z' on every version we support.
+# runs on, not by the Ubuntu base or the snapd version.
 _TIMESTAMP_310 = re.compile(
     r'(?P<datetime>\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2})'
     r'(?:\.(?P<fraction>\d+))?'
@@ -154,37 +155,22 @@ _TIMESTAMP_310 = re.compile(
 )
 
 
-def _parse_timestamp_310(timestamp: str) -> datetime.datetime:
-    """Parse the timestamps snapd sends on Python 3.10, where fromisoformat can't read them.
+def _normalize_timestamp_310(timestamp: str) -> str:
+    """Rewrite a snapd timestamp in the narrow form every supported Python reads the same way.
+
+    This accepts what snapd sends, which is narrower than what ``fromisoformat`` accepts on
+    3.11+: a bare date, an offset without minutes, or the basic format with no separators is a
+    ValueError here and a datetime there.
 
     Python 3.10's ``fromisoformat`` rejects the ``Z`` suffix outright, and accepts a fractional
     part only when it's exactly 3 or 6 digits long. Snapd sends ``Z``, and sends fractions of
     every length from 0 to 9 digits, so the timestamp is normalized to a form 3.10 does read
     rather than parsed by hand -- leaving the arithmetic, and the timezone, to the stdlib.
 
-    Delete this, and the branch in :func:`parse_timestamp`, once we require Python 3.11+.
-
-    This accepts what snapd sends, which is narrower than what ``fromisoformat`` accepts on
-    3.11+: a bare date, an offset without minutes, or the basic format with no separators is a
-    ValueError here and a datetime there. Snapd sends none of those, and the unit tests assert
-    that both paths agree on every form it does send.
-    """
-    return datetime.datetime.fromisoformat(_normalize_timestamp_310(timestamp))
-
-
-def _normalize_timestamp_310(timestamp: str) -> str:
-    """Rewrite a snapd timestamp in the narrow form every supported Python reads the same way.
-
     The result always spells the fractional seconds with exactly 6 digits (or omits them) and
     the timezone as an offset (or omits it), which is the overlap between what Python 3.10's
     ``fromisoformat`` accepts and what later versions accept -- so what this returns parses to
-    the same datetime on every version, and a test of it on 3.14 is a test of 3.10's behaviour.
-
-    Kept separate from :func:`_parse_timestamp_310` because this is the part that is ours: the
-    rest is one stdlib call, on a string this has already put in the subset the versions agree
-    on. Delete both with the branch in :func:`parse_timestamp`.
-
-    Raises ValueError if the timestamp isn't a format snapd sends.
+    the same datetime on every version.
     """
     match = _TIMESTAMP_310.fullmatch(timestamp)
     if match is None:
