@@ -17,7 +17,6 @@ import logging
 from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import datetime
-from enum import StrEnum
 
 from ops import Model, Unit
 
@@ -29,6 +28,7 @@ from charmlibs.rollingops._common._models import (
     OperationResult,
     _Operation,
     _OperationQueue,
+    _StrEnum,
     _UnitBackendState,
 )
 from charmlibs.rollingops._common._utils import datetime_to_str, now_timestamp, parse_timestamp
@@ -36,7 +36,7 @@ from charmlibs.rollingops._common._utils import datetime_to_str, now_timestamp, 
 logger = logging.getLogger(__name__)
 
 
-class LockIntent(StrEnum):
+class LockIntent(_StrEnum):
     """Unit-level lock intents stored in unit databags."""
 
     REQUEST = 'request'

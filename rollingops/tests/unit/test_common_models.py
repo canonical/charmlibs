@@ -15,7 +15,7 @@
 # Learn more about testing at: https://juju.is/docs/sdk/testing
 
 import json
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Any
 
 import pytest
@@ -38,7 +38,7 @@ def test_operation_create_sets_fields():
 
 
 def test_operation_to_string():
-    ts = datetime(2026, 2, 23, 12, 0, 0, 123456, tzinfo=UTC)
+    ts = datetime(2026, 2, 23, 12, 0, 0, 123456, tzinfo=timezone.utc)
     op = _Operation(
         callback_id='cb',
         kwargs={'b': 2, 'a': 1},
@@ -62,7 +62,7 @@ def test_operation_to_string():
 
 
 def test_operation_to_string_zero_max_retry():
-    ts = datetime(2026, 2, 23, 4, 0, 0, 123456, tzinfo=UTC)
+    ts = datetime(2026, 2, 23, 4, 0, 0, 123456, tzinfo=timezone.utc)
     op = _Operation(
         callback_id='cb',
         kwargs={'b': 2, 'a': 1},
@@ -85,7 +85,7 @@ def test_operation_to_string_zero_max_retry():
 
 
 def test_operation_to_string_none_max_retry():
-    ts = datetime(2026, 2, 23, 4, 0, 0, 123456, tzinfo=UTC)
+    ts = datetime(2026, 2, 23, 4, 0, 0, 123456, tzinfo=timezone.utc)
     op = _Operation(
         callback_id='cb',
         kwargs={'b': 2, 'a': 1},
@@ -140,7 +140,7 @@ def test_operation_equality_and_hash_empty_arguments():
 
 
 def test_operation_to_string_and_from_string():
-    ts = datetime(2026, 2, 23, 12, 0, 0, 0, tzinfo=UTC)
+    ts = datetime(2026, 2, 23, 12, 0, 0, 0, tzinfo=timezone.utc)
     op1 = _Operation(
         callback_id='cb',
         kwargs={'x': 1, 'y': 'z'},
@@ -161,7 +161,7 @@ def test_operation_to_string_and_from_string():
 
 
 def test_operation_from_string_valid_payload():
-    requested_at = datetime(2026, 3, 12, 10, 30, 45, 123456, tzinfo=UTC)
+    requested_at = datetime(2026, 3, 12, 10, 30, 45, 123456, tzinfo=timezone.utc)
     payload = json.dumps({
         'callback_id': 'cb-123',
         'kwargs': {'b': 2, 'a': 'x'},
@@ -181,7 +181,7 @@ def test_operation_from_string_valid_payload():
 
 
 def test_from_string_valid_payload_with_empty_kwargs_and_no_max_retry():
-    requested_at = datetime(2026, 3, 12, 10, 30, 45, 123456, tzinfo=UTC)
+    requested_at = datetime(2026, 3, 12, 10, 30, 45, 123456, tzinfo=timezone.utc)
     payload = json.dumps({
         'callback_id': 'cb-123',
         'requested_at': '1773311445.123456',
@@ -199,7 +199,7 @@ def test_from_string_valid_payload_with_empty_kwargs_and_no_max_retry():
 
 
 def test_from_string_valid_payload_with_empty_kwargs_and_0_max_retry():
-    requested_at = datetime(2026, 3, 12, 10, 30, 45, 123456, tzinfo=UTC)
+    requested_at = datetime(2026, 3, 12, 10, 30, 45, 123456, tzinfo=timezone.utc)
     payload = json.dumps({
         'callback_id': 'cb-123',
         'kwargs': {},
@@ -467,7 +467,7 @@ def test_queue_deduplicates_only_against_last_item():
 
 def test_queue_to_string_and_from_string():
     q1 = _OperationQueue()
-    ts1 = datetime(2026, 2, 23, 12, 0, 0, 123456, tzinfo=UTC)
+    ts1 = datetime(2026, 2, 23, 12, 0, 0, 123456, tzinfo=timezone.utc)
     op1 = _Operation(
         callback_id='a',
         kwargs={'x': 1},
@@ -476,7 +476,7 @@ def test_queue_to_string_and_from_string():
         attempt=0,
         result=None,
     )
-    ts2 = datetime(2026, 2, 20, 12, 0, 0, 123456, tzinfo=UTC)
+    ts2 = datetime(2026, 2, 20, 12, 0, 0, 123456, tzinfo=timezone.utc)
     op2 = _Operation(
         callback_id='b',
         kwargs={'y': 'z'},
