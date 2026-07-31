@@ -169,3 +169,32 @@ class TestGlobPattern:
 
         result = sorted(p.name for p in LocalPath(populated_dir).glob(_Pattern()))
         assert result == ['c.md']
+
+
+class TestMatchPattern:
+    def test_str_pattern(self):
+        assert LocalPath('/foo/bar.txt').match('*.txt')
+        assert not LocalPath('/foo/bar.txt').match('*.md')
+
+    def test_pathlib_pattern(self):
+        # Python 3.11's pathlib.Path.match rejects path-like; LocalPath.match shims it.
+        assert LocalPath('/foo/bar.txt').match(pathlib.PurePosixPath('*.txt'))
+        assert not LocalPath('/foo/bar.txt').match(pathlib.PurePosixPath('*.md'))
+
+    def test_custom_pathlike_pattern(self):
+        class _Pattern:
+            def __fspath__(self) -> str:
+                return '*.txt'
+
+        assert LocalPath('/foo/bar.txt').match(_Pattern())
+
+    def test_non_pathlike_rejected(self):
+        # On Python 3.14+, pathlib.PurePath.match accepts any object with `with_segments`,
+        # which would silently allow non-PathLike duck types through. Normalising via
+        # os.fspath in the shim narrows the accepted type back to str | os.PathLike[str].
+        class _NotPathLike:
+            def with_segments(self, *parts: str) -> pathlib.PurePosixPath:
+                return pathlib.PurePosixPath(*parts)
+
+        with pytest.raises(TypeError):
+            LocalPath('/foo/bar.txt').match(_NotPathLike())  # type: ignore
