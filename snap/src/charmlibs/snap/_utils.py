@@ -169,6 +169,23 @@ def _parse_timestamp_310(timestamp: str) -> datetime.datetime:
     ValueError here and a datetime there. Snapd sends none of those, and the unit tests assert
     that both paths agree on every form it does send.
     """
+    return datetime.datetime.fromisoformat(_normalize_timestamp_310(timestamp))
+
+
+def _normalize_timestamp_310(timestamp: str) -> str:
+    """Rewrite a snapd timestamp in the narrow form every supported Python reads the same way.
+
+    The result always spells the fractional seconds with exactly 6 digits (or omits them) and
+    the timezone as an offset (or omits it), which is the overlap between what Python 3.10's
+    ``fromisoformat`` accepts and what later versions accept -- so what this returns parses to
+    the same datetime on every version, and a test of it on 3.14 is a test of 3.10's behaviour.
+
+    Kept separate from :func:`_parse_timestamp_310` because this is the part that is ours: the
+    rest is one stdlib call, on a string this has already put in the subset the versions agree
+    on. Delete both with the branch in :func:`parse_timestamp`.
+
+    Raises ValueError if the timestamp isn't a format snapd sends.
+    """
     match = _TIMESTAMP_310.fullmatch(timestamp)
     if match is None:
         raise ValueError(f'Invalid isoformat string: {timestamp!r}')
@@ -181,7 +198,7 @@ def _parse_timestamp_310(timestamp: str) -> datetime.datetime:
     # A timestamp with no timezone at all stays naive, as fromisoformat would leave it.
     timezone = match['timezone']
     offset = '' if timezone is None else '+00:00' if timezone == 'Z' else timezone
-    return datetime.datetime.fromisoformat(f'{match["datetime"]}{subsecond}{offset}')
+    return f'{match["datetime"]}{subsecond}{offset}'
 
 
 ########################################################

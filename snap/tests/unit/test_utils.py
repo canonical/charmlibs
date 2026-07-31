@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import datetime
+import re
 import sys
 from typing import TYPE_CHECKING
 
@@ -434,6 +435,15 @@ CONSTRUCTED_TIMESTAMPS = [
 TIMESTAMPS = [*OBSERVED_TIMESTAMPS, *CONSTRUCTED_TIMESTAMPS]
 
 
+# What _normalize_timestamp_310 is allowed to emit: fractional seconds spelled with exactly 6
+# digits or left out, and the timezone as an offset or left out. Python 3.10's fromisoformat
+# reads this subset, and every later version reads it to the same datetime -- checked against
+# 3.10, 3.12 and 3.14, including that a '+00:00' offset gives datetime.timezone.utc on all of
+# them. Nothing outside the subset can be assumed to survive the version difference.
+AGREED_SUBSET = re.compile(
+    r'\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d{6})?(?:[+-]\d{2}:\d{2})?'
+)
+
 # Neither fromisoformat nor the 3.10 parser reads any of these, on any version we support.
 MALFORMED = [
     '',
@@ -477,6 +487,19 @@ class TestParseTimestamp:
         parsed = _utils._parse_timestamp_310(timestamp)
         assert parsed == expected
         assert parsed.utcoffset() == expected.utcoffset()
+
+    # ...but that test ends in a call to the *running* version's fromisoformat, so on 3.14 it
+    # only stands in for 3.10 as far as the two agree. What makes it stand in is the shape of
+    # the normalized string: a 6 digit fraction or none, and an offset or none, which is the
+    # subset every supported fromisoformat reads identically. That property is version
+    # independent, so asserting it here is what carries the test across versions.
+    @pytest.mark.parametrize(('timestamp', 'expected'), TIMESTAMPS)
+    def test_normalize_310_output_is_read_the_same_by_every_version(
+        self, timestamp: str, expected: datetime.datetime
+    ):
+        del expected  # only in the signature to share the parametrization
+        normalized = _utils._normalize_timestamp_310(timestamp)
+        assert AGREED_SUBSET.fullmatch(normalized), normalized
 
     @pytest.mark.parametrize(('timestamp', 'expected'), TIMESTAMPS)
     @pytest.mark.skipif(
