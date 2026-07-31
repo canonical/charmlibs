@@ -8,7 +8,7 @@ snapd's conf endpoints treat 'system' as an alias for the 'core' snap and serve 
 configuration whether or not the core snap is installed. The `core_snap` fixture runs every
 test here in both states -- core installed and core absent -- because the absent state is where
 get()'s installed-snap probe must be skipped: /v2/snaps/system always 404s and /v2/snaps/core
-404s with no core snap, so probing would turn working calls into NotFoundError.
+404s with no core snap, so probing would turn working calls into _NotFoundError.
 
 This module is destructive to stored system configuration: removing the core snap deletes it
 (snapd treats core's config like any other snap's; options snapd maintains itself, such as

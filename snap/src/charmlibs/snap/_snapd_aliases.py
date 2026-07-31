@@ -45,6 +45,7 @@ def alias(snap: str, app: str, alias: str) -> None:
     _utils.raise_if_empty_or_blank(app, label='app name')
     _utils.raise_if_empty_or_blank(alias, label='alias')
     data = {'action': 'alias', 'snap': snap, 'app': app, 'alias': alias}
+    # NOTE: snapd sends snap-not-installed (NotInstalledError) if the snap is not installed.
     _client.post('/v2/aliases', body=data)
 
 

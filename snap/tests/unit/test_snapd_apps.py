@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 from charmlibs.snap import _snapd_apps
-from charmlibs.snap._errors import AppNotFoundError, NotFoundError
+from charmlibs.snap._errors import AppNotFoundError, _NotFoundError
 from conftest import result_of
 
 if TYPE_CHECKING:
@@ -131,10 +131,10 @@ class TestEmptyServices:
     def test_empty_services_not_installed_raises_not_found(
         self, mock_client: MockClient, func: Any
     ):
-        mock_client.get.side_effect = NotFoundError(
+        mock_client.get.side_effect = _NotFoundError(
             'snap not installed', kind='snap-not-found', value='hello-world'
         )
-        with pytest.raises(NotFoundError) as ctx:
+        with pytest.raises(_NotFoundError) as ctx:
             func('hello-world', [])
         # snapd's own probe error is raised unchanged: terse message, snap name in value (which
         # str() surfaces). Not chained -- the probe's error was handled, not propagated.
@@ -149,10 +149,10 @@ class TestEmptyServices:
     def test_system_names_are_probed(self, mock_client: MockClient, func: Any, snap: str):
         # Unlike the conf and interfaces endpoints, /v2/apps has no 'system' alias and treats
         # 'core' as an ordinary snap, so neither name skips the probe.
-        mock_client.get.side_effect = NotFoundError(
+        mock_client.get.side_effect = _NotFoundError(
             'snap not installed', kind='snap-not-found', value=snap
         )
-        with pytest.raises(NotFoundError):
+        with pytest.raises(_NotFoundError):
             func(snap, [])
         mock_client.get.assert_called_once_with(f'/v2/snaps/{snap}')
 
@@ -179,7 +179,7 @@ class TestEmptyServices:
 class TestAppNotFoundConversion:
     # snapd answers app-not-found both for a snap that isn't installed and for a service an
     # installed snap doesn't have, so start/stop/restart probe /v2/snaps/{snap} to tell them
-    # apart. An absent snap raises NotFoundError as it does elsewhere in the library, leaving
+    # apart. An absent snap raises _NotFoundError as it does elsewhere in the library, leaving
     # AppNotFoundError to mean the snap is installed but has no such service.
     # Built fresh per call: raising an exception mutates its __context__, so a shared instance
     # would leak chaining state between tests.
@@ -190,14 +190,14 @@ class TestAppNotFoundConversion:
         )
 
     @staticmethod
-    def _snap_not_found() -> NotFoundError:
-        return NotFoundError('snap not installed', kind='snap-not-found', value='hello-world')
+    def _snap_not_found() -> _NotFoundError:
+        return _NotFoundError('snap not installed', kind='snap-not-found', value='hello-world')
 
     @pytest.mark.parametrize('func', _FUNCTIONS, ids=lambda f: f.__name__)
     def test_absent_snap_raises_not_found(self, mock_client: MockClient, func: Any):
         mock_client.post.side_effect = self._app_not_found()
         mock_client.get.side_effect = self._snap_not_found()
-        with pytest.raises(NotFoundError) as ctx:
+        with pytest.raises(_NotFoundError) as ctx:
             func('hello-world', 'daemon')
         assert ctx.value.kind == 'snap-not-found'
         assert str(ctx.value) == 'snap not installed (hello-world)'
@@ -209,7 +209,7 @@ class TestAppNotFoundConversion:
         # sees a single traceback that doesn't mention a service they may not have named.
         mock_client.post.side_effect = self._app_not_found()
         mock_client.get.side_effect = self._snap_not_found()
-        with pytest.raises(NotFoundError) as ctx:
+        with pytest.raises(_NotFoundError) as ctx:
             func('hello-world', 'daemon')
         assert ctx.value.__cause__ is None
         assert ctx.value.__suppress_context__

@@ -14,7 +14,13 @@
 
 """Logical error types for responses from the snapd API."""
 
+from __future__ import annotations
+
 import builtins as _builtins
+import typing
+
+if typing.TYPE_CHECKING:
+    from typing_extensions import Self
 
 
 class Error(Exception):
@@ -50,6 +56,16 @@ class Error(Exception):
         self._status_code = status_code
         self._status = status
 
+    @classmethod
+    def _from(cls, error: Error) -> Self:
+        return cls(
+            error._message,
+            kind=error._kind,
+            value=error._value,
+            status_code=error._status_code,
+            status=error._status,
+        )
+
     @property
     def message(self) -> str:
         """The error message, typically from the snapd API response."""
@@ -70,7 +86,7 @@ class Error(Exception):
 
     def __str__(self) -> str:
         # Surface `value` when it adds information the message doesn't already carry.
-        # Most useful for NotFoundError, with message 'snap not installed' and value '<snap>'.
+        # Most useful for _NotFoundError, with message 'snap not installed' and value '<snap>'.
         # Skip OptionNotFoundError's non-string value, which is redundant with its message.
         value = self._value
         if isinstance(value, str) and value and value not in self._message:
@@ -135,16 +151,22 @@ class AppNotFoundError(APIError):
     """Raised via the API when a specified app is not found within an installed snap."""
 
 
-class NotFoundError(APIError):
+class _NotFoundError(APIError):
     """Raised via the API when a snap is not found.
 
-    Depending on the operation, this means not found in the store (for example install),
-    or not installed on the system (for example configuration operations).
+    Internal only: callers must narrow to either NotInstalledError or NotInStoreError.
     """
 
 
-class NotInstalledError(APIError):
-    """Raised via the API when a snap is not installed on the system."""
+class NotInstalledError(_NotFoundError):
+    """Raised when a snap is not installed on the system."""
+
+
+class NotInStoreError(_NotFoundError):
+    """Raised when the snap store has no snap by that name.
+
+    Distinct from :class:`ChannelNotAvailableError` and :class:`RevisionNotAvailableError`.
+    """
 
 
 class NeedsClassicError(APIError):

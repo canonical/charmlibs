@@ -53,8 +53,9 @@ def ensure(
             ``revision`` to control which channel the snap tracks -- otherwise a newly
             installed snap tracks ``latest/stable``, whichever channel the revision was
             found on.
-        classic: If ``True``, install or refresh the snap with classic confinement. Required
-            for snaps that use classic confinement.
+        classic: Permission to install or refresh a revision that requires classic confinement.
+            If a snap revision requires classic confinement and ``classic`` is not true,
+            a :class:`NeedsClassicError` is raised.
         update: If ``True`` (default), refresh the snap when it is already installed on the
             requested channel. If ``False``, leave an already-correct snap untouched.
 
@@ -67,7 +68,7 @@ def ensure(
 
     Raises:
         ValueError: if the snap name is empty, blank, or is not a single path segment.
-        NotFoundError: If the snap does not exist in the store.
+        NotInStoreError: If the store has no snap by that name.
         RevisionNotAvailableError: If the revision is not available on any channel.
         NeedsClassicError: If the snap requires ``classic=True``.
         ChannelNotAvailableError: If the channel is invalid or unavailable, or if the revision
@@ -101,5 +102,5 @@ def _installed_info(snap: str) -> _snapd_snaps.InstalledInfo | None:
     """Return the snap's local state, or None if it is not installed."""
     try:
         return _snapd_snaps.list_one(snap)
-    except _errors.NotFoundError:
+    except _errors.NotInstalledError:
         return None

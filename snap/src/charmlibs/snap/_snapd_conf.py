@@ -54,7 +54,7 @@ def get(snap: str, keys: str | Iterable[str] | None = None) -> dict[str, Any]:
     Raises:
         ValueError: if the snap name is empty, blank, or is not a single path segment, or if a
             key is empty, blank, or contains a comma or surrounding whitespace.
-        NotFoundError: if the snap is not installed. Never raised for ``system`` or ``core``,
+        NotInstalledError: if the snap is not installed. Never raised for ``system`` or ``core``,
             whose configuration is served whether or not the core snap is installed.
         OptionNotFoundError: if a requested key has no value stored in the snap's configuration.
             Snap configuration is schemaless, so snapd does not distinguish between a key the
@@ -92,10 +92,13 @@ def get(snap: str, keys: str | Iterable[str] | None = None) -> dict[str, Any]:
         params = None
     try:
         config = _client.get(path, query=params)
+    except _errors._NotFoundError as e:
+        # snap-not-found -> NotInstalledError: This endpoint operates on installed snaps.
+        raise _errors.NotInstalledError._from(e) from None
     except _errors.OptionNotFoundError:
         # NOTE: snapd reports option-not-found both for a missing key and for a missing snap.
         # The CLI returns 'error: snap "foo" has no "bar" configuration' in both cases.
-        # For symmetry with PUT (set/unset), we convert to NotFoundError here for a missing snap.
+        # For symmetry with PUT (set/unset), we raise NotInstalledError for a missing snap.
         if error := _utils.check_installed(snap, skip_system=True):
             raise error from None
         raise
@@ -107,7 +110,7 @@ def get(snap: str, keys: str | Iterable[str] | None = None) -> dict[str, Any]:
     ):
         # NOTE: snapd returns {} for an installed snap with no config and for a missing snap.
         # The CLI returns 'error: snap "foo" has no configuration' for a missing snap.
-        # For symmetry with PUT (set/unset), we raise NotFoundError here for a missing snap.
+        # For symmetry with PUT (set/unset), we raise NotInstalledError for a missing snap.
         raise error
     assert isinstance(config, dict)
     return typing.cast('dict[str, Any]', config)
@@ -130,7 +133,7 @@ def get_one(snap: str, key: str) -> Any:
     Raises:
         ValueError: if the snap name is empty, blank, or is not a single path segment, or if the
             key is empty, blank, or contains a comma or surrounding whitespace.
-        NotFoundError: if the snap is not installed. Never raised for ``system`` or ``core``,
+        NotInstalledError: if the snap is not installed. Never raised for ``system`` or ``core``,
             whose configuration is served whether or not the core snap is installed.
         OptionNotFoundError: if the key has no value stored in the snap's configuration. See
             :func:`get` for why snapd cannot distinguish an unrecognised key from an unset one.
@@ -164,7 +167,7 @@ def unset(snap: str, keys: str | Iterable[str]) -> None:
     Raises:
         ValueError: if the snap name is empty, blank, or is not a single path segment,
             or if a key is empty or blank.
-        NotFoundError: if the snap is not installed.
+        NotInstalledError: if the snap is not installed.
         ChangeError: if the snap's configure hook fails. This includes unsetting any
             configuration on a snap that does not define a configure hook. A failed change
             is rolled back: no key from the request is unset.
@@ -176,7 +179,11 @@ def unset(snap: str, keys: str | Iterable[str]) -> None:
     # NOTE: snap-not-found is returned for a missing snap, but not for system or core,
     # even if the core snap isn't installed -- configuration changes are still applied.
     # NOTE: Unset with no keys is a no-op (like set with an empty dict). We let snapd handle it.
-    _client.put(path, body=dict.fromkeys(keys))
+    try:
+        _client.put(path, body=dict.fromkeys(keys))
+    except _errors._NotFoundError as e:
+        # snap-not-found -> NotInstalledError: This endpoint operates on installed snaps.
+        raise _errors.NotInstalledError._from(e) from None
 
 
 # Defined last to minimise the chance of meaningfully shadowing the built-in set type.
@@ -193,7 +200,7 @@ def set(snap: str, config: dict[str, Any]) -> None:  # noqa: A001 (shadowing a P
     Raises:
         ValueError: if the snap name is empty, blank, or is not a single path segment, or if a
             key in ``config`` is empty or blank.
-        NotFoundError: if the snap is not installed.
+        NotInstalledError: if the snap is not installed.
         ChangeError: if the snap's configure hook fails. This includes setting any
             configuration on a snap that does not define a configure hook, and configuration
             rejected by a validating configure hook. A failed change is rolled back: no key
@@ -205,4 +212,8 @@ def set(snap: str, config: dict[str, Any]) -> None:  # noqa: A001 (shadowing a P
     # NOTE: snap-not-found is returned for a missing snap, but not for system or core,
     # even if the core snap isn't installed -- configuration changes are still applied.
     # NOTE: Set with an empty dict is a no-op. We let snapd handle it.
-    _client.put(path, body=config)
+    try:
+        _client.put(path, body=config)
+    except _errors._NotFoundError as e:
+        # snap-not-found -> NotInstalledError: This endpoint operates on installed snaps.
+        raise _errors.NotInstalledError._from(e) from None

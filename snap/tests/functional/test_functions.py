@@ -243,8 +243,11 @@ def test_ensure_installs_classic():
 
 
 def test_ensure_bad_snap_name_raises():
-    with pytest.raises(_errors.NotFoundError):
+    # ensure() finds the snap isn't installed and goes on to install it, so the store is what
+    # reports the name as missing -- not the local check that got there first.
+    with pytest.raises(_errors.NotInStoreError) as ctx:
         _functions.ensure(_ABSENT_SNAP)
+    assert type(ctx.value) is _errors.NotInStoreError
 
 
 # ---------------------------------------------------------------------------

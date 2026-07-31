@@ -273,7 +273,7 @@ _ERRORS = {
     'option-not-found': _errors.OptionNotFoundError,
     'snap-channel-not-available': _errors.ChannelNotAvailableError,
     'snap-needs-classic': _errors.NeedsClassicError,
-    'snap-not-found': _errors.NotFoundError,
+    'snap-not-found': _errors._NotFoundError,
     'snap-not-installed': _errors.NotInstalledError,
     'snap-no-update-available': _errors._NoUpdatesAvailableError,
     'snap-revision-not-available': _errors.RevisionNotAvailableError,

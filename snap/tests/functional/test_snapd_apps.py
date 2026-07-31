@@ -193,7 +193,7 @@ def test_restart_nonexistent_service_raises():
 # Which error snapd answers with depends on the shape of the request. Naming the snap on its own
 # is a typed snap-not-found, but naming a service inside it is app-not-found -- the same kind it
 # uses for a service an installed snap doesn't have. start, stop and restart probe
-# /v2/snaps/{snap} on app-not-found, so an absent snap is a NotFoundError whichever way it was
+# /v2/snaps/{snap} on app-not-found, so an absent snap is a _NotFoundError whichever way it was
 # named, and AppNotFoundError is left meaning what it says. The raw responses are pinned below.
 # ---------------------------------------------------------------------------
 
@@ -205,7 +205,7 @@ def test_restart_nonexistent_service_raises():
 def test_not_installed_snap_raises_not_found(func: Any, services: Any):
     # Every form of the services argument reports an absent snap as the same type and kind,
     # including the empty list, which never reaches /v2/apps and is answered by the probe alone.
-    with pytest.raises(_errors.NotFoundError) as ctx:
+    with pytest.raises(_errors.NotInstalledError) as ctx:
         func(_ABSENT_SNAP, services)
     assert ctx.value.kind == 'snap-not-found'
     assert _ABSENT_SNAP in str(ctx.value)
@@ -216,7 +216,7 @@ def test_not_installed_snap_raises_not_found(func: Any, services: Any):
 def test_not_installed_snap_converted_error_wording(func: Any, services: Any):
     # The forms that reach the probe raise snapd's own /v2/snaps/{snap} error unchanged: a terse
     # message with the snap name in value, which str() surfaces. Same wording as conf's get().
-    with pytest.raises(_errors.NotFoundError) as ctx:
+    with pytest.raises(_errors.NotInstalledError) as ctx:
         func(_ABSENT_SNAP, services)
     assert ctx.value.message == 'snap not installed'
     assert str(ctx.value.value) == _ABSENT_SNAP
@@ -229,7 +229,7 @@ def test_not_installed_snap_unconverted_error_wording(func: Any):
     # snap-not-found -- already the error the library wants, so nothing is converted and snapd's
     # wording is passed through, as set/unset pass through the conf endpoint's. The type and kind
     # are what the library keeps consistent across endpoints, not the message.
-    with pytest.raises(_errors.NotFoundError) as ctx:
+    with pytest.raises(_errors.NotInstalledError) as ctx:
         func(_ABSENT_SNAP, None)
     assert ctx.value.message == f'snap "{_ABSENT_SNAP}" not found'
 
@@ -238,7 +238,7 @@ def test_not_installed_snap_unconverted_error_wording(func: Any):
 def test_not_installed_snap_error_is_not_chained(func: Any):
     # snapd's misleading app-not-found is suppressed ('raise ... from None'), so the traceback is
     # a single error that doesn't blame a service the caller may never have named.
-    with pytest.raises(_errors.NotFoundError) as ctx:
+    with pytest.raises(_errors.NotInstalledError) as ctx:
         func(_ABSENT_SNAP, 'svc')
     assert ctx.value.__cause__ is None
     assert ctx.value.__suppress_context__
@@ -269,7 +269,7 @@ def test_raw_api_installed_snap_without_the_service_is_indistinguishable():
 def test_raw_api_not_installed_snap_alone_is_snap_not_found():
     # Naming the snap on its own is not conflated: snapd resolves the name before it looks for
     # services, so this is already the error the library wants and no probe is made for it.
-    with pytest.raises(_errors.NotFoundError) as ctx:
+    with pytest.raises(_errors._NotFoundError) as ctx:
         _client.post('/v2/apps', body={'action': 'start', 'names': [_ABSENT_SNAP]})
     assert ctx.value.kind == 'snap-not-found'
     assert ctx.value.message == f'snap "{_ABSENT_SNAP}" not found'
@@ -281,7 +281,7 @@ def test_system_is_not_special_here(func: Any):
     # installed, so their not-installed probe skips both names. /v2/apps has no such alias, so
     # they're probed like any other snap. Only 'system' is asserted on: it is never a snap, while
     # 'core' is an ordinary one that may or may not be installed on the test machine.
-    with pytest.raises(_errors.NotFoundError) as ctx:
+    with pytest.raises(_errors.NotInstalledError) as ctx:
         func('system', [])
     assert ctx.value.kind == 'snap-not-found'
 

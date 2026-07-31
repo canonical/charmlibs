@@ -20,7 +20,7 @@ import logging
 import typing
 from typing import Any
 
-from . import _client, _utils
+from . import _client, _errors, _utils
 
 if typing.TYPE_CHECKING:
     import datetime
@@ -97,7 +97,7 @@ def logs(snaps: str | Iterable[str] | None = None, *, limit: int | None = 10) ->
     Raises:
         ValueError: If any snap name is empty, blank, has leading or trailing whitespace, or
             contains a comma; or if ``limit`` is not ``None`` and is not a positive integer.
-        NotFoundError: If a specified snap is not installed.
+        NotInstalledError: If a specified snap is not installed.
         AppNotFoundError: If a specified snap has no services.
 
     ::
@@ -132,7 +132,11 @@ def logs(snaps: str | Iterable[str] | None = None, *, limit: int | None = 10) ->
     query: dict[str, Any] = {'n': n}
     if snaps:
         query['names'] = ','.join(snaps)
-    result = _client.get_logs(query=query)
+    try:
+        result = _client.get_logs(query=query)
+    except _errors._NotFoundError as e:
+        # snap-not-found -> NotInstalledError: Logs come from an installed snap's services.
+        raise _errors.NotInstalledError._from(e) from None
     # A log entry looks like:
     # {'timestamp': '2026-02-27T03:01:19.488008Z',
     #  'message': 'QMP: {"timestamp": {"seconds": 1772161279, "microseconds": 487649}, "event": "RTC_CHANGE", "data": {"offset": 0, "qom-path": "/machine/unattached/device[7]/rtc"}}',  # noqa: E501

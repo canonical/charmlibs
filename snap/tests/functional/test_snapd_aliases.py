@@ -175,8 +175,13 @@ def test_alias_duplicate_name_different_snap_raises():
 
 
 def test_alias_not_installed_snap_raises():
+    # snapd answers with the 'snap-not-installed' kind here, rather than the 'snap-not-found' it
+    # uses on most endpoints. That kind is unambiguous -- only remove and alias send it, and both
+    # act on an installed snap -- so the client maps it straight to the subclass, and alias needs
+    # no narrowing of its own to report the same type every other operation reports.
     with pytest.raises(_errors.NotInstalledError) as ctx:
         _snapd_aliases.alias(_ABSENT_SNAP, 'hello', 'test-not-installed-alias')
+    assert type(ctx.value) is _errors.NotInstalledError
     assert ctx.value.kind == 'snap-not-installed'
 
 

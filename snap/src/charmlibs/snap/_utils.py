@@ -40,11 +40,11 @@ def snap_path_segment(snap: str) -> str:
     return urllib.parse.quote(snap, safe='')
 
 
-def check_installed(snap: str, *, skip_system: bool = False) -> _errors.NotFoundError | None:
-    """Return snapd's own NotFoundError if the snap is not installed, otherwise ``None``.
+def check_installed(snap: str, *, skip_system: bool = False) -> _errors.NotInstalledError | None:
+    """Return an error if the snap is not installed, otherwise ``None``.
 
-    Probes ``GET /v2/snaps/{snap}`` and returns the :class:`NotFoundError` snapd answers with when
-    it reports the snap absent, ready for the caller to ``raise``.
+    Probes ``GET /v2/snaps/{snap}`` and returns the error snapd answers with when it reports the
+    snap absent, as a :class:`NotInstalledError` ready for the caller to ``raise``.
 
     Args:
         snap: The name of the snap to check.
@@ -67,8 +67,9 @@ def check_installed(snap: str, *, skip_system: bool = False) -> _errors.NotFound
     path = f'/v2/snaps/{snap_path_segment(snap)}'
     try:
         _client.get(path)
-    except _errors.NotFoundError as e:
-        return e.with_traceback(None)  # Clean error with no traceback for the caller to raise.
+    except _errors._NotFoundError as e:
+        # snap-not-found -> NotInstalledError: This function queries local state only.
+        return _errors.NotInstalledError._from(e)
     return None
 
 
