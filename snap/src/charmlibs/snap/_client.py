@@ -293,7 +293,7 @@ def _get_path(response: http.client.HTTPResponse) -> str:
 ##########
 
 
-_ERRORS = {
+_ERRORS: dict[str, type[_errors.APIError]] = {
     'snap-already-installed': _errors._AlreadyInstalledError,
     'app-not-found': _errors.AppNotFoundError,
     'option-not-found': _errors.OptionNotFoundError,

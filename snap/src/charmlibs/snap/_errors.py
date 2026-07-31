@@ -24,86 +24,19 @@ if typing.TYPE_CHECKING:
 
 
 class Error(Exception):
-    """Base class for all library errors, not raised directly.
+    """Base class for all library errors, not raised directly."""
 
-    Args:
-        message: Typically the 'message' field from a snapd API response.
-        kind: The 'kind' field from a snapd API response, used to derive the specific error type.
-            Errors the library raises itself have a kind starting with 'charmlibs-snap', so that
-            they can't collide with a kind snapd may add in future.
-        value: The 'value' field from a snapd API response, which may contain additional details.
-            Almost always a string, but can be any JSON value.
-        status_code: The HTTP status code from the snapd API response, if applicable.
-            Stored privately for logging and debugging, not part of the public error API.
-        status: The 'status' field from a snapd API response, if applicable.
-            Stored privately for logging and debugging, not part of the public error API.
-    """
-
-    def __init__(
-        self,
-        message: str,
-        *,
-        kind: str,
-        value: object,
-        status_code: int | None = None,
-        status: str | None = None,
-    ):
+    def __init__(self, message: str):
         super().__init__(message)
-        # Exposed publicly as read-only properties.
         self._message = message
-        self._kind = kind
-        self._value = value
-        # Too low-level to be part of the public API, but useful for debugging and logging.
-        self._status_code = status_code
-        self._status = status
-
-    @classmethod
-    def _from(cls, error: Error) -> Self:
-        return cls(
-            error._message,
-            kind=error._kind,
-            value=error._value,
-            status_code=error._status_code,
-            status=error._status,
-        )
 
     @property
     def message(self) -> str:
         """The error message, typically from the snapd API response."""
         return self._message
 
-    @property
-    def kind(self) -> str:
-        """The error kind, typically from the snapd API response."""
-        return self._kind
-
-    @property
-    def value(self) -> object:
-        """The error value, typically from the snapd API response.
-
-        Currently a string, but future library versions may return any ``object`` subtype.
-        """
-        return str(self._value)
-
-    def __str__(self) -> str:
-        # Surface `value` when it adds information the message doesn't already carry.
-        # Most useful for _NotFoundError, with message 'snap not installed' and value '<snap>'.
-        # Skip OptionNotFoundError's non-string value, which is redundant with its message.
-        value = self._value
-        if isinstance(value, str) and value and value not in self._message:
-            return f'{self._message} ({value})'
-        return self._message
-
     def __repr__(self) -> str:
-        return (
-            f'{type(self).__module__}.{type(self).__name__}('
-            f'{self.message!r}'
-            f', kind={self.kind!r}'
-            f', value={self.value!r}'
-            f', status_code={self._status_code!r}'
-            f', status={self._status!r}'
-            ')'
-        )
+        return f'{type(self).__module__}.{type(self).__name__}({self.message!r})'
 
 
 #####################################################
@@ -156,6 +89,51 @@ class TimeoutError(Error, _builtins.TimeoutError):  # noqa: A001 (shadowing a Py
 
 class APIError(Error):
     """Raised when the snapd API returns an error response."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        kind: str,
+        value: object,
+        status_code: int | None = None,
+        status: str | None = None,
+    ):
+        super().__init__(message)
+        self._kind = kind
+        self._value = value
+        self._status_code = status_code
+        self._status = status
+
+    @classmethod
+    def _from(cls, error: APIError) -> Self:
+        return cls(
+            error._message,
+            kind=error._kind,
+            value=error._value,
+            status_code=error._status_code,
+            status=error._status,
+        )
+
+    def __str__(self) -> str:
+        # Surface `value` when it adds information the message doesn't already carry.
+        # Most useful for _NotFoundError, with message 'snap not installed' and value '<snap>'.
+        # Skip OptionNotFoundError's non-string value, which is redundant with its message.
+        value = self._value
+        if isinstance(value, str) and value and value not in self._message:
+            return f'{self._message} ({value})'
+        return self._message
+
+    def __repr__(self) -> str:
+        return (
+            f'{type(self).__module__}.{type(self).__name__}('
+            f'{self.message!r}'
+            f', kind={self._kind!r}'
+            f', value={self._value!r}'
+            f', status_code={self._status_code!r}'
+            f', status={self._status!r}'
+            ')'
+        )
 
 
 class _AlreadyInstalledError(APIError):  # pyright: ignore[reportUnusedClass]
