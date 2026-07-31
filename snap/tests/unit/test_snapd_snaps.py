@@ -222,6 +222,7 @@ class TestListOne:
             _snapd.list_one('hello-world')
         assert 'Unexpected response type' in ctx.value.message
         assert "'list'" in ctx.value.message
+        assert ctx.value.response == ['hello-world']
 
     @pytest.mark.parametrize('missing', ['name', 'version', 'revision', 'confinement'])
     def test_list_one_missing_field_raises_bad_response(
@@ -232,6 +233,7 @@ class TestListOne:
         with pytest.raises(BadResponseError) as ctx:
             _snapd.list_one('hello-world')
         assert missing in ctx.value.message  # Named by the KeyError repr.
+        assert ctx.value.response == info_dict  # The description we couldn't read.
         assert ctx.value.__suppress_context__
 
     def test_list_one_unparseable_hold_raises_bad_response(self, mock_client: MockClient):
@@ -240,7 +242,7 @@ class TestListOne:
             _snapd.list_one('hello-world')
 
     def test_list_one_other_error_propagates(self, mock_client: MockClient):
-        mock_client.get.side_effect = Error(
+        mock_client.get.side_effect = APIError(
             'internal error',
             kind='internal-error',
             value='',
@@ -293,7 +295,7 @@ class TestInstall:
             _snapd.install('hello-world')
         assert type(ctx.value) is NotInStoreError
         assert ctx.value.message == 'snap not found'
-        assert ctx.value.value == 'hello-world'
+        assert ctx.value._value == 'hello-world'
         assert ctx.value.__suppress_context__
 
 
@@ -406,8 +408,8 @@ class TestRefreshNotInstalled:
             _snapd.refresh('hello-world')
         # snapd's own probe error, narrowed: terse message, snap name in value.
         assert type(ctx.value) is NotInstalledError
-        assert ctx.value.kind == 'snap-not-found'
-        assert ctx.value.value == 'hello-world'
+        assert ctx.value._kind == 'snap-not-found'
+        assert ctx.value._value == 'hello-world'
         assert str(ctx.value) == 'snap not installed (hello-world)'
         mock_client.get.assert_called_once_with('/v2/snaps/hello-world')
 
@@ -443,7 +445,7 @@ class TestRefreshNotInstalled:
             _snapd.refresh('hello-world')
         assert type(ctx.value) is NotInStoreError
         assert ctx.value.message == 'snap not found'  # Not the probe's 'snap not installed'.
-        assert ctx.value.value == 'hello-world'
+        assert ctx.value._value == 'hello-world'
 
     def test_typed_errors_are_reraised_unchanged(self, mock_client: MockClient):
         # A refresh failure snapd does classify keeps its own type once the probe finds the snap.

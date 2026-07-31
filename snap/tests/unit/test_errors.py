@@ -63,27 +63,32 @@ class TestErrorHierarchy:
 
 
 def test_snap_error():
-    err = _errors.Error(
+    err = _errors.Error('the message')
+    # The message is the only public field.
+    assert err.message == 'the message'
+    # It's a read-only property, not an attribute.
+    with pytest.raises(AttributeError):
+        err.message = ''  # pyright: ignore[reportAttributeAccessIssue]
+    # str() and repr() have nothing else to report.
+    assert str(err) == 'the message'
+    assert repr(err) == "charmlibs.snap._errors.Error('the message')"
+
+
+def test_api_error():
+    err = _errors.APIError(
         'the message',
         kind='the-kind',
         value='the-value',
         status_code=400,
         status='Bad Request',
     )
-    # The message, kind and value are public.
+    # The message is public, as for any Error.
     assert err.message == 'the message'
-    assert err.kind == 'the-kind'
-    assert err.value == 'the-value'
-    # They're read-only properties, not attributes.
-    with pytest.raises(AttributeError):
-        err.message = ''  # pyright: ignore[reportAttributeAccessIssue]
-    with pytest.raises(AttributeError):
-        err.kind = ''  # pyright: ignore[reportAttributeAccessIssue]
-    with pytest.raises(AttributeError):
-        err.value = None  # pyright: ignore[reportAttributeAccessIssue]
-    # Status code and status message aren't public.
-    assert not hasattr(err, 'status_code')
-    assert not hasattr(err, 'status')
+    # The fields from the snapd error response are recorded privately, for logging and debugging.
+    assert err._kind == 'the-kind'
+    assert err._value == 'the-value'
+    assert err._status_code == 400
+    assert err._status == 'Bad Request'
     # The repr() contains *all* the arguments.
     r = repr(err)
     assert 'the message' in r
@@ -93,6 +98,15 @@ def test_snap_error():
     assert 'Bad Request' in r
     # str() appends a string value that adds information the message doesn't already carry.
     assert str(err) == 'the message (the-value)'
+
+
+@pytest.mark.parametrize('name', ['kind', 'value', 'status_code', 'status'])
+def test_error_response_fields_are_not_public(name: str):
+    # Only the message is public, on Error and APIError alike.
+    assert not hasattr(_errors.Error('boom'), name)
+    assert not hasattr(
+        _errors.APIError('boom', kind='k', value='v', status_code=1, status='s'), name
+    )
 
 
 @pytest.mark.parametrize(
@@ -115,4 +129,30 @@ def test_snap_error():
     ],
 )
 def test_str_appends_informative_string_value(message: str, value: object, expected: str):
-    assert str(_errors.Error(message, kind='some-kind', value=value)) == expected
+    assert str(_errors.APIError(message, kind='some-kind', value=value)) == expected
+
+
+class TestBadResponseError:
+    """BadResponseError carries what snapd sent, for the caller to put in a bug report."""
+
+    def test_response_is_public(self):
+        err = _errors.BadResponseError('boom', response={'unexpected': 'shape'})
+        assert err.response == {'unexpected': 'shape'}
+
+    def test_response_is_read_only(self):
+        err = _errors.BadResponseError('boom', response='oops')
+        with pytest.raises(AttributeError):
+            err.response = ''  # pyright: ignore[reportAttributeAccessIssue]
+
+    def test_response_defaults_to_none(self):
+        # Not every bad response has anything to report beyond the message.
+        assert _errors.BadResponseError('boom').response is None
+
+    def test_response_is_not_appended_to_str(self):
+        # Unlike APIError's value: a whole response body doesn't belong in a charm's status.
+        assert str(_errors.BadResponseError('boom', response='oops')) == 'boom'
+
+    @pytest.mark.parametrize('response', ['oops', {'unexpected': 'shape'}, None])
+    def test_repr_contains_the_message_and_the_response(self, response: object):
+        r = repr(_errors.BadResponseError('boom', response=response))
+        assert r == f"charmlibs.snap._errors.BadResponseError('boom', response={response!r})"

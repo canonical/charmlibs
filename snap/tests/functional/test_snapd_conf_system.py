@@ -76,9 +76,9 @@ def test_get_system_missing_key_raises_option_not_found(core_snap: str, name: st
     # served, so the probe must be skipped for these names.
     with pytest.raises(_errors.OptionNotFoundError) as ctx:
         _snapd_conf.get(name, ['key-that-does-not-exist-xyz'])
-    assert ctx.value.kind == 'option-not-found'
+    assert ctx.value._kind == 'option-not-found'
     # snapd resolves the alias in the error details: SnapName is always reported as 'core'.
-    assert 'core' in str(ctx.value.value)
+    assert 'core' in str(ctx.value._value)
 
 
 @pytest.mark.parametrize('name', ['system', 'core'])
