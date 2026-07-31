@@ -5,6 +5,9 @@
 
 from __future__ import annotations
 
+import datetime
+import re
+import sys
 from typing import TYPE_CHECKING
 
 import pytest
@@ -372,6 +375,180 @@ class TestResolveChannel:
     )
     def test_resolve(self, channel: str, tracking: str, expected: str):
         assert _utils.resolve_channel(channel, tracking) == expected
+
+
+UTC = datetime.timezone.utc
+NZDT = datetime.timezone(datetime.timedelta(hours=13))
+NZST = datetime.timezone(datetime.timedelta(hours=12))
+CHATHAM = datetime.timezone(datetime.timedelta(hours=12, minutes=45))
+
+# Snapd writes timestamps with Go's RFC3339Nano layout, so the same field varies in two ways:
+# the timezone is 'Z' or an offset depending on the timezone of the machine snapd runs on, and
+# the fractional seconds have their trailing zeros trimmed, down to no fraction at all.
+#
+# These are timestamps snapd 2.76 really sent, copied from the endpoints the library reads.
+# tests/functional/test_timestamps.py checks the format against a live snapd on each base, so
+# that this list stays a record of the real thing rather than of what we assume it to be.
+OBSERVED_TIMESTAMPS = [
+    # /v2/logs, whose timestamps journald records to microsecond precision.
+    ('2026-02-27T03:01:19.488008Z', datetime.datetime(2026, 2, 27, 3, 1, 19, 488008, UTC)),
+    # A snap's 'hold', from Go's nanosecond clock: 9 digits, truncated to 6 rather than rounded.
+    ('2318-11-10T01:13:31.475559159Z', datetime.datetime(2318, 11, 10, 1, 13, 31, 475559, UTC)),
+    # A snap's 'install-date', which regularly lands on a whole second and so arrives with no
+    # fraction at all. fromisoformat reads this on 3.10, but the old parser raised ValueError.
+    ('2026-07-22T11:27:35Z', datetime.datetime(2026, 7, 22, 11, 27, 35, 0, UTC)),
+    # The same fields from a snapd whose machine isn't on UTC. 3.10's fromisoformat reads the
+    # offset but not the fraction, so these need normalizing too -- and the old parser read
+    # every one of them as UTC, putting the result out by the machine's offset.
+    (
+        '2026-02-26T12:20:32.316341429+13:00',
+        datetime.datetime(2026, 2, 26, 12, 20, 32, 316341, NZDT),
+    ),
+    (
+        '2026-06-29T15:23:53.793426507+12:00',
+        datetime.datetime(2026, 6, 29, 15, 23, 53, 793426, NZST),
+    ),
+    (
+        '2026-07-31T13:32:35.365168077+12:00',
+        datetime.datetime(2026, 7, 31, 13, 32, 35, 365168, NZST),
+    ),
+]
+
+# Forms Go's layout can produce that we haven't happened to catch snapd emitting.
+CONSTRUCTED_TIMESTAMPS = [
+    # A negative offset, and one that isn't a whole number of hours.
+    (
+        '2026-02-26T12:20:32.316341429-05:00',
+        datetime.datetime(
+            2026, 2, 26, 12, 20, 32, 316341, datetime.timezone(datetime.timedelta(hours=-5))
+        ),
+    ),
+    ('2026-02-26T12:20:32.3+12:45', datetime.datetime(2026, 2, 26, 12, 20, 32, 300000, CHATHAM)),
+    # Fractions shorter than 6 digits are right padded, not left padded: '.13454' is 134540 μs.
+    ('2026-02-27T03:01:19.13454Z', datetime.datetime(2026, 2, 27, 3, 1, 19, 134540, UTC)),
+    ('2026-02-27T03:01:19.0033Z', datetime.datetime(2026, 2, 27, 3, 1, 19, 3300, UTC)),
+    ('2026-02-27T03:01:19.1Z', datetime.datetime(2026, 2, 27, 3, 1, 19, 100000, UTC)),
+    # Go's zero time, which is what a time field snapd has no value for would marshal to.
+    ('0001-01-01T00:00:00Z', datetime.datetime(1, 1, 1, 0, 0, 0, 0, UTC)),
+]
+
+TIMESTAMPS = [*OBSERVED_TIMESTAMPS, *CONSTRUCTED_TIMESTAMPS]
+
+
+# What _normalize_timestamp_310 is allowed to emit: fractional seconds spelled with exactly 6
+# digits or left out, and the timezone as an offset or left out. Python 3.10's fromisoformat
+# reads this subset, and every later version reads it to the same datetime -- checked against
+# 3.10, 3.12 and 3.14, including that a '+00:00' offset gives datetime.timezone.utc on all of
+# them. Nothing outside the subset can be assumed to survive the version difference.
+AGREED_SUBSET = re.compile(
+    r'\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d{6})?(?:[+-]\d{2}:\d{2})?'
+)
+
+# Neither fromisoformat nor the 3.10 parser reads any of these, on any version we support.
+MALFORMED = [
+    '',
+    'not a timestamp',
+    '03:01:19.488008Z',  # A time with no date.
+    '2026-02-27t03:01:19.488008z',  # fromisoformat is case sensitive, so we are too.
+    '2026-02-27T03:01:19.488008Z trailing',
+    'leading 2026-02-27T03:01:19.488008Z',
+]
+
+# Valid ISO 8601 that snapd never sends. fromisoformat on 3.11+ reads all of these, and the 3.10
+# parser reads none of them: it accepts snapd's format rather than every format, so that an
+# unexpected timestamp is an error rather than a datetime nothing meant.
+NOT_SNAPD_FORMAT = [
+    '2026-02-27',  # A date with no time.
+    '2026-02-27T03:01:19.488008+13',  # An offset with no minutes.
+    '2026-02-27T03:01:19+13:00:30',  # An offset with seconds.
+    '2026-02-27T03:01:19.Z',  # A fraction with no digits.
+    '2026-02-27x03:01:19.488008Z',  # An arbitrary separator.
+    '20260227T030119Z',  # The basic format, with the separators left out.
+    '2026-W09-5T03:01:19Z',  # A week date.
+]
+
+
+class TestParseTimestamp:
+    # Every timestamp is pinned to an exact value rather than to properties of the result, so
+    # that both parsing paths are asserted to agree -- the 3.10 one silently dropped the
+    # timezone, which no assertion about the shape of the result would have caught.
+    @pytest.mark.parametrize(('timestamp', 'expected'), TIMESTAMPS)
+    def test_parse(self, timestamp: str, expected: datetime.datetime):
+        parsed = _utils.parse_timestamp(timestamp)
+        assert parsed == expected
+        # Aware datetimes compare equal across timezones, so the offset is checked separately:
+        # without this, a timestamp parsed as UTC would match one that isn't.
+        assert parsed.utcoffset() == expected.utcoffset()
+
+    # The 3.10 parser is tested directly, on every version rather than only on the version that
+    # uses it, so that a regression in it fails everywhere instead of only in the 3.10 CI job.
+    @pytest.mark.parametrize(('timestamp', 'expected'), TIMESTAMPS)
+    def test_parse_310(self, timestamp: str, expected: datetime.datetime):
+        parsed = _utils._parse_timestamp_310(timestamp)
+        assert parsed == expected
+        assert parsed.utcoffset() == expected.utcoffset()
+
+    # ...but that test ends in a call to the *running* version's fromisoformat, so on 3.14 it
+    # only stands in for 3.10 as far as the two agree. What makes it stand in is the shape of
+    # the normalized string: a 6 digit fraction or none, and an offset or none, which is the
+    # subset every supported fromisoformat reads identically. That property is version
+    # independent, so asserting it here is what carries the test across versions.
+    @pytest.mark.parametrize(('timestamp', 'expected'), TIMESTAMPS)
+    def test_normalize_310_output_is_read_the_same_by_every_version(
+        self, timestamp: str, expected: datetime.datetime
+    ):
+        del expected  # only in the signature to share the parametrization
+        normalized = _utils._normalize_timestamp_310(timestamp)
+        assert AGREED_SUBSET.fullmatch(normalized), normalized
+
+    @pytest.mark.parametrize(('timestamp', 'expected'), TIMESTAMPS)
+    @pytest.mark.skipif(
+        sys.version_info < (3, 11),
+        reason='fromisoformat does not read these formats on 3.10, which is why we normalize',
+    )
+    def test_parse_310_matches_fromisoformat(self, timestamp: str, expected: datetime.datetime):
+        # Where the stdlib can read the timestamp itself, the 3.10 parser must agree with it
+        # exactly: the expected values above are the stdlib's, not ours.
+        del expected  # only in the signature to share the parametrization
+        parsed = datetime.datetime.fromisoformat(timestamp)
+        assert _utils._parse_timestamp_310(timestamp) == parsed
+        assert _utils._parse_timestamp_310(timestamp).utcoffset() == parsed.utcoffset()
+
+    @pytest.mark.parametrize('separator', ['T', ' '])
+    def test_date_and_time_separator(self, separator: str):
+        # Snapd always writes 'T'. The space form is accepted because str(datetime) produces it,
+        # and that's what a caller passing a timestamp to InstalledInfo has most readily to hand.
+        expected = datetime.datetime(2026, 2, 27, 3, 1, 19, 488008, UTC)
+        timestamp = f'2026-02-27{separator}03:01:19.488008Z'
+        assert _utils.parse_timestamp(timestamp) == expected
+        assert _utils._parse_timestamp_310(timestamp) == expected
+
+    def test_no_timezone_is_naive(self):
+        # Snapd always sends a timezone, but fromisoformat accepts a timestamp without one and
+        # returns a naive datetime rather than assuming UTC, so the 3.10 parser does the same.
+        for parsed in (
+            _utils.parse_timestamp('2026-02-27T03:01:19.488008'),
+            _utils._parse_timestamp_310('2026-02-27T03:01:19.488008'),
+        ):
+            assert parsed == datetime.datetime(2026, 2, 27, 3, 1, 19, 488008)
+            assert parsed.tzinfo is None
+
+    @pytest.mark.parametrize('timestamp', MALFORMED)
+    def test_malformed_raises_value_error(self, timestamp: str):
+        # ValueError is what fromisoformat raises, and what logs() catches to skip an entry it
+        # can't read rather than failing the whole call.
+        with pytest.raises(ValueError, match='Invalid isoformat string'):
+            _utils.parse_timestamp(timestamp)
+        with pytest.raises(ValueError, match='Invalid isoformat string'):
+            _utils._parse_timestamp_310(timestamp)
+
+    @pytest.mark.parametrize('timestamp', NOT_SNAPD_FORMAT)
+    def test_not_snapd_format_raises_value_error_on_310(self, timestamp: str):
+        # Only asserted of the 3.10 parser: on 3.11+ parse_timestamp hands the string straight
+        # to fromisoformat, which reads all of these. That difference is the price of dropping
+        # the parser by deleting a branch, and it only shows up for timestamps snapd never sends.
+        with pytest.raises(ValueError, match='Invalid isoformat string'):
+            _utils._parse_timestamp_310(timestamp)
 
     @pytest.mark.parametrize('channel', ['stable', 'candidate', 'beta', 'edge'])
     def test_resolving_the_tracked_channel_is_a_no_op(self, channel: str):

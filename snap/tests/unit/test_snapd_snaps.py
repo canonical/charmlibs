@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import datetime
+import re
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -104,6 +105,85 @@ class TestInstalledInfoFromDict:
         }
         info = _snapd.InstalledInfo._from_dict(info_dict)
         assert info.name == 'hello-world'
+
+
+def _public_fields(cls: type) -> list[str]:
+    """The public properties of a class, in the order the class defines them.
+
+    Read from the class rather than dir(), which sorts alphabetically and would lose that order.
+    """
+    return [
+        name
+        for name, attr in vars(cls).items()
+        if not name.startswith('_') and isinstance(attr, property)
+    ]
+
+
+def _field_values(info: _snapd.InstalledInfo) -> dict[str, Any]:
+    return {name: getattr(info, name) for name in _public_fields(type(info))}
+
+
+def _repr_fields(info: object) -> list[tuple[str | None, str]]:
+    """The fields of a repr as (name, value) pairs, with a None name for a positional field."""
+    r = repr(info)
+    prefix = f'{type(info).__name__}('
+    assert r.startswith(prefix), r
+    assert r.endswith(')'), r
+    fields: list[tuple[str | None, str]] = []
+    for field in r[len(prefix) : -1].split(', '):
+        # A value that happens to contain '=' isn't mistaken for a name: a name has to be a
+        # bare identifier at the start of the field, and every value here is quoted or a literal.
+        match = re.fullmatch(r'(?:([a-z_]+)=)?(.+)', field)
+        assert match is not None, field
+        fields.append((match.group(1), match.group(2)))
+    return fields
+
+
+@pytest.mark.parametrize(
+    'info_dict',
+    [
+        _MINIMAL_INFO_DICT,
+        {**_MINIMAL_INFO_DICT, 'confinement': 'classic', 'revision': 'x1'},
+        # A snap installed from a local file: no tracked channel.
+        {k: v for k, v in _MINIMAL_INFO_DICT.items() if k != 'tracking-channel'},
+        # A held snap: the hold is a timezone aware datetime rather than None.
+        result_of('snap_info_hello_world_held.json'),
+        # The hold as snapd sends it from a machine that isn't on UTC, and one that landed on a
+        # whole second. Both are timestamps the repr has to write in a form __init__ reads back
+        # unchanged, on Python 3.10 as much as on 3.11+ (see TestParseTimestamp).
+        {**_MINIMAL_INFO_DICT, 'hold': '2318-08-04T16:25:39.803472+13:00'},
+        {**_MINIMAL_INFO_DICT, 'hold': '2318-08-04T16:25:39Z'},
+    ],
+    ids=[
+        'minimal',
+        'classic-local-revision',
+        'no-tracking-channel',
+        'held',
+        'held-with-offset',
+        'held-on-a-whole-second',
+    ],
+)
+class TestInstalledInfoRepr:
+    def test_repr_has_every_public_field_in_order(self, info_dict: dict[str, Any]):
+        # Read from the class rather than hardcoded, so a new public field is covered here as
+        # soon as it's added, in the position the class declares it in.
+        expected = _public_fields(_snapd.InstalledInfo)
+        info = _snapd.InstalledInfo._from_dict(info_dict)
+        names = [name for name, _ in _repr_fields(info)]
+        # The first field may be positional, matching the constructor's first argument.
+        assert names[0] in (expected[0], None)
+        assert names[1:] == expected[1:]
+
+    def test_repr_round_trips_through_eval(self, info_dict: dict[str, Any]):
+        # The repr is valid Python that reconstructs an equal object, which pins the timestamp
+        # format the repr writes the hold in: __init__ has to be able to parse it back on every
+        # supported Python (see TestParseTimestamp).
+        info = _snapd.InstalledInfo._from_dict(info_dict)
+        namespace = {'InstalledInfo': _snapd.InstalledInfo, 'datetime': datetime}
+        clone = eval(repr(info), namespace)  # noqa: S307
+        assert isinstance(clone, _snapd.InstalledInfo)
+        assert _field_values(clone) == _field_values(info)
+        assert repr(clone) == repr(info)
 
 
 class TestListOne:

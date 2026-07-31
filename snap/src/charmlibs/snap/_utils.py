@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import datetime
+import re
 import sys
 import typing
 import urllib.parse
@@ -130,25 +131,60 @@ def resolve_channel(channel: str, tracking: str) -> str:
 def parse_timestamp(timestamp: str) -> datetime.datetime:
     """Parse a snapd timestamp string to a datetime object.
 
-    This can be dropped in favour of datetime.fromisoformat when we require Python 3.11+.
+    Raises ValueError for a string that can't be parsed, as ``datetime.fromisoformat`` does.
     """
-    if sys.version_info >= (3, 11):
-        return datetime.datetime.fromisoformat(timestamp)
-    # Python 3.10 can't parse the fractional seconds with fromisoformat.
-    # We parse the format manually here for Ubuntu 22.04 based charms.
-    #
-    # The snapd version that comes with Ubuntu 22.04 emits Z-suffixed timestamps, e.g.
-    # 2026-02-27T03:01:19.488008Z
-    #
-    # Note: Newer snapd versions emit RFC3339 timestamps with timezone offsets, but we don't
-    # need to handle them here since they're covered by fromisoformat in Python 3.11+.
-    dt, ms = timestamp.removesuffix('Z').split('.')
-    base = datetime.datetime.fromisoformat(dt).replace(tzinfo=datetime.timezone.utc)
-    # datetime.timedelta only supports microsecond precision (first 6 digits of fractional secs).
-    # Snapd timestamps may have higher precision (truncated) or fewer than 6 digits (right-padded
-    # with zeros). E.g. '.13454' is 134540 μs, not 13454 μs. This matches fromisoformat in 3.11+.
-    microseconds = datetime.timedelta(microseconds=int(ms[:6].ljust(6, '0')))
-    return base + microseconds
+    if sys.version_info < (3, 11):
+        return _parse_timestamp_310(timestamp)
+    return datetime.datetime.fromisoformat(timestamp)
+
+
+def _parse_timestamp_310(timestamp: str) -> datetime.datetime:
+    """Parse the timestamps snapd sends on Python 3.10, where fromisoformat can't read them."""
+    return datetime.datetime.fromisoformat(_normalize_timestamp_310(timestamp))
+
+
+# Snapd marshals timestamps with Go's RFC3339Nano layout, which drops trailing zeros from the
+# fractional seconds -- so the fraction is 0 to 9 digits long, down to no fraction at all -- and
+# writes the timezone as 'Z' when snapd's clock is UTC and as an offset such as '+13:00' when it
+# isn't. Which of those two forms a charm sees is decided by the timezone of the machine snapd
+# runs on, not by the Ubuntu base or the snapd version.
+_TIMESTAMP_310 = re.compile(
+    r'(?P<datetime>\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2})'
+    r'(?:\.(?P<fraction>\d+))?'
+    r'(?P<timezone>Z|[+-]\d{2}:\d{2})?'
+)
+
+
+def _normalize_timestamp_310(timestamp: str) -> str:
+    """Rewrite a snapd timestamp in the narrow form every supported Python reads the same way.
+
+    This accepts what snapd sends, which is narrower than what ``fromisoformat`` accepts on
+    3.11+: a bare date, an offset without minutes, or the basic format with no separators is a
+    ValueError here and a datetime there.
+
+    Python 3.10's ``fromisoformat`` rejects the ``Z`` suffix outright, and accepts a fractional
+    part only when it's exactly 3 or 6 digits long. Snapd sends ``Z``, and sends fractions of
+    every length from 0 to 9 digits, so the timestamp is normalized to a form 3.10 does read
+    rather than parsed by hand -- leaving the arithmetic, and the timezone, to the stdlib.
+
+    The result always spells the fractional seconds with exactly 6 digits (or omits them) and
+    the timezone as an offset (or omits it), which is the overlap between what Python 3.10's
+    ``fromisoformat`` accepts and what later versions accept -- so what this returns parses to
+    the same datetime on every version.
+    """
+    match = _TIMESTAMP_310.fullmatch(timestamp)
+    if match is None:
+        raise ValueError(f'Invalid isoformat string: {timestamp!r}')
+    # datetime supports microseconds only, so a longer fraction is truncated and a shorter one
+    # is right padded: '.13454' is 134540 μs, not 13454 μs. This is what fromisoformat does with
+    # a fraction it accepts on 3.11+, so the two agree on the timestamps snapd sends.
+    fraction = match['fraction']
+    subsecond = '' if fraction is None else f'.{fraction[:6].ljust(6, "0")}'
+    # 3.10's fromisoformat has always read the offset that 'Z' stands for, just not 'Z' itself.
+    # A timestamp with no timezone at all stays naive, as fromisoformat would leave it.
+    timezone = match['timezone']
+    offset = '' if timezone is None else '+00:00' if timezone == 'Z' else timezone
+    return f'{match["datetime"]}{subsecond}{offset}'
 
 
 ########################################################
