@@ -56,6 +56,16 @@ class Error(Exception):
         self._status_code = status_code
         self._status = status
 
+    @classmethod
+    def _from(cls, error: Error) -> Self:
+        return cls(
+            error._message,
+            kind=error._kind,
+            value=error._value,
+            status_code=error._status_code,
+            status=error._status,
+        )
+
     @property
     def message(self) -> str:
         """The error message, typically from the snapd API response."""
@@ -82,16 +92,6 @@ class Error(Exception):
         if isinstance(value, str) and value and value not in self._message:
             return f'{self._message} ({value})'
         return self._message
-
-    @classmethod
-    def _from(cls, error: Error) -> Self:
-        return cls(
-            error._message,
-            kind=error._kind,
-            value=error._value,
-            status_code=error._status_code,
-            status=error._status,
-        )
 
     def __repr__(self) -> str:
         return (
