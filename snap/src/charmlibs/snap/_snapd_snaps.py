@@ -33,6 +33,8 @@ logger = logging.getLogger(__name__)
 
 
 class InstalledInfo:
+    """Information about an installed snap."""
+
     def __init__(
         self,
         name: str,
@@ -67,10 +69,12 @@ class InstalledInfo:
 
     @property
     def name(self) -> str:
+        """The snap's name."""
         return self._name
 
     @property
     def classic(self) -> bool:
+        """Whether the snap is installed with classic confinement."""
         return self._classic
 
     @property
@@ -87,15 +91,40 @@ class InstalledInfo:
 
     @property
     def revision(self) -> str:
+        """The snap's revision, as a string.
+
+        Note that locally installed snaps have revisions in the form 'x<N>'.
+        """
         return self._revision
 
     @property
     def version(self) -> str:
+        """The version of the installed software as reported by snapd."""
         return self._version
 
     @property
     def hold(self) -> datetime.datetime | None:
+        """The date the snap is held until, or None if it is not held.
+
+        A held snap is not automatically refreshed, but can be manually refreshed.
+
+        A snap that is held forever is reported by snapd as held for 200+ years,
+        which is hopefully sufficient.
+        """
         return self._hold
+
+    def __repr__(self) -> str:
+        hold = self.hold if self.hold is None else f"'{self.hold}'"
+        return (
+            f'{type(self).__name__}('
+            f'{self.name!r}'
+            f', classic={self.classic!r}'
+            f', tracking={self.tracking!r}'
+            f', revision={self.revision!r}'
+            f', version={self.version!r}'
+            f', hold={hold}'
+            ')'
+        )
 
 
 def list_one(snap: str) -> InstalledInfo:
