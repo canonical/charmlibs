@@ -63,7 +63,7 @@ jobs:
     permissions:
       id-token: write
       attestations: write
-      contents: write  # needed to push tag
+      contents: write  # needed to push tag and create release
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
@@ -93,3 +93,21 @@ jobs:
           git config user.email github-actions@github.com
           git tag ${{ matrix.tag }}
           git push origin ${{ matrix.tag }}
+      - name: Create GitHub Release
+        if: ${{ matrix.tag }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ matrix.tag }}
+          PACKAGE: ${{ matrix.package }}
+          VERSION: ${{ matrix.version }}
+        run: |
+          set -xueo pipefail
+          # Give dependabot per-package release notes to render when it
+          # opens a bump PR: without a release for the tag it either shows
+          # nothing or the whole monorepo diff. See issue #427.
+          notes_file="$(mktemp)"
+          python3 .github/extract-changelog.py "${PACKAGE}/CHANGELOG.md" "${VERSION}" \
+            > "${notes_file}"
+          gh release create "${TAG}" \
+            --title "${TAG}" \
+            --notes-file "${notes_file}"
