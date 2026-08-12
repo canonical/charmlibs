@@ -14,8 +14,8 @@
 
 """Utils for integration tests."""
 
+import datetime as dt
 import json
-from datetime import datetime, timezone
 
 import jubilant
 
@@ -33,8 +33,8 @@ def get_unit_events(juju: jubilant.Juju, unit: str) -> list[dict[str, str]]:
     return [json.loads(line) for line in task.stdout.strip().splitlines()]
 
 
-def parse_ts(event: dict[str, str]) -> datetime:
-    return datetime.fromtimestamp(float(event['ts']), tz=timezone.utc)
+def parse_ts(event: dict[str, str]) -> dt.datetime:
+    return dt.datetime.fromtimestamp(float(event['ts']), tz=dt.timezone.utc)
 
 
 def get_leader_unit_name(juju: jubilant.Juju, app: str) -> str:

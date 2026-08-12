@@ -13,10 +13,10 @@
 # limitations under the License.
 """Models for peer-relation rollingops."""
 
+import datetime as dt
 import logging
 from collections.abc import Iterator
 from dataclasses import dataclass
-from datetime import datetime
 
 from ops import Model, Unit
 
@@ -53,12 +53,12 @@ class PeerAppData:
     granted_at: str = ''
 
     @property
-    def granted_at_dt(self) -> datetime | None:
+    def granted_at_dt(self) -> dt.datetime | None:
         """Return the grant timestamp as a datetime, if present."""
         return parse_timestamp(self.granted_at)
 
     @granted_at_dt.setter
-    def granted_at_dt(self, value: datetime | None) -> None:
+    def granted_at_dt(self, value: dt.datetime | None) -> None:
         """Store the grant timestamp from a datetime."""
         self.granted_at = datetime_to_str(value) if value is not None else ''
 
@@ -92,12 +92,12 @@ class PeerUnitData:
         self.operations = value.to_string()
 
     @property
-    def executed_at_dt(self) -> datetime | None:
+    def executed_at_dt(self) -> dt.datetime | None:
         """Return the execution timestamp as a datetime, if present."""
         return parse_timestamp(self.executed_at)
 
     @executed_at_dt.setter
-    def executed_at_dt(self, value: datetime | None) -> None:
+    def executed_at_dt(self, value: dt.datetime | None) -> None:
         """Store the execution timestamp from a datetime."""
         self.executed_at = datetime_to_str(value) if value is not None else ''
 
@@ -123,7 +123,7 @@ class PeerAppLock:
         return self._app_data.granted_unit
 
     @property
-    def granted_at(self) -> datetime | None:
+    def granted_at(self) -> dt.datetime | None:
         """Return the timestamp when the grant was issued, if any."""
         return self._app_data.granted_at_dt
 
@@ -170,7 +170,7 @@ class PeerUnitOperations:
         return self._unit_data.intent
 
     @property
-    def executed_at(self) -> datetime | None:
+    def executed_at(self) -> dt.datetime | None:
         """Return the last execution timestamp for this unit."""
         return self._unit_data.executed_at_dt
 
@@ -300,7 +300,7 @@ class PeerUnitOperations:
             and lock.is_granted(self.unit.name)
         )
 
-    def requested_at(self) -> datetime | None:
+    def requested_at(self) -> dt.datetime | None:
         """Return the timestamp of the current operation request, if any."""
         operation = self.get_current()
         return operation.requested_at if operation is not None else None

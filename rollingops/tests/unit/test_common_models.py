@@ -14,8 +14,8 @@
 #
 # Learn more about testing at: https://juju.is/docs/sdk/testing
 
+import datetime as dt
 import json
-from datetime import datetime, timezone
 from typing import Any
 
 import pytest
@@ -34,11 +34,11 @@ def test_operation_create_sets_fields():
     assert op.kwargs == {'b': 2, 'a': 1}
     assert op.callback_id == 'restart'
     assert op.max_retry == 3
-    assert isinstance(op.requested_at, datetime)
+    assert isinstance(op.requested_at, dt.datetime)
 
 
 def test_operation_to_string():
-    ts = datetime(2026, 2, 23, 12, 0, 0, 123456, tzinfo=timezone.utc)
+    ts = dt.datetime(2026, 2, 23, 12, 0, 0, 123456, tzinfo=dt.timezone.utc)
     op = _Operation(
         callback_id='cb',
         kwargs={'b': 2, 'a': 1},
@@ -62,7 +62,7 @@ def test_operation_to_string():
 
 
 def test_operation_to_string_zero_max_retry():
-    ts = datetime(2026, 2, 23, 4, 0, 0, 123456, tzinfo=timezone.utc)
+    ts = dt.datetime(2026, 2, 23, 4, 0, 0, 123456, tzinfo=dt.timezone.utc)
     op = _Operation(
         callback_id='cb',
         kwargs={'b': 2, 'a': 1},
@@ -85,7 +85,7 @@ def test_operation_to_string_zero_max_retry():
 
 
 def test_operation_to_string_none_max_retry():
-    ts = datetime(2026, 2, 23, 4, 0, 0, 123456, tzinfo=timezone.utc)
+    ts = dt.datetime(2026, 2, 23, 4, 0, 0, 123456, tzinfo=dt.timezone.utc)
     op = _Operation(
         callback_id='cb',
         kwargs={'b': 2, 'a': 1},
@@ -140,7 +140,7 @@ def test_operation_equality_and_hash_empty_arguments():
 
 
 def test_operation_to_string_and_from_string():
-    ts = datetime(2026, 2, 23, 12, 0, 0, 0, tzinfo=timezone.utc)
+    ts = dt.datetime(2026, 2, 23, 12, 0, 0, 0, tzinfo=dt.timezone.utc)
     op1 = _Operation(
         callback_id='cb',
         kwargs={'x': 1, 'y': 'z'},
@@ -161,7 +161,7 @@ def test_operation_to_string_and_from_string():
 
 
 def test_operation_from_string_valid_payload():
-    requested_at = datetime(2026, 3, 12, 10, 30, 45, 123456, tzinfo=timezone.utc)
+    requested_at = dt.datetime(2026, 3, 12, 10, 30, 45, 123456, tzinfo=dt.timezone.utc)
     payload = json.dumps({
         'callback_id': 'cb-123',
         'kwargs': {'b': 2, 'a': 'x'},
@@ -181,7 +181,7 @@ def test_operation_from_string_valid_payload():
 
 
 def test_from_string_valid_payload_with_empty_kwargs_and_no_max_retry():
-    requested_at = datetime(2026, 3, 12, 10, 30, 45, 123456, tzinfo=timezone.utc)
+    requested_at = dt.datetime(2026, 3, 12, 10, 30, 45, 123456, tzinfo=dt.timezone.utc)
     payload = json.dumps({
         'callback_id': 'cb-123',
         'requested_at': '1773311445.123456',
@@ -199,7 +199,7 @@ def test_from_string_valid_payload_with_empty_kwargs_and_no_max_retry():
 
 
 def test_from_string_valid_payload_with_empty_kwargs_and_0_max_retry():
-    requested_at = datetime(2026, 3, 12, 10, 30, 45, 123456, tzinfo=timezone.utc)
+    requested_at = dt.datetime(2026, 3, 12, 10, 30, 45, 123456, tzinfo=dt.timezone.utc)
     payload = json.dumps({
         'callback_id': 'cb-123',
         'kwargs': {},
@@ -284,7 +284,7 @@ def test_operation_from_string_invalid_inputs_return_none(payload: Any):
 
 
 def test_op_id_returns_timestamp_and_callback_id() -> None:
-    requested_at = datetime(2025, 1, 2, 3, 4, 5)
+    requested_at = dt.datetime(2025, 1, 2, 3, 4, 5)
     operation = _Operation(
         callback_id='restart',
         kwargs={'delay': 2},
@@ -301,7 +301,7 @@ def test_complete_increments_attempt_and_sets_release() -> None:
     operation = _Operation(
         callback_id='restart',
         kwargs={},
-        requested_at=datetime(2025, 1, 1, 0, 0, 0),
+        requested_at=dt.datetime(2025, 1, 1, 0, 0, 0),
         max_retry=3,
         attempt=0,
         result=None,
@@ -317,7 +317,7 @@ def test_retry_hold_sets_retry_hold_when_max_retry_not_reached() -> None:
     operation = _Operation(
         callback_id='restart',
         kwargs={},
-        requested_at=datetime(2025, 1, 1, 0, 0, 0),
+        requested_at=dt.datetime(2025, 1, 1, 0, 0, 0),
         max_retry=3,
         attempt=0,
         result=None,
@@ -333,7 +333,7 @@ def test_retry_hold_sets_release_when_max_retry_reached() -> None:
     operation = _Operation(
         callback_id='restart',
         kwargs={},
-        requested_at=datetime(2025, 1, 1, 0, 0, 0),
+        requested_at=dt.datetime(2025, 1, 1, 0, 0, 0),
         max_retry=0,
         attempt=0,
         result=None,
@@ -349,7 +349,7 @@ def test_retry_release_sets_retry_release_when_max_retry_not_reached() -> None:
     operation = _Operation(
         callback_id='restart',
         kwargs={},
-        requested_at=datetime(2025, 1, 1, 0, 0, 0),
+        requested_at=dt.datetime(2025, 1, 1, 0, 0, 0),
         max_retry=3,
         attempt=0,
         result=None,
@@ -365,7 +365,7 @@ def test_retry_release_sets_release_when_max_retry_reached() -> None:
     operation = _Operation(
         callback_id='restart',
         kwargs={},
-        requested_at=datetime(2025, 1, 1, 0, 0, 0),
+        requested_at=dt.datetime(2025, 1, 1, 0, 0, 0),
         max_retry=0,
         attempt=0,
         result=None,
@@ -381,7 +381,7 @@ def test_retry_hold_with_no_max_retry_sets_retry_hold() -> None:
     operation = _Operation(
         callback_id='restart',
         kwargs={},
-        requested_at=datetime(2025, 1, 1, 0, 0, 0),
+        requested_at=dt.datetime(2025, 1, 1, 0, 0, 0),
         max_retry=None,
         attempt=5,
         result=None,
@@ -397,7 +397,7 @@ def test_retry_release_with_no_max_retry_sets_retry_release() -> None:
     operation = _Operation(
         callback_id='restart',
         kwargs={},
-        requested_at=datetime(2025, 1, 1, 0, 0, 0),
+        requested_at=dt.datetime(2025, 1, 1, 0, 0, 0),
         max_retry=None,
         attempt=5,
         result=None,
@@ -467,7 +467,7 @@ def test_queue_deduplicates_only_against_last_item():
 
 def test_queue_to_string_and_from_string():
     q1 = _OperationQueue()
-    ts1 = datetime(2026, 2, 23, 12, 0, 0, 123456, tzinfo=timezone.utc)
+    ts1 = dt.datetime(2026, 2, 23, 12, 0, 0, 123456, tzinfo=dt.timezone.utc)
     op1 = _Operation(
         callback_id='a',
         kwargs={'x': 1},
@@ -476,7 +476,7 @@ def test_queue_to_string_and_from_string():
         attempt=0,
         result=None,
     )
-    ts2 = datetime(2026, 2, 20, 12, 0, 0, 123456, tzinfo=timezone.utc)
+    ts2 = dt.datetime(2026, 2, 20, 12, 0, 0, 123456, tzinfo=dt.timezone.utc)
     op2 = _Operation(
         callback_id='b',
         kwargs={'y': 'z'},

@@ -14,11 +14,12 @@
 
 """Rolling ops common models."""
 
+import datetime as dt
 import json
 import logging
+import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from datetime import datetime
 from enum import Enum
 from typing import Any
 
@@ -38,17 +39,16 @@ from charmlibs.rollingops._common._exceptions import (
 )
 from charmlibs.rollingops._common._utils import datetime_to_str, now_timestamp, parse_timestamp
 
+if sys.version_info >= (3, 11):
+    from enum import StrEnum as _StrEnum
+else:
+
+    class _StrEnum(str, Enum):
+        def __str__(self) -> str:
+            return self.value
+
+
 logger = logging.getLogger(__name__)
-
-
-class _StrEnum(str, Enum):
-    """A str-valued enum whose ``str()`` returns the plain value.
-
-    Equivalent to ``enum.StrEnum`` (Python 3.11+), needed here since this
-    package supports Python 3.10.
-    """
-
-    __str__ = str.__str__
 
 
 class OperationResult(_StrEnum):
@@ -222,7 +222,7 @@ class _Operation(BaseModel):
     model_config = ConfigDict(use_enum_values=True)
 
     callback_id: str
-    requested_at: datetime
+    requested_at: dt.datetime
     max_retry: int | None = None
     attempt: int = 0
     result: OperationResult | None = None
@@ -271,7 +271,7 @@ class _Operation(BaseModel):
         return value
 
     @field_serializer('requested_at')
-    def serialize_requested_at(self, value: datetime) -> str:
+    def serialize_requested_at(self, value: dt.datetime) -> str:
         return datetime_to_str(value)
 
     @classmethod
