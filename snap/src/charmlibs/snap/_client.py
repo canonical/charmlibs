@@ -21,6 +21,7 @@ Errors are converted into :class:`Error` exceptions, with specific subclasses wh
 
 from __future__ import annotations
 
+import http.client
 import json
 import logging
 import time
@@ -32,10 +33,11 @@ from typing import Any
 
 from . import _client_sockets, _errors
 
-if typing.TYPE_CHECKING:
-    import http.client
-
 logger = logging.getLogger(__name__)
+
+# urllib wraps failures from opening the connection and sending the request in URLError,
+# but if a connection breaks we can get an OSError, or an HTTPException on a truncated response.
+_TRANSPORT_ERRORS = (OSError, http.client.HTTPException)
 
 # Defined in the snap application itself under dirs/dirs.go as SnapdSocket.
 _SOCKET_PATH = '/run/snapd.socket'
@@ -96,8 +98,8 @@ def _retry_json_get(
             return _json_request('GET', path, query=query, log=log)
         except _errors.ConnectionError as e:  # noqa: PERF203
             # We don't catch TimeoutError -- the timeout is longer than our retry budget.
-            # We don't retry on a missing socket, since that means snapd is not running at all.
-            if e.kind == 'charmlibs-snap-socket-not-found':
+            # We don't retry on a missing socket, since that means snapd is not installed at all.
+            if isinstance(e, _errors.SocketNotFoundError):
                 raise
             if time.monotonic() > deadline:
                 raise
@@ -147,11 +149,12 @@ def _request(
     )
     opener = urllib.request.OpenerDirector()
     opener.add_handler(_client_sockets.UnixSocketHandler(_SOCKET_PATH))
-    opener.add_handler(urllib.request.HTTPRedirectHandler())
     # We need to handle HTTP errors ourselves, since the response body contains meaningful info,
     # so we don't add HTTPErrorProcessor or HTTPDefaultErrorHandler, which would raise too early.
+    # Without HTTPErrorProcessor, urllib never dispatches 3xx to HTTPRedirectHandler either.
+    # We don't expect redirects, so we manually convert 3xx responses into errors below.
     try:
-        return opener.open(request, timeout=_REQUEST_TIMEOUT)
+        response = opener.open(request, timeout=_REQUEST_TIMEOUT)
     except TimeoutError:
         raise _errors.TimeoutError(
             f'Request to snapd timed out after {_REQUEST_TIMEOUT}s: {method} {path}',
@@ -160,7 +163,7 @@ def _request(
         ) from None
     except urllib.error.URLError as e:
         if e.args and isinstance(e.args[0], FileNotFoundError):
-            raise _errors.ConnectionError(
+            raise _errors.SocketNotFoundError(
                 f'Could not connect to snapd: socket not found at {_SOCKET_PATH!r}',
                 kind='charmlibs-snap-socket-not-found',
                 value='',
@@ -170,6 +173,26 @@ def _request(
             kind='charmlibs-snap-connection-error',
             value='',
         ) from e
+    except _TRANSPORT_ERRORS as e:
+        raise _errors.ConnectionError(
+            f'Connection to snapd lost: {method} {path}: {e}',
+            kind='charmlibs-snap-connection-error',
+            value='',
+        ) from e
+    if 300 <= response.status < 400:  # 3xx responses.
+        # snapd itself never redirects, aside from path canonicalisation -- for example,
+        # paths containing '//', '/./' or '/../' get a 301 to the cleaned path.
+        # We validate and encode the inputs we interpolate into paths, so we only make requests
+        # to canonical paths. A redirect here means a bug on our side or a change in snapd.
+        location = response.getheader('Location')
+        raise _errors.BadResponseError(
+            message=f'Unexpected redirect for path {path!r} to {location!r}',
+            kind='charmlibs-snap-unexpected-redirect',
+            value=location or '',
+            status_code=response.status,
+            status=response.reason,
+        )
+    return response
 
 
 def _decode(response: http.client.HTTPResponse) -> object | _Change:
@@ -179,7 +202,7 @@ def _decode(response: http.client.HTTPResponse) -> object | _Change:
     :class:`_Change` (which the caller can :meth:`_Change.wait` on), a sync
     response returns its ``result`` field, and an error response raises.
     """
-    response_bytes = response.read()
+    response_bytes = _read(response)
     try:
         response_dict: dict[str, Any] = json.loads(response_bytes)
     except json.JSONDecodeError as e:
@@ -221,7 +244,7 @@ def _decode_logs(response: http.client.HTTPResponse) -> list[dict[str, str]]:
 
     Sanitization checks for individual entries are left to the caller.
     """
-    response_bytes = response.read()
+    response_bytes = _read(response)
     # /v2/logs returns a stream of JSON objects separated by \n\x1e
     try:
         logs = [
@@ -243,6 +266,24 @@ def _decode_logs(response: http.client.HTTPResponse) -> list[dict[str, str]]:
     return logs
 
 
+def _read(response: http.client.HTTPResponse) -> bytes:
+    """Read a response body, translating a transport failure mid-read into a library error."""
+    try:
+        return response.read()
+    except TimeoutError:
+        raise _errors.TimeoutError(
+            f'Timed out reading snapd response for path {_get_path(response)!r}',
+            kind='charmlibs-snap-request-timeout',
+            value='',
+        ) from None
+    except _TRANSPORT_ERRORS as e:
+        raise _errors.ConnectionError(
+            f'Connection to snapd lost while reading response for path {_get_path(response)!r}: {e}',  # noqa: E501
+            kind='charmlibs-snap-connection-error',
+            value='',
+        ) from e
+
+
 def _get_path(response: http.client.HTTPResponse) -> str:
     return urllib.parse.urlparse(response.url).path
 
@@ -258,7 +299,7 @@ _ERRORS = {
     'option-not-found': _errors.OptionNotFoundError,
     'snap-channel-not-available': _errors.ChannelNotAvailableError,
     'snap-needs-classic': _errors.NeedsClassicError,
-    'snap-not-found': _errors.NotFoundError,
+    'snap-not-found': _errors._NotFoundError,
     'snap-not-installed': _errors.NotInstalledError,
     'snap-no-update-available': _errors._NoUpdatesAvailableError,
     'snap-revision-not-available': _errors.RevisionNotAvailableError,

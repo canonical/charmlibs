@@ -8,7 +8,7 @@ snapd's conf endpoints treat 'system' as an alias for the 'core' snap and serve 
 configuration whether or not the core snap is installed. The `core_snap` fixture runs every
 test here in both states -- core installed and core absent -- because the absent state is where
 get()'s installed-snap probe must be skipped: /v2/snaps/system always 404s and /v2/snaps/core
-404s with no core snap, so probing would turn working calls into NotFoundError.
+404s with no core snap, so probing would turn working calls into _NotFoundError.
 
 This module is destructive to stored system configuration: removing the core snap deletes it
 (snapd treats core's config like any other snap's; options snapd maintains itself, such as
@@ -18,7 +18,7 @@ CI containers.
 
 Ordering: the module needs no special ordering relative to other modules. It removes and
 restores the core snap within its own fixture, no other module depends on system configuration,
-and any snap a module needs is (re)installed via ensure_installed.
+and any snap a module needs is (re)installed via ensure_installed_store.
 """
 
 from __future__ import annotations
@@ -29,7 +29,7 @@ import pytest
 
 from charmlibs import snap
 from charmlibs.snap import _errors, _snapd_conf
-from conftest import ensure_removed
+from conftest import ensure_installed_store, remove_core_blockers
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -45,19 +45,17 @@ def core_snap(request: pytest.FixtureRequest) -> Iterator[str]:
     pytest groups tests by this module-scoped parameter, so the core snap's install state is
     flipped at most once per state, not once per test.
 
-    In the 'absent' state we remove the core snap after removing any snap that has it as a base
-    (a base-less snap like hello-world or test-snapd-with-configure, installed by other modules,
-    otherwise blocks removal). A failed removal is deliberately left to error loudly rather than
-    skip: if a base-less snap we don't manage is installed, that's worth surfacing so we can
-    handle it explicitly.
+    In the 'absent' state we remove the core snap after removing every snap that is held by
+    it (remove_core_blockers asks snapd which those are, so this doesn't need updating when
+    another module starts using a new snap). A failed removal is left to error loudly.
     """
     if request.param == 'absent':
-        ensure_removed('hello-world', 'test-snapd-with-configure')
+        remove_core_blockers()
         snap.remove('core')  # Errors loudly if an unmanaged snap still depends on core.
         yield request.param
-        snap.install('core')
+        ensure_installed_store('core')
     else:
-        snap.install('core')  # A no-op if already installed.
+        ensure_installed_store('core')  # A no-op if already installed.
         yield request.param
 
 
@@ -125,10 +123,12 @@ def test_removing_core_snap_deletes_stored_system_config():
     # snap deletes them like any other snap's config, while options computed live by snapd
     # (system.hostname and so on) survive. This test manages the core snap itself, so it does
     # not use the core_snap fixture.
-    snap.install('core')  # Ensure installed, so its removal actually deletes stored config.
+    ensure_installed_store(
+        'core'
+    )  # Ensure installed, so its removal actually deletes stored config.
     _snapd_conf.set('system', {_OPTION: 3})
     assert _snapd_conf.get('system', [_OPTION]) == {_OPTION: 3}
-    ensure_removed('hello-world')  # Base-less; would otherwise block core removal.
+    remove_core_blockers()  # Base-less snaps would otherwise block core removal.
     snap.remove('core')
     try:
         # Removal deleted the stored option...
@@ -137,5 +137,5 @@ def test_removing_core_snap_deletes_stored_system_config():
         # ...while computed configuration remains, so bare get is not empty.
         assert 'system' in _snapd_conf.get('system')
     finally:
-        snap.install('core')  # Restore the core snap for other tests.
+        ensure_installed_store('core')  # Restore the core snap for other tests.
         _snapd_conf.unset('system', [_OPTION])  # A no-op if the removal already wiped it.
