@@ -2,7 +2,7 @@
 name = "charmlibs-rollingops"
 description = "The charmlibs.rollingops package."
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.10"
 authors = [
     {name="The Data Platform team at Canonical"},
 ]
@@ -69,7 +69,7 @@ src = ["src", "tests/unit", "tests/integration"]  # correctly sort local imports
 extends = "../pyproject.toml"
 include = ["src", "tests"]
 exclude = ["tests/integration/.tmp/**"]
-pythonVersion = "3.12"  # check no python > 3.12 features are used
+pythonVersion = "3.10"
 
 [tool.charmlibs.functional]
 ubuntu = []  # ubuntu versions to run functional tests with, e.g. "24.04" (defaults to just "latest")

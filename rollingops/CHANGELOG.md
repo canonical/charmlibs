@@ -1,3 +1,7 @@
+# 1.1.2 - 22 July 2026
+
+Broaden the supported Python version range to `>=3.10`.
+
 # 1.1.1 - 22 May 2026
 
 Fix:
