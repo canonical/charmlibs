@@ -779,7 +779,21 @@ class TracingEndpointRequirer(Object):
 def charm_tracing_config(
     endpoint_requirer: TracingEndpointRequirer, cert_path: Path | str | None
 ) -> tuple[str | None, str | None]:
-    """Return the charm_tracing config you likely want.
+    """Return charm tracing config, for use with the ``@trace_charm`` decorator.
+
+    This function is for charms that still use the deprecated
+    ``charms.tempo_coordinator_k8s.v0.charm_tracing`` library and the ``@trace_charm`` decorator
+    from that library.
+
+    To trace a workload or implement a tracing provider, use
+    :class:`TracingEndpointRequirer` or :class:`TracingEndpointProvider`. Don't use this function.
+
+    To trace a charm that has migrated from
+    ``charms.tempo_coordinator_k8s.v0.charm_tracing`` to ``ops.tracing`` (recommended), see
+    `How to trace your charm <https://canonical.com/juju/docs/ops/latest/howto/trace-your-charm/>`_.
+    Don't use this function or anything else from this library.
+
+    How ``charm_tracing_config`` works:
 
     - If no endpoint is provided: disable charm tracing.
     - If https endpoint is provided but cert_path is not found on disk: disable charm tracing.
@@ -788,7 +802,7 @@ def charm_tracing_config(
 
     Usage::
 
-        >>> from lib.charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
+        >>> from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
         >>> from charmlibs.interfaces.tracing import charm_tracing_config
         >>> @trace_charm(tracing_endpoint="my_endpoint", cert_path="cert_path")
         >>> class MyCharm(...):
