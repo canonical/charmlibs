@@ -1,19 +1,64 @@
-from unittest.mock import PropertyMock, patch
-import pytest
-from scenario import Relation, State
+# Copyright 2026 Canonical Ltd.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
-from charmlibs.interfaces.tracing import TracingProviderAppData
+"""Unit tests for the tracing provider."""
+
+import pytest
+from ops import CharmBase, Framework
+from ops.testing import Context, Relation, State
+
+from charmlibs.interfaces.tracing import (
+    ReceiverProtocol,
+    TracingEndpointProvider,
+    TracingProviderAppData,
+)
+
+
+class MyCharm(CharmBase):
+    def __init__(self, framework: Framework):
+        super().__init__(framework)
+        self.external_url = "app.hostname"
+        self.tracing = TracingEndpointProvider(self, external_url=self.external_url)
+
+        requested_receivers = set(self.tracing.requested_protocols())  # type: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+        if self.unit.is_leader():
+            self.tracing.publish_receivers(
+                [(p, self.get_receiver_url(p)) for p in requested_receivers]  # type: ignore[reportUnknownVariableType]
+            )
+
+    def get_receiver_url(self, protocol: ReceiverProtocol) -> str:
+        if protocol == "otlp_grpc":
+            return f"{self.external_url}:4317"
+        elif protocol == "otlp_http":
+            return f"http://{self.external_url}:4318"
+        else:
+            raise ValueError("unsupported")
+
+
+@pytest.fixture
+def context() -> Context[MyCharm]:
+    return Context(
+        charm_type=MyCharm,
+        meta={
+            "name": "jolly",
+            "provides": {"tracing": {"interface": "tracing", "limit": 1}},
+        },
+    )
 
 
 @pytest.mark.parametrize("leader", (True, False))
-def test_receiver_api(
-    context,
-    s3,
-    all_worker,
-    nginx_container,
-    nginx_prometheus_exporter_container,
-    leader,
-):
+def test_receiver_api(context: Context[MyCharm], leader: bool) -> None:
     # GIVEN two incoming tracing relations asking for otlp grpc and http respectively
     tracing_grpc = Relation(
         "tracing",
@@ -34,30 +79,23 @@ def test_receiver_api(
 
     state = State(
         leader=leader,
-        relations=[tracing_grpc, tracing_http, s3, all_worker],
-        containers=[nginx_container, nginx_prometheus_exporter_container],
+        relations=[tracing_grpc, tracing_http],
     )
 
     # WHEN any event occurs
     with context(context.on.update_status(), state) as mgr:
-        charm = mgr.charm
-        assert charm._requested_receivers == ("otlp_grpc", "otlp_http")
+        assert mgr.charm.tracing.requested_protocols() == {"otlp_grpc", "otlp_http"}
         state_out = mgr.run()
 
     # THEN both protocols are in the receivers published in the databag (local side)
-
-    r_out = [r for r in state_out.relations if r.id == tracing_http.id][0]
-    assert sorted(
-        [
-            r.protocol.name
-            for r in TracingProviderAppData.load(r_out.local_app_data).receivers
-        ]
-    ) == ["otlp_grpc", "otlp_http"]
+    r_out = next(r for r in state_out.relations if r.id == tracing_http.id)
+    assert sorted([
+        r.protocol.name
+        for r in TracingProviderAppData.load(r_out.local_app_data).receivers  # type: ignore[reportUnknownMemberType,reportArgumentType]
+    ]) == ["otlp_grpc", "otlp_http"]
 
 
-def test_leader_removes_receivers_on_relation_broken(
-    context, s3, all_worker, nginx_container, nginx_prometheus_exporter_container
-):
+def test_leader_removes_receivers_on_relation_broken(context: Context[MyCharm]) -> None:
     # GIVEN two incoming tracing relations asking for otel grpc and http respectively
     tracing_grpc = Relation(
         "tracing",
@@ -78,33 +116,23 @@ def test_leader_removes_receivers_on_relation_broken(
 
     state = State(
         leader=True,
-        relations=[tracing_grpc, tracing_http, s3, all_worker],
-        containers=[nginx_container, nginx_prometheus_exporter_container],
+        relations=[tracing_grpc, tracing_http],
     )
 
     # WHEN the charm receives a relation-broken event for the one asking for otlp_grpc
     with context(context.on.relation_broken(tracing_grpc), state) as mgr:
-        charm = mgr.charm
-        assert charm._requested_receivers == ("otlp_http",)
+        assert mgr.charm.tracing.requested_protocols() == {"otlp_http"}
         state_out = mgr.run()
 
     # THEN otlp_grpc is gone from the databag
-    r_out = [r for r in state_out.relations if r.id == tracing_http.id][0]
-    assert sorted(
-        [
-            r.protocol.name
-            for r in TracingProviderAppData.load(r_out.local_app_data).receivers
-        ]
-    ) == ["otlp_http"]
+    r_out = next(r for r in state_out.relations if r.id == tracing_http.id)
+    assert sorted([
+        r.protocol.name
+        for r in TracingProviderAppData.load(r_out.local_app_data).receivers  # type: ignore[reportUnknownMemberType,reportArgumentType]
+    ]) == ["otlp_http"]
 
 
-@patch(
-    "charm.TempoCoordinatorCharm.app_hostname",
-    PropertyMock(return_value="app.hostname"),
-)
-def test_publish_receivers(
-    context, s3, all_worker, nginx_container, nginx_prometheus_exporter_container
-):
+def test_publish_receivers(context: Context[MyCharm]) -> None:
     # GIVEN two incoming tracing relations asking for otlp grpc and http respectively
     tracing_grpc = Relation(
         "tracing",
@@ -118,18 +146,15 @@ def test_publish_receivers(
     # AND a leader unit
     state = State(
         leader=True,
-        relations=[tracing_grpc, tracing_http, s3, all_worker],
-        containers=[nginx_container, nginx_prometheus_exporter_container],
+        relations=[tracing_grpc, tracing_http],
     )
 
     # WHEN a relation_changed event occurs
     state_out = context.run(context.on.relation_changed(tracing_http), state)
 
-    # THEN, two receiver endpoints should be published using the mocked value of app_hostname
+    # THEN, two receiver endpoints should be published
     relation_out = state_out.get_relation(tracing_http.id)
-    assert sorted(
-        [
-            r.url
-            for r in TracingProviderAppData.load(relation_out.local_app_data).receivers
-        ]
-    ) == ["app.hostname:4317", "http://app.hostname:4318"]
+    assert sorted([
+        r.url
+        for r in TracingProviderAppData.load(relation_out.local_app_data).receivers  # type: ignore[reportUnknownMemberType,reportArgumentType]
+    ]) == ["app.hostname:4317", "http://app.hostname:4318"]
