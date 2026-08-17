@@ -61,7 +61,10 @@ def _fake_response(
     """Build a fake HTTPResponse-like object for mocking _request."""
     if isinstance(data, (dict, list)):
         data = json.dumps(data).encode()
-    return SimpleNamespace(read=lambda: data, status=status, reason=reason, url=url)
+    # close() is a no-op here, but _read closes every response, so the stub has to offer it.
+    return SimpleNamespace(
+        read=lambda: data, status=status, reason=reason, url=url, close=lambda: None
+    )
 
 
 # A fake snapd on a real unix socket, used by TestSnapdGoingAwayMidRequest below. Each name is
@@ -418,10 +421,13 @@ class TestSnapdGoingAwayMidRequest:
             opener.add_handler(_client_sockets.UnixSocketHandler(socket_path))
             request = urllib.request.Request('http://localhost/v2/snaps/hello-world')
             with pytest.raises(raw_type) as exc_info:
-                response = opener.open(request, timeout=10)
-                # Getting this far means urllib parsed a response, so the failure is in the body.
-                assert stage == 'reading'
-                response.read()
+                # Closed explicitly: this drives urllib directly, so _read isn't there to do it,
+                # and a part-read response holds its fd open until the collector gets to it.
+                with contextlib.closing(opener.open(request, timeout=10)) as response:
+                    # Getting this far means urllib parsed a response, so the failure is in the
+                    # body.
+                    assert stage == 'reading'
+                    response.read()
         if stage == 'sending':
             assert not isinstance(exc_info.value, urllib.error.URLError)
         assert isinstance(exc_info.value, _client._TRANSPORT_ERRORS)

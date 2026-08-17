@@ -12,17 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Pytest configuration for this package's tests."""
+"""Pytest configuration and fixtures that apply to all this package's tests."""
 
 import pytest
 
 
 def pytest_configure(config: pytest.Config) -> None:
-    """Opt this package in to warnings-as-errors.
+    """Pytest configuration specific to the pathops package.
 
-    Setting ``filterwarnings`` in the package's own ``pyproject.toml`` would make pytest
-    use that file as its only config, silently dropping the repository root's
-    ``--strict-markers`` and shared marker list, so the filter is added here instead.
-    Relax a category for a single test with ``@pytest.mark.filterwarnings``.
+    Used instead of the package's ``pyproject.toml`` or ``pytest.ini`` so that the repository
+    root's ``pyproject.toml`` is treated as the pytest root. Otherwise pytest would use the
+    package's file as its only config, silently dropping the root's ``--strict-markers`` and
+    shared marker list.
     """
+    # Opt in to warnings-as-errors.
+    # Relax a category for a single test with the @pytest.mark.filterwarnings decorator:
+    # https://docs.pytest.org/en/stable/reference/reference.html#pytest-mark-filterwarnings-ref
+    # https://docs.python.org/3/library/warnings.html#warning-filter
     config.addinivalue_line('filterwarnings', 'error')

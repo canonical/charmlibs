@@ -21,6 +21,7 @@ Errors are converted into :class:`Error` exceptions, with specific subclasses wh
 
 from __future__ import annotations
 
+import contextlib
 import http.client
 import json
 import logging
@@ -267,21 +268,27 @@ def _decode_logs(response: http.client.HTTPResponse) -> list[dict[str, str]]:
 
 
 def _read(response: http.client.HTTPResponse) -> bytes:
-    """Read a response body, translating a transport failure mid-read into a library error."""
-    try:
-        return response.read()
-    except TimeoutError:
-        raise _errors.TimeoutError(
-            f'Timed out reading snapd response for path {_get_path(response)!r}',
-            kind='charmlibs-snap-request-timeout',
-            value='',
-        ) from None
-    except _TRANSPORT_ERRORS as e:
-        raise _errors.ConnectionError(
-            f'Connection to snapd lost while reading response for path {_get_path(response)!r}: {e}',  # noqa: E501
-            kind='charmlibs-snap-connection-error',
-            value='',
-        ) from e
+    """Read a response body, translating a transport failure mid-read into a library error.
+
+    The response is closed either way. urllib closes the socket as soon as the headers are
+    parsed, but the body's file object keeps the underlying fd open, so abandoning a response
+    we only partly read would leak that fd until the collector got to it.
+    """
+    with contextlib.closing(response):
+        try:
+            return response.read()
+        except TimeoutError:
+            raise _errors.TimeoutError(
+                f'Timed out reading snapd response for path {_get_path(response)!r}',
+                kind='charmlibs-snap-request-timeout',
+                value='',
+            ) from None
+        except _TRANSPORT_ERRORS as e:
+            raise _errors.ConnectionError(
+                f'Connection to snapd lost while reading response for path {_get_path(response)!r}: {e}',  # noqa: E501
+                kind='charmlibs-snap-connection-error',
+                value='',
+            ) from e
 
 
 def _get_path(response: http.client.HTTPResponse) -> str:
