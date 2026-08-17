@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -65,7 +66,7 @@ def test_set_and_get_integer():
 def test_set_and_get_float():
     ensure_installed_store(_SNAP, channel='latest/edge')
     _snapd_conf.set(_SNAP, {_KEY: 3.14})
-    assert _snapd_conf.get_one(_SNAP, _KEY) == pytest.approx(3.14)
+    assert math.isclose(_snapd_conf.get_one(_SNAP, _KEY), 3.14)
     _cleanup()
 
 

@@ -320,6 +320,7 @@ class TestErrorResponses:
             reason='Moved Permanently',
             url='http://localhost/v2/snaps//conf',
             getheader=getheader,
+            close=lambda: None,
         )
         monkeypatch.setattr(
             urllib.request.OpenerDirector, 'open', MagicMock(return_value=response)

@@ -186,6 +186,9 @@ def _request(
         # We validate and encode the inputs we interpolate into paths, so we only make requests
         # to canonical paths. A redirect here means a bug on our side or a change in snapd.
         location = response.getheader('Location')
+        # Nobody will read this response, and until someone does, its body's file object holds
+        # the socket's fd open -- see _read.
+        response.close()
         raise _errors.BadResponseError(
             message=f'Unexpected redirect for path {path!r} to {location!r}',
             kind='charmlibs-snap-unexpected-redirect',
