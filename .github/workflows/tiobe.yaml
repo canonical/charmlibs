@@ -3,7 +3,9 @@ name: TIOBE
 on:
   workflow_dispatch:
   schedule:
-    - cron: '15 3 * * 0'
+    # min (0-59) / hour (0-23) / day (1-31) / month (1-12) / weekday (SUN-SAT)
+    - cron: '14 3 * * MON'
+      timezone: 'Pacific/Auckland'
 
 permissions: {}
 
@@ -40,18 +42,19 @@ jobs:
             echo "No coverage databases produced." >&2
             exit 1
           fi
-          uv run --with coverage coverage combine --keep "${dbs[@]}"
-          uv run --with coverage coverage xml -o .report/coverage.xml
+          uv run --no-project --with-requirements=test-requirements.txt coverage combine --keep "${dbs[@]}"
+          uv run --no-project --with-requirements=test-requirements.txt coverage xml -o .report/coverage.xml
 
       # Note that these are dependencies for the tools that the TIOBE action will
-      # run, which is done in the global environment, rather than a venv, as we
-      # do with the unit tests.
+      # run, which is done in the global environment, rather than a venv.
       - name: Install TIOBE and project dependencies
         run: |
           set -euo pipefail
           # The monorepo lockfile only pins the fast-lint tools, so export each
           # package's own lockfile instead — that's what lets pylint/flake8
           # resolve third-party imports during static analysis.
+          # Works at time of writing, but will break if libraries ever have
+          # incompatible deps.
           mapfile -t packages < <(.scripts/ls.py packages --exclude-examples --exclude-placeholders --no-json)
           for pkg in "${packages[@]}"; do
             uv export --project "$pkg" --no-emit-project --frozen --no-hashes
@@ -63,6 +66,8 @@ jobs:
         with:
           mode: qserver
           viewerUrl: https://canonical.tiobe.com/tiobeweb/TICS/api/cfg?name=default
+          # Provided as an org-level secret, so it can't be scoped to a dedicated
+          # environment — environments only exist per-repo.
           ticsAuthToken: ${{ secrets.TICSAUTHTOKEN }}
           project: charmtech-charmlibs
           installTics: true
