@@ -29,11 +29,13 @@ _CALLS: dict[str, Callable[[str], object]] = {
     'alias': lambda v: snap.alias(v, 'lxc', 'testlxc'),
     'alias (app)': lambda v: snap.alias('lxd', v, 'testlxc'),
     'alias (alias)': lambda v: snap.alias('lxd', 'lxc', v),
-    'ensure': lambda v: snap.ensure(v),
+    'ensure_installed': lambda v: snap.ensure_installed(v),
     'get': lambda v: snap.get(v),
     'get (key)': lambda v: snap.get('lxd', [v]),
+    'get_one': lambda v: snap.get_one(v, 'mykey'),
+    'get_one (key)': lambda v: snap.get_one('lxd', v),
     'hold': lambda v: snap.hold(v),
-    'info': lambda v: snap.info(v),
+    'list_one': lambda v: snap.list_one(v),
     'install': lambda v: snap.install(v),
     'logs': lambda v: snap.logs(v),
     'refresh': lambda v: snap.refresh(v),
@@ -149,15 +151,21 @@ def test_error_is_raised_one_frame_below_the_function_the_caller_called():
 
 
 # The functions that validate through snap_path_segment reach the check one frame deeper, since
-# it returns the encoded name and so has to call the check itself.
+# it returns the encoded name and so has to call the check itself. The /v2/apps functions are the
+# same depth for a different reason: start, stop and restart share one implementation, and it
+# calls the check. Neither is deeper than that, which is why raise_if_not_path_segment chains the
+# empty and blank predicates itself rather than calling raise_if_empty_or_blank.
 _MAX_FRAMES = 3
 
-# ensure is a composition of the other public functions rather than a call to an endpoint of its
-# own, and doesn't check the snap name itself: whichever function it reaches first does it. That
-# leaves the deepest traceback in the library -- ensure, its _get_info probe, info,
-# snap_path_segment and the check -- which is the price of not duplicating the check in a layer
-# that doesn't own it.
-_COMPOSITE_FUNCTIONS = {'ensure'}
+# Some public functions are compositions of other public functions rather than calls to an
+# endpoint of their own, and don't check their arguments themselves: whichever function they
+# reach first does it. That puts the check one or more frames deeper than the rule above
+# allows, which is the price of not duplicating the check in a layer that doesn't own it.
+#
+# ensure_installed leaves the deepest traceback in the library -- ensure_installed, its
+# _installed_info probe, list_one, snap_path_segment and the check. get_one delegates to get,
+# which validates both the snap name and the key before making a request.
+_COMPOSITE_FUNCTIONS = {'ensure_installed', 'get_one'}
 
 
 @pytest.mark.parametrize('name', sorted(_CALLS) + sorted(_BLANK_ONLY_CALLS))

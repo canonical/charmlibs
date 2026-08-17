@@ -45,6 +45,7 @@ def alias(snap: str, app: str, alias: str) -> None:
     _utils.raise_if_empty_or_blank(app, label='app name')
     _utils.raise_if_empty_or_blank(alias, label='alias')
     data = {'action': 'alias', 'snap': snap, 'app': app, 'alias': alias}
+    # NOTE: snapd sends snap-not-installed (NotInstalledError) if the snap is not installed.
     _client.post('/v2/aliases', body=data)
 
 
@@ -58,7 +59,7 @@ def unalias(alias: str) -> None:
         ValueError: if the alias is empty or blank.
         ChangeError: if the alias removal fails after starting.
         APIError: if the alias does not exist (for example, was never created, or the snap it
-            belonged to was removed — aliases do not survive snap removal).
+            belonged to was removed -- aliases do not survive snap removal).
     """
     _utils.raise_if_empty_or_blank(alias, label='alias')
     data = {'action': 'unalias', 'alias': alias}

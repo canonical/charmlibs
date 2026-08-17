@@ -17,7 +17,7 @@
 from . import _errors, _snapd_snaps, _utils
 
 
-def ensure(
+def ensure_installed(
     snap: str,
     channel: str | None = None,
     *,
@@ -53,8 +53,9 @@ def ensure(
             ``revision`` to control which channel the snap tracks -- otherwise a newly
             installed snap tracks ``latest/stable``, whichever channel the revision was
             found on.
-        classic: If ``True``, install or refresh the snap with classic confinement. Required
-            for snaps that use classic confinement.
+        classic: Permission to install or refresh a revision that requires classic confinement.
+            If a snap revision requires classic confinement and ``classic`` is not true,
+            a :class:`NeedsClassicError` is raised.
         update: If ``True`` (default), refresh the snap when it is already installed on the
             requested channel. If ``False``, leave an already-correct snap untouched.
 
@@ -67,7 +68,7 @@ def ensure(
 
     Raises:
         ValueError: if the snap name is empty, blank, or is not a single path segment.
-        NotFoundError: If the snap does not exist in the store.
+        NotInStoreError: If the store has no snap by that name.
         RevisionNotAvailableError: If the revision is not available on any channel.
         NeedsClassicError: If the snap requires ``classic=True``.
         ChannelNotAvailableError: If the channel is invalid or unavailable, or if the revision
@@ -75,7 +76,7 @@ def ensure(
         ChangeError: If the install or refresh fails after starting (for example, a hook errors).
         Error: (or a subtype) if the snap could not be installed or refreshed for another reason.
     """
-    info = _get_info(snap)
+    info = _installed_info(snap)
     if info is None:  # Not installed.
         _snapd_snaps.install(snap, channel=channel, revision=revision, classic=classic)
         return True
@@ -97,9 +98,9 @@ def ensure(
     return _snapd_snaps.refresh(snap, channel=channel, classic=classic)
 
 
-def _get_info(snap: str) -> _snapd_snaps.Info | None:
-    """Get snap info, raising an error if the snap is not installed."""
+def _installed_info(snap: str) -> _snapd_snaps.InstalledInfo | None:
+    """Return the snap's local state, or None if it is not installed."""
     try:
-        return _snapd_snaps.info(snap)
-    except _errors.NotFoundError:
+        return _snapd_snaps.list_one(snap)
+    except _errors.NotInstalledError:
         return None

@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from charmlibs.snap import _snapd_interfaces
-from charmlibs.snap._errors import APIError, NotFoundError, _InterfacesUnchangedError
+from charmlibs.snap._errors import APIError, _InterfacesUnchangedError, _NotFoundError
 
 if TYPE_CHECKING:
     from conftest import MockClient
@@ -20,9 +20,9 @@ def _api_error(message: str = 'boom') -> APIError:
     return APIError(message, kind='', value='', status_code=400)
 
 
-def _not_found(snap: str = 'absent') -> NotFoundError:
+def _not_found(snap: str = 'absent') -> _NotFoundError:
     # Mirrors snapd's GET /v2/snaps/{snap}: a terse message with the snap name in `value`.
-    return NotFoundError('snap not installed', kind='snap-not-found', value=snap, status_code=404)
+    return _NotFoundError('snap not installed', kind='snap-not-found', value=snap, status_code=404)
 
 
 class TestConnect:
@@ -90,7 +90,7 @@ class TestConnect:
 
     def test_connect_probes_plug_before_slot_on_api_error(self, mock_client: MockClient):
         # On an API error, connect probes the named snaps -- plug first -- and re-raises the
-        # not-installed one as NotFoundError. Here the plug snap is installed and the slot is not.
+        # not-installed one as _NotFoundError. Here the plug snap is installed and the slot is not.
         mock_client.post.side_effect = _api_error()
 
         def fake_get(path: str, query: object = None) -> dict[str, object]:
@@ -99,7 +99,7 @@ class TestConnect:
             return {}  # plug snap is installed
 
         mock_client.get.side_effect = fake_get
-        with pytest.raises(NotFoundError) as ctx:
+        with pytest.raises(_NotFoundError) as ctx:
             _snapd_interfaces.connect(('installed-plug', 'p'), ('absent-slot', 's'))
         # The plug snap is probed before the slot snap (matching snapd's blame order).
         assert mock_client.get.call_args_list[0].args[0] == '/v2/snaps/installed-plug'
@@ -113,7 +113,7 @@ class TestConnect:
         # original API error, so the user sees a single traceback without the internal probe.
         mock_client.post.side_effect = _api_error('snap "absent" is not installed')
         mock_client.get.side_effect = _not_found('absent')
-        with pytest.raises(NotFoundError) as ctx:
+        with pytest.raises(_NotFoundError) as ctx:
             _snapd_interfaces.connect(('absent', 'home'))
         assert ctx.value.message == 'snap not installed'
         assert ctx.value.kind == 'snap-not-found'
@@ -216,7 +216,7 @@ class TestDisconnect:
         # value/str and without chaining the original error.
         mock_client.post.side_effect = _api_error('snap "absent" is not installed')
         mock_client.get.side_effect = _not_found('absent')
-        with pytest.raises(NotFoundError) as ctx:
+        with pytest.raises(_NotFoundError) as ctx:
             _snapd_interfaces.disconnect(('absent', 'p'))
         assert ctx.value.message == 'snap not installed'
         assert ctx.value.value == 'absent'

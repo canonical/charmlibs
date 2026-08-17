@@ -4,93 +4,27 @@
 
 """Functional tests for local snap installation via the snapd sideload API.
 
-Includes a provisional install_local implementation built directly on _client internals,
-exercising POST /v2/snaps with a multipart body.
+Exercises the provisional ack and install_local helpers in conftest, which are built directly
+on _client internals and POST /v2/snaps with a multipart body.
 """
 
 from __future__ import annotations
 
-import json
 import subprocess
-import uuid
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
-from charmlibs.snap import _client, _errors
+from charmlibs.snap import _errors
 from charmlibs.snap import _snapd_snaps as _snapd
-from conftest import ensure_removed
+from conftest import SNAPS_DIR, ack, ensure_removed, install_local
 
-SNAPS_DIR = Path(__file__).parent / 'snaps'
+if TYPE_CHECKING:
+    from pathlib import Path
 
-
-# ---------------------------------------------------------------------------
-# Provisional ack implementation
-# ---------------------------------------------------------------------------
-
-
-def ack(assertions_data: bytes) -> None:
-    """Upload assertion(s) to snapd's local database (POST /v2/assertions)."""
-    response = _client._request('POST', '/v2/assertions', data=assertions_data)
-    response_dict = json.loads(response.read())
-    if response_dict.get('type') == 'error':
-        raise _client._make_error(response_dict)
-
-
-# ---------------------------------------------------------------------------
-# Provisional install_local implementation
-# ---------------------------------------------------------------------------
-
-
-def install_local(path: Path, *, dangerous: bool = False, classic: bool = False) -> None:
-    """Install a local snap file via the snapd sideload API (POST /v2/snaps)."""
-    boundary = uuid.uuid4().hex
-    crlf = b'\r\n'
-
-    def form_field(name: str, value: str) -> bytes:
-        return b''.join([
-            b'--',
-            boundary.encode(),
-            crlf,
-            b'Content-Disposition: form-data; name="',
-            name.encode(),
-            b'"',
-            crlf,
-            crlf,
-            value.encode(),
-            crlf,
-        ])
-
-    body = [
-        b'--',
-        boundary.encode(),
-        crlf,
-        b'Content-Disposition: form-data; name="snap"; filename="',
-        path.name.encode(),
-        b'"',
-        crlf,
-        b'Content-Type: application/octet-stream',
-        crlf,
-        crlf,
-        path.read_bytes(),
-        crlf,
-    ]
-    if dangerous:
-        body.append(form_field('dangerous', 'true'))
-    if classic:
-        body.append(form_field('classic', 'true'))
-    body.extend([b'--', boundary.encode(), b'--', crlf])
-
-    headers = {
-        'Accept': 'application/json',
-        'Content-Type': f'multipart/form-data; boundary={boundary}',
-    }
-    response = _client._request('POST', '/v2/snaps', headers=headers, data=b''.join(body))
-    response_dict = json.loads(response.read())
-    if response_dict.get('type') == 'error':
-        raise _client._make_error(response_dict)
-    _client._Change(response_dict['change']).wait()
-
+# A signed store snap, for the assertion (ack) tests: those need a snap whose assertions the
+# store will hand us, which a locally-built snap by definition has none of.
+_STORE_SNAP = 'test-snapd-tools'
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -125,23 +59,23 @@ def remove_test_classic_snap():
 
 
 @pytest.fixture(scope='session')
-def hello_world_download(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, Path]:
-    """Download hello-world snap and assertions once for the session."""
-    d = tmp_path_factory.mktemp('hello-world')
+def store_snap_download(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, Path]:
+    """Download a signed store snap and its assertions once for the session."""
+    d = tmp_path_factory.mktemp(_STORE_SNAP)
     subprocess.run(
-        ['snap', 'download', 'hello-world', '--channel=stable', f'--target-directory={d}'],
+        ['snap', 'download', _STORE_SNAP, '--channel=stable', f'--target-directory={d}'],
         check=True,
         capture_output=True,
     )
-    snap_file = next(d.glob('hello-world_*.snap'))
-    assert_file = next(d.glob('hello-world_*.assert'))
+    snap_file = next(d.glob(f'{_STORE_SNAP}_*.snap'))
+    assert_file = next(d.glob(f'{_STORE_SNAP}_*.assert'))
     return snap_file, assert_file
 
 
 @pytest.fixture(autouse=True)
-def remove_hello_world():
+def remove_store_snap():
     yield
-    ensure_removed('hello-world')
+    ensure_removed(_STORE_SNAP)
 
 
 # ---------------------------------------------------------------------------
@@ -152,7 +86,7 @@ def remove_hello_world():
 def test_install_local(snap_v1: Path):
     ensure_removed('test-snap')
     install_local(snap_v1, dangerous=True)
-    info = _snapd.info('test-snap')
+    info = _snapd.list_one('test-snap')
     assert info.name == 'test-snap'
     assert info.version == '1.0'
 
@@ -162,15 +96,15 @@ def test_install_local_already_installed(snap_v1: Path):
     ensure_removed('test-snap')
     install_local(snap_v1, dangerous=True)
     install_local(snap_v1, dangerous=True)  # Second call must succeed.
-    assert _snapd.info('test-snap').version == '1.0'
+    assert _snapd.list_one('test-snap').version == '1.0'
 
 
 def test_install_local_upgrades(snap_v1: Path, snap_v2: Path):
     ensure_removed('test-snap')
     install_local(snap_v1, dangerous=True)
-    assert _snapd.info('test-snap').version == '1.0'
+    assert _snapd.list_one('test-snap').version == '1.0'
     install_local(snap_v2, dangerous=True)
-    assert _snapd.info('test-snap').version == '2.0'
+    assert _snapd.list_one('test-snap').version == '2.0'
 
 
 def test_install_local_without_dangerous_raises(snap_v1: Path):
@@ -195,7 +129,7 @@ def test_install_local_classic_without_classic_flag_raises(classic_snap_v1: Path
 def test_install_local_classic(classic_snap_v1: Path):
     ensure_removed('test-classic-snap')
     install_local(classic_snap_v1, dangerous=True, classic=True)
-    info = _snapd.info('test-classic-snap')
+    info = _snapd.list_one('test-classic-snap')
     assert info.name == 'test-classic-snap'
     assert info.version == '1.0'
 
@@ -205,15 +139,15 @@ def test_install_local_classic(classic_snap_v1: Path):
 # ---------------------------------------------------------------------------
 
 
-def test_ack_and_install(hello_world_download: tuple[Path, Path]):
-    snap_file, assert_file = hello_world_download
-    ensure_removed('hello-world')
+def test_ack_and_install(store_snap_download: tuple[Path, Path]):
+    snap_file, assert_file = store_snap_download
+    ensure_removed(_STORE_SNAP)
     ack(assert_file.read_bytes())
     install_local(snap_file)  # dangerous=False — assertions are in the DB.
-    assert _snapd.info('hello-world').name == 'hello-world'
+    assert _snapd.list_one(_STORE_SNAP).name == _STORE_SNAP
 
 
-def test_ack_is_idempotent(hello_world_download: tuple[Path, Path]):
-    _, assert_file = hello_world_download
+def test_ack_is_idempotent(store_snap_download: tuple[Path, Path]):
+    _, assert_file = store_snap_download
     ack(assert_file.read_bytes())
     ack(assert_file.read_bytes())  # Second call must not raise.

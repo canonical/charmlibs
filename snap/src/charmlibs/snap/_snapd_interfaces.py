@@ -43,7 +43,7 @@ def connect(plug: tuple[str, str], slot: tuple[str, str] | str | None = None) ->
 
     Raises:
         ValueError: if any part of ``plug`` or ``slot`` is blank (whitespace only).
-        NotFoundError: if the plug snap or slot snap is not installed.
+        NotInstalledError: if the plug snap or slot snap is not installed.
             Never raised for the system snap.
         APIError: if the plug is not fully specified (empty snap or plug name), if the named plug
             or slot does not exist, if the plug and slot interfaces do not match, or if the slot
@@ -75,7 +75,7 @@ def connect(plug: tuple[str, str], slot: tuple[str, str] | str | None = None) ->
     try:
         _client.post('/v2/interfaces', body=data)
     except _errors.APIError:
-        # Turn snapd's empty-kind 'snap is not installed' error into a typed NotFoundError.
+        # Turn snapd's empty-kind 'snap is not installed' error into a typed NotInstalledError.
         if error := _first_not_installed(plug_snap, slot_snap):
             raise error from None
         raise
@@ -117,7 +117,7 @@ def disconnect(
 
     Raises:
         ValueError: if any part of ``plug`` or ``slot`` is blank (whitespace only).
-        NotFoundError: if the plug snap or slot snap is not installed.
+        NotInstalledError: if the plug snap or slot snap is not installed.
             Never raised for the system snap.
         APIError: if neither ``plug`` nor ``slot`` names anything to disconnect, if the named plug
             or slot does not exist, or if the fully-specified plug and slot are not connected.
@@ -156,7 +156,7 @@ def disconnect(
     except _errors._InterfacesUnchangedError:
         pass  # Follow the snap CLI's lead and suppress this error.
     except _errors.APIError:
-        # Turn snapd's empty-kind 'snap is not installed' error into a typed NotFoundError.
+        # Turn snapd's empty-kind 'snap is not installed' error into a typed NotInstalledError.
         if error := _first_not_installed(plug_snap, slot_snap):
             raise error from None
         raise
@@ -172,16 +172,16 @@ def _snap_and_name(spec: tuple[str, str] | str | None) -> tuple[str, str]:
     return snap, name
 
 
-def _first_not_installed(plug_snap: str, slot_snap: str) -> _errors.NotFoundError | None:
-    """Return a NotFoundError for the first named snap that is absent.
+def _first_not_installed(plug_snap: str, slot_snap: str) -> _errors.NotInstalledError | None:
+    """Return a NotInstalledError for the first named snap that is absent.
 
     snapd validates the plug snap before the slot snap (daemon/api_interfaces.go), reporting a
     not-installed snap as an empty-kind ``APIError`` before any plug/slot resolution. We probe the
-    named snaps in the same order -- plug snap first -- so the ``NotFoundError`` names the same
+    named snaps in the same order -- plug snap first -- so the ``NotInstalledError`` names the same
     snap snapd would blame. Note the ``system``/``core`` aliases count as installed because snapd
     serves them without the core snap being installed. Empty (auto-resolved) sides are skipped.
     """
     for snap in (plug_snap, slot_snap):
-        if snap and (error := _utils.check_installed_or_system(snap)):
+        if snap and (error := _utils.check_installed(snap, skip_system=True)):
             return error
     return None

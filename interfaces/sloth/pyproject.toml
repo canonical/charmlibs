@@ -37,8 +37,10 @@ integration = [  # installed for `just integration interfaces/sloth`
 ]
 
 [project.urls]
-"Repository" = "https://github.com/canonical/charmlibs"
+"Documentation" = "https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/sloth"
+"Repository" = "https://github.com/canonical/charmlibs/tree/main/interfaces/sloth"
 "Issues" = "https://github.com/canonical/charmlibs/issues"
+"Changelog" = "https://github.com/canonical/charmlibs/blob/main/interfaces/sloth/CHANGELOG.md"
 
 [build-system]
 requires = ["hatchling"]

@@ -30,8 +30,13 @@ import pytest
 
 from charmlibs import snap
 from charmlibs.snap import _client, _errors, _snapd_interfaces
-from conftest import ensure_installed, ensure_removed
-from test_snapd_local import SNAPS_DIR, install_local
+from conftest import (
+    SNAPS_DIR,
+    ensure_installed_store,
+    ensure_removed,
+    install_local,
+    remove_core_blockers,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -57,17 +62,17 @@ def core_snap(request: pytest.FixtureRequest) -> Iterator[str]:
     """Run each test with the core snap installed and again with it absent.
 
     pytest groups tests by this module-scoped parameter, so the core snap's install state is
-    flipped at most once per state, not once per test. In the 'absent' state we first remove any
-    base-less snap that other modules may have installed (which would otherwise block core
-    removal); a failed removal is left to error loudly, matching test_snapd_conf_system.
+    flipped at most once per state, not once per test. In the 'absent' state we first remove
+    every snap held by core, which would otherwise block its removal; a failed removal is
+    left to error loudly, matching test_snapd_conf_system.
     """
     if request.param == 'absent':
-        ensure_removed('hello-world', 'test-snapd-with-configure')
+        remove_core_blockers()
         snap.remove('core')  # Errors loudly if an unmanaged snap still depends on core.
         yield request.param
-        ensure_installed('core')
+        ensure_installed_store('core')
     else:
-        ensure_installed('core')  # A no-op if already installed.
+        ensure_installed_store('core')  # A no-op if already installed.
         yield request.param
 
 
@@ -92,7 +97,7 @@ def test_core_snap_state_matches_fixture(core_snap: str):
     try:
         _client.get('/v2/snaps/core')
         core_installed = True
-    except _errors.NotFoundError:
+    except _errors._NotFoundError:
         core_installed = False
     assert core_installed == (core_snap == 'installed')
 

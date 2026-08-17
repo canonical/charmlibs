@@ -14,35 +14,51 @@
 
 """Opinionated library for performing snap operations, targeted at use in charm code.
 
-Use :func:`ensure` to ensure that a snap is installed, optionally on a specific channel
-or revision.
+Use :func:`ensure_installed` to ensure that a snap is installed, optionally on a specific
+channel or revision.
 
 Manually manage snap installation with :func:`install`, :func:`refresh`, and :func:`remove`.
-Use :func:`info` to query the current state of an installed snap.
+Use :func:`list_one` to query the current state of an installed snap.
 
 Also manage:
 
 - Automatic refreshes with :func:`hold` and :func:`unhold`.
 - Services with :func:`start`, :func:`stop`, and :func:`restart`.
-- Config with :func:`get`, :func:`set`, and :func:`unset`.
+- Config with :func:`get`, :func:`get_one`, :func:`set`, and :func:`unset`.
 - Connections between snaps with :func:`connect` and :func:`disconnect`.
 - Application aliases with :func:`alias` and :func:`unalias`.
 
 Exceptions
 ----------
 
-All functions will raise a :class:`Error` subclass if the snapd API returns an error response.
+All errors raised due to interactions with the snapd API are subclasses of :class:`Error`.
+Callers may trigger regular Python exceptions (e.g. :class:`ValueError`) when passing
+invalid arguments to library functions.
 
+All functions will raise a :class:`APIError` (or a subclass) if snapd returns an error response.
 Functions will raise specific subclasses where possible to allow callers to handle logical errors.
-Check the documentation for each function for details on which exceptions it may raise.
+Check the documentation for each function for details on which exceptions it may raise. A
+function's documented errors are the ones it can report specifically: a plain :class:`APIError`,
+or one of the transport errors below, is possible for any call.
 
-The :class:`APIError` subclass will be raised if the snapd API returns a malformed response.
-Callers will not be able to resolve this error directly, but may want to catch it for logging,
-or to trigger retries if the error may be transient. If retries are not successful,
-user intervention may be required.
+Separately from the :class:`APIError` hierarchy (but inheriting from :class:`Error`),
+the library may also raise the following exceptions:
 
-A :class:`ConnectionError` indicates a failure to connect to the snapd socket at all. In this case
-something is badly wrong with the system, and user intervention is almost certainly required.
+A :class:`TimeoutError` indicates that snapd did not respond to a request in time. The library
+does not retry a request that timed out: the timeout is generous, and already covers the retries
+snapd itself makes against the store within a single request. The failure may still be transient,
+due to the snap store infrastructure being under load, so callers may catch this error to layer
+their own retry logic on top, or report a transient failure to the user.
+
+A :class:`ConnectionError` indicates that snapd could not be reached at all, and may require user
+action. The library briefly retries read-only requests, since snapd may be restarting as part of
+a snap operation, but not requests that change state, since it cannot tell whether snapd received
+them. :class:`SocketNotFoundError`, a subclass raised when the snapd socket does not exist, is
+never retried: it usually means snapd is not installed on the system.
+
+A :class:`BadResponseError` is raised if the snapd API returns a response the library does not
+understand. Callers will not be able to resolve this error directly, and should report it to the
+library maintainers.
 """
 
 from ._errors import (
@@ -54,14 +70,15 @@ from ._errors import (
     ConnectionError,  # noqa: A004 (shadowing a Python builtin)
     Error,
     NeedsClassicError,
-    NotFoundError,
     NotInstalledError,
+    NotInStoreError,
     OptionNotFoundError,
     RevisionNotAvailableError,
+    SocketNotFoundError,
     TimeoutError,  # noqa: A004 (shadowing a Python builtin)
 )
 from ._functions import (
-    ensure,
+    ensure_installed,
 )
 from ._snapd_aliases import (
     alias,
@@ -74,6 +91,7 @@ from ._snapd_apps import (
 )
 from ._snapd_conf import (
     get,
+    get_one,
     set,  # noqa: A004 (shadowing a Python builtin)
     unset,
 )
@@ -86,10 +104,10 @@ from ._snapd_logs import (
     logs,
 )
 from ._snapd_snaps import (
-    Info,
+    InstalledInfo,
     hold,
-    info,
     install,
+    list_one,
     refresh,
     remove,
     unhold,
@@ -104,22 +122,24 @@ __all__ = [
     'ChannelNotAvailableError',
     'ConnectionError',
     'Error',
-    'Info',
+    'InstalledInfo',
     'LogEntry',
     'NeedsClassicError',
-    'NotFoundError',
+    'NotInStoreError',
     'NotInstalledError',
     'OptionNotFoundError',
     'RevisionNotAvailableError',
+    'SocketNotFoundError',
     'TimeoutError',
     'alias',
     'connect',
     'disconnect',
-    'ensure',
+    'ensure_installed',
     'get',
+    'get_one',
     'hold',
-    'info',
     'install',
+    'list_one',
     'logs',
     'refresh',
     'remove',

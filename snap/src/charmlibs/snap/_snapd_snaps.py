@@ -32,7 +32,9 @@ logger = logging.getLogger(__name__)
 # /v2/snaps/{snap}
 
 
-class Info:
+class InstalledInfo:
+    """Information about an installed snap."""
+
     def __init__(
         self,
         name: str,
@@ -44,7 +46,7 @@ class Info:
     ):
         self._name = name
         self._classic = classic
-        self._tracking = _utils.normalize_channel(tracking)
+        self._tracking = tracking
         self._revision = str(revision)
         self._version = version
         self._hold = _utils.parse_timestamp(hold) if isinstance(hold, str) else hold
@@ -67,10 +69,12 @@ class Info:
 
     @property
     def name(self) -> str:
+        """The snap's name."""
         return self._name
 
     @property
     def classic(self) -> bool:
+        """Whether the snap is installed with classic confinement."""
         return self._classic
 
     @property
@@ -87,38 +91,84 @@ class Info:
 
     @property
     def revision(self) -> str:
+        """The snap's revision, as a string.
+
+        Note that locally installed snaps have revisions in the form 'x<N>'.
+        """
         return self._revision
 
     @property
     def version(self) -> str:
+        """The version of the installed software as reported by snapd."""
         return self._version
 
     @property
     def hold(self) -> datetime.datetime | None:
+        """The date the snap is held until, or None if it is not held.
+
+        A held snap is not automatically refreshed, but can be manually refreshed.
+
+        For an indefinite hold, snapd reports a timestamp roughly 292 years after the hold was
+        placed (Go's maximum duration), which is hopefully sufficient.
+        """
         return self._hold
 
+    def __repr__(self) -> str:
+        hold = None if self.hold is None else self.hold.isoformat()
+        return (
+            f'{type(self).__name__}('
+            f'{self.name!r}'
+            f', classic={self.classic!r}'
+            f', tracking={self.tracking!r}'
+            f', revision={self.revision!r}'
+            f', version={self.version!r}'
+            f', hold={hold!r}'
+            ')'
+        )
 
-def info(snap: str) -> Info:
-    """Get information about an installed snap.
 
-    This function implements the semantics of the `snap list` command,
-    restricted to a single snap.
+def list_one(snap: str) -> InstalledInfo:
+    """Get information about a single installed snap.
+
+    This function implements the semantics of the ``snap list`` command, restricted to a single
+    snap: it reports the local state of an installed snap and never queries the snap store.
+    It is named for that command rather than ``snap info``, which reports what the store offers
+    for a snap -- the channels available and their revisions -- and is not implemented here.
 
     Args:
         snap: the name of the snap.
 
     Returns:
-        An Info object with information about the snap.
+        An :class:`InstalledInfo` object with information about the snap.
 
     Raises:
-        ValueError: if the snap name is empty or is not a single path segment.
-        NotFoundError: if the snap is not installed.
+        ValueError: if the snap name is empty, blank, or is not a single path segment.
+        NotInstalledError: if the snap is not installed.
+        BadResponseError: if snapd's description of the snap isn't one we can read.
         Error: (or a subtype) if the information could not be retrieved for another reason.
     """
-    info_dict = _client.get(f'/v2/snaps/{_utils.snap_path_segment(snap)}')
-    assert isinstance(info_dict, dict)
+    try:
+        info_dict = _client.get(f'/v2/snaps/{_utils.snap_path_segment(snap)}')
+    except _errors._NotFoundError as e:
+        # snap-not-found -> NotInstalledError: This queries local state only.
+        raise _errors.NotInstalledError._from(e) from None
+    if not isinstance(info_dict, dict):
+        raise _errors.BadResponseError(
+            message=f'Unexpected response type {type(info_dict).__name__!r} for snap {snap!r}, expected a "dict"',  # noqa: E501
+            kind='charmlibs-snap',
+            value=str(info_dict),
+        )
     info_dict = typing.cast('dict[str, str]', info_dict)
-    return Info._from_dict(info_dict)
+    try:
+        return InstalledInfo._from_dict(info_dict)
+    except (KeyError, TypeError, ValueError) as e:
+        # A field we require is missing, or holds something we can't parse. Reported rather than
+        # asserted, so that the documented contract -- every failure is an Error -- holds here too.
+        raise _errors.BadResponseError(
+            message=f"Could not read snapd's description of snap {snap!r}: {e!r}",
+            kind='charmlibs-snap',
+            value=str(info_dict),
+        ) from None
 
 
 def install(
@@ -143,16 +193,19 @@ def install(
             on, but the snap tracks ``latest/stable`` regardless, so a later refresh may move
             the snap to a different channel's revision. Pass ``channel`` as well to control
             which channel the snap tracks.
-        classic: If ``True``, install the snap with classic confinement. Required for snaps
-            that use classic confinement.
+        classic: Permission to install a snap that requires classic confinement.
+            If a snap requires classic confinement and ``classic`` is not true,
+            a :class:`NeedsClassicError` is raised.
 
     Returns:
         A truthy value if the snap was installed, or a falsy value if it was already installed.
-        Not guaranteed to be an actual :class:`bool`.
+        Not guaranteed to be an actual :class:`bool`. Note that a falsy result doesn't mean the
+        snap is installed on the requested channel or revision, just that it was already installed
+        at all.
 
     Raises:
-        ValueError: if the snap name is empty or is not a single path segment.
-        NotFoundError: if the snap does not exist in the store.
+        ValueError: if the snap name is empty, blank, or is not a single path segment.
+        NotInStoreError: if the store has no snap by that name.
         RevisionNotAvailableError: if the specified revision is not available on any channel.
         ChannelNotAvailableError: if the specified channel is not available, or if the specified
             revision is not available on it.
@@ -175,11 +228,16 @@ def install(
         data['revision'] = str(revision)
     if classic:
         data['classic'] = True
-    # NOTE: Unlike the API, the CLI doesn't error if it's already installed (just prints a msg).
     try:
         _client.post(path, body=data)
     except _errors._AlreadyInstalledError:
+        # NOTE: Following the CLI, don't error if the snap is already installed.
+        # This includes the case where the snap is installed on a different channel/revision.
         return False
+    except _errors._NotFoundError as e:
+        # snap-not-found -> NotInStoreError: The snap not being installed wouldn't be an error,
+        # so 'not found' here means the store has no snap by that name.
+        raise _errors.NotInStoreError._from(e) from None
     return True
 
 
@@ -195,7 +253,7 @@ def remove(snap: str, *, purge: bool = False) -> object:
         Not guaranteed to be an actual :class:`bool`.
 
     Raises:
-        ValueError: if the snap name is empty or is not a single path segment.
+        ValueError: if the snap name is empty, blank, or is not a single path segment.
         ChangeError: if the removal fails after starting (for example, a remove hook errors).
         Error: (or a subtype) if the snap could not be removed as requested.
     """
@@ -206,7 +264,7 @@ def remove(snap: str, *, purge: bool = False) -> object:
     # NOTE: Unlike the API, the CLI doesn't error if the snap isn't installed (just prints a msg).
     try:
         _client.post(path, body=data)
-    except _errors.NotInstalledError:
+    except _errors._NotFoundError:
         return False
     return True
 
@@ -234,9 +292,8 @@ def refresh(
 
             Without ``channel``, the snap keeps tracking its current channel, even if the
             revision was found on another one.
-        classic: If ``True``, refresh the snap with classic confinement. Only needed to change
-            the confinement of an already installed snap -- a refresh otherwise keeps the
-            confinement the snap was installed with.
+        classic: Permission to refresh to a revision that requires classic confinement from
+            a revision that does not.
 
     Returns:
         A truthy value if the snap was refreshed, or a falsy value if no updates were available.
@@ -244,11 +301,14 @@ def refresh(
         revision is specified, even if that revision is already installed.
 
     Raises:
-        ValueError: if the snap name is empty or is not a single path segment.
+        ValueError: if the snap name is empty, blank, or is not a single path segment.
+        NotInstalledError: if the snap is not installed.
+        NotInStoreError: if the snap is installed but the store no longer offers it.
         RevisionNotAvailableError: if the specified revision is not available on any channel.
         ChannelNotAvailableError: if the specified channel is not available, or if the specified
             revision is not available on it.
-        NeedsClassicError: if the snap requires classic confinement and ``classic`` is not set.
+        NeedsClassicError: if the target revision requires classic confinement, the installed
+            revision does not, and ``classic`` is not set.
         ChangeError: if the refresh fails after starting (for example, a refresh hook errors).
         Error: (or a subtype) if the snap could not be refreshed for another reason.
     """
@@ -266,6 +326,15 @@ def refresh(
         _client.post(path, body=data)
     except _errors._NoUpdatesAvailableError:
         return False
+    except _errors.APIError as e:
+        # NOTE: snapd sends an error with no 'kind' if the snap isn't installed.
+        # We convert to NotInstalledError here if the snap isn't installed.
+        if error := _utils.check_installed(snap):
+            raise error from None
+        # Otherwise, not-found-error -> NotInStoreError.
+        if type(e) is _errors._NotFoundError:  # 'is' to avoid matching subclasses.
+            raise _errors.NotInStoreError._from(e) from None
+        raise
     return True
 
 
@@ -281,8 +350,8 @@ def hold(snap: str, duration: datetime.timedelta | int | float | None = None) ->
             (default), the snap is held indefinitely.
 
     Raises:
-        ValueError: if the snap name is empty or is not a single path segment.
-        NotFoundError: If the snap is not installed.
+        ValueError: if the snap name is empty, blank, or is not a single path segment.
+        NotInstalledError: If the snap is not installed.
         ChangeError: If the hold change fails after starting.
     """
     path = f'/v2/snaps/{_utils.snap_path_segment(snap)}'
@@ -296,22 +365,25 @@ def hold(snap: str, duration: datetime.timedelta | int | float | None = None) ->
             delta = datetime.timedelta(seconds=duration)
         until = (datetime.datetime.now(datetime.timezone.utc) + delta).isoformat()
     data = {'action': 'hold', 'hold-level': 'general', 'time': until}
-    # NOTE: The API returns an error with no 'kind' when holding a non-installed snap.
-    # The CLI raises an error in this case, so we pre-emptively check if the snap is installed.
-    info(snap)  # Raise NotFoundError if not installed.
-    _client.post(path, body=data)
+    try:
+        _client.post(path, body=data)
+    except _errors.APIError:
+        # NOTE: snapd sends an error with no 'kind' if the snap isn't installed.
+        if error := _utils.check_installed(snap):
+            raise error from None
+        raise
 
 
 def unhold(snap: str) -> None:
     """Unhold a snap to allow it to be refreshed.
 
-    Does not raise if the snap is not installed or not held.
+    Does not raise if the snap is not held, or if it is not installed (an absent snap is not held).
 
     Args:
         snap: The name of the snap to unhold.
 
     Raises:
-        ValueError: if the snap name is empty or is not a single path segment.
+        ValueError: if the snap name is empty, blank, or is not a single path segment.
         ChangeError: If the unhold change fails after starting.
     """
     # NOTE: Neither the API nor CLI error if the snap isn't installed or held.

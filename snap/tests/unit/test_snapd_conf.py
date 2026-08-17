@@ -11,7 +11,12 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 from charmlibs.snap import _snapd_conf
-from charmlibs.snap._errors import ChangeError, NotFoundError, OptionNotFoundError
+from charmlibs.snap._errors import (
+    BadResponseError,
+    ChangeError,
+    OptionNotFoundError,
+    _NotFoundError,
+)
 from conftest import result_of
 
 if TYPE_CHECKING:
@@ -40,6 +45,17 @@ class TestGet:
         query = mock_client.get.call_args.kwargs['query']
         assert query == {'keys': 'a,b'}
 
+    def test_get_non_dict_raises_bad_response(self, mock_client: MockClient):
+        # snapd answering with the wrong shape is a library-level error, not an AssertionError:
+        # asserts are stripped under python -O, and wouldn't be an Error subclass anyway.
+        mock_client.get.return_value = ['integer']
+        with pytest.raises(BadResponseError) as ctx:
+            _snapd_conf.get('lxd')
+        assert 'Unexpected response type' in ctx.value.message
+        assert "'list'" in ctx.value.message
+        # Reported as a bad response, rather than probed as a possibly-absent snap.
+        assert mock_client.get.call_count == 1
+
     def test_get_accepts_arbitrary_iterable(self, mock_client: MockClient):
         # keys need not be a list -- any non-string iterable of strings works.
         mock_client.get.return_value = {'a': 1, 'b': 2}
@@ -52,7 +68,7 @@ class TestGet:
     # short-circuit (`keys == []`), so it used to reach snapd as an empty 'keys' value, which
     # snapd reads as "no keys given" and answers with the whole configuration -- and, for a snap
     # that isn't installed, with an empty result that get() returned instead of raising
-    # NotFoundError. See the functional tests for the snapd behaviour behind each case.
+    # _NotFoundError. See the functional tests for the snapd behaviour behind each case.
     @pytest.mark.parametrize(
         ('keys', 'match'),
         [
@@ -90,11 +106,36 @@ class TestGet:
         assert isinstance(result, dict)
         assert 'criu' in result
 
-    def test_get_string_keys_raises_typeerror(self, mock_client: MockClient):
-        # A bare string is iterable, so it's rejected explicitly rather than being
-        # silently split into single-character keys.
-        with pytest.raises(TypeError):
-            _snapd_conf.get('lxd', 'integer')
+    def test_get_bare_string_is_one_key(self, mock_client: MockClient):
+        # A bare string is iterable, so it means that one key rather than being silently split
+        # into single-character keys. The result is still a dict, so get(s, k)[k] holds.
+        mock_client.get.return_value = result_of('conf_lxd_single_key.json')
+        result = _snapd_conf.get('lxd', 'integer')
+        mock_client.get.assert_called_once_with('/v2/snaps/lxd/conf', query={'keys': 'integer'})
+        assert result['integer'] == 1
+
+    def test_get_bare_string_is_the_same_as_a_single_element_list(self, mock_client: MockClient):
+        mock_client.get.return_value = result_of('conf_lxd_single_key.json')
+        from_string = _snapd_conf.get('lxd', 'integer')
+        from_list = _snapd_conf.get('lxd', ['integer'])
+        assert from_string == from_list
+        assert [call.kwargs['query'] for call in mock_client.get.call_args_list] == [
+            {'keys': 'integer'},
+            {'keys': 'integer'},
+        ]
+
+    def test_get_bare_string_is_validated(self, mock_client: MockClient):
+        # A single key gets the same checks as one in a list: a comma in it would otherwise
+        # become two keys once joined into the query parameter.
+        with pytest.raises(ValueError, match='must not contain a comma'):
+            _snapd_conf.get('lxd', 'a,b')
+        mock_client.get.assert_not_called()
+
+    def test_get_empty_string_is_not_empty_keys(self, mock_client: MockClient):
+        # The one case the bare-string rule makes ambiguous: '' is one (unusable) key, not an
+        # empty collection of them, so it's a ValueError rather than the keys=[] no-op.
+        with pytest.raises(ValueError, match='must not be empty'):
+            _snapd_conf.get('lxd', '')
         mock_client.get.assert_not_called()
 
 
@@ -109,10 +150,10 @@ class TestGetEmptyKeys:
         mock_client.get.assert_called_once_with('/v2/snaps/hello-world')
 
     def test_get_empty_keys_not_installed_raises_not_found(self, mock_client: MockClient):
-        mock_client.get.side_effect = NotFoundError(
+        mock_client.get.side_effect = _NotFoundError(
             'snap not installed', kind='snap-not-found', value='hello-world'
         )
-        with pytest.raises(NotFoundError) as ctx:
+        with pytest.raises(_NotFoundError) as ctx:
             _snapd_conf.get('hello-world', [])
         # snapd's own probe error is raised unchanged: terse message, snap name in value (which
         # str() surfaces). Not chained -- the probe's error was handled, not propagated.
@@ -130,7 +171,7 @@ class TestGetEmptyKeys:
 class TestGetAbsentSnapProbe:
     # The conf GET endpoint alone can't distinguish an absent snap from a missing key (or from
     # empty configuration), so get() probes /v2/snaps/{snap} on those paths to raise
-    # NotFoundError, consistent with set and unset. See the functional tests for captured
+    # _NotFoundError, consistent with set and unset. See the functional tests for captured
     # responses.
     # Built fresh per call, not shared: raising an exception mutates its __context__, and the
     # probe now re-raises snapd's own error object, so a shared instance would leak chaining
@@ -145,8 +186,8 @@ class TestGetAbsentSnapProbe:
         )
 
     @staticmethod
-    def _snap_not_found() -> NotFoundError:
-        return NotFoundError('snap not installed', kind='snap-not-found', value='hello-world')
+    def _snap_not_found() -> _NotFoundError:
+        return _NotFoundError('snap not installed', kind='snap-not-found', value='hello-world')
 
     def test_missing_key_on_installed_snap_reraises_option_not_found(
         self, mock_client: MockClient
@@ -162,7 +203,7 @@ class TestGetAbsentSnapProbe:
 
     def test_missing_key_on_absent_snap_raises_not_found(self, mock_client: MockClient):
         mock_client.get.side_effect = [self._option_not_found(), self._snap_not_found()]
-        with pytest.raises(NotFoundError) as ctx:
+        with pytest.raises(_NotFoundError) as ctx:
             _snapd_conf.get('hello-world', ['mykey'])
         assert ctx.value.message == 'snap not installed'
         assert ctx.value.value == 'hello-world'
@@ -174,7 +215,7 @@ class TestGetAbsentSnapProbe:
         # The misleading option-not-found error snapd sent for the absent snap is suppressed
         # ('raise ... from None'), so the user sees a single traceback.
         mock_client.get.side_effect = [self._option_not_found(), self._snap_not_found()]
-        with pytest.raises(NotFoundError) as ctx:
+        with pytest.raises(_NotFoundError) as ctx:
             _snapd_conf.get('hello-world', ['mykey'])
         assert ctx.value.__cause__ is None
         assert ctx.value.__suppress_context__
@@ -183,7 +224,7 @@ class TestGetAbsentSnapProbe:
         # check_installed clears the probe's traceback, so the re-raised error starts at get()'s
         # own raise and never walks back through the internal /v2/snaps/{snap} probe GET.
         mock_client.get.side_effect = [self._option_not_found(), self._snap_not_found()]
-        with pytest.raises(NotFoundError) as ctx:
+        with pytest.raises(_NotFoundError) as ctx:
             _snapd_conf.get('hello-world', ['mykey'])
         files = [frame.filename for frame in traceback.extract_tb(ctx.value.__traceback__)]
         assert not any(f.endswith('_utils.py') for f in files)
@@ -192,7 +233,7 @@ class TestGetAbsentSnapProbe:
         # A bare conf GET on an absent snap is a 200 with an empty result, so the probe is
         # what turns it into an error.
         mock_client.get.side_effect = [{}, self._snap_not_found()]
-        with pytest.raises(NotFoundError) as ctx:
+        with pytest.raises(_NotFoundError) as ctx:
             _snapd_conf.get('hello-world')
         assert ctx.value.message == 'snap not installed'
         assert str(ctx.value) == 'snap not installed (hello-world)'
@@ -220,6 +261,75 @@ class TestGetAbsentSnapProbe:
         mock_client.get.assert_called_once()
 
 
+class TestGetOne:
+    # get_one is get(snap, [key])[key], so its job is to make exactly the request get would and
+    # unwrap the result by one level. Everything else -- validation, the absent-snap probe, the
+    # errors -- is get's, and is covered above.
+    def test_get_one_returns_the_value(self, mock_client: MockClient):
+        mock_client.get.return_value = {'integer': 1}
+        assert _snapd_conf.get_one('lxd', 'integer') == 1
+
+    def test_get_one_makes_the_same_request_as_get(self, mock_client: MockClient):
+        mock_client.get.return_value = {'integer': 1}
+        _snapd_conf.get_one('lxd', 'integer')
+        mock_client.get.assert_called_once_with('/v2/snaps/lxd/conf', query={'keys': 'integer'})
+
+    def test_get_one_unwraps_by_one_level_only(self, mock_client: MockClient):
+        # A key naming a subtree keeps its structure; only the outer dict get built is removed.
+        mock_client.get.return_value = {'server': {'port': 8080}}
+        assert _snapd_conf.get_one('lxd', 'server') == {'port': 8080}
+
+    def test_get_one_dotted_key(self, mock_client: MockClient):
+        mock_client.get.return_value = {'server.port': 8080}
+        assert _snapd_conf.get_one('lxd', 'server.port') == 8080
+        assert mock_client.get.call_args.kwargs['query'] == {'keys': 'server.port'}
+
+    def test_get_one_option_not_found_propagates(self, mock_client: MockClient):
+        # The key is missing, so get raises before there is a dict to subscript: an
+        # OptionNotFoundError reaches the caller, never a KeyError.
+        mock_client.get.side_effect = OptionNotFoundError(
+            'snap "lxd" has no "mykey" configuration option',
+            kind='option-not-found',
+            value={'SnapName': 'lxd', 'Key': 'mykey'},
+        )
+        with pytest.raises(OptionNotFoundError):
+            _snapd_conf.get_one('lxd', 'mykey')
+
+    def test_get_one_not_installed_propagates(self, mock_client: MockClient):
+        mock_client.get.side_effect = _NotFoundError(
+            'snap not installed', kind='snap-not-found', value='lxd'
+        )
+        with pytest.raises(_NotFoundError):
+            _snapd_conf.get_one('lxd', 'mykey')
+
+    @pytest.mark.parametrize(
+        ('key', 'match'),
+        [
+            ('', 'must not be empty'),
+            (' ', 'must not be blank'),
+            (',', 'must not contain a comma'),
+            ('a,b', 'must not contain a comma'),
+            (' a', 'must not have leading or trailing whitespace'),
+        ],
+    )
+    def test_get_one_rejects_unusable_keys_without_request(
+        self, mock_client: MockClient, key: str, match: str
+    ):
+        # get's rejection of keys its query parameter would alter is what guarantees the result
+        # is keyed by exactly the key requested, and so that the subscript can't raise KeyError.
+        with pytest.raises(ValueError, match=match):
+            _snapd_conf.get_one('lxd', key)
+        mock_client.get.assert_not_called()
+
+    @pytest.mark.parametrize('snap', ['', '.', '..', 'hello-world/conf'])
+    def test_get_one_invalid_name_raises_value_error_without_request(
+        self, mock_client: MockClient, snap: str
+    ):
+        with pytest.raises(ValueError):
+            _snapd_conf.get_one(snap, 'mykey')
+        mock_client.get.assert_not_called()
+
+
 class TestSet:
     def test_set(self, mock_client: MockClient):
         _snapd_conf.set('lxd', {'mykey': 'myval'})
@@ -241,11 +351,17 @@ class TestUnset:
         body = mock_client.put.call_args.kwargs['body']
         assert body == {'a': None, 'b': None}
 
-    def test_unset_string_keys_raises_typeerror(self, mock_client: MockClient):
-        # A bare string is iterable, so it's rejected explicitly rather than being
-        # silently split into single-character keys.
-        with pytest.raises(TypeError):
-            _snapd_conf.unset('lxd', 'mykey')
+    def test_unset_bare_string_is_one_key(self, mock_client: MockClient):
+        # A bare string is iterable, so it means that one key rather than being silently split
+        # into single-character keys.
+        _snapd_conf.unset('lxd', 'mykey')
+        mock_client.put.assert_called_once_with('/v2/snaps/lxd/conf', body={'mykey': None})
+
+    def test_unset_empty_string_key_raises(self, mock_client: MockClient):
+        # The one case the bare-string rule makes ambiguous: '' is one (unusable) key, not an
+        # empty collection of them.
+        with pytest.raises(ValueError, match='must not be empty'):
+            _snapd_conf.unset('lxd', '')
         mock_client.put.assert_not_called()
 
     def test_unset_empty_keys_is_noop(self, mock_client: MockClient):
@@ -339,8 +455,8 @@ class TestSnapNameInPath:
     def test_get_empty_name_raises_value_error_for_any_keys(
         self, mock_client: MockClient, keys: Any
     ):
-        # Including keys=[] (the installed-snap probe) and a string (a TypeError otherwise),
-        # so that every path through get() reports the empty name the same way.
+        # Including keys=[] (the installed-snap probe) and a bare string, so that every path
+        # through get() reports the empty name the same way.
         with pytest.raises(ValueError, match='must not be empty'):
             _snapd_conf.get('', keys)
         mock_client.get.assert_not_called()
@@ -361,9 +477,13 @@ class TestSnapNameInPath:
             _snapd_conf.unset(snap, ['mykey'])
         mock_client.put.assert_not_called()
 
-    def test_unset_validates_name_before_keys(self, mock_client: MockClient):
+    @pytest.mark.parametrize('keys', [[], ['mykey'], 'mykey'])
+    def test_unset_empty_name_raises_value_error_for_any_keys(
+        self, mock_client: MockClient, keys: Any
+    ):
         with pytest.raises(ValueError, match='must not be empty'):
-            _snapd_conf.unset('', 'mykey')  # A string 'keys' would otherwise be a TypeError.
+            _snapd_conf.unset('', keys)
+        mock_client.put.assert_not_called()
 
     def test_name_is_percent_encoded(self, mock_client: MockClient):
         _snapd_conf.set('hello world', {'mykey': 'myval'})

@@ -1,0 +1,9 @@
+name: test-service-snap
+version: "1.0"
+summary: Snap with a logging daemon for charmlibs.snap functional tests
+confinement: strict
+base: core24
+apps:
+  daemon:
+    command: bin/daemon
+    daemon: simple
