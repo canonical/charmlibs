@@ -188,6 +188,7 @@ stubPath = ""  # silence warning: https://github.com/microsoft/pyright/issues/77
 
 [tool.pytest.ini_options]
 addopts = ["--strict-markers"]
+filterwarnings = ["error"]
 markers = [
     "pebble: functional tests that require a running Pebble to interact with",
     "sudo: functional tests that require superuser privileges",
