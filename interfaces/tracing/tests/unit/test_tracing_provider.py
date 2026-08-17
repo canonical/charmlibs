@@ -14,9 +14,11 @@
 
 """Unit tests for the tracing provider."""
 
+from typing import TypeAlias
+
+import ops.testing
 import pytest
 from ops import CharmBase, Framework
-from ops.testing import Context, Relation, State
 
 from charmlibs.interfaces.tracing import (
     ReceiverProtocol,
@@ -24,11 +26,21 @@ from charmlibs.interfaces.tracing import (
     TracingProviderAppData,
 )
 
+RECV_GRPC = (
+    '[{"protocol": {"name": "otlp_grpc", "type": "grpc"} , "url": "foo.com:10"}, '
+    '{"protocol": {"name": "otlp_http", "type": "http"}, "url": "http://foo.com:11"}] '
+)
+RECV_HTTP = (
+    '[{"protocol": {"name": "otlp_grpc", "type": "grpc"} , "url": "foo.com:10"}, '
+    '{"protocol": {"name": "otlp_http", "type": "http"}, "url": "http://foo.com:11"}] '
+)
+
 
 class MyCharm(CharmBase):
+    external_url: str = "app.hostname"
+
     def __init__(self, framework: Framework):
         super().__init__(framework)
-        self.external_url = "app.hostname"
         self.tracing = TracingEndpointProvider(self, external_url=self.external_url)
 
         requested_receivers = set(self.tracing.requested_protocols())  # type: ignore[reportUnknownMemberType,reportUnknownArgumentType]
@@ -46,9 +58,12 @@ class MyCharm(CharmBase):
             raise ValueError("unsupported")
 
 
+Context: TypeAlias = ops.testing.Context[MyCharm]
+
+
 @pytest.fixture
-def context() -> Context[MyCharm]:
-    return Context(
+def context() -> Context:
+    return ops.testing.Context(
         charm_type=MyCharm,
         meta={
             "name": "jolly",
@@ -58,26 +73,20 @@ def context() -> Context[MyCharm]:
 
 
 @pytest.mark.parametrize("leader", (True, False))
-def test_receiver_api(context: Context[MyCharm], leader: bool) -> None:
+def test_receiver_api(context: Context, leader: bool) -> None:
     # GIVEN two incoming tracing relations asking for otlp grpc and http respectively
-    tracing_grpc = Relation(
+    tracing_grpc = ops.testing.Relation(
         "tracing",
         remote_app_data={"receivers": '["otlp_grpc"]'},
-        local_app_data={
-            "receivers": '[{"protocol": {"name": "otlp_grpc", "type": "grpc"} , "url": "foo.com:10"}, '
-            '{"protocol": {"name": "otlp_http", "type": "http"}, "url": "http://foo.com:11"}] '
-        },
+        local_app_data={"receivers": RECV_GRPC},
     )
-    tracing_http = Relation(
+    tracing_http = ops.testing.Relation(
         "tracing",
         remote_app_data={"receivers": '["otlp_http"]'},
-        local_app_data={
-            "receivers": '[{"protocol": {"name": "otlp_grpc", "type": "grpc"} , "url": "foo.com:10"}, '
-            '{"protocol": {"name": "otlp_http", "type": "http"}, "url": "http://foo.com:11"}] '
-        },
+        local_app_data={"receivers": RECV_HTTP},
     )
 
-    state = State(
+    state = ops.testing.State(
         leader=leader,
         relations=[tracing_grpc, tracing_http],
     )
@@ -95,26 +104,20 @@ def test_receiver_api(context: Context[MyCharm], leader: bool) -> None:
     ]) == ["otlp_grpc", "otlp_http"]
 
 
-def test_leader_removes_receivers_on_relation_broken(context: Context[MyCharm]) -> None:
+def test_leader_removes_receivers_on_relation_broken(context: Context) -> None:
     # GIVEN two incoming tracing relations asking for otel grpc and http respectively
-    tracing_grpc = Relation(
+    tracing_grpc = ops.testing.Relation(
         "tracing",
         remote_app_data={"receivers": '["otlp_grpc"]'},
-        local_app_data={
-            "receivers": '[{"protocol": {"name": "otlp_grpc", "type": "grpc"} , "url": "foo.com:10"}, '
-            '{"protocol": {"name": "otlp_http", "type": "http"}, "url": "http://foo.com:11"}] '
-        },
+        local_app_data={"receivers": RECV_GRPC},
     )
-    tracing_http = Relation(
+    tracing_http = ops.testing.Relation(
         "tracing",
         remote_app_data={"receivers": '["otlp_http"]'},
-        local_app_data={
-            "receivers": '[{"protocol": {"name": "otlp_grpc", "type": "grpc"} , "url": "foo.com:10"}, '
-            '{"protocol": {"name": "otlp_http", "type": "http"}, "url": "http://foo.com:11"}] '
-        },
+        local_app_data={"receivers": RECV_HTTP},
     )
 
-    state = State(
+    state = ops.testing.State(
         leader=True,
         relations=[tracing_grpc, tracing_http],
     )
@@ -132,19 +135,19 @@ def test_leader_removes_receivers_on_relation_broken(context: Context[MyCharm]) 
     ]) == ["otlp_http"]
 
 
-def test_publish_receivers(context: Context[MyCharm]) -> None:
+def test_publish_receivers(context: Context) -> None:
     # GIVEN two incoming tracing relations asking for otlp grpc and http respectively
-    tracing_grpc = Relation(
+    tracing_grpc = ops.testing.Relation(
         "tracing",
         remote_app_data={"receivers": '["otlp_grpc"]'},
     )
-    tracing_http = Relation(
+    tracing_http = ops.testing.Relation(
         "tracing",
         remote_app_data={"receivers": '["otlp_http"]'},
     )
 
     # AND a leader unit
-    state = State(
+    state = ops.testing.State(
         leader=True,
         relations=[tracing_grpc, tracing_http],
     )
@@ -158,3 +161,15 @@ def test_publish_receivers(context: Context[MyCharm]) -> None:
         r.url
         for r in TracingProviderAppData.load(relation_out.local_app_data).receivers  # type: ignore[reportUnknownMemberType,reportArgumentType]
     ]) == ["app.hostname:4317", "http://app.hostname:4318"]
+
+
+@pytest.mark.parametrize("hook", ("relation_changed", "relation_created", "relation_joined"))
+def test_blank(context: Context, hook: str) -> None:
+    tracing = ops.testing.Relation("tracing", remote_app_data={"receivers": "[]"})
+    state = ops.testing.State(leader=True, relations={tracing})
+
+    with context(getattr(context.on, hook)(tracing), state) as mgr:
+        assert not mgr.charm.tracing.requested_protocols()
+        out = mgr.run()
+
+    assert out.get_relation(tracing).local_app_data == {"receivers": "[]"}
