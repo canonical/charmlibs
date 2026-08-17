@@ -1,0 +1,17 @@
+#!/bin/sh
+# Second daemon for charmlibs.snap functional log tests, so that multi-snap log queries have
+# two snaps to name. Behaves exactly like test-service-snap's daemon (see that script for why),
+# except that every line it logs says which of the two wrote it.
+set -e
+
+i=0
+while [ "$i" -lt 60 ]; do
+    i=$((i + 1))
+    echo "test-other-service-snap startup entry $i"
+done
+
+while true; do
+    i=$((i + 1))
+    echo "test-other-service-snap tick $i"
+    sleep 5
+done

@@ -1,0 +1,560 @@
+# Copyright 2026 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+# pyright: reportPrivateUsage=false
+
+from __future__ import annotations
+
+import datetime
+import re
+import sys
+from typing import TYPE_CHECKING
+
+import pytest
+
+from charmlibs.snap import _utils
+from charmlibs.snap._errors import NotInstalledError, _NotFoundError
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable
+
+    from conftest import MockClient
+
+
+# Every whitespace character we've checked snapd's Go implementation against, including the
+# ones Python and Go define separately. See comma_list.
+BLANK = [' ', '  ', '\t', '\n', '\r', '\x0b', '\x0c', '\x85', '\xa0', '\u1680', '\u2000', '\u3000']
+# Zero-width characters are content to both Python and snapd, not whitespace.
+ZERO_WIDTH = ['\u200b', '\ufeff']
+
+
+class TestPredicates:
+    # Each predicate answers one question about one value, so the checks below can spell out the
+    # rules they apply as a chain rather than deferring to each other.
+    @pytest.mark.parametrize(
+        ('predicate', 'value', 'expected'),
+        [
+            (_utils._empty, '', 'must not be empty'),
+            (_utils._empty, ' ', None),
+            (_utils._empty, 'a', None),
+            (_utils._blank, '', None),  # Left to _empty, so check_blank can omit it.
+            (_utils._blank, ' ', "must not be blank: ' '"),
+            (_utils._blank, 'a', None),
+            (_utils._comma, 'a,b', "must not contain a comma: 'a,b'"),
+            (_utils._comma, 'a', None),
+            (_utils._padding, ' a', "must not have leading or trailing whitespace: ' a'"),
+            (_utils._padding, 'a b', None),
+            (_utils._path_segment, 'a/b', "must be a single path segment: 'a/b'"),
+            (_utils._path_segment, '.', "must be a single path segment: '.'"),
+            (_utils._path_segment, '..', "must be a single path segment: '..'"),
+            (_utils._path_segment, 'a.b', None),  # Only '.' and '..' are non-canonical.
+        ],
+    )
+    def test_predicate(
+        self, predicate: Callable[[str], str | None], value: str, expected: str | None
+    ):
+        assert predicate(value) == expected
+
+
+def assert_raises(call: Callable[[], None], expected: str) -> None:
+    """Assert the check raises ValueError with exactly the expected message."""
+    with pytest.raises(ValueError) as ctx:
+        call()
+    assert str(ctx.value) == expected
+
+
+class TestRaiseIfEmptyOrBlank:
+    def test_empty(self):
+        assert_raises(
+            lambda: _utils.raise_if_empty_or_blank('', label='snap name'),
+            'snap name must not be empty',
+        )
+
+    @pytest.mark.parametrize('value', BLANK)
+    def test_blank(self, value: str):
+        assert_raises(
+            lambda: _utils.raise_if_empty_or_blank(value, label='snap name'),
+            f'snap name must not be blank: {value!r}',
+        )
+
+    def test_label_names_the_value(self):
+        assert_raises(
+            lambda: _utils.raise_if_empty_or_blank('', label='config key'),
+            'config key must not be empty',
+        )
+
+    @pytest.mark.parametrize(
+        'value', ['hello-world', 'lxd', '..', 'a/b', 'a b', ' a', *ZERO_WIDTH]
+    )
+    def test_usable_values_do_not_raise(self, value: str):
+        # Only emptiness and blankness are checked here -- names that aren't usable in a path are
+        # the business of snap_path_segment, and padding is only a problem for the endpoints
+        # covered by raise_if_not_comma_list_safe.
+        _utils.raise_if_empty_or_blank(value, label='snap name')
+
+
+class TestOneValueOrMany:
+    # Each check takes one value or a collection of them, so the caller can hand over the whole
+    # collection it was given and keep the loop out of the call site.
+    def test_a_bare_string_is_one_value_not_a_collection_of_characters(self):
+        # ' a' is not blank, but its characters are: iterating it would report the wrong problem.
+        _utils.raise_if_empty_or_blank(' a', label='snap name')
+        _utils.raise_if_not_comma_list_safe('ab', label='snap name')
+
+    def test_first_unusable_value_is_reported(self):
+        assert_raises(
+            lambda: _utils.raise_if_empty_or_blank(['a', ' ', ''], label='config key'),
+            "config key must not be blank: ' ' (in ['a', ' ', ''])",
+        )
+
+    def test_all_usable_values_do_not_raise(self):
+        _utils.raise_if_empty_or_blank(['a', 'b'], label='config key')
+        _utils.raise_if_not_comma_list_safe(('a', 'b'), label='snap name')
+
+    def test_no_values_does_not_raise(self):
+        # Callers pass collections that may be empty (keys=[], no services, no snap names).
+        _utils.raise_if_empty_or_blank([], label='config key')
+        _utils.raise_if_not_comma_list_safe((), label='snap name')
+
+    def test_a_dict_is_checked_by_its_keys(self):
+        # set() hands over its config mapping directly.
+        _utils.raise_if_empty_or_blank({'a': 1, 'b': 2}, label='config key')
+        assert_raises(
+            lambda: _utils.raise_if_empty_or_blank({'a': 1, '': 2}, label='config key'),
+            "config key must not be empty (in ['a', ''])",
+        )
+
+    def test_a_dicts_values_are_never_in_the_message(self):
+        # The config a charm sets can hold secrets, and the error reaches the Juju debug log.
+        with pytest.raises(ValueError) as ctx:
+            _utils.raise_if_empty_or_blank({'password': 'hunter2', '': 1}, label='config key')
+        assert 'hunter2' not in str(ctx.value)
+
+
+class TestMessageContext:
+    # The collection is named only when there was more than one value to pick from: for a single
+    # value the phrase already quotes it, and repeating it reads as noise.
+    def test_one_value_is_not_repeated(self):
+        assert_raises(
+            lambda: _utils.raise_if_empty_or_blank([' '], label='snap name'),
+            "snap name must not be blank: ' '",
+        )
+
+    def test_many_values_are_named(self):
+        assert_raises(
+            lambda: _utils.raise_if_empty_or_blank(['a', ' '], label='snap name'),
+            "snap name must not be blank: ' ' (in ['a', ' '])",
+        )
+
+
+class TestRaiseIfBlank:
+    def test_empty_does_not_raise(self):
+        # The interface functions give an empty value a meaning of its own.
+        _utils.raise_if_blank('', label='slot snap name')
+
+    @pytest.mark.parametrize('value', BLANK)
+    def test_blank(self, value: str):
+        assert_raises(
+            lambda: _utils.raise_if_blank(value, label='slot snap name'),
+            f'slot snap name must not be blank: {value!r}',
+        )
+
+    @pytest.mark.parametrize('value', ['hello-world', 'a b', ' a', *ZERO_WIDTH])
+    def test_usable_values_do_not_raise(self, value: str):
+        _utils.raise_if_blank(value, label='slot snap name')
+
+
+def comma_separated_list(value: str) -> list[str]:
+    """Mirror of snapd's strutil.CommaSeparatedList, as verified against the real API.
+
+    Splits on commas, strips whitespace from each field, and discards the empty ones.
+    """
+    return [stripped for field in value.split(',') if (stripped := field.strip())]
+
+
+# The contract raise_if_not_comma_list_safe exists to enforce: a value snapd's parser gives back
+# unchanged is fine, and anything else is rejected. Asserting that against a mirror of the parser
+# keeps the individual predicates in the chain honest as a set.
+SAFE = ['hello-world', 'lxd', 'a.b', 'a b', 'core24', *ZERO_WIDTH]
+UNSAFE = ['', *BLANK, ',', ',,', 'a,b', ' , ', ' a', 'a ', '\ta\n']
+
+
+class TestRaiseIfNotCommaListSafe:
+    @pytest.mark.parametrize('value', SAFE)
+    def test_safe_values_round_trip_through_the_parser(self, value: str):
+        assert comma_separated_list(value) == [value]
+
+    @pytest.mark.parametrize('value', UNSAFE)
+    def test_unsafe_values_do_not_round_trip_through_the_parser(self, value: str):
+        assert comma_separated_list(value) != [value]
+
+    @pytest.mark.parametrize('value', SAFE)
+    def test_safe_values_do_not_raise(self, value: str):
+        _utils.raise_if_not_comma_list_safe(value, label='snap name')
+
+    @pytest.mark.parametrize('value', UNSAFE)
+    def test_unsafe_values_raise(self, value: str):
+        with pytest.raises(ValueError):
+            _utils.raise_if_not_comma_list_safe(value, label='snap name')
+
+    @pytest.mark.parametrize(
+        ('value', 'expected'),
+        [
+            ('', 'snap name must not be empty'),
+            (' ', "snap name must not be blank: ' '"),
+            (',', "snap name must not contain a comma: ','"),
+            ('a,b', "snap name must not contain a comma: 'a,b'"),
+            (' a', "snap name must not have leading or trailing whitespace: ' a'"),
+            ('a\n', "snap name must not have leading or trailing whitespace: 'a\\n'"),
+        ],
+    )
+    def test_each_way_of_failing_has_its_own_message(self, value: str, expected: str):
+        assert_raises(
+            lambda: _utils.raise_if_not_comma_list_safe(value, label='snap name'), expected
+        )
+
+    def test_each_value_is_checked_completely_before_the_next(self):
+        # The first unusable value is reported, not the most severe problem across all of them:
+        # what gets reported for a value doesn't depend on what comes after it.
+        assert_raises(
+            lambda: _utils.raise_if_not_comma_list_safe(['a,b', ''], label='snap name'),
+            "snap name must not contain a comma: 'a,b' (in ['a,b', ''])",
+        )
+        assert_raises(
+            lambda: _utils.raise_if_not_comma_list_safe(['', 'a,b'], label='snap name'),
+            "snap name must not be empty (in ['', 'a,b'])",
+        )
+
+
+class TestSnapPathSegment:
+    @pytest.mark.parametrize('snap', ['hello-world', 'lxd', 'kube-proxy', 'core24', 'foo_bar'])
+    def test_ordinary_names_pass_through_unchanged(self, snap: str):
+        assert _utils.snap_path_segment(snap) == snap
+
+    def test_empty_raises(self):
+        with pytest.raises(ValueError, match='must not be empty'):
+            _utils.snap_path_segment('')
+
+    @pytest.mark.parametrize('snap', ['.', '..', '/', 'a/b', 'hello-world/conf', '../changes/1'])
+    def test_non_segment_names_raise(self, snap: str):
+        # Percent-encoding can't make these safe: snapd's router matches on the decoded path,
+        # so '%2F' is still a separator to it, and quote() leaves '.' unencoded. See the
+        # functional tests for what snapd does with the paths these would otherwise build.
+        with pytest.raises(ValueError, match='single path segment'):
+            _utils.snap_path_segment(snap)
+
+    @pytest.mark.parametrize(
+        ('snap', 'expected'),
+        [
+            ('hello world', 'hello%20world'),
+            ('hello?keys=x', 'hello%3Fkeys%3Dx'),
+            ('hello#frag', 'hello%23frag'),
+            ('hello%2Fworld', 'hello%252Fworld'),
+        ],
+    )
+    def test_other_special_characters_are_encoded(self, snap: str, expected: str):
+        # These can't change which endpoint we reach once encoded, so they're passed to snapd
+        # (which answers with snap-not-found) rather than rejected.
+        assert _utils.snap_path_segment(snap) == expected
+
+
+class TestAsList:
+    @pytest.mark.parametrize(
+        ('values', 'expected'),
+        [
+            ('abc', ['abc']),
+            ('', ['']),  # Emptiness is the checks' business, not this function's.
+            ([], []),
+            (['a', 'b'], ['a', 'b']),
+            (('a', 'b'), ['a', 'b']),
+            ({'a': 1, 'b': 2}, ['a', 'b']),  # A mapping iterates its keys.
+            # Callers iterate the values twice -- to validate them and then to send them -- so
+            # a one-shot iterable must come back materialised rather than passed through.
+            ((c for c in ('a', 'b')), ['a', 'b']),
+        ],
+    )
+    def test_as_list(self, values: str | Iterable[str], expected: list[str]):
+        assert _utils.as_list(values) == expected
+
+
+class TestCheckInstalled:
+    def test_empty_raises_value_error_without_request(self, mock_client: MockClient):
+        with pytest.raises(ValueError, match='must not be empty'):
+            _utils.check_installed('')
+        mock_client.get.assert_not_called()
+
+    @pytest.mark.parametrize('snap', ['system', 'core'])
+    def test_system_names_are_not_probed_when_skipped(self, snap: str, mock_client: MockClient):
+        assert _utils.check_installed(snap, skip_system=True) is None
+        mock_client.get.assert_not_called()
+
+    @pytest.mark.parametrize('snap', ['system', 'core'])
+    def test_system_names_are_probed_by_default(self, snap: str, mock_client: MockClient):
+        # skip_system is for endpoints snapd serves under these names whether or not the core
+        # snap is installed. Elsewhere -- /v2/apps -- they get no special treatment, so an
+        # absent 'core' (and 'system', which is never a snap) is reported as not installed.
+        mock_client.get.side_effect = _NotFoundError(
+            'snap not installed', kind='snap-not-found', value=snap
+        )
+        error = _utils.check_installed(snap)
+        assert type(error) is NotInstalledError
+        assert error.value == snap
+        mock_client.get.assert_called_once_with(f'/v2/snaps/{snap}')
+
+    def test_installed_snap_is_probed(self, mock_client: MockClient):
+        assert _utils.check_installed('hello world') is None
+        mock_client.get.assert_called_once_with('/v2/snaps/hello%20world')
+
+    def test_absent_snap_returns_not_installed(self, mock_client: MockClient):
+        # The probe asks only about the local system, so the ambiguous base type the client
+        # raises for snapd's 'snap-not-found' kind is narrowed here, once, for every probe site.
+        mock_client.get.side_effect = _NotFoundError(
+            'snap not installed', kind='snap-not-found', value='hello-world'
+        )
+        error = _utils.check_installed('hello-world')
+        assert type(error) is NotInstalledError
+        # Every field is carried across, so the caller raises snapd's own message and value.
+        assert error.message == 'snap not installed'
+        assert error.value == 'hello-world'
+        assert error.kind == 'snap-not-found'
+
+    def test_narrowed_error_has_no_traceback(self, mock_client: MockClient):
+        # The caller raises this error itself, so it must not carry the probe's frames.
+        mock_client.get.side_effect = _NotFoundError('', kind='snap-not-found', value='x')
+        error = _utils.check_installed('hello-world')
+        assert error is not None
+        assert error.__traceback__ is None
+
+
+class TestNormalizeChannel:
+    @pytest.mark.parametrize(
+        ('channel', 'expected'),
+        [
+            ('', ''),
+            ('/', ''),
+            ('stable', 'latest/stable'),
+            ('candidate', 'latest/candidate'),
+            ('beta', 'latest/beta'),
+            ('edge', 'latest/edge'),
+            ('mytrack', 'mytrack/stable'),
+            ('latest', 'latest/stable'),
+            ('latest/stable', 'latest/stable'),
+            ('latest/stable/hotfix', 'latest/stable/hotfix'),
+            ('3/stable', '3/stable'),
+            ('3.6/edge', '3.6/edge'),
+            # A leading risk in a two part channel means the second part is a branch, so the
+            # default track is filled in -- 'edge/hotfix' is not the 'hotfix' risk on track 'edge'.
+            ('edge/hotfix', 'latest/edge/hotfix'),
+        ],
+    )
+    def test_normalize(self, channel: str, expected: str):
+        assert _utils.normalize_channel(channel) == expected
+
+
+class TestResolveChannel:
+    @pytest.mark.parametrize(
+        ('channel', 'tracking', 'expected'),
+        [
+            # No requested channel keeps whatever the snap is on.
+            ('', 'latest/stable', 'latest/stable'),
+            ('', '', ''),
+            # Not installed (or installed from a local file): nothing to inherit a track from.
+            ('edge', '', 'latest/edge'),
+            ('3.6', '', '3.6/stable'),
+            # A risk inherits the track the snap is on.
+            ('edge', 'latest/stable', 'latest/edge'),
+            ('edge', '3.6/stable', '3.6/edge'),
+            ('stable', '3.6/edge', '3.6/stable'),
+            ('edge/hotfix', '3.6/stable', '3.6/edge/hotfix'),
+            # A track doesn't inherit the risk: it takes the default risk instead.
+            ('4.0', '3.6/edge', '4.0/stable'),
+            # A fully specified channel is used as given.
+            ('4.0/edge', '3.6/stable', '4.0/edge'),
+            ('latest/edge', '3.6/stable', 'latest/edge'),
+        ],
+    )
+    def test_resolve(self, channel: str, tracking: str, expected: str):
+        assert _utils.resolve_channel(channel, tracking) == expected
+
+
+UTC = datetime.timezone.utc
+NZDT = datetime.timezone(datetime.timedelta(hours=13))
+NZST = datetime.timezone(datetime.timedelta(hours=12))
+CHATHAM = datetime.timezone(datetime.timedelta(hours=12, minutes=45))
+
+# Snapd writes timestamps with Go's RFC3339Nano layout, so the same field varies in two ways:
+# the timezone is 'Z' or an offset depending on the timezone of the machine snapd runs on, and
+# the fractional seconds have their trailing zeros trimmed, down to no fraction at all.
+#
+# These are timestamps snapd 2.76 really sent, copied from the endpoints the library reads.
+# tests/functional/test_timestamps.py checks the format against a live snapd on each base, so
+# that this list stays a record of the real thing rather than of what we assume it to be.
+OBSERVED_TIMESTAMPS = [
+    # /v2/logs, whose timestamps journald records to microsecond precision.
+    ('2026-02-27T03:01:19.488008Z', datetime.datetime(2026, 2, 27, 3, 1, 19, 488008, UTC)),
+    # A snap's 'hold', from Go's nanosecond clock: 9 digits, truncated to 6 rather than rounded.
+    ('2318-11-10T01:13:31.475559159Z', datetime.datetime(2318, 11, 10, 1, 13, 31, 475559, UTC)),
+    # A snap's 'install-date', which regularly lands on a whole second and so arrives with no
+    # fraction at all. fromisoformat reads this on 3.10, but the old parser raised ValueError.
+    ('2026-07-22T11:27:35Z', datetime.datetime(2026, 7, 22, 11, 27, 35, 0, UTC)),
+    # The same fields from a snapd whose machine isn't on UTC. 3.10's fromisoformat reads the
+    # offset but not the fraction, so these need normalizing too -- and the old parser read
+    # every one of them as UTC, putting the result out by the machine's offset.
+    (
+        '2026-02-26T12:20:32.316341429+13:00',
+        datetime.datetime(2026, 2, 26, 12, 20, 32, 316341, NZDT),
+    ),
+    (
+        '2026-06-29T15:23:53.793426507+12:00',
+        datetime.datetime(2026, 6, 29, 15, 23, 53, 793426, NZST),
+    ),
+    (
+        '2026-07-31T13:32:35.365168077+12:00',
+        datetime.datetime(2026, 7, 31, 13, 32, 35, 365168, NZST),
+    ),
+]
+
+# Forms Go's layout can produce that we haven't happened to catch snapd emitting.
+CONSTRUCTED_TIMESTAMPS = [
+    # A negative offset, and one that isn't a whole number of hours.
+    (
+        '2026-02-26T12:20:32.316341429-05:00',
+        datetime.datetime(
+            2026, 2, 26, 12, 20, 32, 316341, datetime.timezone(datetime.timedelta(hours=-5))
+        ),
+    ),
+    ('2026-02-26T12:20:32.3+12:45', datetime.datetime(2026, 2, 26, 12, 20, 32, 300000, CHATHAM)),
+    # Fractions shorter than 6 digits are right padded, not left padded: '.13454' is 134540 μs.
+    ('2026-02-27T03:01:19.13454Z', datetime.datetime(2026, 2, 27, 3, 1, 19, 134540, UTC)),
+    ('2026-02-27T03:01:19.0033Z', datetime.datetime(2026, 2, 27, 3, 1, 19, 3300, UTC)),
+    ('2026-02-27T03:01:19.1Z', datetime.datetime(2026, 2, 27, 3, 1, 19, 100000, UTC)),
+    # Go's zero time, which is what a time field snapd has no value for would marshal to.
+    ('0001-01-01T00:00:00Z', datetime.datetime(1, 1, 1, 0, 0, 0, 0, UTC)),
+]
+
+TIMESTAMPS = [*OBSERVED_TIMESTAMPS, *CONSTRUCTED_TIMESTAMPS]
+
+
+# What _normalize_timestamp_310 is allowed to emit: fractional seconds spelled with exactly 6
+# digits or left out, and the timezone as an offset or left out. Python 3.10's fromisoformat
+# reads this subset, and every later version reads it to the same datetime -- checked against
+# 3.10, 3.12 and 3.14, including that a '+00:00' offset gives datetime.timezone.utc on all of
+# them. Nothing outside the subset can be assumed to survive the version difference.
+AGREED_SUBSET = re.compile(
+    r'\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d{6})?(?:[+-]\d{2}:\d{2})?'
+)
+
+# Neither fromisoformat nor the 3.10 parser reads any of these, on any version we support.
+MALFORMED = [
+    '',
+    'not a timestamp',
+    '03:01:19.488008Z',  # A time with no date.
+    '2026-02-27t03:01:19.488008z',  # fromisoformat is case sensitive, so we are too.
+    '2026-02-27T03:01:19.488008Z trailing',
+    'leading 2026-02-27T03:01:19.488008Z',
+]
+
+# Valid ISO 8601 that snapd never sends. fromisoformat on 3.11+ reads all of these, and the 3.10
+# parser reads none of them: it accepts snapd's format rather than every format, so that an
+# unexpected timestamp is an error rather than a datetime nothing meant.
+NOT_SNAPD_FORMAT = [
+    '2026-02-27',  # A date with no time.
+    '2026-02-27T03:01:19.488008+13',  # An offset with no minutes.
+    '2026-02-27T03:01:19+13:00:30',  # An offset with seconds.
+    '2026-02-27T03:01:19.Z',  # A fraction with no digits.
+    '2026-02-27x03:01:19.488008Z',  # An arbitrary separator.
+    '20260227T030119Z',  # The basic format, with the separators left out.
+    '2026-W09-5T03:01:19Z',  # A week date.
+]
+
+
+class TestParseTimestamp:
+    # Every timestamp is pinned to an exact value rather than to properties of the result, so
+    # that both parsing paths are asserted to agree -- the 3.10 one silently dropped the
+    # timezone, which no assertion about the shape of the result would have caught.
+    @pytest.mark.parametrize(('timestamp', 'expected'), TIMESTAMPS)
+    def test_parse(self, timestamp: str, expected: datetime.datetime):
+        parsed = _utils.parse_timestamp(timestamp)
+        assert parsed == expected
+        # Aware datetimes compare equal across timezones, so the offset is checked separately:
+        # without this, a timestamp parsed as UTC would match one that isn't.
+        assert parsed.utcoffset() == expected.utcoffset()
+
+    # The 3.10 parser is tested directly, on every version rather than only on the version that
+    # uses it, so that a regression in it fails everywhere instead of only in the 3.10 CI job.
+    @pytest.mark.parametrize(('timestamp', 'expected'), TIMESTAMPS)
+    def test_parse_310(self, timestamp: str, expected: datetime.datetime):
+        parsed = _utils._parse_timestamp_310(timestamp)
+        assert parsed == expected
+        assert parsed.utcoffset() == expected.utcoffset()
+
+    # ...but that test ends in a call to the *running* version's fromisoformat, so on 3.14 it
+    # only stands in for 3.10 as far as the two agree. What makes it stand in is the shape of
+    # the normalized string: a 6 digit fraction or none, and an offset or none, which is the
+    # subset every supported fromisoformat reads identically. That property is version
+    # independent, so asserting it here is what carries the test across versions.
+    @pytest.mark.parametrize(('timestamp', 'expected'), TIMESTAMPS)
+    def test_normalize_310_output_is_read_the_same_by_every_version(
+        self, timestamp: str, expected: datetime.datetime
+    ):
+        del expected  # only in the signature to share the parametrization
+        normalized = _utils._normalize_timestamp_310(timestamp)
+        assert AGREED_SUBSET.fullmatch(normalized), normalized
+
+    @pytest.mark.parametrize(('timestamp', 'expected'), TIMESTAMPS)
+    @pytest.mark.skipif(
+        sys.version_info < (3, 11),
+        reason='fromisoformat does not read these formats on 3.10, which is why we normalize',
+    )
+    def test_parse_310_matches_fromisoformat(self, timestamp: str, expected: datetime.datetime):
+        # Where the stdlib can read the timestamp itself, the 3.10 parser must agree with it
+        # exactly: the expected values above are the stdlib's, not ours.
+        del expected  # only in the signature to share the parametrization
+        parsed = datetime.datetime.fromisoformat(timestamp)
+        assert _utils._parse_timestamp_310(timestamp) == parsed
+        assert _utils._parse_timestamp_310(timestamp).utcoffset() == parsed.utcoffset()
+
+    @pytest.mark.parametrize('separator', ['T', ' '])
+    def test_date_and_time_separator(self, separator: str):
+        # Snapd always writes 'T'. The space form is accepted because str(datetime) produces it,
+        # and that's what a caller passing a timestamp to InstalledInfo has most readily to hand.
+        expected = datetime.datetime(2026, 2, 27, 3, 1, 19, 488008, UTC)
+        timestamp = f'2026-02-27{separator}03:01:19.488008Z'
+        assert _utils.parse_timestamp(timestamp) == expected
+        assert _utils._parse_timestamp_310(timestamp) == expected
+
+    def test_no_timezone_is_naive(self):
+        # Snapd always sends a timezone, but fromisoformat accepts a timestamp without one and
+        # returns a naive datetime rather than assuming UTC, so the 3.10 parser does the same.
+        for parsed in (
+            _utils.parse_timestamp('2026-02-27T03:01:19.488008'),
+            _utils._parse_timestamp_310('2026-02-27T03:01:19.488008'),
+        ):
+            assert parsed == datetime.datetime(2026, 2, 27, 3, 1, 19, 488008)
+            assert parsed.tzinfo is None
+
+    @pytest.mark.parametrize('timestamp', MALFORMED)
+    def test_malformed_raises_value_error(self, timestamp: str):
+        # ValueError is what fromisoformat raises, and what logs() catches to skip an entry it
+        # can't read rather than failing the whole call.
+        with pytest.raises(ValueError, match='Invalid isoformat string'):
+            _utils.parse_timestamp(timestamp)
+        with pytest.raises(ValueError, match='Invalid isoformat string'):
+            _utils._parse_timestamp_310(timestamp)
+
+    @pytest.mark.parametrize('timestamp', NOT_SNAPD_FORMAT)
+    def test_not_snapd_format_raises_value_error_on_310(self, timestamp: str):
+        # Only asserted of the 3.10 parser: on 3.11+ parse_timestamp hands the string straight
+        # to fromisoformat, which reads all of these. That difference is the price of dropping
+        # the parser by deleting a branch, and it only shows up for timestamps snapd never sends.
+        with pytest.raises(ValueError, match='Invalid isoformat string'):
+            _utils._parse_timestamp_310(timestamp)
+
+    @pytest.mark.parametrize('channel', ['stable', 'candidate', 'beta', 'edge'])
+    def test_resolving_the_tracked_channel_is_a_no_op(self, channel: str):
+        # ensure_installed() relies on this to tell whether a requested channel is the one
+        # tracked, so resolving a snap's own channel must give that channel back unchanged.
+        for track in ('latest', '3.6'):
+            tracking = f'{track}/{channel}'
+            assert _utils.resolve_channel(channel, tracking) == tracking
+            assert _utils.resolve_channel(tracking, tracking) == tracking

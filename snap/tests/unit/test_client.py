@@ -6,8 +6,16 @@
 from __future__ import annotations
 
 import builtins
+import contextlib
+import http.client
 import json
 import logging
+import pathlib
+import socket
+import struct
+import tempfile
+import threading
+import time
 import urllib.error
 import urllib.request
 from types import SimpleNamespace
@@ -17,12 +25,13 @@ from unittest.mock import MagicMock
 import pytest
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from pathlib import Path
 
     from pytest import LogCaptureFixture
 
 import charmlibs.snap._errors
-from charmlibs.snap import _client
+from charmlibs.snap import _client, _client_sockets
 from charmlibs.snap._errors import (
     APIError,
     AppNotFoundError,
@@ -32,10 +41,12 @@ from charmlibs.snap._errors import (
     ConnectionError,  # noqa: A004 (shadowing a Python builtin)
     Error,
     NeedsClassicError,
-    NotFoundError,
+    NotInstalledError,
     OptionNotFoundError,
+    SocketNotFoundError,
     TimeoutError,  # noqa: A004 (shadowing a Python builtin)
     _AlreadyInstalledError,
+    _NotFoundError,
     _NoUpdatesAvailableError,
 )
 from conftest import FIXTURES_DIR, load_fixture
@@ -51,6 +62,100 @@ def _fake_response(
     if isinstance(data, (dict, list)):
         data = json.dumps(data).encode()
     return SimpleNamespace(read=lambda: data, status=status, reason=reason, url=url)
+
+
+# A fake snapd on a real unix socket, used by TestSnapdGoingAwayMidRequest below. Each name is
+# one connection's worth of behaviour; a server is given one per connection it should accept.
+_RECV_SIZE = 4096
+# Long enough for the client's request to land in the receive buffer before we close on it.
+# Only the 'abort' behaviour waits, and only to make the reset the *unread* kind (see below).
+_ABORT_DELAY = 0.2
+
+
+def _abort(conn: socket.socket) -> None:
+    """Reset the connection instead of closing it cleanly, the way an aborting peer does.
+
+    Closing while the peer's data sits unread in the receive buffer makes the kernel send RST
+    rather than FIN, so the client gets ECONNRESET -- the errno 104 a live snapd was seen to
+    produce when it goes away mid-request. SO_LINGER with a zero timeout forces the same for a
+    connection whose request we did read.
+    """
+    conn.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))
+
+
+def _serve(server: socket.socket, behaviours: tuple[str, ...]) -> None:
+    for behaviour in behaviours:
+        conn, _ = server.accept()
+        with conn:
+            if behaviour == 'abort':
+                # Never read the request, so closing on it resets the connection. The wait is
+                # only to let the request land in the buffer first.
+                time.sleep(_ABORT_DELAY)
+                continue
+            if behaviour == 'reset_mid_body':
+                # Answer with headers the client can parse, then reset while it reads the body,
+                # so the failure lands in _read rather than _request. Again, don't read.
+                conn.sendall(b'HTTP/1.1 200 OK\r\nContent-Length: 100000\r\n\r\n' + b'x' * 10)
+                time.sleep(_ABORT_DELAY)
+                _abort(conn)
+                continue
+            conn.recv(_RECV_SIZE)  # Read the request, so the failure is in our answer, not theirs.
+            if behaviour == 'close':
+                continue  # Close without answering at all.
+            if behaviour == 'truncated_body':
+                # Promise more body than we send, so read() raises http.client.IncompleteRead.
+                conn.sendall(b'HTTP/1.1 200 OK\r\nContent-Length: 100\r\n\r\n{"type": "sync"')
+                continue
+            if behaviour == 'not_http':
+                # Something that isn't snapd on the socket: http.client.BadStatusLine.
+                conn.sendall(b'this is not a status line\r\n\r\n')
+                continue
+            body = json.dumps({'type': 'sync', 'result': {'foo': 'bar'}}).encode()
+            conn.sendall(
+                b'HTTP/1.1 200 OK\r\nContent-Length: '
+                + str(len(body)).encode()
+                + b'\r\n\r\n'
+                + body
+            )
+
+
+# Each failure a peer can hand us once the request is on the wire: the behaviour that provokes
+# it, the raw error urllib lets through, and which of the two places we touch the socket it
+# surfaces from -- 'sending' for _request (which covers h.getresponse()), 'reading' for _read.
+#
+# Both flavours of _client._TRANSPORT_ERRORS arise at both places, which is why both except arms
+# need the whole tuple: 'not_http' is the pure-HTTPException case that catching OSError alone
+# would miss in _request, and 'reset_mid_body' the pure-OSError case that catching HTTPException
+# alone would miss in _read. RemoteDisconnected subclasses ConnectionResetError, so the 'abort'
+# expectation holds whether or not the request lands unread in time to make the reset the
+# kernel-level kind.
+_FAILURES = [
+    ('abort', builtins.ConnectionResetError, 'sending'),
+    ('close', http.client.RemoteDisconnected, 'sending'),
+    ('not_http', http.client.BadStatusLine, 'sending'),
+    ('truncated_body', http.client.IncompleteRead, 'reading'),
+    ('reset_mid_body', builtins.ConnectionResetError, 'reading'),
+]
+
+
+@contextlib.contextmanager
+def _snapd_that(*behaviours: str) -> Iterator[str]:
+    """Serve one connection per behaviour on a real unix socket, and yield its path."""
+    # pytest's tmp_paths are too long -- a unix socket path has to fit in sockaddr_un (108 bytes).
+    with tempfile.TemporaryDirectory() as tmp:
+        socket_path = str(pathlib.Path(tmp) / 's')
+        server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        # Bound and listening before we yield, so the client can't connect before we're ready.
+        server.bind(socket_path)
+        server.listen(len(behaviours))
+        server.settimeout(10)  # Don't hang the suite if the client never connects.
+        thread = threading.Thread(target=_serve, args=(server, behaviours), daemon=True)
+        thread.start()
+        try:
+            yield socket_path
+        finally:
+            thread.join(timeout=10)
+            server.close()
 
 
 @pytest.fixture
@@ -116,7 +221,8 @@ class TestErrorResponses:
             ('option-not-found', OptionNotFoundError),
             ('snap-channel-not-available', ChannelNotAvailableError),
             ('snap-needs-classic', NeedsClassicError),
-            ('snap-not-found', NotFoundError),
+            ('snap-not-found', _NotFoundError),
+            ('snap-not-installed', NotInstalledError),
             ('some-unrecognised-kind', APIError),  # Unknown kinds fall back to the base type.
         ],
     )
@@ -186,6 +292,43 @@ class TestErrorResponses:
             _client.get('/v2/snaps/hello-world')
         assert message_fragment in exc_info.value.message
 
+    @pytest.mark.parametrize('status', [200, 400, 404, 500])
+    def test_non_redirect_status_is_decoded_from_the_body(
+        self, monkeypatch: pytest.MonkeyPatch, status: int
+    ):
+        # Only 3xx is special-cased in _request: 4xx and 5xx bodies carry the error we report.
+        body = {'type': 'sync', 'status-code': status, 'result': {'foo': 'bar'}}
+        response = _fake_response(body, status=status)
+        monkeypatch.setattr(
+            urllib.request.OpenerDirector, 'open', MagicMock(return_value=response)
+        )
+        assert _client.get('/v2/snaps/hello-world') == {'foo': 'bar'}
+
+    def test_redirect_raises_bad_response_error(self, monkeypatch: pytest.MonkeyPatch):
+        # snapd's router answers a non-canonical path (e.g. the '/v2/snaps//conf' that an empty
+        # snap name used to build) with an empty-bodied 301 to the cleaned path. We don't follow
+        # redirects: we report them, rather than failing on the empty body as invalid JSON.
+        def getheader(name: str) -> str | None:
+            return '/v2/snaps/conf' if name == 'Location' else None
+
+        response = SimpleNamespace(
+            read=lambda: b'',
+            status=301,
+            reason='Moved Permanently',
+            url='http://localhost/v2/snaps//conf',
+            getheader=getheader,
+        )
+        monkeypatch.setattr(
+            urllib.request.OpenerDirector, 'open', MagicMock(return_value=response)
+        )
+        with pytest.raises(BadResponseError) as exc_info:
+            _client.get('/v2/snaps//conf')
+        assert exc_info.value.kind == 'charmlibs-snap-unexpected-redirect'
+        assert '/v2/snaps//conf' in exc_info.value.message  # The path we asked for.
+        assert '/v2/snaps/conf' in exc_info.value.message  # Where snapd points us.
+        assert exc_info.value.value == '/v2/snaps/conf'
+        assert exc_info.value._status_code == 301
+
     def test_request_timeout_raises_snap_timeout_error(self, monkeypatch: pytest.MonkeyPatch):
         # Patch opener.open inside _request to raise TimeoutError, exercising the conversion.
         monkeypatch.setattr(
@@ -198,7 +341,7 @@ class TestErrorResponses:
         assert exc_info.value.kind == 'charmlibs-snap-request-timeout'
         assert isinstance(exc_info.value, TimeoutError)
 
-    def test_socket_not_found_raises_snap_connection_error(
+    def test_socket_not_found_raises_socket_not_found_error(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ):
         # Point _SOCKET_PATH at a real non-existent path so the real URLError fires.
@@ -206,11 +349,20 @@ class TestErrorResponses:
         # A missing socket means snapd is absent, so the request fails fast without retrying.
         sleep = MagicMock()
         monkeypatch.setattr(_client.time, 'sleep', sleep)
-        with pytest.raises(ConnectionError) as exc_info:
+        with pytest.raises(SocketNotFoundError) as exc_info:
             _client.get('/v2/snaps/hello-world')
         assert exc_info.value.kind == 'charmlibs-snap-socket-not-found'
+        # Callers that only care that snapd was unreachable can catch ConnectionError.
         assert isinstance(exc_info.value, ConnectionError)
         sleep.assert_not_called()
+
+    def test_timeout_while_reading_body_raises_snap_timeout_error(self, mock_raw: MagicMock):
+        response = _fake_response({'type': 'sync', 'result': {}})
+        response.read = MagicMock(side_effect=builtins.TimeoutError('timed out'))
+        mock_raw.return_value = response
+        with pytest.raises(TimeoutError) as exc_info:
+            _client.get('/v2/snaps/hello-world')
+        assert exc_info.value.kind == 'charmlibs-snap-request-timeout'
 
     def test_connection_error_retries_then_raises(self, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setattr(_client, '_CONNECTION_RETRY_BUDGET', 0)
@@ -224,7 +376,8 @@ class TestErrorResponses:
         with pytest.raises(ConnectionError) as exc_info:
             _client.get('/v2/snaps/hello-world')
         assert exc_info.value.kind == 'charmlibs-snap-connection-error'
-        assert isinstance(exc_info.value, ConnectionError)
+        # A reachable-but-failing socket isn't the socket-missing case.
+        assert not isinstance(exc_info.value, SocketNotFoundError)
         # Budget is 0, so the first failure is past the deadline: no retry sleep.
         sleep.assert_not_called()
 
@@ -241,6 +394,73 @@ class TestErrorResponses:
         ]
         assert _client.get('/v2/snaps/hello-world') == {'foo': 'bar'}
         assert mock_raw.call_count == 2
+
+
+class TestSnapdGoingAwayMidRequest:
+    """Transport failures reproduced against a real unix socket, not a mocked opener.
+
+    urllib only wraps failures from opening the connection and sending the request, in
+    AbstractHTTPHandler.do_open. Anything that goes wrong while the peer is *answering* reaches
+    us untranslated, which is what the except arms in _request and _read exist for. These tests
+    pin down both halves: that urllib really does let each failure through, and that the library
+    converts it. The first half is the premise, so it's asserted rather than assumed -- if a
+    future Python starts wrapping these, these tests fail and those arms can go.
+
+    See _FAILURES for the cases and why each one is there.
+    """
+
+    @pytest.mark.parametrize(('behaviour', 'raw_type', 'stage'), _FAILURES)
+    def test_urllib_lets_the_failure_through_untranslated(
+        self, behaviour: str, raw_type: type[BaseException], stage: str
+    ):
+        with _snapd_that(behaviour) as socket_path:
+            opener = urllib.request.OpenerDirector()
+            opener.add_handler(_client_sockets.UnixSocketHandler(socket_path))
+            request = urllib.request.Request('http://localhost/v2/snaps/hello-world')
+            with pytest.raises(raw_type) as exc_info:
+                response = opener.open(request, timeout=10)
+                # Getting this far means urllib parsed a response, so the failure is in the body.
+                assert stage == 'reading'
+                response.read()
+        if stage == 'sending':
+            assert not isinstance(exc_info.value, urllib.error.URLError)
+        assert isinstance(exc_info.value, _client._TRANSPORT_ERRORS)
+
+    @pytest.mark.parametrize(('behaviour', 'raw_type', 'stage'), _FAILURES)
+    def test_the_library_translates_the_failure(
+        self,
+        behaviour: str,
+        raw_type: type[BaseException],
+        stage: str,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        # Budget 0 so the GET isn't retried: one connection is all the server offers. (A failure
+        # while reading the body isn't retried anyway -- that happens after _retry_json_get.)
+        monkeypatch.setattr(_client, '_CONNECTION_RETRY_BUDGET', 0)
+        monkeypatch.setattr(_client.time, 'sleep', MagicMock())
+        with _snapd_that(behaviour) as socket_path:
+            monkeypatch.setattr(_client, '_SOCKET_PATH', socket_path)
+            with pytest.raises(ConnectionError) as exc_info:
+                _client.get('/v2/snaps/hello-world')
+        assert exc_info.value.kind == 'charmlibs-snap-connection-error'
+        # The socket existed and accepted us, so this isn't the snapd-not-installed case.
+        assert not isinstance(exc_info.value, SocketNotFoundError)
+        # The raw error is kept as the cause, so a charm's traceback still shows what broke.
+        assert isinstance(exc_info.value.__cause__, raw_type)
+
+    def test_the_failure_is_retried_on_a_get(self, monkeypatch: pytest.MonkeyPatch):
+        # Translating these is what puts them in front of the GET retry, and snapd restarting
+        # mid-operation -- exactly this failure -- is what that retry exists for.
+        monkeypatch.setattr(_client.time, 'sleep', MagicMock())
+        with _snapd_that('abort', 'ok') as socket_path:
+            monkeypatch.setattr(_client, '_SOCKET_PATH', socket_path)
+            assert _client.get('/v2/snaps/hello-world') == {'foo': 'bar'}
+
+    def test_a_healthy_socket_still_works(self, monkeypatch: pytest.MonkeyPatch):
+        # The control: the same fake snapd answering properly goes through the untouched path.
+        with _snapd_that('ok') as socket_path:
+            monkeypatch.setattr(_client, '_SOCKET_PATH', socket_path)
+            assert _client.get('/v2/snaps/hello-world') == {'foo': 'bar'}
 
 
 class TestAsyncChange:
@@ -399,17 +619,25 @@ def test_all_errors_mapped():
         'APIError',
         # Transport errors
         'ConnectionError',
+        'SocketNotFoundError',
         'TimeoutError',
         # Manually raised errors
         'BadResponseError',
         'ChangeError',
     }
-    expected = sorted(
+    unmapped = unmapped | {
+        # Narrowed from _NotFoundError by the function that made the request, never mapped from a
+        # kind: snapd has no kind that means "the store doesn't have it" as opposed to "it isn't
+        # installed". See _NotFoundError and test_absent_snap_kinds below.
+        'NotInStoreError',
+    }
+    expected = {
         name
         for name in dir(charmlibs.snap._errors)
         if name.endswith('Error') and name not in unmapped
-    )
-    actual = sorted(cls.__name__ for cls in _client._ERRORS.values())
+    }
+    # A set, not a sorted list: a type may be reached by more than one kind.
+    actual = {cls.__name__ for cls in _client._ERRORS.values()}
     assert actual == expected
 
 
