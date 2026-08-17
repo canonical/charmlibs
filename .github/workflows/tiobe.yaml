@@ -1,0 +1,73 @@
+name: TIOBE
+
+on:
+  workflow_dispatch:
+  schedule:
+    # min (0-59) / hour (0-23) / day (1-31) / month (1-12) / weekday (SUN-SAT)
+    - cron: '14 3 * * MON'
+      timezone: 'Pacific/Auckland'
+
+permissions: {}
+
+jobs:
+  TICS:
+    runs-on: [self-hosted, reactive, amd64, tiobe, noble]
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990  # v8.3.2
+
+      # We could store per-package coverage from the regular CI runs and merge
+      # them here, but this is cheap to do fresh and keeps the TICS run
+      # self-contained.
+      - name: Generate coverage report across packages
+        run: |
+          set -euo pipefail
+          # Discover packages the same way the rest of CI does — dynamic so
+          # new packages get picked up automatically.
+          mapfile -t packages < <(.scripts/ls.py packages --exclude-examples --exclude-placeholders --no-json)
+          for pkg in "${packages[@]}"; do
+            # Let `just` resolve the Python version per package (uses the higher
+            # of DEFAULT_PYTHON and the package's requires-python minimum).
+            uvx --from rust-just just unit "$pkg"
+          done
+          mkdir -p .report
+          # Merge every per-package coverage db into one repo-root
+          # coverage.xml for the TICS action to pick up.
+          mapfile -t dbs < <(find . -path '*/.report/coverage-*.db' -type f)
+          if [ ${#dbs[@]} -eq 0 ]; then
+            echo "No coverage databases produced." >&2
+            exit 1
+          fi
+          uv run --no-project --with-requirements=test-requirements.txt coverage combine --keep "${dbs[@]}"
+          uv run --no-project --with-requirements=test-requirements.txt coverage xml -o .report/coverage.xml
+
+      # Note that these are dependencies for the tools that the TIOBE action will
+      # run, which is done in the global environment, rather than a venv.
+      - name: Install TIOBE and project dependencies
+        run: |
+          set -euo pipefail
+          # The monorepo lockfile only pins the fast-lint tools, so export each
+          # package's own lockfile instead — that's what lets pylint/flake8
+          # resolve third-party imports during static analysis.
+          # Works at time of writing, but will break if libraries ever have
+          # incompatible deps.
+          mapfile -t packages < <(.scripts/ls.py packages --exclude-examples --exclude-placeholders --no-json)
+          for pkg in "${packages[@]}"; do
+            uv export --project "$pkg" --no-emit-project --frozen --no-hashes
+          done | sort -u > requirements.txt
+          pip install flake8 pylint -r requirements.txt --break-system-packages
+
+      - name: TICS GitHub Action
+        uses: tiobe/tics-github-action@333078bc527399e5916a166bd1a3a788be5a01a9  # v3.12.0
+        with:
+          mode: qserver
+          viewerUrl: https://canonical.tiobe.com/tiobeweb/TICS/api/cfg?name=default
+          # Provided as an org-level secret, so it can't be scoped to a dedicated
+          # environment — environments only exist per-repo.
+          ticsAuthToken: ${{ secrets.TICSAUTHTOKEN }}
+          project: charmtech-charmlibs
+          installTics: true
