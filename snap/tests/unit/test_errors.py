@@ -159,4 +159,4 @@ class TestBadResponseError:
 
     def test_repr_doesnt_contain_a_none_response(self):
         r = repr(_errors.BadResponseError('boom', response=None))
-        assert r == f"charmlibs.snap._errors.BadResponseError('boom')"
+        assert r == "charmlibs.snap._errors.BadResponseError('boom')"
