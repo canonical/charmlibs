@@ -308,7 +308,7 @@ class TestErrorResponses:
             _client.get('/v2/snaps/hello-world')
         assert message_fragment in exc_info.value.message
         # What snapd sent is kept for the caller to report to the library maintainers.
-        assert exc_info.value.response == expected_response
+        assert exc_info.value._response == expected_response
 
     @pytest.mark.parametrize('status', [200, 400, 404, 500])
     def test_non_redirect_status_is_decoded_from_the_body(
@@ -345,7 +345,7 @@ class TestErrorResponses:
         assert '/v2/snaps/conf' in exc_info.value.message  # Where snapd points us.
         assert '301' in exc_info.value.message  # The kind of redirect it is.
         # The 301's body is empty, and the message already says everything there is to say.
-        assert exc_info.value.response is None
+        assert exc_info.value._response is None
 
     def test_request_timeout_raises_snap_timeout_error(self, monkeypatch: pytest.MonkeyPatch):
         # Patch opener.open inside _request to raise TimeoutError, exercising the conversion.
@@ -540,7 +540,7 @@ class TestAsyncChange:
         with pytest.raises(BadResponseError) as exc_info:
             _client.post('/v2/snaps/hello-world', body={'action': 'hold'})
         assert 'Unexpected response type' in exc_info.value.message
-        assert exc_info.value.response == []
+        assert exc_info.value._response == []
 
     @pytest.mark.parametrize('status', ['Undo', 'Undoing'])
     def test_async_undo_statuses_continue_polling(self, mock_raw: MagicMock, status: str):
@@ -626,7 +626,7 @@ class TestLogsEndpoint:
             _client.get_logs(query={'n': 10, 'names': 'lxd'})
         assert 'Invalid JSON' in exc_info.value.message
         assert 'some-path' in exc_info.value.message
-        assert exc_info.value.response == 'some-bytes'
+        assert exc_info.value._response == 'some-bytes'
 
 
 def test_all_errors_mapped():

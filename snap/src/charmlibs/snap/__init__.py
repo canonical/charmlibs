@@ -58,7 +58,7 @@ never retried: it usually means snapd is not installed on the system.
 
 A :class:`BadResponseError` is raised if the snapd API returns a response the library does not
 understand. Callers will not be able to resolve this error directly, and should report it to the
-library maintainers, along with :attr:`BadResponseError.response` -- what snapd sent that the
+library maintainers, along with the error's :func:`repr`, which includes what snapd sent that the
 library could not read.
 """
 

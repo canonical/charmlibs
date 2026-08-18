@@ -135,18 +135,15 @@ def test_str_appends_informative_string_value(message: str, value: object, expec
 class TestBadResponseError:
     """BadResponseError carries what snapd sent, for the caller to put in a bug report."""
 
-    def test_response_is_public(self):
+    def test_response_is_not_public(self):
+        # It's only there for the repr: a caller can't do anything with it but report it.
         err = _errors.BadResponseError('boom', response={'unexpected': 'shape'})
-        assert err.response == {'unexpected': 'shape'}
-
-    def test_response_is_read_only(self):
-        err = _errors.BadResponseError('boom', response='oops')
-        with pytest.raises(AttributeError):
-            err.response = ''  # pyright: ignore[reportAttributeAccessIssue]
+        assert not hasattr(err, 'response')
+        assert err._response == {'unexpected': 'shape'}
 
     def test_response_defaults_to_none(self):
         # Not every bad response has anything to report beyond the message.
-        assert _errors.BadResponseError('boom').response is None
+        assert _errors.BadResponseError('boom')._response is None
 
     def test_response_is_not_appended_to_str(self):
         # Unlike APIError's value: a whole response body doesn't belong in a charm's status.

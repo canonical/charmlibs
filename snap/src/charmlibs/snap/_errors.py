@@ -49,22 +49,17 @@ class BadResponseError(Error):
 
     Callers will not be able to resolve this error directly. It means the library and snapd
     disagree about the shape of a response, so it should be reported to the library maintainers,
-    along with :attr:`response` -- what snapd sent that the library could not read.
+    along with the error's :func:`repr`, which includes what snapd sent that the library
+    could not read.
     """
 
     def __init__(self, message: str, *, response: object = None):
         super().__init__(message)
+        # What snapd sent that we couldn't read: a string for a response that wasn't valid JSON,
+        # or the decoded JSON value for one that was well-formed but not what we expected. None
+        # when the message says all there is to say, as for an unexpected redirect. Private:
+        # callers can't act on it, they can only include the repr in a bug report.
         self._response = response
-
-    @property
-    def response(self) -> object:
-        """The part of snapd's response the library could not read, if any.
-
-        Typically a string for a response that wasn't valid JSON, or the decoded JSON value
-        for one that was well-formed but not what the library expected. ``None`` when the
-        message says all there is to say, as for an unexpected redirect.
-        """
-        return self._response
 
     def __repr__(self) -> str:
         response = '' if self._response is None else f', response={self._response!r}'
