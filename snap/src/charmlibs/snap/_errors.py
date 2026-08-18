@@ -48,9 +48,12 @@ class BadResponseError(Error):
     """Raised manually when the snapd API returns a response we don't understand.
 
     Callers will not be able to resolve this error directly. It means the library and snapd
-    disagree about the shape of a response, so it should be reported to the library maintainers,
-    along with the error's :func:`repr`, which includes what snapd sent that the library
-    could not read.
+    disagree about the shape of a response, so it should be reported to the library maintainers.
+    The error message includes what snapd sent that the library could not read, so an uncaught
+    traceback carries everything the report needs.
+
+    Use :attr:`message` rather than ``str(error)`` for a charm's status, which is truncated for
+    display and has no room for a response body.
     """
 
     def __init__(self, message: str, *, response: object = None):
@@ -58,8 +61,16 @@ class BadResponseError(Error):
         # What snapd sent that we couldn't read: a string for a response that wasn't valid JSON,
         # or the decoded JSON value for one that was well-formed but not what we expected. None
         # when the message says all there is to say, as for an unexpected redirect. Private:
-        # callers can't act on it, they can only include the repr in a bug report.
+        # callers can't act on it, they can only include it in a bug report.
         self._response = response
+
+    def __str__(self) -> str:
+        # A traceback renders an exception as `type(error): str(error)`, so this is the only
+        # channel that reaches a bug report when a charm doesn't catch the error. Newlines are
+        # safe: juju keeps a multi-line log record intact rather than splitting it.
+        if self._response is None:
+            return self._message
+        return f'{self._message} -- response:\n{self._response!r}'
 
     def __repr__(self) -> str:
         response = '' if self._response is None else f', response={self._response!r}'

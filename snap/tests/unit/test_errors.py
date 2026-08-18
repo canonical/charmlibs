@@ -145,9 +145,40 @@ class TestBadResponseError:
         # Not every bad response has anything to report beyond the message.
         assert _errors.BadResponseError('boom')._response is None
 
-    def test_response_is_not_appended_to_str(self):
-        # Unlike APIError's value: a whole response body doesn't belong in a charm's status.
-        assert str(_errors.BadResponseError('boom', response='oops')) == 'boom'
+    def test_str_appends_the_response(self):
+        # str() is what a traceback shows, and is the only channel that reaches a bug report
+        # when a charm doesn't catch the error.
+        err = _errors.BadResponseError('boom', response='oops')
+        assert str(err) == "boom -- response:\n'oops'"
+
+    def test_str_is_just_the_message_without_a_response(self):
+        assert str(_errors.BadResponseError('boom')) == 'boom'
+
+    @pytest.mark.parametrize(
+        'response',
+        [
+            'oops',  # A string is quoted, so an empty or padded body is still visible.
+            '',
+            {'unexpected': 'shape'},
+            ['hello-world'],
+            b'not json at all',
+        ],
+    )
+    def test_str_renders_the_response_with_repr(self, response: object):
+        # repr(), not str(): it escapes control characters that would otherwise mangle a
+        # terminal, and keeps the difference between a string and a decoded JSON value visible.
+        err = _errors.BadResponseError('boom', response=response)
+        assert str(err) == f'boom -- response:\n{response!r}'
+
+    def test_str_escapes_control_characters_in_the_response(self):
+        err = _errors.BadResponseError('boom', response='a\nb\x00c')
+        assert '\\n' in str(err)  # The newline is escaped, not emitted raw.
+        assert str(err).count('\n') == 1  # Only the separator before the response.
+
+    def test_message_stays_clean_for_a_charm_status(self):
+        # A charm putting the error in its status wants the message, not the whole body.
+        err = _errors.BadResponseError('boom', response='oops' * 100)
+        assert err.message == 'boom'
 
     @pytest.mark.parametrize('response', ['oops', {'unexpected': 'shape'}, ''])
     def test_repr_contains_the_message_and_the_response(self, response: object):
