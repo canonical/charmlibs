@@ -103,6 +103,18 @@ As you work through this guide we'll suggest good moments to commit, but treat t
 
 To start with, commit the output of `just init` now, before making any other changes.
 
+```{admonition} Working with agents
+:class: tip
+
+Agents can greatly benefit from a dry-run in order to produce a cleanly reviewable series of commits.
+Consider prompting agents to:
+
+1. Review the migration guide and the library to migrate, then write an initial multi-step migration plan.
+2. Work through the plan, noting any deviations from the plan.
+3. After finishing, rework the plan & deviations into a clean commit-by-commit plan that aligns with the migration guide. Capture the precise scope of each commit.
+4. Do the migration according to the commit-by-commit plan, with real commits.
+```
+
 ## Migrate your library's code
 
 This is the easy bit, since Charmhub-hosted libs are only a single module.
