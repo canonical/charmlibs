@@ -186,9 +186,7 @@ def _request(
         # We validate and encode the inputs we interpolate into paths, so we only make requests
         # to canonical paths. A redirect here means a bug on our side or a change in snapd.
         location = response.getheader('Location')
-        # Nobody will read this response, and until someone does, its body's file object holds
-        # the socket's fd open -- see _read.
-        response.close()
+        response.close()  # Avoid the body's file object holding the socket's fd open.
         raise _errors.BadResponseError(
             message=f'Unexpected redirect for path {path!r} to {location!r}',
             kind='charmlibs-snap-unexpected-redirect',
@@ -271,12 +269,8 @@ def _decode_logs(response: http.client.HTTPResponse) -> list[dict[str, str]]:
 
 
 def _read(response: http.client.HTTPResponse) -> bytes:
-    """Read a response body, translating a transport failure mid-read into a library error.
-
-    The response is closed either way. urllib closes the socket as soon as the headers are
-    parsed, but the body's file object keeps the underlying fd open, so abandoning a response
-    we only partly read would leak that fd until the collector got to it.
-    """
+    """Read a response body, translating a transport failure mid-read into a library error."""
+    # Avoid the response body's file object holding the socket's fd open if read errors.
     with contextlib.closing(response):
         try:
             return response.read()

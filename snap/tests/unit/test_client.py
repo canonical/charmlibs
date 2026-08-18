@@ -61,7 +61,6 @@ def _fake_response(
     """Build a fake HTTPResponse-like object for mocking _request."""
     if isinstance(data, (dict, list)):
         data = json.dumps(data).encode()
-    # close() is a no-op here, but _read closes every response, so the stub has to offer it.
     return SimpleNamespace(
         read=lambda: data, status=status, reason=reason, url=url, close=lambda: None
     )
