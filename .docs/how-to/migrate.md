@@ -107,7 +107,7 @@ To start with, commit the output of `just init` now, before making any other cha
 :class: tip
 
 Agents can greatly benefit from a dry-run in order to produce a cleanly reviewable series of commits.
-Consider prompting agents to:
+Consider prompting your agent to:
 
 1. Review the migration guide and the library to migrate, then write an initial multi-step migration plan.
 2. Work through the plan, noting any deviations from the plan.
