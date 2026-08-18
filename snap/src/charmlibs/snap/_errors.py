@@ -67,10 +67,8 @@ class BadResponseError(Error):
         return self._response
 
     def __repr__(self) -> str:
-        return (
-            f'{type(self).__module__}.{type(self).__name__}('
-            f'{self.message!r}, response={self._response!r})'
-        )
+        response = '' if self._response is None else f', response={self._response!r}'
+        return f'{type(self).__module__}.{type(self).__name__}({self.message!r}{response})'
 
 
 class ConnectionError(Error, _builtins.ConnectionError):  # noqa: A001 (shadowing a Python builtin)

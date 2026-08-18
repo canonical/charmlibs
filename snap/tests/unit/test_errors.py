@@ -152,7 +152,11 @@ class TestBadResponseError:
         # Unlike APIError's value: a whole response body doesn't belong in a charm's status.
         assert str(_errors.BadResponseError('boom', response='oops')) == 'boom'
 
-    @pytest.mark.parametrize('response', ['oops', {'unexpected': 'shape'}, None])
+    @pytest.mark.parametrize('response', ['oops', {'unexpected': 'shape'}, ''])
     def test_repr_contains_the_message_and_the_response(self, response: object):
         r = repr(_errors.BadResponseError('boom', response=response))
         assert r == f"charmlibs.snap._errors.BadResponseError('boom', response={response!r})"
+
+    def test_repr_doesnt_contain_a_none_response(self):
+        r = repr(_errors.BadResponseError('boom', response=None))
+        assert r == f"charmlibs.snap._errors.BadResponseError('boom')"
