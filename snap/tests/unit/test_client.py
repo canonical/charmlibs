@@ -421,8 +421,7 @@ class TestSnapdGoingAwayMidRequest:
             opener.add_handler(_client_sockets.UnixSocketHandler(socket_path))
             request = urllib.request.Request('http://localhost/v2/snaps/hello-world')
             with pytest.raises(raw_type) as exc_info:
-                # Closed explicitly: this drives urllib directly, so _read isn't there to do it,
-                # and a part-read response holds its fd open until the collector gets to it.
+                # This drives urllib directly, so _read isn't there to close the response.
                 with contextlib.closing(opener.open(request, timeout=10)) as response:
                     # Getting this far means urllib parsed a response, so the failure is in the
                     # body.
