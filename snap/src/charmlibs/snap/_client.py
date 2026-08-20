@@ -269,7 +269,6 @@ def _decode_logs(response: http.client.HTTPResponse) -> list[dict[str, str]]:
 
 def _read(response: http.client.HTTPResponse) -> bytes:
     """Read a response body, translating a transport failure mid-read into a library error."""
-    # Avoid the response body's file object holding the socket's fd open if read errors.
     try:
         return response.read()
     except TimeoutError:
@@ -285,6 +284,7 @@ def _read(response: http.client.HTTPResponse) -> bytes:
             value='',
         ) from e
     finally:
+        # Avoid the response body's file object holding the socket's fd open if `read` errors.
         response.close()
 
 
