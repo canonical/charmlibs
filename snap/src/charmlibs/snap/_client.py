@@ -185,6 +185,7 @@ def _request(
         # We validate and encode the inputs we interpolate into paths, so we only make requests
         # to canonical paths. A redirect here means a bug on our side or a change in snapd.
         location = response.getheader('Location')
+        response.close()  # Avoid the body's file object holding the socket's fd open.
         raise _errors.BadResponseError(
             message=f'Unexpected redirect for path {path!r} to {location!r}',
             kind='charmlibs-snap-unexpected-redirect',
@@ -282,6 +283,9 @@ def _read(response: http.client.HTTPResponse) -> bytes:
             kind='charmlibs-snap-connection-error',
             value='',
         ) from e
+    finally:
+        # Avoid the response body's file object holding the socket's fd open if `read` errors.
+        response.close()
 
 
 def _get_path(response: http.client.HTTPResponse) -> str:

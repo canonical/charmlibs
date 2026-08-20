@@ -61,7 +61,9 @@ def _fake_response(
     """Build a fake HTTPResponse-like object for mocking _request."""
     if isinstance(data, (dict, list)):
         data = json.dumps(data).encode()
-    return SimpleNamespace(read=lambda: data, status=status, reason=reason, url=url)
+    return SimpleNamespace(
+        read=lambda: data, status=status, reason=reason, url=url, close=lambda: None
+    )
 
 
 # A fake snapd on a real unix socket, used by TestSnapdGoingAwayMidRequest below. Each name is
@@ -317,6 +319,7 @@ class TestErrorResponses:
             reason='Moved Permanently',
             url='http://localhost/v2/snaps//conf',
             getheader=getheader,
+            close=lambda: None,
         )
         monkeypatch.setattr(
             urllib.request.OpenerDirector, 'open', MagicMock(return_value=response)
@@ -418,10 +421,12 @@ class TestSnapdGoingAwayMidRequest:
             opener.add_handler(_client_sockets.UnixSocketHandler(socket_path))
             request = urllib.request.Request('http://localhost/v2/snaps/hello-world')
             with pytest.raises(raw_type) as exc_info:
-                response = opener.open(request, timeout=10)
-                # Getting this far means urllib parsed a response, so the failure is in the body.
-                assert stage == 'reading'
-                response.read()
+                # This drives urllib directly, so _read isn't there to close the response.
+                with contextlib.closing(opener.open(request, timeout=10)) as response:
+                    # Getting this far means urllib parsed a response, so the failure is in the
+                    # body.
+                    assert stage == 'reading'
+                    response.read()
         if stage == 'sending':
             assert not isinstance(exc_info.value, urllib.error.URLError)
         assert isinstance(exc_info.value, _client._TRANSPORT_ERRORS)
