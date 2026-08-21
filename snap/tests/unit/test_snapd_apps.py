@@ -139,7 +139,7 @@ class TestEmptyServices:
         # snapd's own probe error is raised unchanged: terse message, snap name in value (which
         # str() surfaces). Not chained -- the probe's error was handled, not propagated.
         assert ctx.value.message == 'snap not installed'
-        assert ctx.value.value == 'hello-world'
+        assert ctx.value._value == 'hello-world'
         assert str(ctx.value) == 'snap not installed (hello-world)'
         assert ctx.value.__context__ is None
         mock_client.post.assert_not_called()
@@ -199,7 +199,7 @@ class TestAppNotFoundConversion:
         mock_client.get.side_effect = self._snap_not_found()
         with pytest.raises(_NotFoundError) as ctx:
             func('hello-world', 'daemon')
-        assert ctx.value.kind == 'snap-not-found'
+        assert ctx.value._kind == 'snap-not-found'
         assert str(ctx.value) == 'snap not installed (hello-world)'
         mock_client.get.assert_called_once_with('/v2/snaps/hello-world')
 
@@ -222,7 +222,7 @@ class TestAppNotFoundConversion:
         mock_client.get.return_value = result_of('snap_info_hello_world.json')
         with pytest.raises(AppNotFoundError) as ctx:
             func('hello-world', 'daemon')
-        assert ctx.value.kind == 'app-not-found'
+        assert ctx.value._kind == 'app-not-found'
         mock_client.get.assert_called_once_with('/v2/snaps/hello-world')
 
     @pytest.mark.parametrize('func', _FUNCTIONS, ids=lambda f: f.__name__)

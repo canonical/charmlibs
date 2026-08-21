@@ -157,28 +157,16 @@ def _request(
         response = opener.open(request, timeout=_REQUEST_TIMEOUT)
     except TimeoutError:
         raise _errors.TimeoutError(
-            f'Request to snapd timed out after {_REQUEST_TIMEOUT}s: {method} {path}',
-            kind='charmlibs-snap-request-timeout',
-            value='',
+            f'Request to snapd timed out after {_REQUEST_TIMEOUT}s: {method} {path}'
         ) from None
     except urllib.error.URLError as e:
         if e.args and isinstance(e.args[0], FileNotFoundError):
             raise _errors.SocketNotFoundError(
-                f'Could not connect to snapd: socket not found at {_SOCKET_PATH!r}',
-                kind='charmlibs-snap-socket-not-found',
-                value='',
+                f'Could not connect to snapd: socket not found at {_SOCKET_PATH!r}'
             ) from None
-        raise _errors.ConnectionError(
-            str(e.reason),
-            kind='charmlibs-snap-connection-error',
-            value='',
-        ) from e
+        raise _errors.ConnectionError(str(e.reason)) from e
     except _TRANSPORT_ERRORS as e:
-        raise _errors.ConnectionError(
-            f'Connection to snapd lost: {method} {path}: {e}',
-            kind='charmlibs-snap-connection-error',
-            value='',
-        ) from e
+        raise _errors.ConnectionError(f'Connection to snapd lost: {method} {path}: {e}') from e
     if 300 <= response.status < 400:  # 3xx responses.
         # snapd itself never redirects, aside from path canonicalisation -- for example,
         # paths containing '//', '/./' or '/../' get a 301 to the cleaned path.
@@ -187,11 +175,7 @@ def _request(
         location = response.getheader('Location')
         response.close()  # Avoid the body's file object holding the socket's fd open.
         raise _errors.BadResponseError(
-            message=f'Unexpected redirect for path {path!r} to {location!r}',
-            kind='charmlibs-snap-unexpected-redirect',
-            value=location or '',
-            status_code=response.status,
-            status=response.reason,
+            message=f'Unexpected {response.status} redirect for path {path!r} to {location!r}'
         )
     return response
 
@@ -209,18 +193,12 @@ def _decode(response: http.client.HTTPResponse) -> object | _Change:
     except json.JSONDecodeError as e:
         raise _errors.BadResponseError(
             message=f'Invalid JSON in response for path {_get_path(response)!r}: {e}',
-            kind='charmlibs-snap',
-            value=response_bytes.decode(errors='replace'),
-            status_code=response.status,
-            status=response.reason,
+            response=response_bytes.decode(errors='replace'),
         ) from None
     if not isinstance(response_dict, dict):  # pyright: ignore[reportUnnecessaryIsInstance]
         raise _errors.BadResponseError(
             message=f"Unexpected response type {type(response_dict).__name__!r} for path {_get_path(response)!r}, expected a 'dict'",  # noqa: E501
-            kind='charmlibs-snap',
-            value=str(response_dict),
-            status_code=response.status,
-            status=response.reason,
+            response=response_dict,
         )
     try:
         match response_dict['type']:
@@ -233,10 +211,7 @@ def _decode(response: http.client.HTTPResponse) -> object | _Change:
     except KeyError as e:
         raise _errors.BadResponseError(
             message=f'Missing expected key {e} in response for path {_get_path(response)!r}',
-            kind='charmlibs-snap',
-            value=str(response_dict),
-            status_code=response.status,
-            status=response.reason,
+            response=response_dict,
         ) from None
 
 
@@ -256,10 +231,7 @@ def _decode_logs(response: http.client.HTTPResponse) -> list[dict[str, str]]:
     except json.JSONDecodeError as e:
         raise _errors.BadResponseError(
             message=f'Invalid JSON in response for path {_get_path(response)!r}: {e}',
-            kind='charmlibs-snap',
-            value=response_bytes.decode(errors='replace'),
-            status_code=response.status,
-            status=response.reason,
+            response=response_bytes.decode(errors='replace'),
         ) from None
     # Error responses are a single JSON object, which we wrapped in a list when decoding.
     if len(logs) == 1 and logs[0].get('type') == 'error':
@@ -273,15 +245,11 @@ def _read(response: http.client.HTTPResponse) -> bytes:
         return response.read()
     except TimeoutError:
         raise _errors.TimeoutError(
-            f'Timed out reading snapd response for path {_get_path(response)!r}',
-            kind='charmlibs-snap-request-timeout',
-            value='',
+            f'Timed out reading snapd response for path {_get_path(response)!r}'
         ) from None
     except _TRANSPORT_ERRORS as e:
         raise _errors.ConnectionError(
             f'Connection to snapd lost while reading response for path {_get_path(response)!r}: {e}',  # noqa: E501
-            kind='charmlibs-snap-connection-error',
-            value='',
         ) from e
     finally:
         # Avoid the response body's file object holding the socket's fd open if `read` errors.
@@ -297,7 +265,7 @@ def _get_path(response: http.client.HTTPResponse) -> str:
 ##########
 
 
-_ERRORS = {
+_ERRORS: dict[str, type[_errors.APIError]] = {
     'snap-already-installed': _errors._AlreadyInstalledError,
     'app-not-found': _errors.AppNotFoundError,
     'option-not-found': _errors.OptionNotFoundError,
@@ -387,7 +355,6 @@ class _Change:
         if not isinstance(result, dict):
             raise _errors.BadResponseError(
                 message=f'Unexpected response type {type(result).__name__} while waiting for change {self._id}',  # noqa: E501
-                kind='charmlibs-snap',
-                value=str(result),
+                response=result,
             )
         return typing.cast('dict[str, Any]', result)

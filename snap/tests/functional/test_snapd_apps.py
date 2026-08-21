@@ -101,7 +101,7 @@ def test_start_nonexistent_service_raises():
     ensure_installed_local(_NO_SERVICES_SNAP)
     with pytest.raises(_errors.AppNotFoundError) as ctx:
         _snapd_apps.start(_NO_SERVICES_SNAP, 'nonexistentservice')
-    assert ctx.value.kind == 'app-not-found'
+    assert ctx.value._kind == 'app-not-found'
 
 
 def test_start_multiple_services():
@@ -149,7 +149,7 @@ def test_stop_nonexistent_service_raises():
     ensure_installed_local(_NO_SERVICES_SNAP)
     with pytest.raises(_errors.AppNotFoundError) as ctx:
         _snapd_apps.stop(_NO_SERVICES_SNAP, 'nonexistentservice')
-    assert ctx.value.kind == 'app-not-found'
+    assert ctx.value._kind == 'app-not-found'
 
 
 # ---------------------------------------------------------------------------
@@ -184,7 +184,7 @@ def test_restart_nonexistent_service_raises():
     ensure_installed_local(_NO_SERVICES_SNAP)
     with pytest.raises(_errors.AppNotFoundError) as ctx:
         _snapd_apps.restart(_NO_SERVICES_SNAP, 'nonexistentservice')
-    assert ctx.value.kind == 'app-not-found'
+    assert ctx.value._kind == 'app-not-found'
 
 
 # ---------------------------------------------------------------------------
@@ -207,7 +207,7 @@ def test_not_installed_snap_raises_not_found(func: Any, services: Any):
     # including the empty list, which never reaches /v2/apps and is answered by the probe alone.
     with pytest.raises(_errors.NotInstalledError) as ctx:
         func(_ABSENT_SNAP, services)
-    assert ctx.value.kind == 'snap-not-found'
+    assert ctx.value._kind == 'snap-not-found'
     assert _ABSENT_SNAP in str(ctx.value)
 
 
@@ -219,7 +219,7 @@ def test_not_installed_snap_converted_error_wording(func: Any, services: Any):
     with pytest.raises(_errors.NotInstalledError) as ctx:
         func(_ABSENT_SNAP, services)
     assert ctx.value.message == 'snap not installed'
-    assert str(ctx.value.value) == _ABSENT_SNAP
+    assert str(ctx.value._value) == _ABSENT_SNAP
     assert str(ctx.value) == f'snap not installed ({_ABSENT_SNAP})'
 
 
@@ -251,7 +251,7 @@ def test_raw_api_not_installed_snap_with_a_service_is_app_not_found():
     # than leaving the probe branch as untested dead code.
     with pytest.raises(_errors.AppNotFoundError) as ctx:
         _client.post('/v2/apps', body={'action': 'start', 'names': [f'{_ABSENT_SNAP}.svc']})
-    assert ctx.value.kind == 'app-not-found'
+    assert ctx.value._kind == 'app-not-found'
     assert ctx.value.message == f'snap "{_ABSENT_SNAP}" has no service "svc"'
 
 
@@ -262,7 +262,7 @@ def test_raw_api_installed_snap_without_the_service_is_indistinguishable():
     ensure_installed_local(_NO_SERVICES_SNAP)
     with pytest.raises(_errors.AppNotFoundError) as ctx:
         _client.post('/v2/apps', body={'action': 'start', 'names': [f'{_NO_SERVICES_SNAP}.svc']})
-    assert ctx.value.kind == 'app-not-found'
+    assert ctx.value._kind == 'app-not-found'
     assert ctx.value.message == f'snap "{_NO_SERVICES_SNAP}" has no service "svc"'
 
 
@@ -271,7 +271,7 @@ def test_raw_api_not_installed_snap_alone_is_snap_not_found():
     # services, so this is already the error the library wants and no probe is made for it.
     with pytest.raises(_errors._NotFoundError) as ctx:
         _client.post('/v2/apps', body={'action': 'start', 'names': [_ABSENT_SNAP]})
-    assert ctx.value.kind == 'snap-not-found'
+    assert ctx.value._kind == 'snap-not-found'
     assert ctx.value.message == f'snap "{_ABSENT_SNAP}" not found'
 
 
@@ -283,7 +283,7 @@ def test_system_is_not_special_here(func: Any):
     # 'core' is an ordinary one that may or may not be installed on the test machine.
     with pytest.raises(_errors.NotInstalledError) as ctx:
         func('system', [])
-    assert ctx.value.kind == 'snap-not-found'
+    assert ctx.value._kind == 'snap-not-found'
 
 
 # ---------------------------------------------------------------------------
@@ -311,21 +311,21 @@ def test_start_snap_with_no_services_raises():
     ensure_installed_local(_NO_SERVICES_SNAP)
     with pytest.raises(_errors.AppNotFoundError) as ctx:
         _snapd_apps.start(_NO_SERVICES_SNAP)
-    assert ctx.value.kind == 'app-not-found'
+    assert ctx.value._kind == 'app-not-found'
 
 
 def test_stop_snap_with_no_services_raises():
     ensure_installed_local(_NO_SERVICES_SNAP)
     with pytest.raises(_errors.AppNotFoundError) as ctx:
         _snapd_apps.stop(_NO_SERVICES_SNAP)
-    assert ctx.value.kind == 'app-not-found'
+    assert ctx.value._kind == 'app-not-found'
 
 
 def test_restart_snap_with_no_services_raises():
     ensure_installed_local(_NO_SERVICES_SNAP)
     with pytest.raises(_errors.AppNotFoundError) as ctx:
         _snapd_apps.restart(_NO_SERVICES_SNAP)
-    assert ctx.value.kind == 'app-not-found'
+    assert ctx.value._kind == 'app-not-found'
 
 
 # ---------------------------------------------------------------------------
@@ -387,7 +387,7 @@ def test_raw_api_unusable_service_name_is_not_found(service: str):
     ensure_installed_local(_SNAP)
     with pytest.raises(_errors.AppNotFoundError) as ctx:
         _client.post('/v2/apps', body={'action': 'restart', 'names': [f'{_SNAP}.{service}']})
-    assert ctx.value.kind == 'app-not-found'
+    assert ctx.value._kind == 'app-not-found'
     assert f'has no service "{service}"' in ctx.value.message
 
 
@@ -438,5 +438,5 @@ def test_raw_api_invalid_snap_name(name: str, kind: str, message: str):
     # client-side: snapd resolves none of them to a snap either.
     with pytest.raises(_errors.APIError) as ctx:
         _client.post('/v2/apps', body={'action': 'start', 'names': [name]})
-    assert ctx.value.kind == kind
+    assert ctx.value._kind == kind
     assert ctx.value.message == message
