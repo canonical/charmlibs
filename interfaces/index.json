@@ -835,9 +835,9 @@
   {
     "name": "tracing",
     "version": "2",
-    "lib": "charms.tempo_coordinator_k8s.tracing",
-    "lib_url": "https://charmhub.io/tempo-coordinator-k8s/libraries/tracing",
-    "lib_docs_url": "",
+    "lib": "charmlibs.interfaces.tracing",
+    "lib_url": "https://pypi.org/project/charmlibs-interfaces-tracing",
+    "lib_docs_url": "https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/tracing",
     "docs_url": "https://canonical.com/juju/docs/charmlibs/reference/interfaces/tracing/",
     "summary": "Request endpoints for pushing trace data.",
     "description": "The `tracing` interface supports push-based tracing.\nThe requirer publishes the list of protocols it wants to use to send traces.\nThe provider replies with an API URL and an endpoint for each protocol, omitting those it does not support.",
