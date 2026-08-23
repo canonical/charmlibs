@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Sphinx fallback extension for per-library diataxis docs.
+"""Sphinx fallback extension for per-library diataxis docs and change logs.
 
 The ``diataxis_preprocessor.py`` script (run by ``just docs``) copies library
 docs into the Sphinx source tree and generates ``_lib-*.md`` include files.
@@ -44,3 +44,9 @@ def _fallback(app: sphinx.application.Sphinx) -> None:
         path = docs_dir / category / f'_lib-{category}.md'
         if not path.exists():
             path.write_text('')
+    # Change logs live under reference/ rather than in their own top-level
+    # section, so the include file goes there too.
+    changelog_include = docs_dir / 'reference' / '_lib-changelog.md'
+    if not changelog_include.exists():
+        changelog_include.parent.mkdir(parents=True, exist_ok=True)
+        changelog_include.write_text('')
