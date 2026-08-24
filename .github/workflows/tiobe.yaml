@@ -50,15 +50,19 @@ jobs:
       - name: Install TIOBE and project dependencies
         run: |
           set -euo pipefail
-          # The monorepo lockfile only pins the fast-lint tools, so export each
-          # package's own lockfile instead — that's what lets pylint/flake8
+          # The monorepo lockfile only pins the fast-lint tools, so resolve the
+          # libraries' own dependencies here — that's what lets pylint/flake8
           # resolve third-party imports during static analysis.
-          # Works at time of writing, but will break if libraries ever have
-          # incompatible deps.
+          # Concatenating each package's lockfile doesn't work: packages pin
+          # different versions of shared dependencies (ops, pydantic, certifi,
+          # ...), and pip rejects the conflicting pins. Instead resolve all the
+          # packages together, for the interpreter we're installing into, so
+          # there's exactly one version of each dependency. The result isn't the
+          # per-package locked versions, but these are only here so the analysis
+          # tools can follow imports.
           mapfile -t packages < <(.scripts/ls.py packages --exclude-examples --exclude-placeholders --no-json)
-          for pkg in "${packages[@]}"; do
-            uv export --project "$pkg" --no-emit-project --frozen --no-hashes
-          done | sort -u > requirements.txt
+          uv pip compile --python "$(command -v python3)" --no-header \
+            "${packages[@]/%//pyproject.toml}" -o requirements.txt
           pip install flake8 pylint -r requirements.txt --break-system-packages
 
       - name: TICS GitHub Action
