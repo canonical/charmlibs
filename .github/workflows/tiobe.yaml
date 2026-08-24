@@ -53,13 +53,8 @@ jobs:
           # The monorepo lockfile only pins the fast-lint tools, so resolve the
           # libraries' own dependencies here — that's what lets pylint/flake8
           # resolve third-party imports during static analysis.
-          # Concatenating each package's lockfile doesn't work: packages pin
-          # different versions of shared dependencies (ops, pydantic, certifi,
-          # ...), and pip rejects the conflicting pins. Instead resolve all the
-          # packages together, for the interpreter we're installing into, so
-          # there's exactly one version of each dependency. The result isn't the
-          # per-package locked versions, but these are only here so the analysis
-          # tools can follow imports.
+          # Works at time of writing, but will break if libraries ever have
+          # incompatible deps.
           mapfile -t packages < <(.scripts/ls.py packages --exclude-examples --exclude-placeholders --no-json)
           uv pip compile --python "$(command -v python3)" --no-header \
             "${packages[@]/%//pyproject.toml}" -o requirements.txt
