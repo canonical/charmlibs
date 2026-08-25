@@ -2708,9 +2708,10 @@ class TLSCertificatesRequiresV4(Object):
             except DataValidationError:
                 logger.warning("Invalid relation data for unit - Skipping")
 
-        if self.mode == Mode.APP_AND_UNIT or (
-            self.mode == Mode.APP and self.model.unit.is_leader()
-        ):
+        # Juju only lets the leader read its own application databag, so a non-leader gets
+        # the unit scope only. In APP_AND_UNIT that is still all such a unit can act on: it
+        # can reach neither the APP private key nor the APP certificate secrets either way.
+        if self.mode in (Mode.APP, Mode.APP_AND_UNIT) and self.model.unit.is_leader():
             try:
                 app_data = _RequirerData.load(relation.data[self.model.app])
                 csrs.extend(app_data.certificate_signing_requests)

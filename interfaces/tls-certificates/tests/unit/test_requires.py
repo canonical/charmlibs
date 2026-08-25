@@ -638,6 +638,113 @@ class TestTLSCertificatesRequiresV4:
             ),
         })
 
+    def test_given_app_and_unit_mode_and_populated_app_databag_when_not_leader_then_only_unit_csrs_are_loaded(
+        self,
+    ):
+        """A non-leader must not try to read its own application databag.
+
+        Juju only lets the leader read its own app databag, so once the leader has written
+        the APP request, every non-leader unit used to raise RelationDataAccessError on its
+        next hook -- taking the UNIT scope, which it is entitled to, down with it.
+        """
+        ctx = testing.Context(
+            charm_type=DummyTLSCertificatesRequirerCharmAppAndUnit,
+            meta=METADATA,
+            config=METADATA["config"],
+            actions=METADATA["actions"],
+        )
+        private_key = generate_private_key()
+        csr_app = generate_csr(private_key=private_key, common_name="app.example.com")
+        csr_unit = generate_csr(private_key=private_key, common_name="unit.example.com")
+        certificates_relation = testing.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-requirer",
+            # written by the leader, and visible to every unit of the application
+            local_app_data={
+                "certificate_signing_requests": json.dumps([
+                    {"certificate_signing_request": str(csr_app), "ca": False}
+                ])
+            },
+            local_unit_data={
+                "certificate_signing_requests": json.dumps([
+                    {"certificate_signing_request": str(csr_unit), "ca": False}
+                ])
+            },
+        )
+        state_in = testing.State(
+            leader=False,
+            relations={certificates_relation},
+            secrets={
+                testing.Secret(
+                    tracked_content={"private-key": str(private_key)},
+                    label=f"{LIBID}-private-key-0-certificates",
+                    owner="unit",
+                )
+            },
+        )
+
+        with ctx(ctx.on.relation_changed(certificates_relation), state_in) as manager:
+            manager.run()
+            csrs = manager.charm.certificates.get_csrs_from_requirer_relation_data()
+
+        # the unit scope is loaded, the app scope is silently out of reach
+        assert [str(csr.certificate_signing_request) for csr in csrs] == [str(csr_unit)]
+
+    def test_given_app_and_unit_mode_and_populated_app_databag_when_leader_then_both_csrs_are_loaded(
+        self,
+    ):
+        """Companion to the non-leader case: the leader still sees both scopes."""
+        ctx = testing.Context(
+            charm_type=DummyTLSCertificatesRequirerCharmAppAndUnit,
+            meta=METADATA,
+            config=METADATA["config"],
+            actions=METADATA["actions"],
+        )
+        private_key = generate_private_key()
+        csr_app = generate_csr(private_key=private_key, common_name="app.example.com")
+        csr_unit = generate_csr(private_key=private_key, common_name="unit.example.com")
+        certificates_relation = testing.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-requirer",
+            local_app_data={
+                "certificate_signing_requests": json.dumps([
+                    {"certificate_signing_request": str(csr_app), "ca": False}
+                ])
+            },
+            local_unit_data={
+                "certificate_signing_requests": json.dumps([
+                    {"certificate_signing_request": str(csr_unit), "ca": False}
+                ])
+            },
+        )
+        state_in = testing.State(
+            leader=True,
+            relations={certificates_relation},
+            secrets={
+                testing.Secret(
+                    tracked_content={"private-key": str(private_key)},
+                    label=f"{LIBID}-private-key-0-certificates",
+                    owner="unit",
+                ),
+                testing.Secret(
+                    tracked_content={"private-key": str(private_key)},
+                    label=f"{LIBID}-private-key-app-certificates",
+                    owner="app",
+                ),
+            },
+        )
+
+        with ctx(ctx.on.relation_changed(certificates_relation), state_in) as manager:
+            manager.run()
+            csrs = manager.charm.certificates.get_csrs_from_requirer_relation_data()
+
+        assert {str(csr.certificate_signing_request) for csr in csrs} == {
+            str(csr_app),
+            str(csr_unit),
+        }
+
     def test_given_app_and_unit_mode_with_duplicate_requests_then_error_is_raised(self):
         ctx = testing.Context(
             charm_type=DummyTLSCertificatesRequirerCharmAppAndUnitDuplicate,
