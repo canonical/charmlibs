@@ -70,3 +70,9 @@ jobs:
           ticsAuthToken: ${{ secrets.TICSAUTHTOKEN }}
           project: charmtech-charmlibs
           installTics: true
+          # Temporary: the last run tripped TICS' sanity check, which aborts
+          # when more than 200 files change between runs. The changes are
+          # expected (we've added and moved a lot of files since the previous
+          # run), so tell TICS to accept them. Remove this once a run with it
+          # has succeeded.
+          additionalFlags: '-nosanity'
