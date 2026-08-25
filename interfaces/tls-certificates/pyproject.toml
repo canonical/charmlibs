@@ -86,12 +86,6 @@ ignore = [
     "tests/integration/charms/requirer/fetch-lib-*",
 ]
 
-[tool.pytest.ini_options]
-addopts = ["-x"]
-markers = [
-    "upgrade: test that refreshes the chamr with the new library version",
-]
-
 [tool.charmlibs.functional]
 ubuntu = []  # ubuntu versions to run functional tests with, e.g. "24.04" (defaults to just "latest")
 pebble = []  # pebble versions to run functional tests with, e.g. "v1.0.0", "master" (defaults to no pebble versions)
