@@ -1,3 +1,7 @@
+# 1.10.1 - 25 August 2026
+
+Fix `Mode.APP_AND_UNIT` requirers raising `RelationDataAccessError` on every non-leader unit. The library read the requirer's own application databag regardless of leadership, so once the leader had written its application certificate request, no other unit could complete a hook -- taking the unit scope down with the application one. Non-leaders now load the unit scope only, which is all they can act on: they can reach neither the application private key nor the application certificate secrets.
+
 # 1.10.0 - 13 July 2026
 
 Allow providers to advertise their certificate server's capabilities (`ProviderCapabilities`) in relation data, and let requirers read them via `get_provider_capabilities()` or by passing a callable `certificate_requests` that shapes requests from the advertised capabilities. Additive and backwards compatible.
