@@ -2708,9 +2708,6 @@ class TLSCertificatesRequiresV4(Object):
             except DataValidationError:
                 logger.warning("Invalid relation data for unit - Skipping")
 
-        # Juju only lets the leader read its own application databag, so a non-leader gets
-        # the unit scope only. In APP_AND_UNIT that is still all such a unit can act on: it
-        # can reach neither the APP private key nor the APP certificate secrets either way.
         if self.mode in (Mode.APP, Mode.APP_AND_UNIT) and self.model.unit.is_leader():
             try:
                 app_data = _RequirerData.load(relation.data[self.model.app])
