@@ -27,6 +27,8 @@ from tests.integration.utils import (
     is_empty_file,
     parse_ts,
     remove_transition_file,
+    wait_for_event,
+    wait_for_events,
 )
 
 logger = logging.getLogger(__name__)
@@ -205,7 +207,11 @@ def test_retry_hold_operation_two_units_single_app(juju: jubilant.Juju, app_name
     unit_b = units[3]
 
     juju.run(unit_a, 'deferred-restart', {'delay': 15, 'max-retry': 2}, wait=TIMEOUT)
-    time.sleep(2)
+    # Each unit's etcd worker polls its queue on its own schedule, so the etcd
+    # lock is granted in worker-poll order, not in operation-request order. Wait
+    # until unit_a actually holds the lock before unit_b requests it, otherwise
+    # unit_b can win the race and execute first.
+    wait_for_event(juju, unit_a, '_deferred_restart:start', timeout=TIMEOUT)
     juju.run(unit_b, 'restart', {'delay': 2}, wait=TIMEOUT)
 
     juju.wait(
@@ -215,8 +221,8 @@ def test_retry_hold_operation_two_units_single_app(juju: jubilant.Juju, app_name
     )
 
     all_events: list[dict[str, str]] = []
-    all_events.extend(get_unit_events(juju, unit_a))
-    all_events.extend(get_unit_events(juju, unit_b))
+    all_events.extend(wait_for_events(juju, unit_a, count=6, timeout=TIMEOUT))
+    all_events.extend(wait_for_events(juju, unit_b, count=2, timeout=TIMEOUT))
     all_events.sort(key=parse_ts)
 
     logger.info(all_events)
@@ -254,12 +260,14 @@ def test_retry_release_two_units_single_app(juju: jubilant.Juju, app_name: str):
     juju.run(unit_a, 'failed-restart', {'delay': 10, 'max-retry': 2}, wait=TIMEOUT)
     juju.run(unit_b, 'failed-restart', {'delay': 15, 'max-retry': 2}, wait=TIMEOUT)
 
+    # Each unit executes 3 times (attempt 0 plus 2 retries), recording a start
+    # and a retry_release event each time. How long that takes depends on how
+    # the two workers' poll intervals line up, so wait for the events rather
+    # than for a fixed duration.
     # TODO: in charm use lock state to clear status.
-    time.sleep(60 * 3)
-
     all_events: list[dict[str, str]] = []
-    all_events.extend(get_unit_events(juju, unit_a))
-    all_events.extend(get_unit_events(juju, unit_b))
+    all_events.extend(wait_for_events(juju, unit_a, count=2 * 3, timeout=TIMEOUT))
+    all_events.extend(wait_for_events(juju, unit_b, count=2 * 3, timeout=TIMEOUT))
     all_events.sort(key=parse_ts)
 
     restart_events = [e for e in all_events if not e['event'].startswith('action')]
