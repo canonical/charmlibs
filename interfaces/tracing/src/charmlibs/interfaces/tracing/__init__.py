@@ -89,9 +89,6 @@ follows::
         # ...
         self.tracing = TracingEndpointProvider(self)
         # ...
-
-
-
 """
 
 from ._tracing import (
