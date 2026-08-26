@@ -42,7 +42,10 @@ jobs:
       - uses: actions/checkout@v5
         with:
           repository: canonical/charmlibs
-          ref: main
+          # Pinned rather than tracking `main`: the interface tests and the tooling that runs
+          # them are being removed from `main`, and this workflow is being retired along with
+          # them. Pinning keeps consumers of this workflow green in the meantime.
+          ref: 615fb9ed2b3123a4b80eebcb37a881a49499baf0  # canonical/charmlibs@main, 2026-08-26
       - uses: astral-sh/setup-uv@v6
       - name: Define interface test matrix
         id: include
@@ -71,7 +74,10 @@ jobs:
       - uses: actions/checkout@v5
         with:
           repository: canonical/charmlibs
-          ref: main
+          # Pinned rather than tracking `main`: the interface tests and the tooling that runs
+          # them are being removed from `main`, and this workflow is being retired along with
+          # them. Pinning keeps consumers of this workflow green in the meantime.
+          ref: 615fb9ed2b3123a4b80eebcb37a881a49499baf0  # canonical/charmlibs@main, 2026-08-26
       - uses: astral-sh/setup-uv@v6
       - name: Run interface tests
         run: |
