@@ -15,11 +15,11 @@ Charms originally shared code by distributing single-file Python modules on Char
 
 ## Timeline
 
-- `charmcraft` 4.3 emits a deprecation warning on library operations (2026-06-23).
-- Charmhub disables uploading *new* libraries, so `charmcraft create-lib` no longer works (2026-08-11).
+- 2026-06-23: `charmcraft` 4.3 emits a deprecation warning on library operations.
+- 2026-08-11: Charmhub disables uploading *new* libraries, so `charmcraft create-lib` no longer works.
 - `charmcraft` 4.5 will replace `create-lib` with a stub (26.10 cycle).
 - `charmcraft` 5 will remove the `create-lib` command.
-- Charmhub will eventually disable updates to existing libraries.
+- Charmhub will eventually disable updates to existing libraries (27.04 cycle).
 - Charmhub will continue to support downloading existing libraries.
 
 ## Why the change?
