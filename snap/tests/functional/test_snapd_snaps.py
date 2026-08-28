@@ -105,14 +105,14 @@ def test_refresh_invalid_channel_raises():
     ensure_installed_store(_SNAP)
     with pytest.raises(_errors.ChannelNotAvailableError) as ctx:
         retry_on_rate_limit(_snapd.refresh)(_SNAP, channel='garbage')
-    assert ctx.value.kind == 'snap-channel-not-available'
+    assert ctx.value._kind == 'snap-channel-not-available'
 
 
 def test_refresh_revision_not_available_raises():
     ensure_installed_store(_SNAP)
     with pytest.raises(_errors.RevisionNotAvailableError) as ctx:
         retry_on_rate_limit(_snapd.refresh)(_SNAP, revision=99999999)
-    assert ctx.value.kind == 'snap-revision-not-available'
+    assert ctx.value._kind == 'snap-revision-not-available'
 
 
 def test_hold_with_duration():
@@ -175,7 +175,7 @@ def test_list_one_missing_raises():
     assert _SNAP not in {s.name for s in _list(None)}
     with pytest.raises(_errors.NotInstalledError) as ctx:
         _snapd.list_one(_SNAP)
-    assert ctx.value.kind == 'snap-not-found'
+    assert ctx.value._kind == 'snap-not-found'
 
 
 def test_remove_not_installed_returns_false():
@@ -199,7 +199,7 @@ def test_refresh_not_installed_raises_not_found():
     with pytest.raises(_errors.NotInstalledError) as ctx:
         retry_on_rate_limit(_snapd.refresh)(_SNAP)
     assert type(ctx.value) is _errors.NotInstalledError
-    assert ctx.value.kind == 'snap-not-found'
+    assert ctx.value._kind == 'snap-not-found'
 
 
 def test_raw_refresh_not_installed_has_no_kind():
@@ -208,7 +208,7 @@ def test_raw_refresh_not_installed_has_no_kind():
     ensure_removed(_SNAP)
     with pytest.raises(_errors.APIError) as ctx:
         _client.post(f'/v2/snaps/{_SNAP}', body={'action': 'refresh'})
-    assert not ctx.value.kind
+    assert not ctx.value._kind
     assert 'not installed' in ctx.value.message
 
 
@@ -217,7 +217,7 @@ def test_hold_not_installed_raises_not_found():
     ensure_removed(_SNAP)
     with pytest.raises(_errors.NotInstalledError) as ctx:
         _snapd.hold(_SNAP)
-    assert ctx.value.kind == 'snap-not-found'
+    assert ctx.value._kind == 'snap-not-found'
 
 
 def test_raw_hold_not_installed_has_no_kind():
@@ -227,7 +227,7 @@ def test_raw_hold_not_installed_has_no_kind():
             f'/v2/snaps/{_SNAP}',
             body={'action': 'hold', 'hold-level': 'general', 'time': 'forever'},
         )
-    assert not ctx.value.kind
+    assert not ctx.value._kind
     assert 'not installed' in ctx.value.message
 
 
@@ -255,7 +255,7 @@ def test_install_invalid_channel_raises():
     ensure_removed(_SNAP)
     with pytest.raises(_errors.ChannelNotAvailableError) as ctx:
         retry_on_rate_limit(_snapd.install)(_SNAP, channel='garbage')
-    assert ctx.value.kind == 'snap-channel-not-available'
+    assert ctx.value._kind == 'snap-channel-not-available'
     assert 'channel' in ctx.value.message or 'no snap revision' in ctx.value.message
 
 
@@ -263,7 +263,7 @@ def test_install_revision_not_available_raises():
     ensure_removed(_SNAP)
     with pytest.raises(_errors.RevisionNotAvailableError) as ctx:
         retry_on_rate_limit(_snapd.install)(_SNAP, revision=99999999)
-    assert ctx.value.kind == 'snap-revision-not-available'
+    assert ctx.value._kind == 'snap-revision-not-available'
 
 
 # ---------------------------------------------------------------------------
@@ -315,7 +315,7 @@ def test_install_needs_classic_raises():
     ensure_removed(_CLASSIC_SNAP)
     with pytest.raises(_errors.NeedsClassicError) as ctx:
         retry_on_rate_limit(_snapd.install)(_CLASSIC_SNAP)
-    assert ctx.value.kind == 'snap-needs-classic'
+    assert ctx.value._kind == 'snap-needs-classic'
 
 
 def test_install_classic():
@@ -339,8 +339,8 @@ def test_install_nonexistent_snap_raises():
         retry_on_rate_limit(_snapd.install)(_ABSENT_SNAP)
     assert type(ctx.value) is _errors.NotInStoreError
     assert ctx.value.message == 'snap not found'
-    assert ctx.value.kind == 'snap-not-found'
-    assert ctx.value.value == _ABSENT_SNAP
+    assert ctx.value._kind == 'snap-not-found'
+    assert ctx.value._value == _ABSENT_SNAP
 
 
 def test_install_channel_and_revision():
@@ -363,7 +363,7 @@ def test_install_revision_not_on_channel_raises():
     absent_from_channel = int(channels[_ALT_CHANNEL].revision)
     with pytest.raises(_errors.ChannelNotAvailableError) as ctx:
         retry_on_rate_limit(_snapd.install)(_SNAP, channel=_CHANNEL, revision=absent_from_channel)
-    assert ctx.value.kind == 'snap-channel-not-available'
+    assert ctx.value._kind == 'snap-channel-not-available'
 
 
 def test_refresh_channel_and_revision():

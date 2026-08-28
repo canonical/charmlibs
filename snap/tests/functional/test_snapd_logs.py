@@ -141,7 +141,7 @@ def test_logs_snap_with_no_services_raises():
     ensure_installed_local(_NO_SERVICES_SNAP)
     with pytest.raises(_errors.AppNotFoundError) as ctx:
         _snapd_logs.logs(_NO_SERVICES_SNAP)
-    assert ctx.value.kind == 'app-not-found'
+    assert ctx.value._kind == 'app-not-found'
 
 
 # ---------------------------------------------------------------------------
@@ -153,7 +153,7 @@ def test_logs_not_installed_snap_raises():
     # Requesting logs for an uninstalled snap raises _NotFoundError.
     with pytest.raises(_errors.NotInstalledError) as ctx:
         _snapd_logs.logs(_ABSENT_SNAP)
-    assert ctx.value.kind == 'snap-not-found'
+    assert ctx.value._kind == 'snap-not-found'
 
 
 # ---------------------------------------------------------------------------
@@ -235,7 +235,7 @@ def test_discarded_and_stripped_entries_leave_the_named_snap(names: str):
     ensure_installed_local(_NO_SERVICES_SNAP)
     with pytest.raises(_errors.AppNotFoundError) as ctx:
         _client.get_logs(query={'n': -1, 'names': names})
-    assert ctx.value.kind == 'app-not-found'
+    assert ctx.value._kind == 'app-not-found'
     assert ctx.value.message == f'snap "{_NO_SERVICES_SNAP}" has no services'
 
 
@@ -248,8 +248,8 @@ def test_comma_in_a_name_queries_two_snaps():
     names = f'{_ABSENT_SNAP},{_ABSENT_SNAP_2}'
     with pytest.raises(_errors._NotFoundError) as ctx:
         _client.get_logs(query={'n': -1, 'names': names})
-    assert ctx.value.kind == 'snap-not-found'
-    assert ctx.value.value in (_ABSENT_SNAP, _ABSENT_SNAP_2)
+    assert ctx.value._kind == 'snap-not-found'
+    assert ctx.value._value in (_ABSENT_SNAP, _ABSENT_SNAP_2)
     assert names not in str(ctx.value)
 
 
@@ -258,4 +258,4 @@ def test_no_comma_in_a_name_is_one_snap():
     # about a name as passed is what a comma-free name looks like.
     with pytest.raises(_errors._NotFoundError) as ctx:
         _client.get_logs(query={'n': -1, 'names': _ABSENT_SNAP})
-    assert ctx.value.value == _ABSENT_SNAP
+    assert ctx.value._value == _ABSENT_SNAP
