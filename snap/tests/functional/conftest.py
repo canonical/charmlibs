@@ -16,8 +16,10 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from charmlibs import snap
-from charmlibs.snap import _client, _functions
+from charmlibs.snap import _client, _functions, _snapd_conf
 from charmlibs.snap import _snapd_snaps as _snapd
 
 if typing.TYPE_CHECKING:
@@ -42,6 +44,33 @@ handler.setLevel(logging.DEBUG)
 snap_logger = logging.getLogger(snap.__name__)
 snap_logger.setLevel(logging.DEBUG)
 snap_logger.addHandler(handler)
+
+
+def hold_auto_refresh() -> None:
+    """Hold auto-refresh of every snap indefinitely, as `snap refresh --hold` does.
+
+    snapd refuses to start a change that touches a snap which already has one in progress, so an
+    auto-refresh landing mid-run fails every test that asks snapd to do something to the system
+    snap -- connecting an interface to it, for instance. Runner and container images ship with a
+    stale last-refresh, so a refresh is due almost immediately and fires in the first gap between
+    the suite's own changes.
+
+    The hold is stored as system (core snap) configuration, so removing the core snap deletes it
+    -- which is why remove_core re-applies it. It can be set whether or not the core snap is
+    installed, since snapd serves the system configuration namespace either way.
+    """
+    _snapd_conf.set('system', {'refresh.hold': 'forever'})
+
+
+@pytest.fixture(scope='session', autouse=True)
+def _hold_auto_refresh() -> None:  # pyright: ignore[reportUnusedFunction] (autouse fixture)
+    """Hold auto-refresh for the whole session, before any test runs.
+
+    Not undone afterwards: the suite is destructive to the machine it runs on and is only ever
+    run where that's disposable (a workshop container or a CI runner), so leaving refreshes held
+    is preferable to re-arming them for whatever runs next.
+    """
+    hold_auto_refresh()
 
 
 def retry_on_rate_limit(func: Callable[_P, _T]) -> Callable[_P, _T]:
@@ -157,6 +186,19 @@ def remove_core_blockers() -> None:
     (hence the workshop container), so removing a snap the suite didn't install is acceptable.
     """
     ensure_removed(*snaps_holding_core())
+
+
+def remove_core() -> None:
+    """Remove the core snap, first removing every snap that would block its removal.
+
+    Removing core deletes the stored system configuration, which includes the auto-refresh hold,
+    so the hold is re-applied straight afterwards -- otherwise the rest of the run is exposed to
+    an auto-refresh again. Only the hold is restored: every other system option is expendable
+    here, and one test asserts that the removal wiped what it had stored.
+    """
+    remove_core_blockers()  # Base-less snaps would otherwise block core removal.
+    snap.remove('core')  # Errors loudly if an unmanaged snap still depends on core.
+    hold_auto_refresh()
 
 
 # ---------------------------------------------------------------------------
