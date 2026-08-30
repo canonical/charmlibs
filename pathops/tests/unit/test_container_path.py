@@ -181,6 +181,26 @@ def test_is_absolute(container: ops.Container):
         ContainerPath('.', container=container)
 
 
+class TestIsRelativeTo:
+    @pytest.mark.parametrize(
+        ('path_str', 'other'),
+        (
+            ('/foo/bar', '/foo'),
+            ('/foo/bar', '/foo/bar'),
+            ('/foo/bar', '/baz'),
+            ('/foo/bar', '/foo/bartholemew'),
+            ('/foo', '/foo/bar'),
+        ),
+    )
+    def test_ok(self, path_str: str, other: str, container: ops.Container):
+        container_path = ContainerPath(path_str, container=container)
+        pathlib_path = pathlib.PurePosixPath(path_str)
+        expected = pathlib_path.is_relative_to(other)
+        assert container_path.is_relative_to(other) == expected
+        assert container_path.is_relative_to(pathlib.PurePath(other)) == expected
+        assert container_path.is_relative_to(LocalPath(other)) == expected
+
+
 class TestMatch:
     @pytest.mark.parametrize('path_str', ('/', '/foo', '/foo/bar.txt', '/foo/bar_txt'))
     @pytest.mark.parametrize('pattern', ('', '*', '**/bar', '/foo/bar*', '*.txt', '/FoO/bAr.txt'))
@@ -219,6 +239,15 @@ def test_with_name(container: ops.Container):
     container_path = ContainerPath(path, container=container)
     pathlib_result = path.with_name(name)
     container_result = container_path.with_name(name)
+    assert str(container_result) == str(pathlib_result)
+
+
+def test_with_stem(container: ops.Container):
+    stem = 'baz'
+    path = pathlib.PurePath('/foo/bar.txt')
+    container_path = ContainerPath(path, container=container)
+    pathlib_result = path.with_stem(stem)
+    container_result = container_path.with_stem(stem)
     assert str(container_result) == str(pathlib_result)
 
 
