@@ -21,7 +21,6 @@ import os
 import pathlib
 import pwd
 import shutil
-import sys
 import typing
 
 from . import _constants
@@ -172,23 +171,11 @@ class LocalPath(pathlib.PosixPath):
         # ContainerPath.glob accepts str | os.PathLike[str], so we normalise here to match.
         return super().glob(os.fspath(pattern))
 
-    # On Python 3.11, pathlib.Path.match only accepts a str pattern and has no
-    # case_sensitive keyword (3.12 added both). On Python 3.14, pathlib.PurePath.match
-    # accepts any object with `with_segments`, which would silently allow a ContainerPath
-    # through. Normalising via os.fspath gives us a consistent, narrow API on every
-    # supported version, with a clear TypeError for anything else (including ContainerPath,
-    # which is not os.PathLike). The signature is version-gated so callers on <3.12 get a
-    # static error if they pass case_sensitive rather than a hidden runtime TypeError.
-    if sys.version_info >= (3, 12):
-
-        def match(
-            self, path_pattern: str | os.PathLike[str], *, case_sensitive: bool | None = None
-        ) -> bool:
-            return super().match(os.fspath(path_pattern), case_sensitive=case_sensitive)
-    else:
-
-        def match(self, path_pattern: str | os.PathLike[str]) -> bool:
-            return super().match(os.fspath(path_pattern))
+    # NOTE: there is deliberately no match override to go with ContainerPath.match's
+    # str | os.PathLike[str] pattern. pathlib.Path.match's signature varies across the
+    # versions we support -- the case_sensitive keyword only exists from 3.12 -- so an
+    # override would have to be version-gated to avoid either dropping the keyword or
+    # passing one that doesn't exist. Add it once the minimum supported Python is 3.12.
 
     def mkdir(
         self,
