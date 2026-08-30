@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import errno
+import os
 import pathlib
 import re
 import typing
@@ -27,7 +28,6 @@ from ops import pebble
 from . import _constants, _errors, _fileinfo
 
 if typing.TYPE_CHECKING:
-    import os
     from collections.abc import Generator
     from typing import Literal, TypeGuard
 
@@ -151,14 +151,30 @@ class ContainerPath:
         """
         return self._path.is_absolute()
 
-    def match(self, path_pattern: str) -> bool:
+    def match(self, path_pattern: str | os.PathLike[str]) -> bool:
         """Return whether this path matches the given pattern.
 
         If the pattern is relative, matching is done from the right; otherwise, the entire path is
         matched. The recursive wildcard ``'**'`` is **not** supported by this method. Matching is
         always case-sensitive. Only the path is matched against, the container is not considered.
+
+        Args:
+            path_pattern: A :class:`str` or :class:`os.PathLike` object.
+
+        .. warning::
+            :class:`ContainerPath` is not :class:`os.PathLike`. A :class:`ContainerPath` instance
+            is not a valid value for ``path_pattern``, and will result in a :class:`TypeError`.
         """
-        return self._path.match(path_pattern)
+        # Python 3.14's pathlib.PurePath.match accepts any object with `with_segments`, which
+        # would silently allow a ContainerPath through. Reject it explicitly to match the
+        # behaviour of joinpath / __truediv__ and stay consistent across Python versions.
+        if isinstance(path_pattern, ContainerPath):
+            raise TypeError(
+                f'ContainerPath is not a valid pattern for ContainerPath.match: {path_pattern!r}'
+            )
+        # os.fspath normalises path-like to str; this also produces a clear TypeError for
+        # anything that is neither str nor os.PathLike, matching pathlib.Path.match on 3.12+.
+        return self._path.match(os.fspath(path_pattern))
 
     def with_name(self, name: str) -> Self:
         """Return a new ContainerPath, with the same container, but with the path name replaced.

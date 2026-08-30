@@ -116,6 +116,12 @@ class PathProtocol(typing.Protocol):
         ...
 
     # NOTE: Not supported -- (Python 3.12) ``case_sensitive`` keyword argument
+    # NOTE: Not supported -- (Python 3.12) path-like ``path_pattern``
+    # ContainerPath.match accepts str | os.PathLike[str], but the protocol stays narrow.
+    # Widening it here would oblige us to shim LocalPath.match too, and we can't write that
+    # override without also handling the case_sensitive keyword, which pathlib.Path.match
+    # doesn't have before 3.12. Widen both -- and drop both NOTEs -- once the minimum
+    # supported Python is 3.12.
     def match(self, path_pattern: str) -> bool:
         """Return whether this path matches the given pattern.
 

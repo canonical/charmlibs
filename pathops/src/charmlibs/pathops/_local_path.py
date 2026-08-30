@@ -171,6 +171,12 @@ class LocalPath(pathlib.PosixPath):
         # ContainerPath.glob accepts str | os.PathLike[str], so we normalise here to match.
         return super().glob(os.fspath(pattern))
 
+    # NOTE: there is deliberately no match override to go with ContainerPath.match's
+    # str | os.PathLike[str] pattern. pathlib.Path.match's signature varies across the
+    # versions we support -- the case_sensitive keyword only exists from 3.12 -- so an
+    # override would have to be version-gated to avoid either dropping the keyword or
+    # passing one that doesn't exist. Add it once the minimum supported Python is 3.12.
+
     def mkdir(
         self,
         mode: int = _constants.DEFAULT_MKDIR_MODE,
