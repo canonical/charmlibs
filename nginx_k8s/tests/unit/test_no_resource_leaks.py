@@ -82,3 +82,35 @@ def test_sync_certificates_closes_pull_handles(
                 TLSConfig(server_cert='foo', ca_cert='foo', private_key='foo'),
             )
         _assert_no_unclosed_file_warnings(caught)
+
+
+def test_configure_tls_closes_pull_handles(
+    ctx: testing.Context, nginx_container: testing.Container, tmp_path, monkeypatch
+):
+    """``Nginx._configure_tls`` must close every ``pull()`` handle."""
+    # _configure_tls writes the CA cert to the charm container's own filesystem,
+    # so point it somewhere writable rather than at /usr/local/share.
+    ca_cert_path = str(tmp_path / 'charm' / 'ca.crt')
+    monkeypatch.setattr(Nginx, 'CA_CERT_PATH', ca_cert_path)
+
+    mounts = {}
+    for path, name in (
+        (Nginx.CERT_PATH, 'cert'),
+        (Nginx.KEY_PATH, 'key'),
+        (ca_cert_path, 'cacert'),
+    ):
+        f = tmp_path / name
+        f.write_text('foo')
+        mounts[name] = testing.Mount(location=path, source=str(f))
+    container = replace(nginx_container, mounts=mounts)
+    state = testing.State(containers={container})
+
+    with ctx(ctx.on.update_status(), state=state) as mgr:
+        nginx = Nginx(mgr.charm.unit.get_container(nginx_container.name))
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter('always')
+            nginx.reconcile(
+                'foo',
+                TLSConfig(server_cert='bar', ca_cert='bar', private_key='bar'),
+            )
+        _assert_no_unclosed_file_warnings(caught)
