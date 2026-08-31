@@ -51,13 +51,17 @@ def hold_auto_refresh() -> None:
 
     snapd refuses to start a change that touches a snap which already has one in progress, so an
     auto-refresh landing mid-run fails every test that asks snapd to do something to the system
-    snap -- connecting an interface to it, for instance. Runner and container images ship with a
-    stale last-refresh, so a refresh is due almost immediately and fires in the first gap between
-    the suite's own changes.
+    snap -- connecting an interface to it, for instance.
 
-    The hold is stored as system (core snap) configuration, so removing the core snap deletes it
-    -- which is why remove_core re-applies it. It can be set whether or not the core snap is
-    installed, since snapd serves the system configuration namespace either way.
+    Images normally hold auto-refresh already: GitHub's ubuntu runner images run
+    `snap set system refresh.hold=<build date + 60 days>` in configure-snap.sh. The catch is that
+    the hold is system (core snap) configuration, so this suite deletes it whenever it removes
+    the core snap -- and the refresh it was holding back has been due since the image was built,
+    so snapd starts one within seconds. That is why remove_core re-applies the hold rather than
+    the suite setting it once and trusting it to stay.
+
+    Nothing here depends on the image having held anything: the hold can be set whether or not
+    the core snap is installed, since snapd serves the system configuration namespace either way.
     """
     _snapd_conf.set('system', {'refresh.hold': 'forever'})
 
@@ -66,9 +70,11 @@ def hold_auto_refresh() -> None:
 def _hold_auto_refresh() -> None:  # pyright: ignore[reportUnusedFunction] (autouse fixture)
     """Hold auto-refresh for the whole session, before any test runs.
 
-    Not undone afterwards: the suite is destructive to the machine it runs on and is only ever
-    run where that's disposable (a workshop container or a CI runner), so leaving refreshes held
-    is preferable to re-arming them for whatever runs next.
+    Held indefinitely rather than for the image's dated span, since the suite has no idea how
+    long it will run and an indefinite hold is the stronger of the two. Not undone afterwards:
+    the suite is destructive to the machine it runs on and is only ever run where that's
+    disposable (a workshop container or a CI runner), so leaving refreshes held is preferable to
+    re-arming them for whatever runs next.
     """
     hold_auto_refresh()
 
@@ -191,9 +197,10 @@ def remove_core_blockers() -> None:
 def remove_core() -> None:
     """Remove the core snap, first removing every snap that would block its removal.
 
-    Removing core deletes the stored system configuration, which includes the auto-refresh hold,
-    so the hold is re-applied straight afterwards -- otherwise the rest of the run is exposed to
-    an auto-refresh again. Only the hold is restored: every other system option is expendable
+    Removing core deletes the stored system configuration, which includes the auto-refresh hold
+    -- the suite's own, and the one the runner image set -- so the hold is re-applied straight
+    afterwards. Without that, the rest of the run is exposed to an auto-refresh that has been due
+    since the image was built. Only the hold is restored: every other system option is expendable
     here, and one test asserts that the removal wiped what it had stored.
     """
     remove_core_blockers()  # Base-less snaps would otherwise block core removal.

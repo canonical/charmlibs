@@ -14,8 +14,9 @@ This module is destructive to stored system configuration: removing the core sna
 (snapd treats core's config like any other snap's; options snapd maintains itself, such as
 seed.loaded, are re-mirrored on the next snapd restart). Tests therefore never preserve
 pre-existing system options -- run this only where system configuration is disposable, as in
-CI containers. The one exception is the auto-refresh hold the suite sets: core removal wipes
-that too, so remove_core puts it back (see conftest.hold_auto_refresh).
+CI containers. The one exception is the auto-refresh hold: removing core wipes the runner
+image's hold along with everything else, so remove_core puts one back (see
+conftest.hold_auto_refresh for why that matters).
 
 Ordering: the module needs no special ordering relative to other modules. It removes and
 restores the core snap within its own fixture, no other module depends on system configuration,
