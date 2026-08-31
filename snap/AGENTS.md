@@ -29,7 +29,7 @@ workshop shell resolute
 **Never guess what the snapd API returns.** Always capture real responses first, then write assertions against them. This applies to both error paths and success responses.
 
 1. **Capture**: Run the real API call in a workshop container and record the raw response (and/or the resulting exception). A simple way is a throwaway script using `_client` directly, or a temporary functional test that dumps the response to a JSON file.
-2. **Assert**: Replace the capture with real assertions using the captured data — the most specific error class and `message`. snapd's `kind` and `value` are private (`_kind`, `_value`); assert on them only in functional tests that pin which snapd error a call produces.
+2. **Assert**: Replace the capture with real assertions using the captured data — the most specific error class, `_kind`, `message`, and `_value`.
 3. **Mirror in unit tests**: Add a unit test that mocks `_client` to raise/return the captured response and asserts the function under test handles it correctly.
 4. **Consider new error classes**: If a captured `kind` falls through to base `APIError` and a charm author might reasonably want to catch it specifically, add a dedicated subclass in `_errors.py`, wire it into the `_ERRORS` mapping in `_client.py`, and export it from `__init__.py`.
 5. **Update docstrings**: Add any newly-discovered raisable errors to the function's `Raises:` section.
