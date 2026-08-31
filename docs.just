@@ -121,7 +121,6 @@ clean:
     rm -f tutorials/_lib-tutorials.md
     rm -f how-to/_lib-how-to.md
     rm -f explanation/_lib-explanation.md
-    # per-library changelog include (per-package copies live under reference/charmlibs, cleaned above)
     rm -f reference/_lib-changelog.md
 
 [doc('Run `pyright` for local sphinx extensions.')]
