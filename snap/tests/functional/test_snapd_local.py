@@ -112,7 +112,7 @@ def test_install_local_without_dangerous_raises(snap_v1: Path):
     with pytest.raises(_errors.APIError) as ctx:
         install_local(snap_v1)  # dangerous=False by default.
     assert 'cannot find signatures with metadata' in ctx.value.message
-    assert ctx.value.kind == ''
+    assert ctx.value._kind == ''
 
 
 # ---------------------------------------------------------------------------

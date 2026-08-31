@@ -61,7 +61,7 @@ def test_post_sync_error_snap_already_installed():
     ensure_installed_store(_STORE_SNAP)
     with pytest.raises(_errors._AlreadyInstalledError) as ctx:
         _client.post(f'/v2/snaps/{_STORE_SNAP}', body={'action': 'install'})
-    assert ctx.value.kind == 'snap-already-installed'
+    assert ctx.value._kind == 'snap-already-installed'
 
 
 def test_post_sync_error_app_not_found():
@@ -70,16 +70,16 @@ def test_post_sync_error_app_not_found():
         _client.post(
             '/v2/apps', body={'action': 'start', 'names': [f'{_STORE_SNAP}.nonexistentservice']}
         )
-    assert ctx.value.kind == 'app-not-found'
+    assert ctx.value._kind == 'app-not-found'
 
 
 def test_post_sync_error_no_kind():
     # An invalid action returns an error with no 'kind'.
     ensure_installed_store(_STORE_SNAP)
-    with pytest.raises(_errors.Error) as ctx:
+    with pytest.raises(_errors.APIError) as ctx:
         _client.post(f'/v2/snaps/{_STORE_SNAP}', body={'action': 'invalid-action'})
-    assert not ctx.value.kind
-    assert not isinstance(ctx.value, _errors.BadResponseError)
+    assert type(ctx.value) is _errors.APIError
+    assert not ctx.value._kind
 
 
 def test_post_snap_no_update_available():
@@ -89,7 +89,7 @@ def test_post_snap_no_update_available():
         retry_on_rate_limit(_client.post)(
             f'/v2/snaps/{_STORE_SNAP}', body={'action': 'refresh', 'channel': 'latest/stable'}
         )
-    assert ctx.value.kind == 'snap-no-update-available'
+    assert ctx.value._kind == 'snap-no-update-available'
 
 
 def test_post_waits_for_async_change():
@@ -114,20 +114,21 @@ def test_get_sync_error_snap_not_found():
     with pytest.raises(_errors._NotFoundError) as ctx:
         _client.get(f'/v2/snaps/{_ABSENT_SNAP}')
     assert type(ctx.value) is _errors._NotFoundError
-    assert ctx.value.kind == 'snap-not-found'
+    assert ctx.value._kind == 'snap-not-found'
     # This endpoint is what _utils.check_installed probes with; its message is terse, with the
-    # snap name in `value`. get()/connect()/disconnect() raise this very error unchanged, relying
-    # on str() to surface the name rather than building their own message.
+    # snap name in the response's 'value'. get()/connect()/disconnect() raise this very error
+    # unchanged, relying on str() to surface the name rather than building their own message.
     assert ctx.value.message == 'snap not installed'
-    assert str(ctx.value.value) == _ABSENT_SNAP
+    assert str(ctx.value._value) == _ABSENT_SNAP
     assert str(ctx.value) == f'snap not installed ({_ABSENT_SNAP})'
 
 
 def test_get_sync_error_no_kind():
-    # An error response with no 'kind' field maps to the base Error.
-    with pytest.raises(_errors.Error) as ctx:
+    # An error response with no 'kind' field maps to the base APIError.
+    with pytest.raises(_errors.APIError) as ctx:
         _client.get('/v2/nonexistent-endpoint')
-    assert not ctx.value.kind
+    assert type(ctx.value) is _errors.APIError
+    assert not ctx.value._kind
 
 
 def test_put_sync_error_snap_not_found():
@@ -135,7 +136,7 @@ def test_put_sync_error_snap_not_found():
     with pytest.raises(_errors._NotFoundError) as ctx:
         _client.put(f'/v2/snaps/{_ABSENT_SNAP}/conf', body={'key': 'value'})
     assert type(ctx.value) is _errors._NotFoundError
-    assert ctx.value.kind == 'snap-not-found'
+    assert ctx.value._kind == 'snap-not-found'
 
 
 def test_get_logs_error_snap_not_found():
@@ -143,7 +144,7 @@ def test_get_logs_error_snap_not_found():
     with pytest.raises(_errors._NotFoundError) as ctx:
         _client.get('/v2/logs', query={'names': _ABSENT_SNAP, 'n': 10})
     assert type(ctx.value) is _errors._NotFoundError
-    assert ctx.value.kind == 'snap-not-found'
+    assert ctx.value._kind == 'snap-not-found'
 
 
 # ---------------------------------------------------------------------------
@@ -155,7 +156,7 @@ def test_post_sync_error_snap_needs_classic():
     ensure_removed(_CLASSIC_SNAP)
     with pytest.raises(_errors.NeedsClassicError) as ctx:
         _client.post(f'/v2/snaps/{_CLASSIC_SNAP}', body={'action': 'install'})
-    assert ctx.value.kind == 'snap-needs-classic'
+    assert ctx.value._kind == 'snap-needs-classic'
 
 
 # ---------------------------------------------------------------------------
@@ -223,12 +224,12 @@ def test_put_waits_for_async_change():
 
 
 def test_put_no_body_raises():
-    # PUT with no body (None) raises a base Error: snapd can't decode EOF as patch values.
+    # PUT with no body (None) raises a base APIError: snapd can't decode EOF as patch values.
     ensure_installed_local(_CONF_SNAP)
-    with pytest.raises(_errors.Error) as ctx:
+    with pytest.raises(_errors.APIError) as ctx:
         _client.put(f'/v2/snaps/{_CONF_SNAP}/conf')
     assert 'EOF' in ctx.value.message
-    assert not ctx.value.kind
+    assert not ctx.value._kind
 
 
 def test_put_empty_body_succeeds():
@@ -251,7 +252,7 @@ def test_poll_fails_fast_when_socket_missing():
             mp.setattr(_client, '_SOCKET_PATH', '/run/this-snapd-socket-does-not-exist.socket')
             with pytest.raises(_errors.SocketNotFoundError) as ctx:
                 change.wait()
-        assert ctx.value.kind == 'charmlibs-snap-socket-not-found'
+        assert 'this-snapd-socket-does-not-exist' in ctx.value.message
     finally:
         # snapd is still processing the original change; wait for it before cleaning up.
         change.wait()
@@ -280,10 +281,11 @@ def test_redirect_raises_bad_response_error(path: str, location: str):
     # handled, the empty body of the 301 surfaced as a confusing 'Invalid JSON' error.
     with pytest.raises(_errors.BadResponseError) as ctx:
         _client.get(path)
-    assert ctx.value.kind == 'charmlibs-snap-unexpected-redirect'
-    assert ctx.value.value == location
-    assert path in ctx.value.message
+    assert '301' in ctx.value.message  # snapd's router cleans the path with a permanent redirect.
+    assert path in ctx.value.message  # The path we asked for.
+    assert location in ctx.value.message  # Where snapd points us.
     assert 'Invalid JSON' not in ctx.value.message
+    assert ctx.value._response is None  # snapd sends an empty body with the redirect.
 
 
 def test_percent_encoded_separator_still_reaches_another_endpoint():
@@ -316,4 +318,4 @@ def test_get_logs_error_app_not_found():
     ensure_installed_local(_NO_SERVICES_SNAP)
     with pytest.raises(_errors.AppNotFoundError) as ctx:
         _client.get_logs(query={'names': _NO_SERVICES_SNAP, 'n': 10})
-    assert ctx.value.kind == 'app-not-found'
+    assert ctx.value._kind == 'app-not-found'
