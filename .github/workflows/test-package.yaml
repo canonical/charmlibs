@@ -211,11 +211,6 @@ jobs:
         tag: ${{ fromJson(needs.init.outputs.integration-tags) }}
         substrate: ${{ fromJson(needs.init.outputs.integration-substrates) }}
     steps:
-      - name: Avoid auto refresh of snaps during the workflow run
-        # snapd checks for updates automatically, and some may be available for installed snaps.
-        # snap refresh --hold will fail if a refresh is already in progress, warn in this case.
-        run: sudo snap refresh --hold || echo "::warning::couldn't hold snap auto-refresh"
-
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
           persist-credentials: false
