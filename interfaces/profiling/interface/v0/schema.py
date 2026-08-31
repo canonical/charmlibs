@@ -1,15 +1,9 @@
-"""This file defines the schemas for the provider and requirer sides of this relation interface.
+"""This file defines the schemas for the provider and requirer sides of this relation interface."""
 
-It must expose two interfaces.schema_base.DataBagSchema subclasses called:
-- ProviderSchema
-- RequirerSchema
-"""
-
-from interface_tester.schema_base import DataBagSchema
 from pydantic import BaseModel, Field
 
 
-class ProviderAppSchema(BaseModel):
+class ProviderAppData(BaseModel):
     """Application databag schema for the provider side of the profiling interface."""
 
     otlp_grpc_endpoint_url: str = Field(
@@ -22,11 +16,6 @@ class ProviderAppSchema(BaseModel):
     )
 
 
-class ProviderSchema(DataBagSchema):
-    """The schema for the provider side of this interface."""
-
-    app: ProviderAppSchema
-
-
-class RequirerSchema(DataBagSchema):
-    """The schema for the requirer side of this interface."""
+ProviderUnitData = None
+RequirerAppData = None
+RequirerUnitData = None
