@@ -1,21 +1,12 @@
 # Copyright 2026 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-"""LDAP relation schema definitions.
+"""LDAP relation schema definitions."""
 
-This file defines the schemas for the provider and requirer sides of this
-relation interface.
-
-It must expose two interfaces.schema_base.DataBagSchema subclasses called:
-- ProviderSchema
-- RequirerSchema
-"""
-
-from interface_tester.schema_base import DataBagSchema
 from pydantic import AnyUrl, BaseModel, Field
 
 
-class LdapProviderData(BaseModel):
+class ProviderAppData(BaseModel):
     """LDAP provider relation data schema."""
 
     urls: list[AnyUrl] = Field(
@@ -49,7 +40,7 @@ class LdapProviderData(BaseModel):
     )
 
 
-class LdapRequirerData(BaseModel):
+class RequirerAppData(BaseModel):
     """LDAP requirer relation data schema."""
 
     user: str | None = Field(
@@ -60,13 +51,5 @@ class LdapRequirerData(BaseModel):
     )
 
 
-class ProviderSchema(DataBagSchema):
-    """The schema for the provider side of the ldap interface."""
-
-    app: LdapProviderData
-
-
-class RequirerSchema(DataBagSchema):
-    """The schema for the requirer side of the ldap interface."""
-
-    app: LdapRequirerData
+ProviderUnitData = None
+RequirerUnitData = None
