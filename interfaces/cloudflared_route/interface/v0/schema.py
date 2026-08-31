@@ -1,11 +1,9 @@
 # Copyright 2024 Canonical
 # See LICENSE file for licensing details.
 """This file defines the schemas for the provider sides of the cloudflared_route interface.
-It exposes the interfaces.schema_base.DataBagSchema subclasses called:
-- ProviderSchema
 
 Examples:
-    ProviderSchema:
+    Provider:
         unit: <empty>
         app: {
           "tunnel_token_secret_id": "secret:csn5caau557j9bojn7rg",
@@ -13,18 +11,16 @@ Examples:
         }
 """
 
-from interface_tester.schema_base import DataBagSchema
 from pydantic import BaseModel, IPvAnyAddress
 
 
-class CloudflaredRouteProvider(BaseModel):
+class ProviderAppData(BaseModel):
     """Provider application databag schema for cloudflared_route integration."""
 
     tunnel_token_secret_id: str
     nameserver: IPvAnyAddress | None = None
 
 
-class ProviderSchema(DataBagSchema):
-    """Provider schema for cloudflared_route integration."""
-
-    app: CloudflaredRouteProvider
+ProviderUnitData = None
+RequirerAppData = None
+RequirerUnitData = None
