@@ -211,6 +211,15 @@ jobs:
         tag: ${{ fromJson(needs.init.outputs.integration-tags) }}
         substrate: ${{ fromJson(needs.init.outputs.integration-substrates) }}
     steps:
+      # Before checkout, to leave the smallest window: runner images ship with a stale
+      # last-refresh, so an auto-refresh is due almost immediately. concierge installs juju,
+      # charmcraft and the substrate snap, and snapd refuses to start a change touching a snap
+      # that already has one in progress -- so a refresh landing mid-run disturbs the tests.
+      # Non-fatal: the hold is a mitigation, and can itself lose the race to a refresh that has
+      # already started.
+      - name: Hold snap auto-refresh
+        run: sudo snap refresh --hold || echo "::warning::couldn't hold snap auto-refresh"
+
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
           persist-credentials: false
