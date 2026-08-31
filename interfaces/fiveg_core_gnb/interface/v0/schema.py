@@ -1,11 +1,7 @@
 """This file defines the schemas for the provider and requirer sides of the `fiveg_core_gnb` relation interface.
 
-It must expose two interfaces.schema_base.DataBagSchema subclasses called:
-- ProviderSchema
-- RequirerSchema
-
 Examples:
-    ProviderSchema:
+    Provider:
         unit: <empty>
         app: {
             "tac": 1,
@@ -18,7 +14,7 @@ Examples:
                 }
             ],
         }
-    RequirerSchema:
+    Requirer:
         unit: <empty>
         app: {
             "gnb-name": "gnb001",
@@ -27,7 +23,6 @@ Examples:
 
 from dataclasses import dataclass
 
-from interface_tester.schema_base import DataBagSchema
 from pydantic import BaseModel, Field
 
 
@@ -60,7 +55,7 @@ class PLMNConfig:
     )
 
 
-class FivegCoreGnbProviderAppData(BaseModel):
+class ProviderAppData(BaseModel):
     tac: int = Field(
         description="Tracking Area Code",
         examples=[1],
@@ -70,19 +65,11 @@ class FivegCoreGnbProviderAppData(BaseModel):
     plmns: list[PLMNConfig]
 
 
-class FivegCoreGnbRequirerAppData(BaseModel):
+class RequirerAppData(BaseModel):
     gnb_name: str = Field(
         alias="gnb-name", description="Unique identifier of the CU/gnB.", examples=["gnb001"]
     )
 
 
-class ProviderSchema(DataBagSchema):
-    """The schema for the provider side of the fiveg_core_gnb interface."""
-
-    app: FivegCoreGnbProviderAppData
-
-
-class RequirerSchema(DataBagSchema):
-    """The schema for the requirer side of the fiveg_core_gnb interface."""
-
-    app: FivegCoreGnbRequirerAppData
+ProviderUnitData = None
+RequirerUnitData = None
