@@ -1,5 +1,5 @@
 name: Test an interface
-# runs tests for specified interface
+# checks the schema for the specified interface
 
 on:
   workflow_call:
@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       interface:
-        description: Name of interface to run tests for.
+        description: Name of interface to run checks for.
         required: true
         type: string
 
@@ -20,10 +20,8 @@ env:
   INTERFACE: ${{ inputs.interface }}
 
 jobs:
-  init:
+  schema:
     runs-on: ubuntu-latest
-    outputs:
-      include: ${{ steps.include.outputs.result }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
@@ -37,41 +35,6 @@ jobs:
           echo "result=$SCHEMA" >> "$GITHUB_OUTPUT"
       - name: Check schema can be run if it exists
         if: steps.schema.outputs.result
-        run: uv run --no-project --with-requirements interface-test-requirements.txt "$SCHEMA"
+        run: uv run --no-project --with-requirements schema-requirements.txt "$SCHEMA"
         env:
           SCHEMA: ${{ steps.schema.outputs.result }}
-      - name: Define interface test matrix
-        id: include
-        run: |
-          set -xueo pipefail
-          INCLUDE=$(.scripts/get-interface-test-targets.py "interfaces/$INTERFACE")
-          echo "$INCLUDE" | jq  # logging
-          echo "result=$INCLUDE" >> "$GITHUB_OUTPUT"
-
-  tests:
-    needs: [init]
-    if: ${{ needs.init.outputs.include != '[]' }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include: ${{ fromJSON(needs.init.outputs.include) }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
-        with:
-          persist-credentials: false
-      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
-      - name: Run interface tests
-        env:
-          VERSION: ${{ matrix.version }}
-          ROLE: ${{ matrix.role }}
-          CHARM_NAME: ${{ matrix.charm_name }}
-          ENDPOINT: ${{ matrix.endpoint }}
-        run: |
-          set -xueo pipefail
-          .scripts/run-interface-tests.py \
-            "$INTERFACE" \
-            "$VERSION" \
-            "$ROLE" \
-            "$CHARM_NAME" \
-            "$ENDPOINT"
