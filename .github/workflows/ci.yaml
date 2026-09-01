@@ -102,10 +102,10 @@ jobs:
 
   interface-tests-passed:  # GitHub status checks require a static job name
     needs: [interface]
-    if: ${{ !cancelled() }}  # run even if tests are skipped or failed
+    if: ${{ !cancelled() }}  # run even if checks are skipped or failed
     runs-on: ubuntu-latest
     steps:
-      - name: Fail if any interface tests failed
+      - name: Fail if any interface checks failed
         if: ${{ needs.interface.result != 'success' && needs.interface.result != 'skipped' }}
         env:
           NEEDS_JSON: ${{ toJSON(needs) }}
