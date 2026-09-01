@@ -417,6 +417,10 @@ class _PeerRollingOpsBackend(Object):  # pyright: ignore[reportUnusedClass]
                 logger.info('Skipping mirror: etcd lock was not granted.')
                 return
 
+            case _RunWithLockStatus.OPERATION_PENDING:
+                logger.info('Skipping mirror: no operation is in progress yet.')
+                return
+
             case _RunWithLockStatus.NO_OPERATION:
                 if not self._operations(self.model.unit).has_pending_work():
                     logger.info('Skipping mirror: no operation.')
