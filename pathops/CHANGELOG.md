@@ -1,3 +1,8 @@
+# Unreleased
+
+`ContainerPath` now provides `is_relative_to` and `with_stem`, matching `pathlib.Path` on Python 3.9+.
+`with_stem` is also part of `PathProtocol`; `is_relative_to` is not, because `pathlib`'s signature doesn't settle until Python 3.12.
+
 # 1.3.0.post0 - 16 June 2026
 
 Update project URLs.
