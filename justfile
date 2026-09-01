@@ -55,6 +55,9 @@ integration-machine *args:
 interfaces-json *args:
     @.scripts/just.py interfaces-json "$@"
 
+check-codeowners *args:
+    @.scripts/just.py check-codeowners "$@"
+
 _scripts-unit *args:
     @.scripts/just.py scripts-unit "$@"
 
