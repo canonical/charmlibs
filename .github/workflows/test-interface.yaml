@@ -1,5 +1,5 @@
 name: Test an interface
-# checks the schema for the specified interface
+# Checks the schema for the specified interface.
 
 on:
   workflow_call:
