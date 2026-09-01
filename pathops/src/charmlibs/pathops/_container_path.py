@@ -151,6 +151,13 @@ class ContainerPath:
         """
         return self._path.is_absolute()
 
+    def is_relative_to(self, other: str | os.PathLike[str], /) -> bool:
+        """Return whether this path is relative to the ``other`` path.
+
+        Only the path is matched against, the container is not considered.
+        """
+        return self._path.is_relative_to(other)
+
     def match(self, path_pattern: str) -> bool:
         """Return whether this path matches the given pattern.
 
@@ -173,6 +180,20 @@ class ContainerPath:
             # ContainerPath('/foo/baz.bin', container=<ops.Container 'c'>)"
         """
         return self.with_segments(self._path.with_name(name))
+
+    def with_stem(self, stem: str) -> Self:
+        """Return a new ContainerPath, with the same container, but with the path stem replaced.
+
+        The stem is the path name minus its last suffix.
+
+        ::
+
+            container = self.unit.get_container('c')
+            path = ContainerPath('/', 'foo', 'bar.txt', container=container)
+            repr(path.with_stem('baz'))
+            # ContainerPath('/foo/baz.txt', container=<ops.Container 'c'>)"
+        """
+        return self.with_segments(self._path.with_stem(stem))
 
     def with_suffix(self, suffix: str) -> Self:
         """Return a new ContainerPath with the same container and the suffix changed.
