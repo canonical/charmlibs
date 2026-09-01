@@ -9,13 +9,17 @@ Build the docs, (re)generating reference docs for all packages, or just those sp
 `just docs` is an alias for `just docs html`. To specify packages, you must use the full recipe, e.g.
 `just docs html interfaces/foo`.
 """)]
-html *packages: _diataxis_docs (_packages packages)
+html *packages: _diataxis_docs _interface_docs (_packages packages)
     uvx --with-requirements=_dev/requirements.txt --from=sphinx \
         sphinx-build -b dirhtml -T -W --keep-going -d _dev/.doctrees -D language=en . '{{build_dir}}/html'
 
 [doc('Copy per-library diataxis docs into the Sphinx source tree and generate toctree include files.')]
 _diataxis_docs:
     ./scripts/diataxis_preprocessor.py
+
+[doc('Generate interface reference docs in the Sphinx source tree.')]
+_interface_docs:
+    ./scripts/interface_preprocessor.py
 
 [doc("""
 Run html builder once per package, with its deps installed, setting the package argument and suppressing reference warnings.
@@ -46,8 +50,8 @@ _packages *packages:
             '-D', 'language=en',
             '-D', f'package={package}',
             # llms.txt is only generated in the final combined pass (the `html` recipe).
-            # Leaving it enabled here triggers a nested base-mode build that regenerates the
-            # interface reference docs, deleting the placeholder this package pass depends on.
+            # Leaving it enabled here triggers a nested base-mode build that the
+            # intermediate package passes don't need.
             '-D', 'llms_txt_enabled=0',
             '-D', 'suppress_warnings=ref.ref,ref.doc,myst.xref_missing',
             '.', '{{build_dir}}/html',
