@@ -25,7 +25,12 @@ from unittest.mock import patch
 import ops
 import pytest
 from cosl.juju_topology import JujuTopology
-from cosl.types import AlertingRuleFormat, OfficialRuleFileFormat, RecordingRuleFormat
+from cosl.types import (
+    AlertingRuleFormat,
+    OfficialRuleFileFormat,
+    RecordingRuleFormat,
+    SigmaRuleFormat,
+)
 from ops import testing
 from ops.charm import CharmBase
 
@@ -74,6 +79,26 @@ OFFICIAL_PROMQL_RULES = OfficialRuleFileFormat(
         },
     ]
 )
+SINGLE_SIGMA_RULE: SigmaRuleFormat = {
+    'title': 'Failed SSH Login Attempt',
+    'id': '5f3a4e20-1b2c-4d5e-9f8a-7b6c3d4e5f6a',
+    'status': 'experimental',
+    'logsource': {'category': 'authentication', 'product': 'linux', 'service': 'sshd'},
+    'detection': {'selection': {'event_type': 'authentication_failure'}, 'condition': 'selection'},
+    'level': 'medium',
+}
+SIGMA_COLLECTION: dict = {
+    'rules': [
+        SINGLE_SIGMA_RULE,
+        {
+            'title': 'High CPU Usage',
+            'logsource': {'category': 'process_monitoring', 'product': 'linux'},
+            'detection': {'selection': {'metric': 'cpu_percent'}, 'condition': 'selection'},
+            'level': 'high',
+        },
+    ]
+}
+
 ALL_PROTOCOLS: list[Literal['grpc', 'http']] = ['grpc', 'http']
 ALL_TELEMETRIES: list[Literal['logs', 'metrics', 'traces']] = ['logs', 'metrics', 'traces']
 
@@ -102,6 +127,8 @@ class OtlpRequirerCharm(CharmBase):
                 .add_promql(deepcopy(SINGLE_PROMQL_RECORD), group_name='test_promql_record')
                 .add_logql(deepcopy(OFFICIAL_LOGQL_RULES))
                 .add_promql(deepcopy(OFFICIAL_PROMQL_RULES))
+                .add_sigma(deepcopy(SINGLE_SIGMA_RULE))
+                .add_sigma(deepcopy(SIGMA_COLLECTION))
             )
         OtlpRequirer(
             self,
