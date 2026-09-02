@@ -68,8 +68,7 @@ snapd's raw error `kind` and `value` are not part of the public API: they're inc
 
 ## Other changes
 
-- Timestamps from snapd (`InstalledInfo.hold`, `LogEntry.timestamp`) are timezone-aware and parsed correctly on Python 3.10, where they were previously assumed to be UTC.
-- The functional test suite runs against real snapd on Ubuntu 22.04, 24.04, and 26.04 using lightweight test snaps.
+- Timestamps from snapd (`InstalledInfo.hold`, `LogEntry.timestamp`) are timezone-aware, where they were previously assumed to be UTC.
 
 # 1.0.1.post0 - 16 June 2026
 
