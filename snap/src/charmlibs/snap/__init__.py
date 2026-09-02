@@ -41,6 +41,15 @@ Check the documentation for each function for details on which exceptions it may
 function's documented errors are the ones it can report specifically: a plain :class:`APIError`,
 or one of the transport errors below, is possible for any call.
 
+snapd reports both an uninstalled snap and a snap the store doesn't have as a generic
+"not found". The library narrows this for you, raising :class:`NotInstalledError` when the
+snap isn't on the system and :class:`NotInStoreError` when the store has no such snap, so,
+for example, :func:`refresh` on an uninstalled snap raises :class:`NotInstalledError`.
+
+The raw ``kind`` and ``value`` fields of snapd's error responses are not part of the public
+API: they're inconsistent across endpoints, and the typed error classes are the supported way
+to tell errors apart. The :attr:`Error.message` property carries the error message from snapd.
+
 Separately from the :class:`APIError` hierarchy (but inheriting from :class:`Error`),
 the library may also raise the following exceptions:
 
