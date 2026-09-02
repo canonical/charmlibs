@@ -727,7 +727,7 @@ general:
   K8s: false
   description: Use ``snapd`` to install and manage packages. Deprecated in favor of
     ``charmlibs.snap``. ``charmlibs-snap~=1.0`` is a drop-in replacement, while 2.0
-    is a breaking rewrite with a new API.
+    has a new, backwards incompatible, API.
   tags:
   - substrate
 - name: charms.operator_libs_linux.sysctl
