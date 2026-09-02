@@ -6,10 +6,6 @@ Every operation is a module-level function that takes the snap's name -- there a
 
 If you can't migrate yet, pin `charmlibs-snap<2`. The 1.x series remains the drop-in replacement for `operator_libs_linux.v2.snap`.
 
-## Other changes
-
-- Timestamps from snapd (`InstalledInfo.hold`, `LogEntry.timestamp`) are timezone-aware, where they were previously assumed to be UTC.
-
 # 1.0.1.post0 - 16 June 2026
 
 Update project URLs.

@@ -75,7 +75,3 @@ See the [reference documentation](https://canonical.com/juju/docs/charmlibs/refe
 | `install_local(filename, ...)` | No replacement yet |
 | `SnapError`, `SnapAPIError`, `SnapNotFoundError` | The `Error` hierarchy above; `SnapNotFoundError` becomes `NotInstalledError` or `NotInStoreError` |
 | `SnapState`, `SnapService`, `SnapServiceDict`, `MetaCache`, `JSONAble`, `JSONType`, `ansi_filter` | Removed |
-
-## Other behavioural changes
-
-- Timestamps from snapd (`InstalledInfo.hold`, `LogEntry.timestamp`) are timezone-aware, where they were previously assumed to be UTC.
