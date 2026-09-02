@@ -4,27 +4,23 @@ myst:
     description: Migrate charm code from charmlibs.snap 1.x or operator_libs_linux.v2.snap to charmlibs.snap 2.0.
 ---
 
-# Migrate from 1.x to 2.0
+# Migrate to 2.0
 
 `charmlibs.snap` 2.0 is a ground-up rewrite. The 1.x library was a straight migration of `operator_libs_linux.v2.snap`; 2.0 is a new, deliberately smaller API. It talks to snapd exclusively over the REST API (it no longer shells out to the `snap` CLI), has no caching layer, and has no runtime dependencies. Function names, argument semantics, and error behaviour follow the `snap` CLI, so what you know from the command line carries over.
 
-This guide describes the 2.0 API in terms of what changed from 1.x, and ends with a table mapping each 1.x name to its replacement. The 1.x series is a drop-in replacement for `operator_libs_linux.v2.snap`, so the same table applies if you're migrating directly from the Charmhub-hosted library.
+The 1.x series was a drop-in replacement for `operator_libs_linux.v2.snap`, so the same table applies if you're migrating directly from the Charmhub-hosted library. If you can't migrate yet, pin `charmlibs-snap<2`.
 
-If you can't migrate yet, pin `charmlibs-snap<2`.
+One notable gap in the initial 2.0 release is support for installing local snaps. We hope to provide this functionality soon, with the addition of support for `snap ack` to allow charms to smoothly refresh between local and store revisions of their snap.
 
 ## The new API
 
-Every operation is a module-level function that takes the snap's name. There are no `Snap` objects and no `SnapCache`.
+Every operation is a module-level function that takes the snap's name. There are no `Snap` objects and no `SnapCache`. Every name-like argument is validated before a request is made, and an empty or blank name raises `ValueError` rather than reaching snapd.
 
-Every name-like argument is validated before a request is made, and an empty or blank name raises `ValueError` rather than reaching snapd.
+`ensure_installed(snap, channel=None, *, revision=None, classic=False, update=True)` is the one-call replacement for `ensure`/`add`: it installs the snap if absent, refreshes it if it's on the wrong channel or revision, and otherwise refreshes it only when `update` is true and no revision was requested. `install`, `refresh`, and `ensure_installed` all return a truthy value if something changed and a falsy value otherwise (not guaranteed to be a `bool`). These operations wait for the snapd change to complete, with no overall deadline, like the CLI. A change that finishes in the `Wait` state (for example, one that needs a reboot) is treated as success and logged as a warning.
 
-`ensure_installed(snap, channel=None, *, revision=None, classic=False, update=True)` is the one-call replacement for `ensure`/`add`: it installs the snap if absent, refreshes it if it's on the wrong channel or revision, and otherwise refreshes it only when `update` is true and no revision was requested. `install`, `refresh`, and `ensure_installed` all return a truthy value if something changed and a falsy value otherwise (not guaranteed to be a `bool`). These operations wait for the snapd change to complete, with no overall deadline, like the CLI; a change that finishes in the `Wait` state (for example, one that needs a reboot) is treated as success and logged as a warning.
+Use `hold` to prevent snap auto-refreshes. Use `list_one` to query (list) information about an installed snap -- for example, `InstalledInfo.hold` reports when a hold ends. Use `get` to check an installed snap's config -- this always returns JSON-typed snap config values (the 1.x `typed=` flag is gone), and always returns a dict keyed by what you asked for; `get_one(snap, key)` returns a single value directly.
 
-`get` always returns JSON-typed values (the 1.x `typed=` flag is gone), and always returns a dict keyed by what you asked for; `get_one(snap, key)` returns a single value directly.
-
-`logs` returns structured `LogEntry` objects (`timestamp`, `message`, `sid`, `pid`) in chronological order, rather than a string, and `limit=None` retrieves everything, like `snap logs -n all`.
-
-`hold(snap, duration=None)` accepts a `timedelta` or a number of seconds, and holds indefinitely by default. `InstalledInfo.hold` reports when a hold ends.
+The previous library versions automatically appended some logs when errors were raised. This version provides an explicit `logs` function, which returns structured `LogEntry` objects (`timestamp`, `message`, `sid`, `pid`) in chronological order. You can fetch and log these on errors, or rely on the hopefully improved error taxonomy below.
 
 ## Errors
 
@@ -54,7 +50,7 @@ See the [reference documentation](https://canonical.com/juju/docs/charmlibs/refe
 | `Snap.connect(plug, service, slot)` | `connect((name, plug), slot)` where `slot` is `(snap, slot)`, a snap name, or `None`; new `disconnect` |
 | `Snap.alias(application, alias)` | `alias(name, app, alias)`; new `unalias(alias)` |
 | `Snap.logs(services, num_lines)` returning `str` | `logs(names, limit=...)` returning `list[LogEntry]`; filtering by service is not supported |
-| `Snap.apps`, `Snap.services`, `SnapClient.get_installed_snaps`, `SnapClient.get_installed_snap_apps` | No replacement |
+| `Snap.apps`, `Snap.services`, `SnapClient.get_installed_snaps`, `SnapClient.get_installed_snap_apps` | No replacement; query individual snaps with `list_one` |
 | `SnapClient.snapd_installed` | Catch `SocketNotFoundError` |
 | `install_local(filename, ...)` | No replacement yet |
 | `SnapError`, `SnapAPIError`, `SnapNotFoundError` | The `Error` hierarchy above; `SnapNotFoundError` becomes `NotInstalledError` or `NotInStoreError` |
