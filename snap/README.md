@@ -10,7 +10,7 @@ from charmlibs import snap
 
 See the [reference documentation](https://canonical.com/juju/docs/charmlibs/reference/charmlibs/snap) for more.
 
-Upgrading from 1.x? Version 2.0 is a rewrite with a new API -- see [how to migrate from 1.x to 2.0](https://canonical.com/juju/docs/charmlibs/how-to/charmlibs/snap/migrate-from-1x). This README and the library docs cover the 2.x series; for 1.x, see the [snap-v1.0.1.post0 tag](https://github.com/canonical/charmlibs/tree/snap-v1.0.1.post0/snap). Pin `charmlibs-snap<2` to stay on the drop-in replacement for `operator_libs_linux.v2.snap`.
+Upgrading from 1.x? Version 2.0 is a rewrite with a new API -- see [how to migrate from 1.x to 2.0](https://canonical.com/juju/docs/charmlibs/how-to/charmlibs/snap/migrate-from-1x). This README and the library docs cover the 2.x series; for 1.x, see the [snap-v1.0.1.post0 tag](https://github.com/canonical/charmlibs/tree/snap-v1.0.1.post0/snap).
 
 # Getting started
 
