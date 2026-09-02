@@ -10,7 +10,7 @@ from charmlibs import snap
 
 See the [reference documentation](https://canonical.com/juju/docs/charmlibs/reference/charmlibs/snap) for more.
 
-Upgrading from 1.x? Version 2.0 is a rewrite with a new API -- see the [changelog](https://github.com/canonical/charmlibs/blob/main/snap/CHANGELOG.md) for a migration table. Pin `charmlibs-snap<2` to stay on the drop-in replacement for `operator_libs_linux.v2.snap`.
+Upgrading from 1.x? Version 2.0 is a rewrite with a new API -- see [how to migrate from 1.x to 2.0](https://canonical.com/juju/docs/charmlibs/how-to/charmlibs/snap/migrate-from-1x). This README and the library docs cover the 2.x series; for 1.x, see the [snap-v1.0.1.post0 tag](https://github.com/canonical/charmlibs/tree/snap-v1.0.1.post0/snap). Pin `charmlibs-snap<2` to stay on the drop-in replacement for `operator_libs_linux.v2.snap`.
 
 # Getting started
 
@@ -56,4 +56,4 @@ Every error the library raises is a subclass of `snap.Error`, so `except snap.Er
 
 When snapd reports an error, the library raises `snap.APIError`, narrowed to a specific subclass where a charm might want to handle the case -- for example `NotInstalledError`, `NotInStoreError`, `ChannelNotAvailableError`, `NeedsClassicError`, or `ChangeError` (a change that failed after starting, such as an install hook erroring). Each function documents the errors it raises.
 
-When snapd can't be reached or understood, the library raises `snap.ConnectionError` (snapd isn't running; also raised as `SocketNotFoundError` if it isn't installed), `snap.TimeoutError` (snapd didn't answer in time, typically because it is waiting on the store), or `snap.BadResponseError` (a response the library can't read, which should be reported as a bug).
+When snapd can't be reached or understood, the library raises `snap.ConnectionError` -- or its subclass `snap.SocketNotFoundError`, which usually means snapd isn't installed -- `snap.TimeoutError` (snapd didn't answer in time), or `snap.BadResponseError` (a response the library can't read, which should be reported as a bug).
