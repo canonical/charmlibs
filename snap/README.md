@@ -47,13 +47,3 @@ Install or refresh to a specific revision, and `hold` the snap so that automatic
 snap.refresh('lxd', '5.21/stable', revision=33110)
 snap.hold('lxd')
 ```
-
-Also available: `install`, `remove`, `unhold`, `stop`, `restart`, `get`, `unset`, `connect`, `disconnect`, `alias`, `unalias`, and `logs`.
-
-# Errors
-
-Every error the library raises is a subclass of `snap.Error`, so `except snap.Error` catches anything that went wrong talking to snapd. Invalid arguments raise ordinary Python exceptions such as `ValueError`.
-
-When snapd reports an error, the library raises `snap.APIError`, narrowed to a specific subclass where a charm might want to handle the case -- for example `NotInstalledError`, `NotInStoreError`, `ChannelNotAvailableError`, `NeedsClassicError`, or `ChangeError` (a change that failed after starting, such as an install hook erroring). Each function documents the errors it raises.
-
-When snapd can't be reached or understood, the library raises `snap.ConnectionError` -- or its subclass `snap.SocketNotFoundError`, which usually means snapd isn't installed -- `snap.TimeoutError` (snapd didn't answer in time), or `snap.BadResponseError` (a response the library can't read, which should be reported as a bug).
