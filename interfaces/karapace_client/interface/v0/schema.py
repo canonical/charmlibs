@@ -1,14 +1,8 @@
-"""This file defines the schemas for the provider and requirer sides of the karapace_client interface.
-
-It must expose two interfaces.schema_base.DataBagSchema subclasses called:
-- ProviderSchema
-- RequirerSchema
-"""
+"""This file defines the schemas for the provider and requirer sides of the karapace_client interface."""
 
 from enum import Enum
 
-from interface_tester.schema_base import DataBagSchema
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ExtraUserRole(str, Enum):
@@ -16,8 +10,24 @@ class ExtraUserRole(str, Enum):
     user = "user"
 
 
-class KarapaceProviderData(BaseModel):
+class _BareStringDatabag(BaseModel):
+    """Base class for databag models that don't strictly JSON encode all entries."""
+
+    @staticmethod
+    def __juju_decoder__(value: str) -> str:
+        """Pass Juju's string through unmodified to be decoded by individual field validators."""
+        return value
+
+    @staticmethod
+    def __juju_encoder__(value: str | None) -> str:
+        """Convert `None` to "", erasing the value; Ops will error on a non-string."""
+        return "" if value is None else value
+
+
+class ProviderAppData(_BareStringDatabag):
     """The databag for the provider side of this interface."""
+
+    model_config = ConfigDict(strict=True, populate_by_name=True)
 
     subject: str = Field(
         description="The subject that has been made available to the relation user. Name defined in the Requirer's subject field",
@@ -38,7 +48,7 @@ class KarapaceProviderData(BaseModel):
     )
 
     endpoints: str = Field(
-        description="A list of endpoints used to connect to the subject",
+        description="A list of endpoints used to connect to the subject, comma separated on the wire",
         examples=["10.141.78.155:8082,10.141.78.62:8082,10.141.78.186:8082"],
         title="Karapace server endpoints",
     )
@@ -60,8 +70,10 @@ class KarapaceProviderData(BaseModel):
     )
 
 
-class KarapaceRequirerData(BaseModel):
+class RequirerAppData(_BareStringDatabag):
     """The databag for the requirer side of this interface."""
+
+    model_config = ConfigDict(strict=True, populate_by_name=True)
 
     subject: str = Field(
         description="The subject name access requested by the requirer",
@@ -96,7 +108,7 @@ class KarapaceRequirerData(BaseModel):
     entity_permissions: str | None = Field(
         None,
         alias="entity-permissions",
-        description="List of permissions to assign to the custom entity, in JSON format",
+        description="List of permissions to assign to the custom entity, in JSON format. Written to the databag as an opaque string",
         examples=[
             "[{\"resource_name\": \"schemas\", \"resource_type\": \"SUBJECT\", \"privileges\": [\"READ\"]}]"
         ],
@@ -105,7 +117,10 @@ class KarapaceRequirerData(BaseModel):
 
     @field_validator("extra_user_roles", mode="before")
     @classmethod
-    def extra_user_roles_validator(cls, value: str) -> str:
+    def extra_user_roles_validator(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+
         try:
             _role = ExtraUserRole(value)
         except ValueError:
@@ -114,13 +129,5 @@ class KarapaceRequirerData(BaseModel):
         return value
 
 
-class ProviderSchema(DataBagSchema):
-    """The schema for the provider side of this interface."""
-
-    app: KarapaceProviderData
-
-
-class RequirerSchema(DataBagSchema):
-    """The schema for the requirer side of this interface."""
-
-    app: KarapaceRequirerData
+ProviderUnitData = None
+RequirerUnitData = None
