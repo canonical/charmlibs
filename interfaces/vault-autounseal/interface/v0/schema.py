@@ -1,15 +1,9 @@
-"""This file defines the schemas for the provider and requirer sides of this relation interface.
+"""This file defines the schemas for the provider and requirer sides of this relation interface."""
 
-It must expose two interfaces.schema_base.DataBagSchema subclasses called:
-- ProviderSchema
-- RequirerSchema
-"""
-
-from interface_tester.schema_base import DataBagSchema
 from pydantic import BaseModel, Field
 
 
-class VaultAutounsealProviderSchema(BaseModel):
+class ProviderAppData(BaseModel):
     """Provider side of the vault-autounseal relation interface."""
 
     address: str = Field(description="The address of the Vault server to connect to.")
@@ -27,7 +21,6 @@ class VaultAutounsealProviderSchema(BaseModel):
     )
 
 
-class ProviderSchema(DataBagSchema):
-    """The schema for the provider side of this interface."""
-
-    app: VaultAutounsealProviderSchema  # type: ignore
+ProviderUnitData = None
+RequirerAppData = None
+RequirerUnitData = None
