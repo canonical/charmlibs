@@ -3,9 +3,10 @@
 """This file defines the schemas for the provider and requirer sides of the kubeflow-dashboard-links interface.
 
 Examples:
-    RequirerSchema:
+    Requirer:
         unit: <empty>
-        app: [
+        app: {
+            "dashboard_links": '[
                 {
                     "text": "Some link text",
                     "link": "/some-relative-link",
@@ -14,10 +15,10 @@ Examples:
                     "icon": "assessment",
                     "desc": "link description"
                 }
-            ]
+            ]'
+        }
 """
 
-from interface_tester.schema_base import DataBagSchema
 from pydantic import BaseModel
 
 
@@ -45,7 +46,12 @@ class DashboardItem(BaseModel):
     desc: str = ""
 
 
-class RequirerSchema(DataBagSchema):
-    """Requirer schema for Ingress."""
+class RequirerAppData(BaseModel):
+    """The requirer's application databag."""
 
-    app: list[DashboardItem]
+    dashboard_links: list[DashboardItem]
+
+
+ProviderAppData = None
+ProviderUnitData = None
+RequirerUnitData = None
