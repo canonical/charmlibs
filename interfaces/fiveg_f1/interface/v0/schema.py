@@ -1,9 +1,7 @@
 """This file defines the schemas for the provider and requirer sides of the `fiveg_f1` interface.
-It exposes two interface_tester.schema_base.DataBagSchema subclasses called:
-- ProviderSchema
-- RequirerSchema
+
 Examples:
-    ProviderSchema:
+    Provider:
         unit: <empty>
         app: {
             "f1_ip_address": "192.168.70.132",
@@ -18,7 +16,7 @@ Examples:
                 }
             ],
         }
-    RequirerSchema:
+    Requirer:
         unit: <empty>
         app:  {
             "f1_port": 2153
@@ -27,7 +25,6 @@ Examples:
 
 from dataclasses import dataclass
 
-from interface_tester.schema_base import DataBagSchema
 from pydantic import BaseModel, Field, IPvAnyAddress, conlist
 
 
@@ -60,7 +57,7 @@ class PLMNConfig:
     )
 
 
-class FivegF1ProviderAppData(BaseModel):
+class ProviderAppData(BaseModel):
     f1_ip_address: IPvAnyAddress = Field(
         description="IPv4 address of the network interface used for F1 traffic",
         examples=["192.168.70.132"],
@@ -75,17 +72,9 @@ class FivegF1ProviderAppData(BaseModel):
     plmns: conlist(PLMNConfig, min_length=1)
 
 
-class FivegF1RequirerAppData(BaseModel):
+class RequirerAppData(BaseModel):
     f1_port: int = Field(description="Number of the port used for F1 traffic", examples=[2153])
 
 
-class ProviderSchema(DataBagSchema):
-    """Provider schema for fiveg_f1."""
-
-    app: FivegF1ProviderAppData
-
-
-class RequirerSchema(DataBagSchema):
-    """Requirer schema for fiveg_f1."""
-
-    app: FivegF1RequirerAppData
+ProviderUnitData = None
+RequirerUnitData = None

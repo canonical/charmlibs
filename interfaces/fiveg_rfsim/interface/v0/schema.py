@@ -1,25 +1,22 @@
 """This file defines the schemas for the provider and requirer sides of the `fiveg_rfsim` interface.
-It exposes two interface_tester.schema_base.DataBagSchema subclasses called:
-- ProviderSchema
-- RequirerSchema
+
 Examples:
-    ProviderSchema:
+    Provider:
         unit: <empty>
         app: {
             "rfsim_address": "192.168.70.130",
             "sst": 1,
             "sd": 1,
         }
-    RequirerSchema:
+    Requirer:
         unit: <empty>
         app:  <empty>
 """
 
-from interface_tester.schema_base import DataBagSchema
 from pydantic import BaseModel, Field
 
 
-class FivegRFSIMProviderAppData(BaseModel):
+class ProviderAppData(BaseModel):
     rfsim_address: str = Field(description="RF simulator service ip", examples=["192.168.70.130"])
     sst: int = Field(
         description="Slice/Service Type",
@@ -36,11 +33,6 @@ class FivegRFSIMProviderAppData(BaseModel):
     )
 
 
-class ProviderSchema(DataBagSchema):
-    """Provider schema for the fiveg_rfsim interface."""
-
-    app: FivegRFSIMProviderAppData
-
-
-class RequirerSchema(DataBagSchema):
-    """Requirer schema for the fiveg_rfsim interface."""
+ProviderUnitData = None
+RequirerAppData = None
+RequirerUnitData = None
