@@ -1,11 +1,9 @@
 # Copyright 2023 Canonical
 # See LICENSE file for licensing details.
 """This file defines the schemas for the provider and requirer sides of the login_ui_endpoints interface.
-It exposes two interfaces.schema_base.DataBagSchema subclasses called:
-- ProviderSchema
-- RequirerSchema
+
 Examples:
-    ProviderSchema:
+    Provider:
         unit: <empty>
         app: {"consent_url": "http://identity-platform-login-ui-url/consent",
               "error_url": "http://identity-platform-login-ui-url/error",
@@ -17,11 +15,10 @@ Examples:
               }
 """
 
-from interface_tester.schema_base import DataBagSchema
 from pydantic import BaseModel, Field
 
 
-class MyProviderAppData(BaseModel):
+class ProviderAppData(BaseModel):
     consent_url: str = Field(
         description="Endpoint Hydra forwards users for consent related operations."
     )
@@ -39,11 +36,6 @@ class MyProviderAppData(BaseModel):
     default_url: str = Field(description="Default Browser endpoint Kratos forwards users to.")
 
 
-class ProviderSchema(DataBagSchema):
-    """Provider schema for login_ui_endpoints."""
-
-    app: MyProviderAppData
-
-
-class RequirerSchema(DataBagSchema):
-    """Requirer schema for login_ui_endpoints."""
+ProviderUnitData = None
+RequirerAppData = None
+RequirerUnitData = None
