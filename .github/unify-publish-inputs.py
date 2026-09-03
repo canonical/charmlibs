@@ -39,7 +39,10 @@ def _main() -> None:
             '--output=version',
         ]
         items = json.loads(subprocess.check_output(cmd, text=True))
-        include = [{'package': item['path'], 'tag': _get_tag(item)} for item in items]
+        include = [
+            {'package': item['path'], 'tag': _get_tag(item), 'version': item['version']}
+            for item in items
+        ]
         _output({
             'include': json.dumps(include),
             'skip-juju': 'false',
@@ -47,7 +50,9 @@ def _main() -> None:
         })
     elif event_name == 'workflow_dispatch':
         _output({
-            'include': json.dumps([{'package': event['inputs']['package'], 'tag': ''}]),
+            'include': json.dumps([
+                {'package': event['inputs']['package'], 'tag': '', 'version': ''}
+            ]),
             'skip-juju': event['inputs']['skip-juju'],
             'repository-url': 'https://test.pypi.org/legacy/',
         })
