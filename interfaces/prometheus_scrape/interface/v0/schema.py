@@ -1,12 +1,7 @@
-"""
-This file defines the schemas for the provider and requirer sides of the `prometheus_scrape` interface.
-
-It exposes two interfaces.schema_base.DataBagSchema subclasses called:
-- ProviderSchema
-- RequirerSchema
+"""This file defines the schemas for the ``prometheus_scrape`` interface.
 
 Examples:
-    ProviderSchema:
+    Provider:
         app: {
             "alert_rules": {
                 "groups": [
@@ -56,8 +51,7 @@ Examples:
         }
 """
 
-from interface_tester.schema_base import DataBagSchema
-from pydantic import BaseModel, Field, Json
+from pydantic import BaseModel, Field
 
 
 class AlertRuleModel(BaseModel):
@@ -115,20 +109,20 @@ class ScrapeMetadataModel(BaseModel):
     unit: str = Field(description="Juju unit name.")
 
 
-class ApplicationDataModel(BaseModel):
-    alert_rules: Json[AlertRulesModel] = Field(
+class ProviderAppData(BaseModel):
+    alert_rules: AlertRulesModel = Field(
         description="Alert rules provided by the charm. By default, loaded from "
         "`<charm_parent_dir>/prometheus_alert_rules`."
     )
-    scrape_jobs: Json[list[ScrapeJobModel]] = Field(
+    scrape_jobs: list[ScrapeJobModel] = Field(
         description="List of Prometheus scrape job configurations specifying metrics scraping targets."
     )
-    scrape_metadata: Json[ScrapeMetadataModel] = Field(
+    scrape_metadata: ScrapeMetadataModel = Field(
         description="Metadata providing information about the Juju topology."
     )
 
 
-class UnitDataModel(BaseModel):
+class ProviderUnitData(BaseModel):
     class Config:
         extra = "allow"
 
@@ -146,12 +140,5 @@ class UnitDataModel(BaseModel):
     )
 
 
-class ProviderSchema(DataBagSchema):
-    """Provider schema for Prometheus Scrape."""
-
-    app: ApplicationDataModel
-    unit: UnitDataModel
-
-
-class RequirerSchema(DataBagSchema):
-    """Requirer schema for Prometheus Scrape."""
+RequirerAppData = None
+RequirerUnitData = None
