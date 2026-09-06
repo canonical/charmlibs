@@ -165,8 +165,11 @@ class Nginx:
             return False
 
         try:
-            with _tracer.start_as_current_span('read config'):
-                current_config = self._container.pull(self.NGINX_CONFIG).read()
+            with (
+                _tracer.start_as_current_span('read config'),
+                self._container.pull(self.NGINX_CONFIG) as config_file,
+            ):
+                current_config = config_file.read()
         except pebble.PathError:
             logger.debug('nginx configuration file not found at %s', str(self.NGINX_CONFIG))
             # file does not exist! it's probably because it's the first time we're generating it.
