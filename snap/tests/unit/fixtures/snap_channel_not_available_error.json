@@ -1,0 +1,20 @@
+{
+    "type": "error",
+    "status-code": 404,
+    "status": "Not Found",
+    "result": {
+        "message": "no snap revision on specified channel",
+        "kind": "snap-channel-not-available",
+        "value": {
+            "action": "install",
+            "architecture": "amd64",
+            "channel": "garbage",
+            "releases": [
+                {"architecture": "amd64", "channel": "stable"},
+                {"architecture": "amd64", "channel": "candidate"},
+                {"architecture": "amd64", "channel": "beta"},
+                {"architecture": "amd64", "channel": "edge"}
+            ]
+        }
+    }
+}

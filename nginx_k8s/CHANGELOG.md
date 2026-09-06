@@ -1,3 +1,7 @@
+# Unreleased
+
+- Updated project URLs.
+
 # 1.0.1 - 22 June 2026
 
 This change ensures that _tls_config checks the correct path for a CA cert. If the module checks the wrong path, it cannot correctly determine whether TLS is enabled or not.

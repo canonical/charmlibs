@@ -1,0 +1,38 @@
+{
+    "type": "sync",
+    "status-code": 200,
+    "status": "OK",
+    "result": {
+        "id": "96",
+        "kind": "alias",
+        "summary": "Setup alias \"test-alias-error-fixture\" => \"nonexistent\" for snap \"hello-world\"",
+        "status": "Error",
+        "tasks": [
+            {
+                "id": "1674",
+                "kind": "alias",
+                "summary": "Setup manual alias \"test-alias-error-fixture\" => \"nonexistent\" for snap \"hello-world\"",
+                "status": "Error",
+                "log": [
+                    "2026-04-24T18:27:12+12:00 ERROR cannot enable alias \"test-alias-error-fixture\" for \"hello-world\", target application \"nonexistent\" does not exist"
+                ],
+                "progress": {
+                    "label": "",
+                    "done": 1,
+                    "total": 1
+                },
+                "spawn-time": "2026-04-24T18:27:12.47621461+12:00",
+                "ready-time": "2026-04-24T18:27:12.51431474+12:00",
+                "data": {
+                    "affected-snaps": [
+                        "hello-world"
+                    ]
+                }
+            }
+        ],
+        "ready": true,
+        "err": "cannot perform the following tasks:\n- Setup manual alias \"test-alias-error-fixture\" => \"nonexistent\" for snap \"hello-world\" (cannot enable alias \"test-alias-error-fixture\" for \"hello-world\", target application \"nonexistent\" does not exist)",
+        "spawn-time": "2026-04-24T18:27:12.476244896+12:00",
+        "ready-time": "2026-04-24T18:27:12.514315671+12:00"
+    }
+}

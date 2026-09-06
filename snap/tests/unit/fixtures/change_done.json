@@ -1,0 +1,19 @@
+{
+    "type": "sync",
+    "status-code": 200,
+    "status": "OK",
+    "result": {
+        "id": "94",
+        "kind": "hold-snap",
+        "summary": "Hold general refreshes for \"hello-world\"",
+        "status": "Done",
+        "ready": true,
+        "spawn-time": "2026-04-24T18:27:12.299973563+12:00",
+        "ready-time": "2026-04-24T18:27:12.299981257+12:00",
+        "data": {
+            "snap-names": [
+                "hello-world"
+            ]
+        }
+    }
+}

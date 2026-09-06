@@ -22,7 +22,7 @@ under a local directory so they can be reused across charm executions.
 Certificates are valid for 50 years. They are not renewed or rotated.
 """
 
-from datetime import timedelta
+import datetime as dt
 
 import shortuuid
 
@@ -132,7 +132,7 @@ class CertificateStore:
         ca_crt = Certificate.generate_self_signed_ca(
             attributes=ca_attributes,
             private_key=ca_key,
-            validity=timedelta(days=VALIDITY_DAYS),
+            validity=dt.timedelta(days=VALIDITY_DAYS),
         )
 
         client_key = PrivateKey.generate(key_size=KEY_SIZE)
@@ -149,7 +149,7 @@ class CertificateStore:
             csr=csr,
             ca=ca_crt,
             ca_private_key=ca_key,
-            validity=timedelta(days=VALIDITY_DAYS),
+            validity=dt.timedelta(days=VALIDITY_DAYS),
             is_ca=False,
         )
 

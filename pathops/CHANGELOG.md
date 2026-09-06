@@ -1,5 +1,7 @@
 # Unreleased
 
+`ContainerPath` now provides `is_relative_to` and `with_stem`, matching `pathlib.Path` on Python 3.9+.
+`with_stem` is also part of `PathProtocol`; `is_relative_to` is not, because `pathlib`'s signature doesn't settle until Python 3.12.
 `ContainerPath.match` now accepts a `str | os.PathLike[str]` pattern, matching `pathlib.Path.match` on Python 3.12+.
 `ContainerPath.match` also explicitly rejects `ContainerPath` arguments with a `TypeError` (since `ContainerPath` is not `os.PathLike`), restoring the pre-3.14 behaviour: Python 3.14's `pathlib.PurePath.match` accepts any object that implements `with_segments`, which would otherwise silently let a `ContainerPath` through.
 

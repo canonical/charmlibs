@@ -1,0 +1,27 @@
+{
+    "type": "sync",
+    "status-code": 200,
+    "status": "OK",
+    "result": {
+        "id": "5457",
+        "kind": "alias",
+        "summary": "Setup alias \"test-functional-lxc-alias\" => \"hello-world\" for snap \"hello-world\"",
+        "status": "Error",
+        "tasks": [
+            {
+                "id": "9001",
+                "kind": "alias",
+                "summary": "Setup manual alias \"test-functional-lxc-alias\" => \"hello-world\" for snap \"hello-world\"",
+                "status": "Error",
+                "log": [
+                    "2026-04-24T18:27:12+12:00 ERROR cannot enable alias \"test-functional-lxc-alias\" for \"hello-world\", already enabled for \"lxd\""
+                ],
+                "progress": {"label": "", "done": 1, "total": 1}
+            }
+        ],
+        "ready": true,
+        "err": "cannot perform the following tasks:\n- Setup manual alias \"test-functional-lxc-alias\" => \"hello-world\" for snap \"hello-world\" (cannot enable alias \"test-functional-lxc-alias\" for \"hello-world\", already enabled for \"lxd\")",
+        "spawn-time": "2026-04-24T18:27:12.476244896+12:00",
+        "ready-time": "2026-04-24T18:27:12.514315671+12:00"
+    }
+}

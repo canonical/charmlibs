@@ -1,0 +1,9 @@
+{
+    "type": "error",
+    "status-code": 404,
+    "status": "Not Found",
+    "result": {
+        "message": "snap \"hello-world\" has no service \"svc\"",
+        "kind": "app-not-found"
+    }
+}

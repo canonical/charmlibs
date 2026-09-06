@@ -33,8 +33,8 @@ integration = [
 ]
 
 [project.urls]
-"Documentation" = "https://documentation.ubuntu.com/charmlibs/reference/charmlibs/nginx_k8s/"
-"Repository" = "https://github.com/canonical/charmlibs"
+"Documentation" = "https://documentation.ubuntu.com/charmlibs/reference/charmlibs/nginx-k8s/"
+"Repository" = "https://github.com/canonical/charmlibs/tree/main/nginx_k8s"
 "Issues" = "https://github.com/canonical/charmlibs/issues"
 "Changelog" = "https://github.com/canonical/charmlibs/blob/main/nginx_k8s/CHANGELOG.md"
 

@@ -1,0 +1,291 @@
+{
+    "type": "sync",
+    "status-code": 200,
+    "status": "OK",
+    "result": {
+        "id": "98",
+        "kind": "install-snap",
+        "summary": "Install \"kube-proxy\" snap",
+        "status": "Doing",
+        "tasks": [
+            {
+                "id": "1686",
+                "kind": "prerequisites",
+                "summary": "Ensure prerequisites for \"kube-proxy\" are available",
+                "status": "Done",
+                "progress": {
+                    "label": "",
+                    "done": 1,
+                    "total": 1
+                },
+                "spawn-time": "2026-04-24T18:29:02.975496783+12:00",
+                "ready-time": "2026-04-24T18:29:03.040226709+12:00",
+                "data": {
+                    "affected-snaps": [
+                        "kube-proxy"
+                    ]
+                }
+            },
+            {
+                "id": "1687",
+                "kind": "download-snap",
+                "summary": "Download snap \"kube-proxy\" (3879) from channel \"stable\"",
+                "status": "Do",
+                "progress": {
+                    "label": "",
+                    "done": 0,
+                    "total": 1
+                },
+                "spawn-time": "2026-04-24T18:29:02.975525216+12:00",
+                "data": {
+                    "affected-snaps": [
+                        "kube-proxy"
+                    ]
+                }
+            },
+            {
+                "id": "1688",
+                "kind": "validate-snap",
+                "summary": "Fetch and check assertions for snap \"kube-proxy\" (3879)",
+                "status": "Do",
+                "progress": {
+                    "label": "",
+                    "done": 0,
+                    "total": 1
+                },
+                "spawn-time": "2026-04-24T18:29:02.975537198+12:00",
+                "data": {
+                    "affected-snaps": [
+                        "kube-proxy"
+                    ]
+                }
+            },
+            {
+                "id": "1689",
+                "kind": "mount-snap",
+                "summary": "Mount snap \"kube-proxy\" (3879)",
+                "status": "Do",
+                "progress": {
+                    "label": "",
+                    "done": 0,
+                    "total": 1
+                },
+                "spawn-time": "2026-04-24T18:29:02.97558653+12:00",
+                "data": {
+                    "affected-snaps": [
+                        "kube-proxy"
+                    ]
+                }
+            },
+            {
+                "id": "1690",
+                "kind": "copy-snap-data",
+                "summary": "Copy snap \"kube-proxy\" data",
+                "status": "Do",
+                "progress": {
+                    "label": "",
+                    "done": 0,
+                    "total": 1
+                },
+                "spawn-time": "2026-04-24T18:29:02.975592281+12:00",
+                "data": {
+                    "affected-snaps": [
+                        "kube-proxy"
+                    ]
+                }
+            },
+            {
+                "id": "1691",
+                "kind": "setup-profiles",
+                "summary": "Setup snap \"kube-proxy\" (3879) security profiles",
+                "status": "Do",
+                "progress": {
+                    "label": "",
+                    "done": 0,
+                    "total": 1
+                },
+                "spawn-time": "2026-04-24T18:29:02.975595026+12:00",
+                "data": {
+                    "affected-snaps": [
+                        "kube-proxy"
+                    ]
+                }
+            },
+            {
+                "id": "1692",
+                "kind": "link-snap",
+                "summary": "Make snap \"kube-proxy\" (3879) available to the system",
+                "status": "Do",
+                "progress": {
+                    "label": "",
+                    "done": 0,
+                    "total": 1
+                },
+                "spawn-time": "2026-04-24T18:29:02.975597381+12:00",
+                "data": {
+                    "affected-snaps": [
+                        "kube-proxy"
+                    ]
+                }
+            },
+            {
+                "id": "1693",
+                "kind": "auto-connect",
+                "summary": "Automatically connect eligible plugs and slots of snap \"kube-proxy\"",
+                "status": "Do",
+                "progress": {
+                    "label": "",
+                    "done": 0,
+                    "total": 1
+                },
+                "spawn-time": "2026-04-24T18:29:02.97560265+12:00",
+                "data": {
+                    "affected-snaps": [
+                        "kube-proxy"
+                    ]
+                }
+            },
+            {
+                "id": "1694",
+                "kind": "set-auto-aliases",
+                "summary": "Set automatic aliases for snap \"kube-proxy\"",
+                "status": "Do",
+                "progress": {
+                    "label": "",
+                    "done": 0,
+                    "total": 1
+                },
+                "spawn-time": "2026-04-24T18:29:02.975606688+12:00",
+                "data": {
+                    "affected-snaps": [
+                        "kube-proxy"
+                    ]
+                }
+            },
+            {
+                "id": "1695",
+                "kind": "setup-aliases",
+                "summary": "Setup snap \"kube-proxy\" aliases",
+                "status": "Do",
+                "progress": {
+                    "label": "",
+                    "done": 0,
+                    "total": 1
+                },
+                "spawn-time": "2026-04-24T18:29:02.975613691+12:00",
+                "data": {
+                    "affected-snaps": [
+                        "kube-proxy"
+                    ]
+                }
+            },
+            {
+                "id": "1696",
+                "kind": "run-hook",
+                "summary": "Run install hook of \"kube-proxy\" snap if present",
+                "status": "Do",
+                "progress": {
+                    "label": "",
+                    "done": 0,
+                    "total": 1
+                },
+                "spawn-time": "2026-04-24T18:29:02.975618119+12:00",
+                "data": {
+                    "affected-snaps": [
+                        "kube-proxy"
+                    ]
+                }
+            },
+            {
+                "id": "1697",
+                "kind": "run-hook",
+                "summary": "Run default-configure hook of \"kube-proxy\" snap if present",
+                "status": "Do",
+                "progress": {
+                    "label": "",
+                    "done": 0,
+                    "total": 1
+                },
+                "spawn-time": "2026-04-24T18:29:02.975629091+12:00",
+                "data": {
+                    "affected-snaps": [
+                        "kube-proxy"
+                    ]
+                }
+            },
+            {
+                "id": "1698",
+                "kind": "start-snap-services",
+                "summary": "Start snap \"kube-proxy\" (3879) services",
+                "status": "Do",
+                "progress": {
+                    "label": "",
+                    "done": 0,
+                    "total": 1
+                },
+                "spawn-time": "2026-04-24T18:29:02.975635212+12:00",
+                "data": {
+                    "affected-snaps": [
+                        "kube-proxy"
+                    ]
+                }
+            },
+            {
+                "id": "1699",
+                "kind": "run-hook",
+                "summary": "Run configure hook of \"kube-proxy\" snap if present",
+                "status": "Do",
+                "progress": {
+                    "label": "",
+                    "done": 0,
+                    "total": 1
+                },
+                "spawn-time": "2026-04-24T18:29:02.975638498+12:00",
+                "data": {
+                    "affected-snaps": [
+                        "kube-proxy"
+                    ]
+                }
+            },
+            {
+                "id": "1700",
+                "kind": "run-hook",
+                "summary": "Run health check of \"kube-proxy\" snap",
+                "status": "Do",
+                "progress": {
+                    "label": "",
+                    "done": 0,
+                    "total": 1
+                },
+                "spawn-time": "2026-04-24T18:29:02.975647725+12:00",
+                "data": {
+                    "affected-snaps": [
+                        "kube-proxy"
+                    ]
+                }
+            },
+            {
+                "id": "1701",
+                "kind": "process-delayed-security-backend-effects",
+                "summary": "Process delayed security backend side effects for affected snaps",
+                "status": "Doing",
+                "progress": {
+                    "label": "",
+                    "done": 1,
+                    "total": 1
+                },
+                "spawn-time": "2026-04-24T18:29:02.975836207+12:00"
+            }
+        ],
+        "ready": false,
+        "spawn-time": "2026-04-24T18:29:02.975846306+12:00",
+        "data": {
+            "components": {
+                "kube-proxy": null
+            },
+            "snap-names": [
+                "kube-proxy"
+            ]
+        }
+    }
+}

@@ -1,0 +1,9 @@
+name: test-other-service-snap
+version: "1.0"
+summary: Second snap with a logging daemon, for multi-snap log queries
+confinement: strict
+base: core24
+apps:
+  daemon:
+    command: bin/daemon
+    daemon: simple

@@ -1,7 +1,7 @@
 name: ldap
 version: 0
 status: draft
-lib: charms.glauth_k8s.ldap
+lib: charmlibs.interfaces.ldap
 summary: Configure and connect to a Lightweight Directory Access Protocol (LDAP) server.
 description: |
   The `ldap` interface supports sharing configuration and connection information for a Lightweight Directory Access Protocol (LDAP) server.
@@ -10,6 +10,8 @@ description: |
 providers:
   - name: glauth-k8s
     url: https://github.com/canonical/glauth-k8s-operator
+  - name: authentik-ldap-outpost
+    url: https://github.com/canonical/authentik-ldap-outpost-operator
 requirers:
   - name: sssd
     url: https://github.com/canonical/sssd-operator

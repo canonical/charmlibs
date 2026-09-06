@@ -1,0 +1,140 @@
+{
+    "type": "sync",
+    "status-code": 200,
+    "status": "OK",
+    "result": [
+        {
+            "id": "buPKUD3TKqCOgLEjjHx5kSiCpIs5cMuQ",
+            "title": "Hello World",
+            "summary": "The 'hello-world' of snaps",
+            "description": "This is a simple hello world example.",
+            "icon": "/v2/icons/hello-world/icon",
+            "installed-size": 20480,
+            "install-date": "2026-02-26T12:20:32.316341429+13:00",
+            "name": "hello-world",
+            "publisher": {
+                "id": "canonical",
+                "username": "canonical",
+                "display-name": "Canonical",
+                "validation": "verified"
+            },
+            "developer": "canonical",
+            "status": "active",
+            "type": "app",
+            "version": "6.4",
+            "channel": "latest/stable",
+            "tracking-channel": "latest/stable",
+            "ignore-validation": false,
+            "revision": "29",
+            "confinement": "strict",
+            "grade": "",
+            "private": false,
+            "devmode": false,
+            "jailmode": false,
+            "apps": [
+                {
+                    "snap": "hello-world",
+                    "name": "env"
+                },
+                {
+                    "snap": "hello-world",
+                    "name": "evil"
+                },
+                {
+                    "snap": "hello-world",
+                    "name": "hello-world"
+                },
+                {
+                    "snap": "hello-world",
+                    "name": "sh"
+                }
+            ],
+            "mounted-from": "/var/lib/snapd/snaps/hello-world_29.snap",
+            "links": {
+                "contact": [
+                    "mailto:snaps@canonical.com"
+                ]
+            },
+            "contact": "mailto:snaps@canonical.com",
+            "media": [
+                {
+                    "type": "icon",
+                    "url": "https://dashboard.snapcraft.io/site_media/appmedia/2015/03/hello.svg_NZLfWbh.png",
+                    "width": 256,
+                    "height": 256
+                },
+                {
+                    "type": "screenshot",
+                    "url": "https://dashboard.snapcraft.io/site_media/appmedia/2018/06/Screenshot_from_2018-06-14_09-33-31.png",
+                    "width": 199,
+                    "height": 118
+                },
+                {
+                    "type": "video",
+                    "url": "https://vimeo.com/194577403"
+                }
+            ]
+        },
+        {
+            "id": "0euyIM60JIN6PlZgyL5WB4OaDncn7cBm",
+            "title": "kube-proxy",
+            "summary": "Kubernetes network proxy that runs on each node.",
+            "description": "Kube-proxy enables the Kubernetes service abstraction by maintaining network rules on the host and performing connection forwarding.\n\nFor more information, consult the [reference documentation](https://kubernetes.io/docs/reference/command-line-tools-reference/kube-proxy/).",
+            "icon": "https://dashboard.snapcraft.io/site_media/appmedia/2019/02/k8s-logo-256_gqpRJln.png",
+            "installed-size": 11313152,
+            "install-date": "2026-04-19T13:16:33.194643623+12:00",
+            "name": "kube-proxy",
+            "publisher": {
+                "id": "canonical",
+                "username": "canonical",
+                "display-name": "Canonical",
+                "validation": "verified"
+            },
+            "developer": "canonical",
+            "status": "active",
+            "type": "app",
+            "base": "core20",
+            "version": "1.35.4",
+            "channel": "latest/stable",
+            "tracking-channel": "latest/stable",
+            "ignore-validation": false,
+            "revision": "3879",
+            "confinement": "classic",
+            "grade": "stable",
+            "private": false,
+            "devmode": false,
+            "jailmode": false,
+            "apps": [
+                {
+                    "snap": "kube-proxy",
+                    "name": "daemon",
+                    "daemon": "simple",
+                    "daemon-scope": "system"
+                },
+                {
+                    "snap": "kube-proxy",
+                    "name": "kube-proxy"
+                }
+            ],
+            "mounted-from": "/var/lib/snapd/snaps/kube-proxy_3879.snap",
+            "links": {
+                "contact": [
+                    "https://www.ubuntu.com/kubernetes"
+                ],
+                "website": [
+                    "https://www.ubuntu.com/kubernetes"
+                ]
+            },
+            "contact": "https://www.ubuntu.com/kubernetes",
+            "website": "https://www.ubuntu.com/kubernetes",
+            "media": [
+                {
+                    "type": "icon",
+                    "url": "https://dashboard.snapcraft.io/site_media/appmedia/2019/02/k8s-logo-256_gqpRJln.png",
+                    "width": 256,
+                    "height": 256
+                }
+            ]
+        }
+    ]
+}
