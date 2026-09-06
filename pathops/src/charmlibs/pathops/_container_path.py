@@ -179,8 +179,8 @@ class ContainerPath:
             raise TypeError(
                 f'ContainerPath is not a valid pattern for ContainerPath.match: {path_pattern!r}'
             )
-        # os.fspath normalises path-like to str; this also produces a clear TypeError for
-        # anything that is neither str nor os.PathLike, matching pathlib.Path.match on 3.12+.
+        # Python <3.12 requires path_pattern to be a string. Python 3.12+ accepts any path-like.
+        # When the library requires Python 3.12+, we can drop the os.fspath call and this comment.
         return self._path.match(os.fspath(path_pattern))
 
     def with_name(self, name: str) -> Self:
