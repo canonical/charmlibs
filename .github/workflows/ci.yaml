@@ -197,6 +197,17 @@ jobs:
             : 'CHANGELOG.md must be updated before merging :('
             exit 1
           fi
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d  # v10.0.1
+      - name: Ensure the release notes can be extracted from CHANGELOG.md
+        env:
+          PACKAGE: ${{ matrix.package }}
+        run: |
+          set -xueo pipefail
+          # The publish workflow feeds this section to `gh release create
+          # --notes-file`. Parse it here too, so a heading the extractor
+          # can't match fails the PR rather than the release.
+          VERSION=$(.scripts/ls.py packages --regex "^${PACKAGE}$" --output-only version --no-json)
+          python3 .github/extract-changelog.py "${PACKAGE}/CHANGELOG.md" "${VERSION}"
 
   changelogs-updated-if-releasing:  # GitHub status checks require a static job name
     needs: [changelog-updated]
