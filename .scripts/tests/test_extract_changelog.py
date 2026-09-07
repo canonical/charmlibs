@@ -105,3 +105,43 @@ def test_subheadings_are_kept():
 @pytest.mark.parametrize('version', ['1.3.0', '1.2.1', '1.2.0'])
 def test_every_heading_is_findable(version: str):
     assert extract_changelog.extract(CHANGELOG, version) is not None
+
+
+# The interfaces packages open with a prose H1 and put versions at H2.
+def test_extract_h2_versions_under_a_prose_h1():
+    text = (
+        '# Changelog\n\nAll notable changes are documented here.\n\n'
+        '## 1.1.0 - 2 June 2026\n\nsecond\n\n'
+        '## 1.0.0 - 1 June 2026\n\nfirst\n'
+    )
+    assert extract_changelog.extract(text, '1.1.0') == 'second'
+    assert extract_changelog.extract(text, '1.0.0') == 'first'
+
+
+# otlp and sloth follow Keep a Changelog, which brackets the version.
+def test_extract_keep_a_changelog_bracketed_version():
+    text = (
+        '# Changelog\n\nThe format is based on Keep a Changelog.\n\n'
+        '## [0.5.0] - 2026-01-02\n\n### Updated\n\n- newer\n\n'
+        '## [0.4.0] - 2026-01-01\n\n- older\n'
+    )
+    got = extract_changelog.extract(text, '0.5.0')
+    assert got is not None
+    assert '- newer' in got
+    assert '- older' not in got
+
+
+# A subheading inside a version's section must not end it.
+def test_extract_keeps_deeper_subheadings():
+    text = '## [0.5.0] - 2026-01-02\n\n### Added\n\n- a\n\n### Fixed\n\n- b\n\n## [0.4.0]\n\nold\n'
+    got = extract_changelog.extract(text, '0.5.0')
+    assert got is not None
+    assert '### Added' in got
+    assert '### Fixed' in got
+    assert 'old' not in got
+
+
+# The prose heading must not be picked up as part of a version's section.
+def test_extract_does_not_include_the_prose_heading():
+    text = '# Changelog\n\nprose\n\n## 1.0.0 - 1 June 2026\n\nreal\n'
+    assert extract_changelog.extract(text, '1.0.0') == 'real'
