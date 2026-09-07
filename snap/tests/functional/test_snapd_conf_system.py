@@ -14,7 +14,9 @@ This module is destructive to stored system configuration: removing the core sna
 (snapd treats core's config like any other snap's; options snapd maintains itself, such as
 seed.loaded, are re-mirrored on the next snapd restart). Tests therefore never preserve
 pre-existing system options -- run this only where system configuration is disposable, as in
-CI containers.
+CI containers. The one exception is the auto-refresh hold: removing core wipes the runner
+image's hold along with everything else, so remove_core puts one back (see
+conftest.hold_auto_refresh for why that matters).
 
 Ordering: the module needs no special ordering relative to other modules. It removes and
 restores the core snap within its own fixture, no other module depends on system configuration,
@@ -27,9 +29,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from charmlibs import snap
 from charmlibs.snap import _errors, _snapd_conf
-from conftest import ensure_installed_store, remove_core_blockers
+from conftest import ensure_installed_store, remove_core
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -46,12 +47,11 @@ def core_snap(request: pytest.FixtureRequest) -> Iterator[str]:
     flipped at most once per state, not once per test.
 
     In the 'absent' state we remove the core snap after removing every snap that is held by
-    it (remove_core_blockers asks snapd which those are, so this doesn't need updating when
-    another module starts using a new snap). A failed removal is left to error loudly.
+    it (remove_core asks snapd which those are, so this doesn't need updating when another
+    module starts using a new snap). A failed removal is left to error loudly.
     """
     if request.param == 'absent':
-        remove_core_blockers()
-        snap.remove('core')  # Errors loudly if an unmanaged snap still depends on core.
+        remove_core()
         yield request.param
         ensure_installed_store('core')
     else:
@@ -128,8 +128,9 @@ def test_removing_core_snap_deletes_stored_system_config():
     )  # Ensure installed, so its removal actually deletes stored config.
     _snapd_conf.set('system', {_OPTION: 3})
     assert _snapd_conf.get('system', [_OPTION]) == {_OPTION: 3}
-    remove_core_blockers()  # Base-less snaps would otherwise block core removal.
-    snap.remove('core')
+    # remove_core re-applies the auto-refresh hold, which is system configuration too. That
+    # doesn't weaken the assertions below: only refresh.hold is written back, not _OPTION.
+    remove_core()
     try:
         # Removal deleted the stored option...
         with pytest.raises(_errors.OptionNotFoundError):

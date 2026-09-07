@@ -1,3 +1,11 @@
+# 1.1.3 - 25 August 2026
+
+Fix:
+- Stop falling back to the peer backend when an `update-status` (or a second
+  lock-granted hook) runs while the etcd worker is between operations. Finding
+  an empty in-progress queue while holding the lock is a normal transient state
+  during retries, not an etcd/peer inconsistency.
+
 # 1.1.2 - 22 July 2026
 
 Broaden the supported Python version range to `>=3.10`.

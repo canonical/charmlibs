@@ -171,8 +171,8 @@ def list_one(snap: str) -> InstalledInfo:
 
 def install(
     snap: str,
-    *,
     channel: str | None = None,
+    *,
     revision: int | str | None = None,
     classic: bool = False,
 ) -> object:

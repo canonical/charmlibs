@@ -28,14 +28,13 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from charmlibs import snap
 from charmlibs.snap import _client, _errors, _snapd_interfaces
 from conftest import (
     SNAPS_DIR,
     ensure_installed_store,
     ensure_removed,
     install_local,
-    remove_core_blockers,
+    remove_core,
 )
 
 if TYPE_CHECKING:
@@ -63,12 +62,11 @@ def core_snap(request: pytest.FixtureRequest) -> Iterator[str]:
 
     pytest groups tests by this module-scoped parameter, so the core snap's install state is
     flipped at most once per state, not once per test. In the 'absent' state we first remove
-    every snap held by core, which would otherwise block its removal; a failed removal is
-    left to error loudly, matching test_snapd_conf_system.
+    every snap held by core, which would otherwise block its removal (remove_core); a failed
+    removal is left to error loudly, matching test_snapd_conf_system.
     """
     if request.param == 'absent':
-        remove_core_blockers()
-        snap.remove('core')  # Errors loudly if an unmanaged snap still depends on core.
+        remove_core()
         yield request.param
         ensure_installed_store('core')
     else:
