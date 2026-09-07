@@ -280,6 +280,12 @@ class _EtcdRollingOpsBackend(Object):  # pyright: ignore[reportUnusedClass]
             return _RunWithLockOutcome(status=_RunWithLockStatus.NOT_GRANTED)
 
         if not (operation := self.operations_store.peek_current()):
+            if self.operations_store.has_queued_work():
+                logger.info(
+                    'Lock granted but no operation is in progress yet. '
+                    'The worker will dispatch again once it claims the next operation.'
+                )
+                return _RunWithLockOutcome(status=_RunWithLockStatus.OPERATION_PENDING)
             logger.info('Lock granted but there is no operation to run.')
             return _RunWithLockOutcome(status=_RunWithLockStatus.NO_OPERATION)
 

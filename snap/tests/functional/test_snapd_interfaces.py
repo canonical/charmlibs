@@ -134,10 +134,10 @@ def test_connect_slot_empty_snap_wrong_interface_hits_system():
 
 
 def test_connect_nonexistent_plug_raises():
-    # Connecting a nonexistent plug raises a base Error (no kind from snapd).
-    with pytest.raises(_errors.Error) as ctx:
+    # Connecting a nonexistent plug raises a base APIError (no kind from snapd).
+    with pytest.raises(_errors.APIError) as ctx:
         _snapd_interfaces.connect((_SNAP, 'nonexistent-plug'))
-    assert not ctx.value.kind
+    assert not ctx.value._kind
     assert 'nonexistent-plug' in ctx.value.message
 
 
@@ -146,7 +146,7 @@ def test_connect_interface_mismatch_raises():
     _ensure_disconnected()
     with pytest.raises(_errors.APIError) as ctx:
         _snapd_interfaces.connect((_SNAP, _PLUG), (_SYSTEM_SNAP, 'network'))
-    assert not ctx.value.kind
+    assert not ctx.value._kind
     assert 'cannot connect' in ctx.value.message
 
 
@@ -155,7 +155,7 @@ def test_connect_all_empty_raises():
     # an empty-kind APIError. We deliberately do not guard this client-side.
     with pytest.raises(_errors.APIError) as ctx:
         _snapd_interfaces.connect(('', ''), ('', ''))
-    assert not ctx.value.kind
+    assert not ctx.value._kind
     assert 'plug snap name is empty' in ctx.value.message
 
 
@@ -164,7 +164,7 @@ def test_connect_empty_plug_name_raises():
     # exists, but snapd cannot resolve which plug to connect).
     with pytest.raises(_errors.APIError) as ctx:
         _snapd_interfaces.connect((_SNAP, ''))
-    assert not ctx.value.kind
+    assert not ctx.value._kind
     assert 'plug name is empty' in ctx.value.message
 
 
@@ -175,7 +175,7 @@ def test_connect_empty_plug_name_raises():
 def test_connect_empty_plug_snap_raises(slot: str | None):
     with pytest.raises(_errors.APIError) as ctx:
         _snapd_interfaces.connect(('', _PLUG), slot)
-    assert not ctx.value.kind
+    assert not ctx.value._kind
     assert 'plug snap name is empty' in ctx.value.message
 
 
@@ -249,7 +249,7 @@ def test_disconnect_partial_spec_raises(plug: object, slot: object):
     _ensure_connected()
     with pytest.raises(_errors.APIError) as ctx:
         _disconnect(plug, slot)
-    assert not ctx.value.kind
+    assert not ctx.value._kind
     assert 'allowed forms are' in ctx.value.message
 
 
@@ -273,7 +273,7 @@ def test_disconnect_both_sides_not_connected_raises():
     _ensure_disconnected()
     with pytest.raises(_errors.APIError) as ctx:
         _snapd_interfaces.disconnect((_SNAP, _PLUG), (_SYSTEM_SNAP, _PLUG))
-    assert not ctx.value.kind
+    assert not ctx.value._kind
     assert 'not connected' in ctx.value.message
 
 
@@ -296,7 +296,7 @@ def test_disconnect_both_sides_forget_not_connected_raises():
     _ensure_disconnected()
     with pytest.raises(_errors.APIError) as ctx:
         _snapd_interfaces.disconnect((_SNAP, _PLUG), (_SYSTEM_SNAP, _PLUG), forget=True)
-    assert not ctx.value.kind
+    assert not ctx.value._kind
     assert 'not connected' in ctx.value.message
 
 
@@ -304,7 +304,7 @@ def test_disconnect_nonexistent_plug_or_slot_raises():
     # disconnect: plug/slot name doesn't exist on the installed snap.
     with pytest.raises(_errors.APIError) as ctx:
         _snapd_interfaces.disconnect((_SNAP, 'nonexistent-slot'))
-    assert not ctx.value.kind
+    assert not ctx.value._kind
     assert 'no plug or slot named' in ctx.value.message
 
 
@@ -315,7 +315,7 @@ def test_disconnect_all_empty_raises():
     for args in [(), (('', ''),), (('', ''), ('', ''))]:
         with pytest.raises(_errors.APIError) as ctx:
             _snapd_interfaces.disconnect(*args)
-        assert not ctx.value.kind
+        assert not ctx.value._kind
         assert 'allowed forms are' in ctx.value.message
 
 
@@ -337,8 +337,8 @@ def test_disconnect_all_empty_raises():
 def test_connect_not_installed_snap_raises_not_found():
     with pytest.raises(_errors.NotInstalledError) as ctx:
         _snapd_interfaces.connect((_ABSENT_SNAP, 'home'))
-    assert ctx.value.kind == 'snap-not-found'
-    assert str(ctx.value.value) == _ABSENT_SNAP
+    assert ctx.value._kind == 'snap-not-found'
+    assert str(ctx.value._value) == _ABSENT_SNAP
     assert ctx.value.message == 'snap not installed'
     assert str(ctx.value) == f'snap not installed ({_ABSENT_SNAP})'
 
@@ -355,8 +355,8 @@ def test_connect_not_installed_snap_error_is_not_chained():
 def test_disconnect_not_installed_snap_raises_not_found():
     with pytest.raises(_errors.NotInstalledError) as ctx:
         _snapd_interfaces.disconnect((_ABSENT_SNAP, 'home'))
-    assert ctx.value.kind == 'snap-not-found'
-    assert str(ctx.value.value) == _ABSENT_SNAP
+    assert ctx.value._kind == 'snap-not-found'
+    assert str(ctx.value._value) == _ABSENT_SNAP
     assert ctx.value.message == 'snap not installed'
     assert str(ctx.value) == f'snap not installed ({_ABSENT_SNAP})'
 
@@ -364,8 +364,8 @@ def test_disconnect_not_installed_snap_raises_not_found():
 def test_connect_slot_snap_not_installed_raises_not_found():
     with pytest.raises(_errors.NotInstalledError) as ctx:
         _snapd_interfaces.connect((_SNAP, _PLUG), (_ABSENT_SNAP, _PLUG))
-    assert ctx.value.kind == 'snap-not-found'
-    assert str(ctx.value.value) == _ABSENT_SNAP
+    assert ctx.value._kind == 'snap-not-found'
+    assert str(ctx.value._value) == _ABSENT_SNAP
     assert ctx.value.message == 'snap not installed'
     assert str(ctx.value) == f'snap not installed ({_ABSENT_SNAP})'
 
@@ -401,7 +401,7 @@ def test_raw_api_slot_not_installed_precedes_bad_plug():
     # slot snap is reported even with a bad plug name -- as the empty-kind error the library hides.
     with pytest.raises(_errors.APIError) as ctx:
         _raw_connect(_SNAP, 'nonexistent-plug', _ABSENT_SNAP, '')
-    assert ctx.value.kind == ''
+    assert ctx.value._kind == ''
     assert _ABSENT_SNAP in ctx.value.message
     assert 'is not installed' in ctx.value.message
     assert 'nonexistent-plug' not in ctx.value.message
@@ -411,7 +411,7 @@ def test_raw_api_plug_snap_checked_before_slot_snap():
     # Native snapd: when both snaps are absent, the plug snap is reported first.
     with pytest.raises(_errors.APIError) as ctx:
         _raw_connect(_ABSENT_SNAP, 'x', _ABSENT_SNAP_2, '')
-    assert ctx.value.kind == ''
+    assert ctx.value._kind == ''
     assert _ABSENT_SNAP in ctx.value.message
     assert _ABSENT_SNAP_2 not in ctx.value.message
 
@@ -420,34 +420,34 @@ def test_connect_slot_snap_not_installed_precedes_bad_plug():
     # Library: the not-installed slot snap wins over the bad plug, surfaced as _NotFoundError.
     with pytest.raises(_errors.NotInstalledError) as ctx:
         _snapd_interfaces.connect((_SNAP, 'nonexistent-plug'), (_ABSENT_SNAP, ''))
-    assert ctx.value.kind == 'snap-not-found'
-    assert _ABSENT_SNAP in str(ctx.value.value)
-    assert 'nonexistent-plug' not in str(ctx.value.value)
+    assert ctx.value._kind == 'snap-not-found'
+    assert _ABSENT_SNAP in str(ctx.value._value)
+    assert 'nonexistent-plug' not in str(ctx.value._value)
 
 
 def test_connect_plug_snap_checked_before_slot_snap():
     # Library: both absent -> the plug snap is probed first, so it is the one named.
     with pytest.raises(_errors.NotInstalledError) as ctx:
         _snapd_interfaces.connect((_ABSENT_SNAP, 'x'), (_ABSENT_SNAP_2, ''))
-    assert ctx.value.kind == 'snap-not-found'
-    assert _ABSENT_SNAP in str(ctx.value.value)
-    assert _ABSENT_SNAP_2 not in str(ctx.value.value)
+    assert ctx.value._kind == 'snap-not-found'
+    assert _ABSENT_SNAP in str(ctx.value._value)
+    assert _ABSENT_SNAP_2 not in str(ctx.value._value)
 
 
 def test_disconnect_slot_snap_not_installed_precedes_bad_plug():
     with pytest.raises(_errors.NotInstalledError) as ctx:
         _snapd_interfaces.disconnect((_SNAP, 'nonexistent-plug'), (_ABSENT_SNAP, 'x'))
-    assert ctx.value.kind == 'snap-not-found'
-    assert _ABSENT_SNAP in str(ctx.value.value)
-    assert 'nonexistent-plug' not in str(ctx.value.value)
+    assert ctx.value._kind == 'snap-not-found'
+    assert _ABSENT_SNAP in str(ctx.value._value)
+    assert 'nonexistent-plug' not in str(ctx.value._value)
 
 
 def test_disconnect_plug_snap_checked_before_slot_snap():
     with pytest.raises(_errors.NotInstalledError) as ctx:
         _snapd_interfaces.disconnect((_ABSENT_SNAP, 'x'), (_ABSENT_SNAP_2, 'y'))
-    assert ctx.value.kind == 'snap-not-found'
-    assert _ABSENT_SNAP in str(ctx.value.value)
-    assert _ABSENT_SNAP_2 not in str(ctx.value.value)
+    assert ctx.value._kind == 'snap-not-found'
+    assert _ABSENT_SNAP in str(ctx.value._value)
+    assert _ABSENT_SNAP_2 not in str(ctx.value._value)
 
 
 def test_disconnect_empty_snap_with_unknown_name_reports_against_system_snap():
@@ -457,7 +457,7 @@ def test_disconnect_empty_snap_with_unknown_name_reports_against_system_snap():
     # are meaningful when empty here, so disconnect doesn't reject them client-side.
     with pytest.raises(_errors.APIError) as ctx:
         _snapd_interfaces.disconnect(('', 'nonexistent-plug'))
-    assert not ctx.value.kind
+    assert not ctx.value._kind
     assert 'snap "snapd" has no plug or slot named "nonexistent-plug"' in ctx.value.message
 
 

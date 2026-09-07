@@ -16,12 +16,14 @@
 
 import datetime as dt
 import json
+import time
 
 import jubilant
 
 from charmlibs import pathops
 
 TRACE_FILE = '/var/lib/charm-rolling-ops/transitions.log'
+POLL_INTERVAL = 5.0
 
 
 def get_unit_events(juju: jubilant.Juju, unit: str) -> list[dict[str, str]]:
@@ -31,6 +33,70 @@ def get_unit_events(juju: jubilant.Juju, unit: str) -> list[dict[str, str]]:
         return []
 
     return [json.loads(line) for line in task.stdout.strip().splitlines()]
+
+
+def wait_for_events(
+    juju: jubilant.Juju,
+    unit: str,
+    count: int,
+    timeout: float,
+    ignore_actions: bool = True,
+) -> list[dict[str, str]]:
+    """Poll a unit's trace file until it has recorded at least ``count`` events.
+
+    Rolling operations are executed by a background worker that polls etcd, so
+    the delay between requesting an operation and executing it is not bounded by
+    the request itself. Tests must wait for the events they expect rather than
+    for a fixed amount of time.
+
+    Args:
+        juju: The Juju client to run commands with.
+        unit: Name of the unit whose trace file should be polled.
+        count: Minimum number of matching events to wait for.
+        timeout: Maximum time in seconds to wait.
+        ignore_actions: Whether ``action:*`` events are excluded from the count.
+
+    Returns:
+        The events recorded by the unit, including ``action:*`` events.
+
+    Raises:
+        TimeoutError: If the unit did not record ``count`` events in time.
+    """
+    deadline = time.monotonic() + timeout
+    events: list[dict[str, str]] = []
+    while True:
+        events = get_unit_events(juju, unit)
+        matching = [e for e in events if not (ignore_actions and e['event'].startswith('action'))]
+        if len(matching) >= count:
+            return events
+        if time.monotonic() >= deadline:
+            raise TimeoutError(
+                f'{unit} recorded {len(matching)} of {count} expected events '
+                f'in {timeout}s: {matching}'
+            )
+        time.sleep(POLL_INTERVAL)
+
+
+def wait_for_event(juju: jubilant.Juju, unit: str, event: str, timeout: float) -> None:
+    """Poll a unit's trace file until it has recorded the named event.
+
+    Args:
+        juju: The Juju client to run commands with.
+        unit: Name of the unit whose trace file should be polled.
+        event: Name of the event to wait for, e.g. ``_restart:start``.
+        timeout: Maximum time in seconds to wait.
+
+    Raises:
+        TimeoutError: If the unit did not record the event in time.
+    """
+    deadline = time.monotonic() + timeout
+    while True:
+        events = get_unit_events(juju, unit)
+        if any(e['event'] == event for e in events):
+            return
+        if time.monotonic() >= deadline:
+            raise TimeoutError(f'{unit} did not record {event} within {timeout}s: {events}')
+        time.sleep(POLL_INTERVAL)
 
 
 def parse_ts(event: dict[str, str]) -> dt.datetime:

@@ -1,2 +1,0 @@
-pydantic~=2.0
-pytest-interface-tester~=3.4
