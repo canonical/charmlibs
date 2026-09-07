@@ -14,11 +14,18 @@
 
 """Print a single version's section from a package CHANGELOG.md.
 
-Package CHANGELOGs in this repo use one ``# <version> - <date>`` heading per
-release. Given a CHANGELOG path and a version string, print the block from
-that heading up to the next ``# `` heading (exclusive), so that a release
-workflow can pass it to ``gh release create --notes-file`` and give
-dependabot something useful to render for a single-package version bump.
+Given a CHANGELOG path and a version string, print the block for that
+version, so that a release workflow can pass it to ``gh release create
+--notes-file`` and give dependabot something useful to render for a
+single-package version bump.
+
+CHANGELOGs in this repo do not all look the same. Most packages use one
+``# <version> - <date>`` heading per release, but the interfaces packages
+open with a prose ``# Changelog`` and put versions at H2, and a couple of
+them follow Keep a Changelog and bracket the version: ``## [0.5.0] - ...``.
+So a heading at any level counts if its first word, with any surrounding
+brackets removed, is the version we want, and its section runs to the next
+heading at the same level or shallower.
 
 Exits non-zero if the version is not found, so the caller notices the
 missing changelog entry rather than publishing an empty release body.
@@ -31,16 +38,31 @@ import pathlib
 import re
 import sys
 
+_HEADING = re.compile(r'^(?P<hashes>#{1,6})[ \t]+(?P<title>\S.*)$', re.MULTILINE)
+
+
+def _version_of(title: str) -> str:
+    """Return the version a heading names, or '' if it doesn't name one.
+
+    Keep a Changelog brackets the version, so strip those.
+    """
+    return title.split()[0].strip('[]')
+
 
 def extract(text: str, version: str) -> str | None:
     """Return the CHANGELOG section for ``version``, or ``None`` if absent."""
-    heading = re.compile(r'^# (?P<version>\S+)\b.*$', re.MULTILINE)
-    matches = list(heading.finditer(text))
+    matches = list(_HEADING.finditer(text))
     for i, match in enumerate(matches):
-        if match.group('version') == version:
-            start = match.end()
-            end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
-            return text[start:end].strip()
+        if _version_of(match.group('title')) != version:
+            continue
+        level = len(match.group('hashes'))
+        start = match.end()
+        end = len(text)
+        for later in matches[i + 1 :]:
+            if len(later.group('hashes')) <= level:
+                end = later.start()
+                break
+        return text[start:end].strip()
     return None
 
 
