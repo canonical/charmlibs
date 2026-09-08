@@ -27,6 +27,8 @@ Both the Requirer and the provider need to adhere to a certain set of criterias 
 - Is expected to inject alert rule topology labels as label matchers in alert rule expressions.
 - Is expected not to inject juju_unit as a label matcher by default, but to honor it if hard-coded by the user.
 - Is expected to be able to ingest both single alert rules and alert rule groups provided over the relation data bag.
+- Is expected to advertise the alert rule encodings it can read in `alert_rules_encodings`, if it is able to read any encoding other than plain `json`.
+- Is expected to be able to ingest alert rules in any encoding it advertises.
 
 
 ### Requirer
@@ -37,6 +39,7 @@ Both the Requirer and the provider need to adhere to a certain set of criterias 
 - Is expected to provide any wanted label matchers as labels on every alert rule in the relation data bag.
 - Is expected to add any wanted topology labels to all metrics sent to the provider.
 - Is expected to be able to expose both single alert rules and alert rule groups over the relation data bag
+- Is expected to encode its alert rules as plain `json`, unless the provider advertises support for another encoding in `alert_rules_encodings`.
 
 ## Relation Data
 
@@ -46,6 +49,10 @@ Both the Requirer and the provider need to adhere to a certain set of criterias 
 
 Exposes all endpoints the requirer should write metrics to. Should be placed in the **unit** databag for each 
 unit of the provider capable of receiving metrics over remote write.
+
+Optionally exposes the alert rule encodings the provider is able to read, most preferred first, so that
+requirers know whether they may compress their alert rules. Should be placed in the **application** databag
+by the leader unit. A provider that omits this key is assumed to understand plain `json` only.
 
 #### Example
 
@@ -58,6 +65,8 @@ related-units:
       remote_write: {
         "url": "http://192.168.1.2:9090/api/v1/write"
       }
+application-data:
+  alert_rules_encodings: ["lzma", "json"]
 ```
 
 ### Requirer
@@ -65,6 +74,11 @@ related-units:
 [\[JSON Schema\]](./schemas/requirer.json)
 
 Exposes all alert rules relevant to the metrics being sent over. Expected to contain expressions without Juju topology injected, but with the topology available as labels. Should be placed in the **application** databag.
+
+The rules are encoded as a plain JSON object, unless the provider advertises another encoding in
+`alert_rules_encodings`. With the `lzma` encoding, the value is the same JSON object, LZMA-compressed
+and base64-encoded, which keeps large rule sets below the Juju relation data size limit. Compressed
+rules can be read with `<value> | base64 -d | xz -d | jq`.
 
 #### Example
 ```yaml
@@ -93,5 +107,11 @@ application-data:
       }
     ]
   }
+```
+
+#### Example, with the `lzma` encoding
+```yaml
+application-data:
+  alert_rules: /Td6WFoAAATm1rRGAgAhARYAAAB0L+Wj4AKxASldAD2IiOdj/FO+er8ludNiIOGP157QqGtpLb+UcZYVMe8lCM1Ta6HUpl865IX7aJo4VJ+Avb3YcvBbwcBoXxSLw798TKy6thm5WVNHjMVwSB+htM6lCDuzSsxHLK8WB7V5it9M6QFrbfqAb9SW1qDLQbkUHaERDlnrEJ4Z+Q/fCe51dVSmtFQ4MAfYQtE44YLH3DDrrGGEnrL1x+HCpOkmScSu61MUPFj5glrgvVeU3dEWpD9GitXYokMbsmGPHWP6FWRO3cE/FOjOyVaeNKas8/pnvOrQw0QY6VBIlGIgUv4YPgU9zA7ZFZ7A6QFpnqTtChBmZCvKzeWfMIimODLKg5Cw3e90Ntxb9nELE+Ji2nnHD4Zszp0RslfbnSffnxxenat+yDaS1SgUKgAAAADfB7I9BeI/0gABxQKyBQAAQEwASbHEZ/sCAAAAAARZWg==
 ```
 

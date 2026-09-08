@@ -31,6 +31,9 @@
                     }
                 ]
             }
+        },
+        {
+            "alert_rules": "/Td6WFoAAATm1rRGAgAhARYAAAB0L+Wj4AKxASldAD2IiOdj/FO+er8ludNiIOGP157QqGtpLb+UcZYVMe8lCM1Ta6HUpl865IX7aJo4VJ+Avb3YcvBbwcBoXxSLw798TKy6thm5WVNHjMVwSB+htM6lCDuzSsxHLK8WB7V5it9M6QFrbfqAb9SW1qDLQbkUHaERDlnrEJ4Z+Q/fCe51dVSmtFQ4MAfYQtE44YLH3DDrrGGEnrL1x+HCpOkmScSu61MUPFj5glrgvVeU3dEWpD9GitXYokMbsmGPHWP6FWRO3cE/FOjOyVaeNKas8/pnvOrQw0QY6VBIlGIgUv4YPgU9zA7ZFZ7A6QFpnqTtChBmZCvKzeWfMIimODLKg5Cw3e90Ntxb9nELE+Ji2nnHD4Zszp0RslfbnSffnxxenat+yDaS1SgUKgAAAADfB7I9BeI/0gABxQKyBQAAQEwASbHEZ/sCAAAAAARZWg=="
         }
     ],
     "required": [
@@ -39,9 +42,12 @@
     "properties": {
         "alert_rules": {
             "$id": "#/properties/alert_rules",
-            "type": "object",
+            "type": [
+                "object",
+                "string"
+            ],
             "title": "Alert Rules",
-            "description": "Alert rules provided by the requirer",
+            "description": "Alert rules provided by the requirer, either as an object in the official Prometheus rule file format, or as a string holding the same object LZMA-compressed and base64-encoded. The compressed form keeps large rule sets below the Juju relation data size limit, and may only be used if the provider advertises the `lzma` encoding in `alert_rules_encodings`. Compressed rules can be read with `<value> | base64 -d | xz -d | jq`.",
             "default": {},
             "examples": [
                 {
@@ -67,8 +73,10 @@
                             ]
                         }
                     ]
-                }
+                },
+                "/Td6WFoAAATm1rRGAgAhARYAAAB0L+Wj4AKxASldAD2IiOdj/FO+er8ludNiIOGP157QqGtpLb+UcZYVMe8lCM1Ta6HUpl865IX7aJo4VJ+Avb3YcvBbwcBoXxSLw798TKy6thm5WVNHjMVwSB+htM6lCDuzSsxHLK8WB7V5it9M6QFrbfqAb9SW1qDLQbkUHaERDlnrEJ4Z+Q/fCe51dVSmtFQ4MAfYQtE44YLH3DDrrGGEnrL1x+HCpOkmScSu61MUPFj5glrgvVeU3dEWpD9GitXYokMbsmGPHWP6FWRO3cE/FOjOyVaeNKas8/pnvOrQw0QY6VBIlGIgUv4YPgU9zA7ZFZ7A6QFpnqTtChBmZCvKzeWfMIimODLKg5Cw3e90Ntxb9nELE+Ji2nnHD4Zszp0RslfbnSffnxxenat+yDaS1SgUKgAAAADfB7I9BeI/0gABxQKyBQAAQEwASbHEZ/sCAAAAAARZWg=="
             ],
+            "$comment": "`required` and `properties` below constrain the object form only; JSON Schema applies them vacuously to the compressed string form.",
             "required": [
                 "groups"
             ],
