@@ -1765,6 +1765,18 @@ interfaces:
   description: Manage TLS certificates. Deprecated in favor of ``charmlibs.interfaces.tls_certificates``.
   tags:
   - security
+- name: charmlibs.interfaces.tracing
+  status: recommended
+  url: https://pypi.org/project/charmlibs-interfaces-tracing
+  docs: https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/tracing
+  src: https://github.com/canonical/charmlibs/tree/main/interfaces/tracing
+  kind: PyPI
+  rel_name: tracing
+  rel_url_charmhub: https://charmhub.io/integrations/tracing
+  rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/tracing/v2
+  description: Provide and consume tracing data.
+  tags:
+  - observability
 - name: charms.tempo_k8s.tracing
   status: legacy
   url: https://charmhub.io/tempo-k8s/libraries/tracing
@@ -1774,11 +1786,11 @@ interfaces:
   rel_name: tracing
   rel_url_charmhub: https://charmhub.io/integrations/tracing
   rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/tracing/v2
-  description: Deprecated in favour of ``tempo_coordinator_k8s .tracing``.
+  description: Deprecated in favor of ``charmlibs.interfaces.tracing``.
   tags:
   - observability
 - name: charms.tempo_coordinator_k8s.tracing
-  status: ''
+  status: legacy
   url: https://charmhub.io/tempo-coordinator-k8s/libraries/tracing
   docs: ''
   src: https://github.com/canonical/tempo-coordinator-k8s-operator
@@ -1786,7 +1798,7 @@ interfaces:
   rel_name: tracing
   rel_url_charmhub: https://charmhub.io/integrations/tracing
   rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/tracing/v2
-  description: Provide and consume tracing data.
+  description: Provide and consume tracing data. Deprecated in favor of ``charmlibs.interfaces.tracing``.
   tags:
   - observability
 - name: charms.traefik_route_k8s.traefik_route
