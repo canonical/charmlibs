@@ -14,9 +14,21 @@
                 "lzma",
                 "json"
             ]
+        },
+        {
+            "remote_write": {
+                "url": "http://192.168.1.2:9090/api/v1/write"
+            },
+            "alert_rules_encodings": [
+                "lzma",
+                "json"
+            ],
+            "event": {
+                "errors": "error validating rule: could not parse expression"
+            }
         }
     ],
-    "$comment": "`remote_write` is placed in the unit databag of every unit able to receive metrics; `alert_rules_encodings` is placed in the application databag by the leader.",
+    "$comment": "`remote_write` is placed in the unit databag of every unit able to receive metrics; `alert_rules_encodings` and `event` are placed in the application databag by the leader.",
     "required": [
         "remote_write"
     ],
@@ -53,7 +65,7 @@
             "$id": "#/properties/alert_rules_encodings",
             "type": "array",
             "title": "Alert Rules Encodings",
-            "description": "The encodings the provider is able to read the requirer's `alert_rules` in, most preferred first. A provider that does not publish this key is only assumed to understand `json`, so requirers must not compress their alert rules for it. Optional, for backwards compatibility with providers predating this key.",
+            "description": "The encodings the provider is able to read the requirer's `alert_rules` in. A provider that does not publish this key is only assumed to understand `json`, so requirers must not compress their alert rules for it. Optional, for backwards compatibility with providers predating this key. Providers must be able to read `json` whether or not they advertise it, so that rules from a requirer of any version are never lost. The order is advisory: requirers pick any entry they support, ignore entries they do not recognise, and fall back to `json` when they recognise none. The value is expected to be a constant, so that republishing it does not churn the databag.",
             "default": [
                 "json"
             ],
@@ -73,6 +85,32 @@
                     "lzma"
                 ]
             }
+        },
+        "event": {
+            "$id": "#/properties/event",
+            "type": "object",
+            "title": "Event",
+            "description": "Feedback to the requirer about the alert rules it published.",
+            "default": {},
+            "examples": [
+                {
+                    "errors": "error validating rule: could not parse expression"
+                }
+            ],
+            "properties": {
+                "errors": {
+                    "$id": "#/properties/event/properties/errors",
+                    "type": "string",
+                    "title": "Errors",
+                    "description": "Why the requirer's alert rules could not be used, e.g. they failed validation or could not be decoded. Absent while the rules are usable. Requirers may surface it to the user, and providers may use it to reflect the problem in their own status.",
+                    "default": "",
+                    "examples": [
+                        "error validating rule: could not parse expression",
+                        "Could not decode the published alert rules: Alert rules must be a JSON object, not list"
+                    ]
+                }
+            },
+            "additionalProperties": true
         }
     },
     "additionalProperties": false

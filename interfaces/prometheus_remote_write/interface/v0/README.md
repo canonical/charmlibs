@@ -29,6 +29,9 @@ Both the Requirer and the provider need to adhere to a certain set of criterias 
 - Is expected to be able to ingest both single alert rules and alert rule groups provided over the relation data bag.
 - Is expected to advertise the alert rule encodings it can read in `alert_rules_encodings`, if it is able to read any encoding other than plain `json`.
 - Is expected to be able to ingest alert rules in any encoding it advertises.
+- Is expected to be able to ingest plain `json` alert rules whether or not it advertises `json`, so that rules published by a requirer of any version are never lost.
+- Is expected to (re)publish `alert_rules_encodings` on leadership changes and charm upgrades, so that relations established before the provider gained the capability learn about it.
+- Is expected to report alert rules it cannot use, whether they failed validation or could not be decoded, in `event.errors` rather than dropping them silently.
 
 
 ### Requirer
@@ -40,6 +43,15 @@ Both the Requirer and the provider need to adhere to a certain set of criterias 
 - Is expected to add any wanted topology labels to all metrics sent to the provider.
 - Is expected to be able to expose both single alert rules and alert rule groups over the relation data bag
 - Is expected to encode its alert rules as plain `json`, unless the provider advertises support for another encoding in `alert_rules_encodings`.
+- Is expected to ignore encodings it does not recognise, and to fall back to plain `json` when it recognises none of the advertised ones.
+- Is expected to re-evaluate the encoding whenever the provider's application databag changes, since the provider's advertisement may only arrive after the relation was joined.
+- Is expected to serialize its alert rules deterministically, e.g. with sorted keys, so that unchanged rules produce an unchanged databag value and no spurious `relation-changed` is triggered on the provider.
+
+> [!NOTE]
+> A provider that is downgraded to a version without `lzma` support cannot remove its own
+> `alert_rules_encodings`, so requirers keep compressing and the downgraded provider cannot
+> read the rules; it reports this in `event.errors`. Recovery is to remove the key manually,
+> or to remove and re-add the integration, so that the requirer republishes plain `json`.
 
 ## Relation Data
 
@@ -50,9 +62,10 @@ Both the Requirer and the provider need to adhere to a certain set of criterias 
 Exposes all endpoints the requirer should write metrics to. Should be placed in the **unit** databag for each 
 unit of the provider capable of receiving metrics over remote write.
 
-Optionally exposes the alert rule encodings the provider is able to read, most preferred first, so that
-requirers know whether they may compress their alert rules. Should be placed in the **application** databag
-by the leader unit. A provider that omits this key is assumed to understand plain `json` only.
+Optionally exposes the alert rule encodings the provider is able to read, so that requirers know
+whether they may compress their alert rules, and any problem with the rules a requirer published,
+in `event.errors`. Both should be placed in the **application** databag by the leader unit. A
+provider that omits `alert_rules_encodings` is assumed to understand plain `json` only.
 
 #### Example
 
@@ -67,6 +80,9 @@ related-units:
       }
 application-data:
   alert_rules_encodings: ["lzma", "json"]
+  event: {
+    "errors": "error validating rule: could not parse expression"
+  }
 ```
 
 ### Requirer
