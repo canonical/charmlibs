@@ -47,12 +47,6 @@ Both the Requirer and the provider need to adhere to a certain set of criterias 
 - Is expected to re-evaluate the encoding whenever the provider's application databag changes, since the provider's advertisement may only arrive after the relation was joined.
 - Is expected to serialize its alert rules deterministically, e.g. with sorted keys, so that unchanged rules produce an unchanged databag value and no spurious `relation-changed` is triggered on the provider.
 
-> [!NOTE]
-> A provider that is downgraded to a version without `lzma` support cannot remove its own
-> `alert_rules_encodings`, so requirers keep compressing and the downgraded provider cannot
-> read the rules; it reports this in `event.errors`. Recovery is to remove the key manually,
-> or to remove and re-add the integration, so that the requirer republishes plain `json`.
-
 ## Relation Data
 
 ### Provider
