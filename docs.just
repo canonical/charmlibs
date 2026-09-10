@@ -17,23 +17,41 @@ html *packages: _diataxis_docs (_packages packages)
 _diataxis_docs:
     ./scripts/diataxis_preprocessor.py
 
+[doc('Write the placeholder rst files that the per-package reference docs builds fill in.')]
+_package_docs:
+    ./scripts/package_docs_preprocessor.py
+
 [doc("""
 Run html builder once per package, with its deps installed, setting the package argument and suppressing reference warnings.
 
 This allows us to generate the reference docs for that package with autodoc, saving the doctrees and reference information
 to be combined into the final docs in a separate pass.
+
+Package builds run in parallel: each gets its own doctree cache and html outdir so they can't step
+on each other, and they read the placeholder rst files written once up front by the `_package_docs`
+recipe, injecting their own automodule in-memory during source-read (see
+`.docs/extensions/package_docs.py`). Since the on-disk files never carry an automodule, the parallel
+builds don't race on the source tree. Each build's captured stdout/stderr is printed atomically
+after it finishes.
 """)]
-_packages *packages:
+_packages *packages: _package_docs
     #!/usr/bin/env -S uv run --script --no-project
-    import json, pathlib, subprocess, sys
+    import concurrent.futures, json, os, pathlib, subprocess, sys
     ROOT = pathlib.Path('{{justfile_directory()}}')
+    BUILD_DIR = pathlib.Path('{{build_dir}}')
     packages = '{{packages}}'.split()
     if packages == ['-']:
         sys.exit()
     if not packages:
         cmd = [ROOT / '.scripts/ls.py', 'packages', '--exclude-examples', '--exclude-placeholders']
         packages = json.loads(subprocess.check_output(cmd, text=True))
-    for package in packages:
+
+    def build(package):
+        # Isolate per-build outputs (html, doctree cache) so parallel builds don't clobber each
+        # other. Only the .save/ pickles are shared, and they're keyed on unique per-package names.
+        pkg_slug = package.replace('/', '_')
+        outdir = BUILD_DIR / '_pkg_pass' / pkg_slug / 'html'
+        doctrees = BUILD_DIR / '_pkg_pass' / pkg_slug / 'doctrees'
         cmd = [
             'uvx',
             '--from', 'sphinx',
@@ -42,7 +60,7 @@ _packages *packages:
             'sphinx-build',
             '-T', '-W', '--keep-going',
             '-b', 'dirhtml',
-            '-d', '_dev/.doctrees',
+            '-d', str(doctrees),
             '-D', 'language=en',
             '-D', f'package={package}',
             # llms.txt is only generated in the final combined pass (the `html` recipe).
@@ -50,10 +68,27 @@ _packages *packages:
             # interface reference docs, deleting the placeholder this package pass depends on.
             '-D', 'llms_txt_enabled=0',
             '-D', 'suppress_warnings=ref.ref,ref.doc,myst.xref_missing',
-            '.', '{{build_dir}}/html',
+            '.', str(outdir),
         ]
-        print(cmd)
-        subprocess.check_call(cmd)
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        return package, cmd, result
+
+    max_workers = min(len(packages), os.cpu_count() or 1)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as pool:
+        futures = [pool.submit(build, p) for p in packages]
+        failures = 0
+        for future in concurrent.futures.as_completed(futures):
+            package, cmd, result = future.result()
+            print(f'--- {package} ---')
+            print(cmd)
+            if result.stdout:
+                sys.stdout.write(result.stdout)
+            if result.stderr:
+                sys.stderr.write(result.stderr)
+            if result.returncode != 0:
+                failures += 1
+                print(f'--- {package} FAILED (exit {result.returncode}) ---', file=sys.stderr)
+        sys.exit(failures)
 
 [doc('Show help for the docs recipes.')]
 help:
