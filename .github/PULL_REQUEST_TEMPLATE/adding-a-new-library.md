@@ -33,7 +33,6 @@ Package:
 
 Repository metadata:
 - [ ] `.docs/reference/libs.yaml` updated with a new entry.
-- [ ] `CODEOWNERS` updated with a `/<package>/` entry for the owning team.
 
 Tests and docs:
 - [ ] Unit tests added, plus functional and integration tests as appropriate.
