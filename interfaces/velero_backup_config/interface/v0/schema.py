@@ -2,7 +2,6 @@
 # See LICENSE file for licensing details.
 
 
-from interface_tester.schema_base import DataBagSchema
 from pydantic import BaseModel, Field
 
 
@@ -87,14 +86,6 @@ class RequirerAppData(BaseModel):
     )
 
 
-class RequirerSchema(DataBagSchema):
-    """Schema for the requirer (client) side of velero-backup-config."""
-
-    app: RequirerAppData
-
-
-class ProviderSchema(DataBagSchema):
-    """Schema for the provider (Velero Operator) side of velero-backup-config."""
-
-    # The provider sends no data, so no app or unit fields are defined.
-    pass
+ProviderAppData = None
+ProviderUnitData = None
+RequirerUnitData = None
