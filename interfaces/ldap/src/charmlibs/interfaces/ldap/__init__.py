@@ -138,6 +138,7 @@ situations, which are listed below:
 
 from ._ldap import (
     LdapProvider,
+    LdapProviderBaseData,
     LdapProviderData,
     LdapReadyEvent,
     LdapRequestedEvent,
@@ -149,6 +150,7 @@ from ._version import __version__ as __version__
 
 __all__ = [
     'LdapProvider',
+    'LdapProviderBaseData',
     'LdapProviderData',
     'LdapReadyEvent',
     'LdapRequestedEvent',
