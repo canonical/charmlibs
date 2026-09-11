@@ -249,3 +249,119 @@ def test_copy_category_empty_sources(tmp_path: pathlib.Path, monkeypatch: pytest
     monkeypatch.setattr(pp, '_DOCS_DIR', docs_dir)
     entries = pp._copy_category([], pathlib.PurePath('mylib'), 'how-to', {})
     assert entries == []
+
+
+# --- _include_path_for ---
+
+
+def test_include_path_for_diataxis(monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path):
+    monkeypatch.setattr(pp, '_DOCS_DIR', tmp_path)
+    assert pp._include_path_for('how-to') == tmp_path / 'how-to' / '_lib-how-to.md'
+
+
+def test_include_path_for_changelog(monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path):
+    monkeypatch.setattr(pp, '_DOCS_DIR', tmp_path)
+    assert pp._include_path_for('changelog') == tmp_path / 'reference' / '_lib-changelog.md'
+
+
+# --- _copy_changelogs ---
+
+
+def test_copy_changelogs_generates_page(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch):
+    docs_dir = tmp_path / 'docs_site'
+    (tmp_path / 'mylib').mkdir()
+    (tmp_path / 'mylib' / 'CHANGELOG.md').write_text(
+        '# 1.0.0 - 1 May 2026\n\nFirst release.\n\n# 0.1.0 - 1 Apr 2026\n\nBeta.\n'
+    )
+    monkeypatch.setattr(pp, '_REPO_ROOT', tmp_path)
+    monkeypatch.setattr(pp, '_DOCS_DIR', docs_dir)
+    entries = pp._copy_changelogs([{'path': 'mylib', 'docs': {}}], {})
+    out = docs_dir / 'reference' / 'charmlibs' / 'mylib' / 'CHANGELOG.md'
+    assert out.exists()
+    text = out.read_text()
+    assert text.startswith('# mylib: Changelog\n\n')
+    # Existing per-version H1s are demoted to H2 so the injected heading is
+    # the only H1 on the page.
+    assert '\n## 1.0.0 - 1 May 2026\n' in text
+    assert '\n## 0.1.0 - 1 Apr 2026\n' in text
+    assert '\n# 1.0.0' not in text
+    assert entries == ['mylib <charmlibs/mylib/CHANGELOG>']
+
+
+def test_copy_changelogs_drops_leading_prose_heading(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+):
+    # The interfaces packages open with a prose '# Changelog' and use H2 for
+    # versions, rather than going straight to a per-version H1.
+    docs_dir = tmp_path / 'docs_site'
+    (tmp_path / 'mylib').mkdir()
+    (tmp_path / 'mylib' / 'CHANGELOG.md').write_text(
+        '# Changelog\n\n## 1.0.0\n\nInitial release.\n'
+    )
+    monkeypatch.setattr(pp, '_REPO_ROOT', tmp_path)
+    monkeypatch.setattr(pp, '_DOCS_DIR', docs_dir)
+    pp._copy_changelogs([{'path': 'mylib', 'docs': {}}], {})
+    text = (docs_dir / 'reference' / 'charmlibs' / 'mylib' / 'CHANGELOG.md').read_text()
+    assert text.startswith('# mylib: Changelog\n\n')
+    # The prose heading is dropped rather than demoted, so the page doesn't
+    # carry a redundant 'Changelog' section under its own title.
+    assert '## Changelog' not in text
+    assert '\n## 1.0.0\n' in text
+
+
+def test_copy_changelogs_keeps_version_heading_that_starts_with_a_digit(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+):
+    docs_dir = tmp_path / 'docs_site'
+    (tmp_path / 'mylib').mkdir()
+    (tmp_path / 'mylib' / 'CHANGELOG.md').write_text('# 1.0.0 - 1 May 2026\n\nFirst.\n')
+    monkeypatch.setattr(pp, '_REPO_ROOT', tmp_path)
+    monkeypatch.setattr(pp, '_DOCS_DIR', docs_dir)
+    pp._copy_changelogs([{'path': 'mylib', 'docs': {}}], {})
+    text = (docs_dir / 'reference' / 'charmlibs' / 'mylib' / 'CHANGELOG.md').read_text()
+    assert '\n## 1.0.0 - 1 May 2026\n' in text
+    assert 'First.' in text
+
+
+def test_copy_changelogs_skips_missing(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch):
+    docs_dir = tmp_path / 'docs_site'
+    (tmp_path / 'has_log').mkdir()
+    (tmp_path / 'has_log' / 'CHANGELOG.md').write_text('# 1.0.0\n\nRelease.\n')
+    (tmp_path / 'no_log').mkdir()
+    monkeypatch.setattr(pp, '_REPO_ROOT', tmp_path)
+    monkeypatch.setattr(pp, '_DOCS_DIR', docs_dir)
+    entries = pp._copy_changelogs(
+        [{'path': 'has_log', 'docs': {}}, {'path': 'no_log', 'docs': {}}], {}
+    )
+    assert entries == ['has_log <charmlibs/has_log/CHANGELOG>']
+    assert (docs_dir / 'reference' / 'charmlibs' / 'has_log' / 'CHANGELOG.md').exists()
+    assert not (docs_dir / 'reference' / 'charmlibs' / 'no_log').exists()
+
+
+def test_copy_changelogs_rewrites_links(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch):
+    docs_dir = tmp_path / 'docs_site'
+    (tmp_path / 'mylib').mkdir()
+    (tmp_path / 'mylib' / 'CHANGELOG.md').write_text(
+        '# 1.0.0 - 1 May 2026\n\nSee [README](README.md) for details.\n'
+    )
+    (tmp_path / 'mylib' / 'README.md').touch()
+    monkeypatch.setattr(pp, '_REPO_ROOT', tmp_path)
+    monkeypatch.setattr(pp, '_DOCS_DIR', docs_dir)
+    pp._copy_changelogs([{'path': 'mylib', 'docs': {}}], {})
+    out = docs_dir / 'reference' / 'charmlibs' / 'mylib' / 'CHANGELOG.md'
+    # Unknown-in-map links become absolute GitHub URLs.
+    assert 'https://github.com/canonical/charmlibs/blob/main/mylib/README.md' in out.read_text()
+
+
+# --- _build_sphinx_map (changelog) ---
+
+
+def test_build_sphinx_map_changelog(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch):
+    """A package's ``CHANGELOG.md`` maps to its docs-site copy."""
+    monkeypatch.setattr(pp, '_REPO_ROOT', tmp_path)
+    monkeypatch.setattr(pp, '_DOCS_DIR', tmp_path / '.docs')
+    (tmp_path / '.docs').mkdir()
+    (tmp_path / 'mylib').mkdir()
+    (tmp_path / 'mylib' / 'CHANGELOG.md').touch()
+    m = pp._build_sphinx_map([{'path': 'mylib', 'docs': {}}])
+    assert m[pathlib.PurePath('mylib/CHANGELOG.md')] == '/reference/charmlibs/mylib/CHANGELOG'
