@@ -12,8 +12,10 @@ from ops.testing import Context, Relation, Secret, State
 
 from charmlibs.interfaces.oauth import (
     ClientChangedEvent,
+    ClientConfig,
     ClientCreatedEvent,
     ClientDeletedEvent,
+    DataValidationError,
     OAuthProvider,
 )
 from charmlibs.interfaces.oauth._oauth import CLIENT_SECRET_FIELD
@@ -67,6 +69,16 @@ class OAuthProviderCharm(CharmBase):
             jwks_endpoint=join(public_ingress, '.well-known/jwks.json'),
             scope='openid profile email phone',
         )
+
+    def get_client_config(self, relation_id: int) -> ClientConfig | None:
+        rel = self.model.get_relation('oauth', relation_id)
+        assert rel is not None
+        return self.oauth.get_client_config(rel)
+
+    def get_client_secret(self, relation_id: int) -> str | None:
+        rel = self.model.get_relation('oauth', relation_id)
+        assert rel is not None
+        return self.oauth.get_client_secret(rel)
 
 
 def test_provider_info_in_relation_databag(context: Context[OAuthProviderCharm]) -> None:
@@ -224,3 +236,86 @@ def test_secret_removed_when_relation_removed(context: Context[OAuthProviderChar
     found_secret = next((s for s in state_out.secrets if s.id == secret_id), None)
 
     assert found_secret is None
+
+
+def test_get_client_config(context: Context[OAuthProviderCharm]) -> None:
+    requirer_data = {
+        'redirect_uri': 'https://oidc-client.com/callback',
+        'scope': 'openid email',
+        'grant_types': '["authorization_code"]',
+        'audience': '["app1"]',
+        'token_endpoint_auth_method': 'client_secret_basic',
+    }
+    relation = Relation('oauth', remote_app_data=requirer_data)
+    state = create_state(leader=True, relations=[relation])
+
+    with context(context.on.relation_changed(relation), state) as mgr:
+        mgr.run()
+        config = mgr.charm.get_client_config(relation.id)
+        assert config == ClientConfig(
+            redirect_uri='https://oidc-client.com/callback',
+            scope='openid email',
+            grant_types=['authorization_code'],
+            audience=['app1'],
+            token_endpoint_auth_method='client_secret_basic',
+        )
+
+
+def test_get_client_config_invalid_data(context: Context[OAuthProviderCharm]) -> None:
+    requirer_data = {
+        'redirect_uri': 'https://oidc-client.com/callback',
+        'scope': 'openid email',
+        'grant_types': 'invalid_json',
+    }
+    relation = Relation('oauth', remote_app_data=requirer_data)
+    state = create_state(leader=True, relations=[relation])
+
+    with context(context.on.relation_changed(relation), state) as mgr:
+        mgr.run()
+        with pytest.raises(DataValidationError):
+            mgr.charm.get_client_config(relation.id)
+
+
+def test_get_client_secret(context: Context[OAuthProviderCharm]) -> None:
+    relation = Relation('oauth')
+    secret = Secret(
+        owner='app',
+        label=f'client_secret_{relation.id}',
+        tracked_content={CLIENT_SECRET_FIELD: 'secret_val'},
+    )
+    state = create_state(leader=True, relations=[relation], secrets=[secret])
+
+    with context(context.on.relation_changed(relation), state) as mgr:
+        mgr.run()
+        secret_val = mgr.charm.get_client_secret(relation.id)
+        assert secret_val == 'secret_val'
+
+
+def test_update_existing_secret_content(context: Context[OAuthProviderCharm]) -> None:
+    relation = Relation('oauth')
+    secret = Secret(
+        owner='app',
+        label=f'client_secret_{relation.id}',
+        tracked_content={CLIENT_SECRET_FIELD: 'old_secret'},
+    )
+    state = create_state(leader=True, relations=[relation], secrets=[secret])
+
+    with context(context.on.start(), state) as mgr:
+        mgr.run()
+        rel = mgr.charm.model.get_relation('oauth', relation.id)
+        assert rel is not None
+        mgr.charm.oauth.set_client_credentials_in_relation_data(
+            relation.id, 'new_client_id', 'new_secret_val'
+        )
+        assert mgr.charm.oauth.get_client_secret(rel) == 'new_secret_val'
+
+
+def test_get_client_config_from_relation_data_handles_invalid_data(
+    context: Context[OAuthProviderCharm],
+) -> None:
+    requirer_data = {'invalid': 'data'}
+    relation = Relation('oauth', remote_app_data=requirer_data)
+    state = create_state(leader=True, relations=[relation])
+
+    context.run(context.on.relation_changed(relation), state)
+    assert not any(isinstance(e, ClientCreatedEvent) for e in context.emitted_events)
