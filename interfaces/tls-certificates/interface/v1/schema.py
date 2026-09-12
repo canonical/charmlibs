@@ -1,11 +1,7 @@
 """This file defines the schemas for the provider and requirer sides of the `tls-certificates` interface.
 
-It exposes two interfaces.schema_base.DataBagSchema subclasses called:
-- ProviderSchema
-- RequirerSchema
-
 Examples:
-    ProviderSchema:
+    Provider:
         unit: <empty>
         app: {
             "certificates": [
@@ -41,7 +37,7 @@ Examples:
                 "provider_type": "acme"
             }
         }
-    RequirerSchema:
+    Requirer:
         unit: {
             "certificate_signing_requests": [
                 {
@@ -53,8 +49,7 @@ Examples:
         app:  <empty>
 """
 
-from interface_tester.schema_base import DataBagSchema
-from pydantic import BaseModel, Field, Json
+from pydantic import BaseModel, Field
 
 
 class Certificate(BaseModel):
@@ -138,16 +133,16 @@ class Capabilities(BaseModel):
     )
 
 
-class ProviderApplicationData(BaseModel):
+class ProviderAppData(BaseModel):
     """Provider application data model."""
 
-    certificates: Json[list[Certificate]] | None = Field(
+    certificates: list[Certificate] | None = Field(
         default=None, description="List of certificates."
     )
-    request_errors: Json[list[RequestError]] | None = Field(
+    request_errors: list[RequestError] | None = Field(
         default=None, description="List of request errors."
     )
-    capabilities: Json[Capabilities] | None = Field(
+    capabilities: Capabilities | None = Field(
         default=None, description="Best-effort provider capabilities."
     )
 
@@ -158,19 +153,11 @@ class RequirerData(BaseModel):
     The same model is used for the unit and application data.
     """
 
-    certificate_signing_requests: Json[list[CertificateSigningRequest]] = Field(
+    certificate_signing_requests: list[CertificateSigningRequest] = Field(
         description="List of certificate signing requests."
     )
 
 
-class ProviderSchema(DataBagSchema):
-    """Provider schema for TLS Certificates."""
-
-    app: ProviderApplicationData  # pyright: ignore[reportGeneralTypeIssues,reportIncompatibleVariableOverride]
-
-
-class RequirerSchema(DataBagSchema):
-    """Requirer schema for TLS Certificates."""
-
-    app: RequirerData  # pyright: ignore[reportGeneralTypeIssues,reportIncompatibleVariableOverride]
-    unit: RequirerData  # pyright: ignore[reportGeneralTypeIssues,reportIncompatibleVariableOverride]
+ProviderUnitData = None
+RequirerAppData = RequirerData
+RequirerUnitData = RequirerData
