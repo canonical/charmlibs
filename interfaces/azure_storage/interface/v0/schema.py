@@ -1,14 +1,11 @@
-"""This file defines the schemas for the provider and requirer sides of the zookeeper_client interface.
-It must expose two interfaces.schema_base.DataBagSchema subclasses called:
-- ProviderSchema
-- RequirerSchema
-"""
+"""This file defines the schemas for the provider and requirer sides of the azure_storage interface."""
 
+import json
+import pathlib
 from enum import Enum
-from pathlib import Path
+from typing import Any
 
-from interface_tester.schema_base import DataBagSchema
-from pydantic import BaseModel, Field, SecretStr
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_serializer, field_validator
 
 
 class ConnectionProtocolEnum(str, Enum):
@@ -18,7 +15,25 @@ class ConnectionProtocolEnum(str, Enum):
     adls_gen2_secure = "abfss"
 
 
-class AzureStorageProviderAppData(BaseModel):
+class _BareStringDatabag(BaseModel):
+    """Base class for databag models that don't strictly JSON encode all entries."""
+
+    @staticmethod
+    def __juju_decoder__(value: str) -> str:
+        """Pass Juju's string through unmodified to be decoded by individual field validators."""
+        return value
+
+    @staticmethod
+    def __juju_encoder__(value: str | None) -> str:
+        """Convert `None` to "", erasing the value; Ops will error on a non-string."""
+        return "" if value is None else value
+
+
+class ProviderAppData(_BareStringDatabag):
+    """The provider's application databag."""
+
+    model_config = ConfigDict(strict=True, populate_by_name=True)
+
     container: str = Field(
         description="The name of the Azure storage container provided by the provider.",
         examples=["mycontainer"],
@@ -26,25 +41,29 @@ class AzureStorageProviderAppData(BaseModel):
     )
 
     storage_account: str = Field(
+        alias="storage-account",
         description="The name of Azure storage account.",
         examples=["test-storage-account"],
         title="Storage account",
     )
 
     connection_protocol: ConnectionProtocolEnum = Field(
+        alias="connection-protocol",
         description="The connection protocol to be used to connect to Azure Storage.",
         examples=["wasb", "wasbs", "abfs", "abfss"],
         default=ConnectionProtocolEnum.adls_gen2_secure,
+        strict=False,
         title="Connection protocol",
     )
 
     secret_key: SecretStr = Field(
+        alias="secret-key",
         description="Secret key corresponding to the storage account for connecting to the object storage.",
         examples=["random-secret-key"],
         title="Secret key",
     )
 
-    path: Path = Field(
+    path: str = Field(
         description="The path inside the container to store objects.",
         examples=["foo/bar"],
         title="Path",
@@ -56,8 +75,29 @@ class AzureStorageProviderAppData(BaseModel):
         title="Endpoint URL",
     )
 
+    @field_serializer("connection_protocol")
+    def _dump_enum(self, value: ConnectionProtocolEnum) -> str:
+        """Write the enum's wire string rather than the enum member."""
+        return value.value
 
-class AzureStorageRequirerAppData(BaseModel):
+    @field_serializer("secret_key")
+    def _reveal(self, value: SecretStr) -> str:
+        """Write the real secret to the databag rather than the masked repr."""
+        return value.get_secret_value()
+
+    @field_validator("path")
+    @classmethod
+    def _check_path(cls, value: str) -> str:
+        """Check the value is a usable path, keeping any trailing slash."""
+        pathlib.PurePosixPath(value)  # raises if it isn't a usable path
+        return value
+
+
+class RequirerAppData(_BareStringDatabag):
+    """The requirer's application databag."""
+
+    model_config = ConfigDict(strict=True, populate_by_name=True)
+
     container: str = Field(
         description="The name of the container that's requested by the requirer.",
         examples=["mycontainer"],
@@ -66,19 +106,24 @@ class AzureStorageRequirerAppData(BaseModel):
 
     requested_secrets: list[str] = Field(
         alias="requested-secrets",
-        description="Any provider field which should be transfered as Juju Secret",
+        description="Any provider field which should be transfered as Juju Secret. A JSON array on the wire.",
         examples=[["username", "password", "tls-ca", "uris"]],
         title="Requested secrets",
     )
 
+    @field_validator("requested_secrets", mode="before")
+    @classmethod
+    def _load_json(cls, value: Any) -> Any:
+        if not isinstance(value, str):
+            return value  # __init__ argument was already deserialized.
+        return json.loads(value)
 
-class ProviderSchema(DataBagSchema):
-    """The schema for the provider side of this interface."""
+    @field_serializer("requested_secrets")
+    def _dump_json(self, value: object) -> str | None:
+        if value is None:
+            return None
+        return json.dumps(value)
 
-    app: AzureStorageProviderAppData
 
-
-class RequirerSchema(DataBagSchema):
-    """The schema for the requirer side of this interface."""
-
-    app: AzureStorageRequirerAppData
+ProviderUnitData = None
+RequirerUnitData = None
