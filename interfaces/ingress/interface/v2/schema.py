@@ -2,18 +2,14 @@
 # See LICENSE file for licensing details.
 """This file defines the schemas for the provider and requirer sides of the ingress interface.
 
-It exposes two interfaces.schema_base.DataBagSchema subclasses called:
-- ProviderSchema
-- RequirerSchema
-
 Examples:
-    ProviderSchema:
+    Provider:
         unit: <empty>
         app: {"ingress":
                  {"url":  "http://foo.bar:80/model_name-app_name"}
              }
 
-    RequirerSchema:
+    Requirer:
         unit: {
               "name": "app-name",
               "host": "hostname"
@@ -24,36 +20,25 @@ Examples:
               }
 """
 
-from interface_tester.schema_base import DataBagSchema
-from pydantic import AnyHttpUrl, BaseModel, Field, Json
+from pydantic import AnyHttpUrl, BaseModel, Field
 
 
 class Url(BaseModel):
     url: AnyHttpUrl
 
 
-class MyProviderData(BaseModel):
-    ingress: Json[Url]
+class ProviderAppData(BaseModel):
+    ingress: Url
 
 
-class ProviderSchema(DataBagSchema):
-    """Provider schema for Ingress."""
-
-    app: MyProviderData
-
-
-class IngressRequirerAppData(BaseModel):
-    model: Json[str] = Field(description="The model the application is in.")
-    port: Json[int] = Field(description="The port the unit wishes to be exposed. Stringified int.")
-    name: Json[str] = Field(description="The name of the application requesting ingress.")
+class RequirerAppData(BaseModel):
+    model: str = Field(description="The model the application is in.")
+    port: int = Field(description="The port the unit wishes to be exposed. Stringified int.")
+    name: str = Field(description="The name of the application requesting ingress.")
 
 
-class IngressRequirerUnitData(BaseModel):
-    host: Json[str] = Field(description="Unit hostname to be exposed.")
+class RequirerUnitData(BaseModel):
+    host: str = Field(description="Unit hostname to be exposed.")
 
 
-class RequirerSchema(DataBagSchema):
-    """Requirer schema for Ingress."""
-
-    app: IngressRequirerAppData
-    unit: IngressRequirerUnitData
+ProviderUnitData = None
