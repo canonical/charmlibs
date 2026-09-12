@@ -1,11 +1,9 @@
 """This file defines the schemas for the provider and requirer sides of the kratos_external_idp interface.
 
-It exposes two interfaces.schema_base.DataBagSchema subclasses called:
-- ProviderSchema
-- RequirerSchema
+It defines models `ProviderAppData` and `RequirerAppData`.
 
 Examples:
-    ProviderSchema:
+    Provider:
         unit: <empty>
         app: {
           "providers":[
@@ -17,7 +15,7 @@ Examples:
           ]
         }
 
-    RequirerSchema:
+    Requirer:
         unit: <empty>
         app: {
           "providers": [
@@ -30,7 +28,6 @@ Examples:
 import textwrap
 from enum import Enum
 
-from interface_tester.schema_base import DataBagSchema
 from pydantic import AnyHttpUrl, BaseModel, Field, field_validator
 
 
@@ -129,34 +126,8 @@ class ExternalIdpProvider(BaseModel):
         return v
 
 
-class KratosExternalIdpProviderData(BaseModel):
+class ProviderAppAData(BaseModel):
     providers: list[ExternalIdpProvider]
-
-
-class ProviderSchema(DataBagSchema):
-    """Provider schema for KratosExternalIdp.
-    This relation interface can be used to provide a set of client configurations to Kratos to connect with external providers.
-    """
-
-    app: KratosExternalIdpProviderData
-
-    class Config:
-        schema_extra = {
-            "example": {
-                "unit": None,
-                "app": {
-                    "providers": [
-                        {
-                            "client_id": "client_id",
-                            "client_secret": "cl1ent-s3cRet",
-                            "secret_backend": "relation",
-                            "tenant_id": "4242424242424242",
-                            "provider": "microsoft",
-                        }
-                    ]
-                },
-            }
-        }
 
 
 class ExternalIdpRequirer(BaseModel):
@@ -164,28 +135,9 @@ class ExternalIdpRequirer(BaseModel):
     provider_id: str
 
 
-class KratosExternalIdpRequirerData(BaseModel):
+class RequirerAppData(BaseModel):
     providers: list[ExternalIdpRequirer]
 
 
-class RequirerSchema(DataBagSchema):
-    """Requirer schema for KratosExternalIdp.
-    This relation interface can be used from Kratos to provide the redirect_uri of a client that will be used with an external provider.
-    """
-
-    app: KratosExternalIdpRequirerData
-
-    class Config:
-        schema_extra = {
-            "example": {
-                "unit": None,
-                "app": {
-                    "providers": [
-                        {
-                            "redirect_uri": "https://example.kratos.com/self-service/methods/oidc/callback/microsoft",
-                            "provider_id": "microsoft",
-                        }
-                    ]
-                },
-            }
-        }
+ProviderUnitData = None
+RequirerUnitData = None
