@@ -1,7 +1,6 @@
 from typing import Any
 
-from interface_tester.schema_base import DataBagSchema
-from pydantic import BaseModel, Field, Json
+from pydantic import BaseModel, Field
 
 
 class GrafanaSourceData(BaseModel):
@@ -19,21 +18,21 @@ class GrafanaSourceData(BaseModel):
     type: str = Field(
         description="Type of the datasource.", examples=['tempo', 'loki', 'prometheus']
     )
-    extra_fields: Json[Any] | None = Field(
+    extra_fields: Any | None = Field(
         description="Any datasource-type-specific additional configuration."
     )
-    secure_extra_fields: Json[Any] | None = Field(
+    secure_extra_fields: Any | None = Field(
         description="Any secure datasource-type-specific additional configuration."
     )
 
 
-class GrafanaSourceProviderAppData(BaseModel):
+class ProviderAppData(BaseModel):
     """Application databag model for the requirer side of this interface."""
 
-    grafana_source_data: Json[GrafanaSourceData]
+    grafana_source_data: GrafanaSourceData
 
 
-class GrafanaSourceProviderUnitData(BaseModel):
+class ProviderUnitData(BaseModel):
     """Application databag model for the requirer side of this interface."""
 
     grafana_source_host: str = Field(
@@ -41,24 +40,14 @@ class GrafanaSourceProviderUnitData(BaseModel):
     )
 
 
-class ProviderSchema(DataBagSchema):
-    """The schemas for the requirer side of this interface."""
-
-    app: GrafanaSourceProviderAppData
-    unit: GrafanaSourceProviderUnitData
-
-
-class GrafanaSourceRequirerAppData(BaseModel):
+class RequirerAppData(BaseModel):
     """Application databag model for the requirer side of this interface."""
 
-    datasource_uids: Json[dict[str, str]]
+    datasource_uids: dict[str, str]
     grafana_uid: str = Field(
         description="UID of the requirer application.",
         examples=['foo-0000-0000-0000-0000-grafana-1'],
     )
 
 
-class RequirerSchema(DataBagSchema):
-    """The schema for the provider side of this interface."""
-
-    app: GrafanaSourceRequirerAppData
+RequirerUnitData = None

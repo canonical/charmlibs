@@ -13,16 +13,10 @@ description: |
 providers:
   - name: tempo-coordinator-k8s
     url: https://github.com/canonical/tempo-coordinator-k8s-operator
-    test_setup:
-      location: tests/interface/conftest.py
-      identifier: grafana_datasource_exchange_tester
 
 requirers:
   - name: tempo-coordinator-k8s
     url: https://github.com/canonical/tempo-coordinator-k8s-operator
-    test_setup:
-      location: tests/interface/conftest.py
-      identifier: grafana_datasource_exchange_tester
 
 
 maintainer: observability

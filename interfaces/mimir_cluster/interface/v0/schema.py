@@ -1,15 +1,9 @@
-"""This file defines the schemas for the provider and requirer sides of this relation interface.
-
-It must expose two interfaces.schema_base.DataBagSchema subclasses called:
-- ProviderSchema
-- RequirerSchema
-"""
+"""This file defines the schemas for the provider and requirer sides of this relation interface."""
 
 import enum
 import typing
 
 import pydantic
-from interface_tester.schema_base import DataBagSchema
 
 
 class MimirRole(str, enum.Enum):
@@ -41,14 +35,8 @@ class Scheme(str, enum.Enum):
     https = "https"
 
 
-class MimirClusterProviderAppData(pydantic.BaseModel):
+class ProviderAppData(pydantic.BaseModel):
     mimir_config: dict[str, typing.Any]
-
-
-class ProviderSchema(DataBagSchema):
-    """The schema for the provider side of this interface."""
-
-    app: MimirClusterProviderAppData
 
 
 class JujuTopology(pydantic.BaseModel):
@@ -60,19 +48,15 @@ class JujuTopology(pydantic.BaseModel):
     juju_model_uuid: str = pydantic.Field(description="Juju model UUID.", alias="model_uuid")
 
 
-class MimirClusterRequirerUnitData(pydantic.BaseModel):
+class RequirerUnitData(pydantic.BaseModel):
     juju_topology: JujuTopology
     address: str
     port: int
     scheme: Scheme
 
 
-class MimirClusterRequirerAppData(pydantic.BaseModel):
+class RequirerAppData(pydantic.BaseModel):
     roles: list[MimirRole]
 
 
-class RequirerSchema(DataBagSchema):
-    """The schema for the requirer side of this interface."""
-
-    unit: MimirClusterRequirerUnitData
-    app: MimirClusterRequirerAppData
+ProviderUnitData = None
