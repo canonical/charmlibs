@@ -224,6 +224,12 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/64/a2/4615c8f7d81a00b1d6e6afe19f694e1543582349fb5f4076f6cb5dc36485/cryptography-50.0.0-cp39-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:c87f62a3d3b9888ed0fdde100ec06aa61ca9cd44bad9057d1dff9a516b5f5bb9", size = 4878208, upload-time = "2026-07-31T14:24:45.522Z" },
     { url = "https://files.pythonhosted.org/packages/d2/1a/efcfb02f91407149a0dacffffab791f7e19bf6385f63b3666dc8b5e5c9c8/cryptography-50.0.0-cp39-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:65c2c3add92b45fd0709db8594536aea39c2a67af0e27ffcf049c498501140b7", size = 5037050, upload-time = "2026-07-31T14:24:47.697Z" },
     { url = "https://files.pythonhosted.org/packages/57/30/4a22984d4f1bdfb8c054f07a92bc176b97a3134cc1d6c4b3bffb1f3688b4/cryptography-50.0.0-cp39-abi3-win_amd64.whl", hash = "sha256:d24fead1d4d076e1bfb006dcec392074a3cd8d7b4fc8a595aa64073b2b7a96ba", size = 3874135, upload-time = "2026-07-31T14:24:50.085Z" },
+    { url = "https://files.pythonhosted.org/packages/9d/3e/e54cde8c01631a5a8226ccd617eab9e57fd5cfdad90f1a9e6bb570794631/cryptography-50.0.0-pp311-pypy311_pp73-macosx_11_0_arm64.whl", hash = "sha256:5e34edd123674534acd70147f0ca331eaa2c74e6325fb2028c886aa26ba0b68c", size = 3963170, upload-time = "2026-07-31T14:24:51.968Z" },
+    { url = "https://files.pythonhosted.org/packages/01/b6/0b9e125e90f3d2dcf599a218a899cda7326a3158cfa258723f0b398b08f6/cryptography-50.0.0-pp311-pypy311_pp73-manylinux_2_28_aarch64.whl", hash = "sha256:8eb5e1172eb569ea8a872796576e6a67c276351728b6455d5beb01242b027c6a", size = 4692441, upload-time = "2026-07-31T14:24:53.743Z" },
+    { url = "https://files.pythonhosted.org/packages/53/c9/a5151588710785a96d7bc4de27d4cd62f263bbbcb203cfe29df537eb6505/cryptography-50.0.0-pp311-pypy311_pp73-manylinux_2_28_x86_64.whl", hash = "sha256:910d11e1a385c654bf738bf3e6b8e6ed5de0f5610fcae2be9e5b398d8081d20e", size = 4699810, upload-time = "2026-07-31T14:24:55.746Z" },
+    { url = "https://files.pythonhosted.org/packages/c7/1a/15b92b25eb6ce3089cd49377ae990a0f3ad485a510f968aed1f19dbdcdf2/cryptography-50.0.0-pp311-pypy311_pp73-manylinux_2_34_aarch64.whl", hash = "sha256:62598a8a57f815db4c6259a4e97d857dab56697e7de8e8ab02352ab74da1995d", size = 4691924, upload-time = "2026-07-31T14:24:58.082Z" },
+    { url = "https://files.pythonhosted.org/packages/62/15/219075012ab13e8905f3cd572204f4acb4b111df787104346b9bc0cea789/cryptography-50.0.0-pp311-pypy311_pp73-manylinux_2_34_x86_64.whl", hash = "sha256:07479a1cb08219ab719147e742e76090c9c773321959bb94946fffdd397a6437", size = 4699593, upload-time = "2026-07-31T14:24:59.951Z" },
+    { url = "https://files.pythonhosted.org/packages/8e/b5/c2c5fce26f0ee40d21bafe7f191d29a34b35a65ac4fe8a1191d1983612e9/cryptography-50.0.0-pp311-pypy311_pp73-win_amd64.whl", hash = "sha256:c99c003e088647b8a5b7c145d6f78c335f6348332b62e142d411c4b63d1460b9", size = 3813796, upload-time = "2026-07-31T14:25:02.298Z" },
 ]
 
 [[package]]
@@ -278,16 +284,16 @@ wheels = [
 
 [[package]]
 name = "ops"
-version = "3.6.0"
+version = "3.8.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "opentelemetry-api" },
     { name = "pyyaml" },
     { name = "websocket-client" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d3/bb/79b7efdb1243cbad11b6568c51ba4fb7358cd2c4d13bfd971a77c0aa7440/ops-3.6.0.tar.gz", hash = "sha256:a1c3361049c66759840a436143b07c74c2a46dcc44cbfd1177a9051f849c7971", size = 579236, upload-time = "2026-02-26T04:19:12.689Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/85/0a/6e5730c50c1737b505ccd0d7bc3c53c625745a75aae9faa2fe635ea7a473/ops-3.8.2.tar.gz", hash = "sha256:a516e76a76fdfd4a37f26f2b9956c332b56bda72014c8565ceb4f6deb137407f", size = 610712, upload-time = "2026-08-31T04:37:49.011Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/8c/b6/d7daab4f841566d3cb0402d3463f7c1a00626724d6d7c02d7bf934ae6c86/ops-3.6.0-py3-none-any.whl", hash = "sha256:341c6688684446cc4b42860738898683feb271175bb9c4775ae68c81e4e0976a", size = 211856, upload-time = "2026-02-26T04:19:08.012Z" },
+    { url = "https://files.pythonhosted.org/packages/f0/4c/ddaef2a0f8d208aed071087b61e6984bb8507cf202c965025446cf4cce8a/ops-3.8.2-py3-none-any.whl", hash = "sha256:dcead2241d17921441123425072dd6adddf5f337dc6d6fd2b3ba1fd60a0af822", size = 215761, upload-time = "2026-08-31T04:37:45.153Z" },
 ]
 
 [package.optional-dependencies]
@@ -297,16 +303,16 @@ testing = [
 
 [[package]]
 name = "ops-scenario"
-version = "8.6.0"
+version = "8.8.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "ops" },
     { name = "pyyaml" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/63/c8/15d9f91eafa46d1dfa7f580be3274c22399f941724b74e274334de9468bb/ops_scenario-8.6.0.tar.gz", hash = "sha256:5a40a91fd5e9b6c8249933944dfc6e807ad2ddbd36a68c800746b9bb8a0eabfb", size = 71728, upload-time = "2026-02-26T04:19:15.34Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/1e/06/fc2da6f27a9831b11ed55420b0d65720f6b96ee324fcea0e699e4e01b7ea/ops_scenario-8.8.2.tar.gz", hash = "sha256:4d9c8371ae02064352f852dda4cccd0fb825b8184f26ae2150c8b5bc1032c6b9", size = 86981, upload-time = "2026-08-31T04:37:50.287Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ea/d2/fb3176805339d3aa95b9d6e43478d0e34355c6c46f27723249f46bb8d19d/ops_scenario-8.6.0-py3-none-any.whl", hash = "sha256:469490a042dc45eca24eef7aa1b9214704d97d67503ad8465414ab68dc989d30", size = 64241, upload-time = "2026-02-26T04:19:09.579Z" },
+    { url = "https://files.pythonhosted.org/packages/15/15/abe6b080341cd6db8c9d1d7124903c48361f3cf783c8d8a08043560f1e1a/ops_scenario-8.8.2-py3-none-any.whl", hash = "sha256:4e2a8edc04e169739e0769a4cec0acbd6e0d82d771a3e5617223a9f537f3128a", size = 74916, upload-time = "2026-08-31T04:37:46.657Z" },
 ]
 
 [[package]]
