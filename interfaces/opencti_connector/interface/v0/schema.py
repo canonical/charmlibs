@@ -2,19 +2,15 @@
 # See LICENSE file for licensing details.
 """This file defines the schemas for the provider and requirer sides of the opencti-connector interface.
 
-It exposes two interfaces.schema_base.DataBagSchema subclasses called:
-- ProviderSchema
-- RequirerSchema
-
 Examples:
-    ProviderSchema:
+    Provider:
         unit: <empty>
         app: {
                 "connector_charm_name": "connector-charm-name",
                 "connector_type": "connector-type",
              }
 
-    RequirerSchema:
+    Requirer:
         unit: <empty>
         app: {
                 "opencti_url": "http://opencti-endpoints.stg-opencti.svc:8080",
@@ -22,7 +18,6 @@ Examples:
               }
 """
 
-from interface_tester.schema_base import DataBagSchema
 from pydantic import AnyHttpUrl, BaseModel, Field
 
 
@@ -45,12 +40,6 @@ class ProviderAppData(BaseModel):
     )
 
 
-class ProviderSchema(DataBagSchema):
-    """Provider schema for the opencti-connector interface."""
-
-    app: ProviderAppData
-
-
 class RequirerAppData(BaseModel):
     opencti_url: AnyHttpUrl = Field(
         description="URL to the OpenCTI instance.",
@@ -64,7 +53,5 @@ class RequirerAppData(BaseModel):
     )
 
 
-class RequirerSchema(DataBagSchema):
-    """Requirer schema for the opencti-connector interface."""
-
-    app: RequirerAppData
+ProviderUnitData = None
+RequirerUnitData = None

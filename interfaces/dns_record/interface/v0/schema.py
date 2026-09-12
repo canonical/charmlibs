@@ -1,12 +1,9 @@
 # Copyright 2024 Canonical
 # See LICENSE file for licensing details.
 """This file defines the schemas for the provider and requirer sides of the dns_record interface.
-It exposes two interfaces.schema_base.DataBagSchema subclasses called:
-- ProviderSchema
-- RequirerSchema
 
 Examples:
-    RequirerSchema:
+    Requirer:
         unit: <empty>
         app: {
           "dns_entries": [
@@ -28,7 +25,7 @@ Examples:
           ]
         }
 
-    ProviderSchema:
+    Provider:
         unit: <empty>
         app: {
           "dns_entries": [
@@ -49,7 +46,6 @@ Examples:
 from enum import Enum
 from uuid import UUID
 
-from interface_tester.schema_base import DataBagSchema
 from pydantic import BaseModel, Field, IPvAnyAddress
 
 
@@ -111,7 +107,7 @@ class DnsProviderData(BaseModel):
     )
 
 
-class DNSRecordProvider(BaseModel):
+class ProviderAppData(BaseModel):
     """List statuses for the DNS records informed by the requirer."""
 
     dns_entries: list[DnsProviderData] = Field(
@@ -160,7 +156,7 @@ class RequirerEntries(BaseModel):
     )
 
 
-class DNSRecordRequirer(BaseModel):
+class RequirerAppData(BaseModel):
     """List of domains for the provider to manage."""
 
     dns_entries: list[RequirerEntries] = Field(
@@ -168,13 +164,5 @@ class DNSRecordRequirer(BaseModel):
     )
 
 
-class ProviderSchema(DataBagSchema):
-    """Provider schema for dns_record."""
-
-    app: DNSRecordProvider
-
-
-class RequirerSchema(DataBagSchema):
-    """Requirer schema for dns_record."""
-
-    app: DNSRecordRequirer
+ProviderUnitData = None
+RequirerUnitData = None
