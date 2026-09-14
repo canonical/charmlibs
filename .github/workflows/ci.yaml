@@ -125,6 +125,16 @@ jobs:
           uvx --from rust-just just interfaces-json
           git diff --exit-code
 
+  codeowners:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78  # v7
+      - name: Ensure every package and interface has a CODEOWNERS entry, and no entries are orphaned
+        run: uvx --from rust-just just check-codeowners
+
   meta:  # tests for the repository's own CI tooling and helper scripts
     runs-on: ubuntu-latest
     steps:
