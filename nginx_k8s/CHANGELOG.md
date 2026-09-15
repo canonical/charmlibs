@@ -1,7 +1,7 @@
 # Unreleased
 
 - Updated project URLs.
-- Close the config file that `_has_config_changed` pulls from the container, instead of leaving it to the garbage collector.
+- Close the file handles returned by `Container.pull()`, rather than leaving them to the garbage collector.
 
 # 1.0.1 - 22 June 2026
 
