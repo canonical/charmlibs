@@ -365,3 +365,60 @@ def test_build_sphinx_map_changelog(tmp_path: pathlib.Path, monkeypatch: pytest.
     (tmp_path / 'mylib' / 'CHANGELOG.md').touch()
     m = pp._build_sphinx_map([{'path': 'mylib', 'docs': {}}])
     assert m[pathlib.PurePath('mylib/CHANGELOG.md')] == '/reference/charmlibs/mylib/CHANGELOG'
+
+
+# --- _copy_changelogs against the repo's real change logs ---
+
+
+def _real_changelogs() -> list[pathlib.Path]:
+    """Every CHANGELOG.md `ls.py packages` would publish.
+
+    `_packages` globs `[a-z]*` from the repo root and from `interfaces/`, so
+    dot-directories (`.package`, `.template`, ...) are not packages.
+    """
+    root = pathlib.Path(pp._REPO_ROOT)
+    found = [*root.glob('[a-z]*/CHANGELOG.md'), *root.glob('interfaces/[a-z]*/CHANGELOG.md')]
+    return sorted(p for p in found if p.is_file())
+
+
+def test_there_are_real_changelogs_to_check():
+    """Guard the guard: a glob that silently matched nothing would pass everything."""
+    assert len(_real_changelogs()) > 10
+
+
+@pytest.mark.parametrize('changelog', _real_changelogs(), ids=lambda p: p.parent.name)
+def test_copy_changelogs_keeps_every_heading_in_a_real_changelog(
+    changelog: pathlib.Path, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+):
+    """The synthetic fixtures above only cover the conventions we thought of.
+
+    `nginx_k8s` opens with `# Unreleased` rather than a version or a prose
+    `# Changelog`, and a heuristic written as "an H1 that doesn't start with a
+    digit" deleted that heading, orphaning its entries under the page title.
+    Running the real files is what catches the convention nobody wrote a
+    fixture for -- including the next one.
+    """
+    lib = changelog.parent.relative_to(pp._REPO_ROOT)
+    docs_dir = tmp_path / 'docs_site'
+    pkg_dir = tmp_path / lib
+    pkg_dir.mkdir(parents=True)
+    (pkg_dir / 'CHANGELOG.md').write_text(changelog.read_text(), encoding='utf-8')
+    monkeypatch.setattr(pp, '_REPO_ROOT', tmp_path)
+    monkeypatch.setattr(pp, '_DOCS_DIR', docs_dir)
+
+    pp._copy_changelogs([{'path': str(lib), 'docs': {}}], {})
+
+    text = (docs_dir / 'reference' / 'charmlibs' / lib / 'CHANGELOG.md').read_text()
+    h1s = [line for line in text.splitlines() if line.startswith('# ')]
+    assert h1s == [f'# {lib.name}: Changelog'], 'the injected heading must be the only H1'
+    # Every heading in the source survives, at one level deeper. The prose
+    # `# Changelog` heading is the one exception: it is dropped deliberately,
+    # because the injected heading says the same thing.
+    published = {line.lstrip('#').strip() for line in text.splitlines() if line.startswith('#')}
+    for line in changelog.read_text().splitlines():
+        if not line.startswith(('# ', '## ')):
+            continue
+        heading = line.lstrip('#').strip()
+        if heading.lower() == 'changelog':
+            continue
+        assert heading in published, f'{heading!r} was dropped from {lib}'

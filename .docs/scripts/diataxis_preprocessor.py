@@ -153,12 +153,16 @@ def _copy_changelogs(
         if not source.is_file():
             continue
         raw = source.read_text()
-        # Two conventions are in use. Most packages go straight to a per-version
-        # H1 (`# 1.2.3 - 4 May 2026`); the interfaces packages open with a prose
-        # `# Changelog` and use H2 for versions. Drop a leading prose heading
-        # rather than demoting it, so the page doesn't end up with a redundant
-        # `Changelog` section directly under its own title.
-        body = re.sub(r'\A\s*#\s+(?!\d)[^\n]*\n+', '', raw)
+        # Three conventions are in use. Most packages go straight to a
+        # per-version H1 (`# 1.2.3 - 4 May 2026`), the interfaces packages open
+        # with a prose `# Changelog` and use H2 for versions, and nginx_k8s
+        # opens with `# Unreleased`. Drop a leading `# Changelog` rather than
+        # demoting it, so the page doesn't end up with a redundant `Changelog`
+        # section directly under its own title -- but match that heading by
+        # name: "an H1 that doesn't start with a digit" also deletes
+        # `# Unreleased`, orphaning its entries under the page title, and would
+        # delete a released `# v1.2.3` too.
+        body = re.sub(r'\A\s*#\s+Changelog\s*\n+', '', raw, flags=re.IGNORECASE)
         # Demote any remaining H1s (per-version headings) to H2 so the injected
         # library heading is the sole H1 for the page.
         demoted = re.sub(r'^# ', '## ', body, flags=re.MULTILINE)
