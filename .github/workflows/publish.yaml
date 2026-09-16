@@ -85,29 +85,31 @@ jobs:
           packages-dir: ./${{ matrix.package }}/dist/
           repository-url: ${{ needs.unify-inputs.outputs.repository-url }}
           verbose: true
-      - name: Tag
-        if: ${{ matrix.tag }}
-        run: |
-          set -xueo pipefail
-          git config user.name github-actions
-          git config user.email github-actions@github.com
-          git tag ${{ matrix.tag }}
-          git push origin ${{ matrix.tag }}
-      - name: Create GitHub Release
+      - name: Tag and create GitHub Release
         if: ${{ matrix.tag }}
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ matrix.tag }}
           PACKAGE: ${{ matrix.package }}
           VERSION: ${{ matrix.version }}
+          SHA: ${{ github.sha }}
         run: |
           set -xueo pipefail
           # Give dependabot per-package release notes to render when it
           # opens a bump PR: without a release for the tag it either shows
           # nothing or the whole monorepo diff. See issue #427.
           notes_file="$(mktemp)"
-          python3 .github/extract-changelog.py "${PACKAGE}/CHANGELOG.md" "${VERSION}" \
+          python3 .scripts/extract_changelog.py "${PACKAGE}/CHANGELOG.md" "${VERSION}" \
             > "${notes_file}"
+          # `gh release create` creates the tag itself, so this is one step
+          # rather than a `git push` followed by a release that cannot be
+          # retried: re-running a failed job used to die on the tag already
+          # being on the remote, and never reach the release again.
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            echo "Release ${TAG} already exists; not recreating it."
+            exit 0
+          fi
           gh release create "${TAG}" \
+            --target "${SHA}" \
             --title "${TAG}" \
             --notes-file "${notes_file}"
