@@ -14,37 +14,17 @@
 
 # ruff: noqa: D103 (function docstrings)
 
-"""Unit tests for the extract-changelog script.
-
-The script lives in `.github/` and its filename isn't a valid module name, so
-it's loaded by path rather than imported.
-"""
+"""Unit tests for the extract_changelog script."""
 
 from __future__ import annotations
 
-import importlib.util
-import pathlib
 import typing
 
+import extract_changelog
 import pytest
 
 if typing.TYPE_CHECKING:
-    import types
-
-_REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
-_SCRIPT = _REPO_ROOT / '.github' / 'extract-changelog.py'
-
-
-def _load() -> types.ModuleType:
-    spec = importlib.util.spec_from_file_location('extract_changelog', _SCRIPT)
-    assert spec is not None
-    assert spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-extract_changelog = _load()
+    import pathlib
 
 CHANGELOG = """\
 # 1.3.0 - 2 June 2026
@@ -102,11 +82,6 @@ def test_subheadings_are_kept():
     assert extract_changelog.extract(text, '2.0.0') == '## Fixes\n\nA fix.'
 
 
-@pytest.mark.parametrize('version', ['1.3.0', '1.2.1', '1.2.0'])
-def test_every_heading_is_findable(version: str):
-    assert extract_changelog.extract(CHANGELOG, version) is not None
-
-
 # The interfaces packages open with a prose H1 and put versions at H2.
 def test_extract_h2_versions_under_a_prose_h1():
     text = (
@@ -145,3 +120,55 @@ def test_extract_keeps_deeper_subheadings():
 def test_extract_does_not_include_the_prose_heading():
     text = '# Changelog\n\nprose\n\n## 1.0.0 - 1 June 2026\n\nreal\n'
     assert extract_changelog.extract(text, '1.0.0') == 'real'
+
+
+# A migration example in a breaking-change entry contains Python comments,
+# which start with the same character as a heading.
+def test_a_fenced_code_block_does_not_end_the_section():
+    text = (
+        '# 2.0.0 - 31 August 2026\n\n'
+        'Breaking change. Migrate like this:\n\n'
+        '```python\n# Before\nsnap.add("foo")\n# After\nsnap.install("foo")\n```\n\n'
+        'Also fixed a leak.\n\n'
+        '# 1.0.0 - 1 August 2026\n\nFirst release.\n'
+    )
+    got = extract_changelog.extract(text, '2.0.0')
+    assert got is not None
+    assert '# Before' in got
+    assert got.endswith('Also fixed a leak.')
+    # The fence is closed: notes ending mid-block render as a broken block.
+    assert got.count('```') == 2
+    # And the next version is still bounded correctly.
+    assert extract_changelog.extract(text, '1.0.0') == 'First release.'
+
+
+@pytest.mark.parametrize('fence', ['```', '~~~~'])
+def test_both_fence_characters_are_honoured(fence: str):
+    text = f'# 1.0.0\n\n{fence}\n# not a heading\n{fence}\n\ntail\n'
+    got = extract_changelog.extract(text, '1.0.0')
+    assert got is not None
+    assert got.endswith('tail')
+
+
+def test_main_prints_the_section(tmp_path: pathlib.Path, capsys: pytest.CaptureFixture[str]):
+    changelog = tmp_path / 'CHANGELOG.md'
+    changelog.write_text(CHANGELOG, encoding='utf-8')
+
+    assert extract_changelog.main([str(changelog), '1.2.1']) == 0
+
+    assert capsys.readouterr().out.strip() == extract_changelog.extract(CHANGELOG, '1.2.1')
+
+
+def test_main_reports_a_missing_version(
+    tmp_path: pathlib.Path, capsys: pytest.CaptureFixture[str]
+):
+    """The whole safety argument is that the caller notices, so check it does."""
+    changelog = tmp_path / 'CHANGELOG.md'
+    changelog.write_text(CHANGELOG, encoding='utf-8')
+
+    assert extract_changelog.main([str(changelog), '9.9.9']) == 1
+
+    captured = capsys.readouterr()
+    assert captured.out == ''
+    assert '9.9.9' in captured.err
+    assert str(changelog) in captured.err
