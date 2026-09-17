@@ -93,21 +93,9 @@ class Nginx:
 
         if self._container.can_connect():
             # Read the current content of the files (if they exist)
-            current_server_cert = (
-                self._container.pull(self.CERT_PATH).read()
-                if self._container.exists(self.CERT_PATH)
-                else ''
-            )
-            current_private_key = (
-                self._container.pull(self.KEY_PATH).read()
-                if self._container.exists(self.KEY_PATH)
-                else ''
-            )
-            current_ca_cert = (
-                self._container.pull(self.CA_CERT_PATH).read()
-                if self._container.exists(self.CA_CERT_PATH)
-                else ''
-            )
+            current_server_cert = self._read_if_exists(self.CERT_PATH)
+            current_private_key = self._read_if_exists(self.KEY_PATH)
+            current_ca_cert = self._read_if_exists(self.CA_CERT_PATH)
 
             if (
                 current_server_cert == server_cert
@@ -121,6 +109,13 @@ class Nginx:
             self._container.push(self.CA_CERT_PATH, ca_cert, make_dirs=True)
             logger.debug('running update-ca-certificates')
             self._container.exec(['update-ca-certificates', '--fresh']).wait()
+
+    def _read_if_exists(self, path: str) -> str:
+        """Return the text contents of ``path`` in the workload, or '' if missing."""
+        if not self._container.exists(path):
+            return ''
+        with self._container.pull(path) as f:
+            return f.read()
 
     def _delete_certificates(self) -> None:
         """Delete the certificate files from disk and run update-ca-certificates."""
@@ -166,7 +161,8 @@ class Nginx:
 
         try:
             with _tracer.start_as_current_span('read config'):
-                current_config = self._container.pull(self.NGINX_CONFIG).read()
+                with self._container.pull(self.NGINX_CONFIG) as f:
+                    current_config = f.read()
         except pebble.PathError:
             logger.debug('nginx configuration file not found at %s', str(self.NGINX_CONFIG))
             # file does not exist! it's probably because it's the first time we're generating it.
