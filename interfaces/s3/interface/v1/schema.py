@@ -1,9 +1,10 @@
 """Schemas for v1 of the s3 interface."""
 
+import json
 from enum import Enum, IntEnum
+from typing import Any
 
-from interface_tester.schema_base import DataBagSchema
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
 
 
 class S3URIStyleEnum(str, Enum):
@@ -16,8 +17,24 @@ class S3APIVersion(IntEnum):
     v4 = 4
 
 
-class S3ProviderAppData(BaseModel):
+class _BareStringDatabag(BaseModel):
+    """Base class for databag models that don't strictly JSON encode all entries."""
+
+    @staticmethod
+    def __juju_decoder__(value: str) -> str:
+        """Pass Juju's string through unmodified to be decoded by individual field validators."""
+        return value
+
+    @staticmethod
+    def __juju_encoder__(value: str | None) -> str:
+        """Convert `None` to "", erasing the value; Ops will error on a non-string."""
+        return "" if value is None else value
+
+
+class ProviderAppData(_BareStringDatabag):
     """Data expected on the provider side for the s3 v1 interface."""
+
+    model_config = ConfigDict(strict=True, populate_by_name=True)
 
     bucket: str | None = Field(
         description="The bucket/container name delivered by the provider.",
@@ -64,6 +81,7 @@ class S3ProviderAppData(BaseModel):
         alias="s3-uri-style",
         description="The S3 protocol specific bucket path lookup type.",
         examples=["path", "host"],
+        strict=False,
         title="S3 URI Style",
     )
 
@@ -76,20 +94,24 @@ class S3ProviderAppData(BaseModel):
 
     tls_ca_chain: list[str] | None = Field(
         alias="tls-ca-chain",
-        description="The complete CA chain, which can be used for HTTPS validation.",
+        description=(
+            "The complete CA chain, which can be used for HTTPS validation."
+            " A JSON array on the wire."
+        ),
         examples=[["base64-encoded-ca-chain=="]],
         title="TLS CA Chain",
     )
 
     s3_api_version: S3APIVersion | None = Field(
         alias="s3-api-version",
-        description="S3 protocol specific API signature.",
+        description="S3 protocol specific API signature. A decimal string on the wire.",
         examples=[2, 4],
+        strict=False,
         title="S3 API signature",
     )
 
     attributes: list[str] | None = Field(
-        description="The custom metadata (HTTP headers).",
+        description="The custom metadata (HTTP headers). Semicolon separated on the wire.",
         examples=[
             [
                 "Cache-Control=max-age=90000,min-fresh=9000",
@@ -99,9 +121,47 @@ class S3ProviderAppData(BaseModel):
         title="Custom metadata",
     )
 
+    @field_serializer("s3_uri_style")
+    def _dump_uri_style(self, value: S3URIStyleEnum | None) -> str | None:
+        """Write the enum's wire string rather than the enum member."""
+        return None if value is None else value.value
 
-class S3RequirerAppData(BaseModel):
+    @field_serializer("s3_api_version")
+    def _dump_api_version(self, value: S3APIVersion | None) -> str | None:
+        """Write the signature as a decimal string; Ops will error on a non-string."""
+        return None if value is None else str(value.value)
+
+    @field_validator("tls_ca_chain", mode="before")
+    @classmethod
+    def _load_json(cls, value: Any) -> Any:
+        if not isinstance(value, str):
+            return value  # __init__ argument was already deserialized.
+        return json.loads(value)
+
+    @field_serializer("tls_ca_chain")
+    def _dump_json(self, value: object) -> str | None:
+        if value is None:
+            return None
+        return json.dumps(value)
+
+    @field_validator("attributes", mode="before")
+    @classmethod
+    def _split_semicolon_separated(cls, value: str | list[str] | None) -> list[str] | None:
+        if not isinstance(value, str):
+            return value  # __init__ argument was already deserialized.
+        return value.split(";")
+
+    @field_serializer("attributes")
+    def _join_semicolon_separated(self, value: list[str] | None) -> str | None:
+        if value is None:
+            return None
+        return ";".join(value)
+
+
+class RequirerAppData(_BareStringDatabag):
     """Data expected on the requirer side for the s3 v1 interface."""
+
+    model_config = ConfigDict(strict=True, populate_by_name=True)
 
     bucket: str | None = Field(
         description="The name of the bucket/container requested by the requirer.",
@@ -124,19 +184,14 @@ class S3RequirerAppData(BaseModel):
 
     requested_secrets: str = Field(
         alias="requested-secrets",
-        description="Any provider field which should be transferred as a Juju Secret.",
+        description=(
+            "Any provider field which should be transferred as a Juju Secret."
+            " A JSON array on the wire, written to the databag as an opaque string."
+        ),
         examples=[["access-key", "secret-key"]],
         title="Requested secrets",
     )
 
 
-class ProviderSchema(DataBagSchema):
-    """The schema for the provider side of this interface."""
-
-    app: S3ProviderAppData
-
-
-class RequirerSchema(DataBagSchema):
-    """The schema for the requirer side of this interface."""
-
-    app: S3RequirerAppData
+ProviderUnitData = None
+RequirerUnitData = None
