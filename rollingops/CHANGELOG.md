@@ -1,3 +1,7 @@
+# 1.1.4 - 23 September 2026
+
+Bump dependencies
+
 # 1.1.3 - 25 August 2026
 
 Fix:
