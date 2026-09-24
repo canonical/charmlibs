@@ -2,7 +2,12 @@ name: Workflow static checks
 
 on:
   push:
-    branches: ["main"]
+    branches:
+      # NOTE: the workflow runs from the current branch
+      # only the branch name matching the current branch actually matters
+      # but we list them all to minimise the diff across branches
+      - 'main'
+      - '*-maintenance'
   pull_request:
 
 permissions: {}
