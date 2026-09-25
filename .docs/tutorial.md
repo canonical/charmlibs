@@ -294,11 +294,11 @@ Read more: {ref}`how-to-customize-integration-tests`
 For now, we'll just add an integration test for our `uptime` function.
 
 We'll start by taking a look at the files that will make up our packed charm, under `tests/integration/charms`.
-At the top level are directories for two test charms, with the directory name reflecting the substrate the charm is for: `k8s` and `machine`.
-You'll also see some common files which are symlinked into the structure for our two test charms -- these symlinks are resolved by the packing step before `charmcraft pack` is executed.
+At the top level are directories for two test charms, with the directory name reflecting the substrate the charm is for: `k8s-charm` and `machine-charm`.
+You'll also see a `common/` directory containing shared files which are symlinked into the structure for our two test charms -- these symlinks are resolved by the packing step before `charmcraft pack` is executed.
 Taking a look inside one of the charm directories, you can see these symlinks, as well as a unique `charmcraft.yaml` file per substrate, and the usual `src/` directory.
-There's also a directory named `library/`, which contains symlinks to your library code and metadata -- this is how the latest changes from your library are made available to these charms.
-Under `src/`, you'll see a unique `charm.py` file, and a symlink to `common.py`.
+There's also a symlink named `library/`, pointing to `common/local-library/`, which contains symlinks to your library code and metadata -- this is how the latest changes from your library are made available to these charms.
+Under `src/`, you'll see a unique `charm.py` file, and a symlink to `common/common.py`.
 
 Our `uptime` function should work just as well in a K8s charm as in a machine charm, so we'll test on both substrates, meaning that we don't need to change anything so far.
 
@@ -307,18 +307,18 @@ If you're working on an integration library, the K8s / machine distinction may o
 As long as your library is intended to work on both substrates, it's a good idea to test on both.
 
 However, whether you test on both substrates or just one, you'll definitely want to be packing both a requirer and provider charm.
-Consider adding `provider` and `requirer` directories under `tests/integration/charms`, duplicating the existing charm structure in each, updating `pack.sh` to pack both `requirer` and `provider` charms, and deploying both in `conftest.py`.
+Consider adding `requirer-charm` and `provider-charm` directories under `tests/integration/charms`, following the same pattern as the existing charms, updating `pack.sh` to pack both charms, and deploying both in `conftest.py`.
 ````
 
 For testing purposes, we'll communicate with the library in our packed charm via a Juju action.
-Open `tests/integration/charms/actions.yaml` and add a new action:
+Open `tests/integration/charms/common/actions.yaml` and add a new action:
 ```yaml
 charm-uptime:
 ```
 
-We'll also need an observer for this action, which can be the same for both charms, so it can go in the `Charm` base class in `common.py`.
+We'll also need an observer for this action, which can be the same for both charms, so it can go in the `Charm` base class in `common/common.py`.
 It will look a lot like the handler for `lib-version`, `_on_lib_version`, but we'll serialize the result as a JSON object to preserve its type for our test code.
-Open `tests/integraton/charms/common.py` and add this import statement:
+Open `tests/integration/charms/common/common.py` and add this import statement:
 ```python
 import json
 ```
