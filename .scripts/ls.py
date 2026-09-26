@@ -500,17 +500,15 @@ def _all_libs_by_name() -> dict[str, _LibEntry]:
     libs_yaml = yaml.safe_load((_REPO_ROOT / '.docs' / 'reference' / 'libs.yaml').read_text())
     result: dict[str, _LibEntry] = {}
     for entry in (*libs_yaml['general'], *libs_yaml['interfaces']):
-        # Library names should be unique, but we currently have an entry for
-        # charms.data_platform_libs.data_interfaces for each interface it supports
-        # This doesn't break our lookups though, since they all have the same metadata
-        # (aside from the interface column)
-        assert (
-            entry['name'] not in result
-            or entry['name'] == 'charms.data_platform_libs.data_interfaces'
+        lib = _LibEntry(**{k.name: entry[k.name] for k in dataclasses.fields(_LibEntry)})
+        # A library may appear more than once -- once per interface it supports, and once in
+        # each section for a library that is both general purpose and used for an interface.
+        # That doesn't break these lookups, as long as every entry agrees on the fields we
+        # read here (the interface and substrate columns are not among them).
+        assert result.get(entry['name'], lib) == lib, (
+            f'Conflicting libs.yaml entries for {entry["name"]!r}.'
         )
-        result[entry['name']] = _LibEntry(**{
-            k.name: entry[k.name] for k in dataclasses.fields(_LibEntry)
-        })
+        result[entry['name']] = lib
     return result
 
 
