@@ -60,7 +60,7 @@ jobs:
         id: package-info
         run: |
           set -xueo pipefail
-          NAME=$(.scripts/ls.py packages --no-json --exclude-testing --output-only name --regex "$PACKAGE")
+          NAME=$(.scripts/ls.py packages --no-json --output-only name --regex "$PACKAGE")
           echo "name=$NAME"
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
 

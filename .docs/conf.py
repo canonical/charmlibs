@@ -15,19 +15,20 @@ local_extensions = [
 ]
 
 # So that sphinx.ext.autodoc can find charmlibs code
+# Reference docs are generated with bare module names (for example `automodule:: pathops`), so
+# each package's namespace directory goes on the path, along with the namespace directory of
+# its testing package, if it has one.
 root = pathlib.Path(__file__).parent.parent
 package_glob = '[a-z]*'
+general_packages = [
+    p for p in root.glob(package_glob) if p.is_dir() and not p.name == 'interfaces'
+]
+interface_packages = [p for p in (root / 'interfaces').glob(package_glob) if p.is_dir()]
 sys.path[0:0] = [
-    *(
-        str(p / 'src' / 'charmlibs')
-        for p in root.glob(package_glob)
-        if p.is_dir() and not p.name == 'interfaces'
-    ),
-    *(
-        str(p / 'src' / 'charmlibs' / 'interfaces')
-        for p in (root / 'interfaces').glob(package_glob)
-        if p.is_dir()
-    ),
+    *(str(p / 'src' / 'charmlibs') for p in general_packages),
+    *(str(p / 'testing' / 'src' / 'charmlibs') for p in general_packages),
+    *(str(p / 'src' / 'charmlibs' / 'interfaces') for p in interface_packages),
+    *(str(p / 'testing' / 'src' / 'charmlibs' / 'interfaces') for p in interface_packages),
 ]
 
 # A complete list of built-in Sphinx configuration values:

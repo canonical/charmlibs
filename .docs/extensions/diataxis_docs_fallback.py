@@ -44,3 +44,10 @@ def _fallback(app: sphinx.application.Sphinx) -> None:
         path = docs_dir / category / f'_lib-{category}.md'
         if not path.exists():
             path.write_text('')
+    # The same fallback for the testing-package toctree that reference/testing.md includes,
+    # written by scripts/package_docs_preprocessor.py. It's an include rather than a glob so
+    # that having no testing packages at all is an empty toctree rather than a warning.
+    testing = docs_dir / 'reference' / '_testing-packages.md'
+    if not testing.exists():
+        testing.parent.mkdir(parents=True, exist_ok=True)
+        testing.write_text('')

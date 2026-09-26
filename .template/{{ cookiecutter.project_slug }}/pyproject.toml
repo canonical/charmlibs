@@ -58,7 +58,7 @@ build-backend = "hatchling.build"
 packages = ["src/charmlibs"]
 
 [tool.hatch.version]
-path = "src/charmlibs/{{ cookiecutter.__path_prefix }}{{ cookiecutter.__pkg}}/_version.py"
+path = "src/charmlibs/{{ cookiecutter.__path_prefix }}{{ cookiecutter.__pkg }}/_version.py"
 {% if cookiecutter._interface %}
 [tool.uv.sources]
 {{ cookiecutter.__dist_pkg }}-testing = { path = "testing", editable = true }

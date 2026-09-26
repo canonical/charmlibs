@@ -20,6 +20,13 @@ dependencies = [
     "pydantic",
 ]
 
+[project.optional-dependencies]
+testing = [
+    # Lockstep versioning: the testing package reuses the library's private wire format,
+    # so the two are released together and pin each other exactly.
+    "charmlibs-interfaces-tls-certificates-testing==1.11.0",
+]
+
 [dependency-groups]
 lint = [  # installed for `just lint interfaces/tls_certificates` (unit, functional, and integration are also installed)
     "typing_extensions",
@@ -50,6 +57,9 @@ packages = ["src/charmlibs"]
 
 [tool.hatch.version]
 path = "src/charmlibs/interfaces/tls_certificates/_version.py"
+
+[tool.uv.sources]
+charmlibs-interfaces-tls-certificates-testing = { path = "testing", editable = true }
 
 [tool.ruff]
 extend = "../../pyproject.toml"

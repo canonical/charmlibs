@@ -47,6 +47,8 @@ import tomllib
 import yaml
 
 _REPO_ROOT = pathlib.Path(__file__).parent.parent
+_TESTING_DIR = 'testing'
+"""The directory a library's testing package lives in, next to the library itself."""
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(str(pathlib.Path(__file__).relative_to(_REPO_ROOT)))
@@ -145,7 +147,8 @@ def _ls(
         include_placeholders: Whether to include the namespace placeholder packages.
             Typically included for testing and publishing, but excluded from docs.
         include_testing: Whether to include library testing packages.
-            Typically included for testing and publishing, but excluded from docs.
+            Typically included -- they're tested, published, and documented like any other
+            package -- but excluded where a testing package would shadow the library it's for.
         regex: Regular expression to match dirs on, or None to skip matching and include all.
         output: List of fields to include in the output, one or more of
             'name', 'path', or 'version'
@@ -158,7 +161,7 @@ def _ls(
     with _snapshot_repo(new_ref) as root:
         # Collect packages or interfaces.
         if category == 'packages':
-            dirs = _packages(root, include=include, regex=regex)
+            dirs = _packages(root, include=include, regex=regex, include_testing=include_testing)
         elif category == 'interfaces':
             dirs = _interfaces(root, include=include, regex=regex)
         else:
@@ -167,10 +170,10 @@ def _ls(
         # Return full info if we calculate it.
         if old_ref:
             dirs = _changed_only(root, dirs, ref=old_ref)
+            if category == 'packages' and include_testing:
+                dirs = _with_testing_siblings(root, dirs, regex=regex)
             if only_if_version_changed:
                 dirs = _get_changed_versions_only(category, root, dirs, ref=old_ref)
-        if category == 'packages' and include_testing:
-            dirs.extend([t for p in dirs if _is_package(t := p / 'testing')])
         # Calculate only the information needed.
         infos: list[Info] = []
         for path in dirs:
@@ -203,20 +206,56 @@ def _ls(
         return infos
 
 
-def _packages(root: pathlib.Path, include: list[str], regex: str | None) -> list[pathlib.Path]:
+def _packages(
+    root: pathlib.Path, include: list[str], regex: str | None, include_testing: bool = True
+) -> list[pathlib.Path]:
     """Iterate over package directories in the repository.
 
     Returns any directory starting with [a-z] from the root and from the 'interfaces'
     sub-directory, as well as any directories listed in `include`, if they exists and have a
-    'pyproject.toml' file with a 'project' table.
+    'pyproject.toml' file with a 'project' table. A library's testing package -- a package in a
+    'testing' directory next to the library -- is included too unless `include_testing` is false.
+
+    `regex` is matched against every path, testing packages included, so
+    `--regex 'interfaces/tls-certificates/testing'` selects just the testing package.
     """
     paths: set[pathlib.Path] = set()
     for r in root, root / 'interfaces':
         paths.update(r.glob(r'[a-z]*'))
         paths.update(r / i for i in include)
+    if include_testing:
+        paths.update(p / _TESTING_DIR for p in list(paths))
     if regex is not None:
         paths = {path for path in paths if re.fullmatch(regex, str(path.relative_to(root)))}
     return sorted(path.relative_to(root) for path in paths if _is_package(path))
+
+
+def _with_testing_siblings(
+    root: pathlib.Path, dirs: list[pathlib.Path], regex: str | None
+) -> list[pathlib.Path]:
+    """Return `dirs` with each library's testing package, and each testing package's library.
+
+    A library and its testing package are versioned in lockstep, so a change to either is a
+    change to both: whichever of the pair `_changed_only` selected, the other must come along,
+    or a release could ship one half of a lockstep pair. Each is still version-checked in its own
+    right afterwards, so neither rides along on -- nor is hidden by -- the other's version.
+
+    `regex` still applies: a caller that asked for one package of the pair by path gets only that
+    one, because selecting a single package is a deliberate request, not change detection.
+    """
+    result = list(dirs)
+    for path in dirs:
+        sibling = (
+            path.parent if path.name == _TESTING_DIR and _is_package(root / path.parent) else None
+        )
+        if sibling is None and _is_package(root / path / _TESTING_DIR):
+            sibling = path / _TESTING_DIR
+        if sibling is None or sibling in result:
+            continue
+        if regex is not None and not re.fullmatch(regex, str(sibling)):
+            continue
+        result.append(sibling)
+    return sorted(result)
 
 
 def _is_package(path: pathlib.Path) -> bool:

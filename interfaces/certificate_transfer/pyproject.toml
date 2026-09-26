@@ -19,6 +19,13 @@ dependencies = [
     "pydantic",
 ]
 
+[project.optional-dependencies]
+testing = [
+    # Lockstep versioning: the testing package reuses the library's private databag models,
+    # so the two are released together and pin each other exactly.
+    "charmlibs-interfaces-certificate-transfer-testing==1.1.0",
+]
+
 [dependency-groups]
 lint = [  # installed for `just lint interfaces/certificate_transfer` (unit, functional, and integration are also installed)
 ]
@@ -46,6 +53,9 @@ packages = ["src/charmlibs"]
 
 [tool.hatch.version]
 path = "src/charmlibs/interfaces/certificate_transfer/_version.py"
+
+[tool.uv.sources]
+charmlibs-interfaces-certificate-transfer-testing = { path = "testing", editable = true }
 
 [tool.ruff]
 extend = "../../pyproject.toml"

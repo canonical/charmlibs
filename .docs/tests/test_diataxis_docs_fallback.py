@@ -60,3 +60,28 @@ def test_fallback_skips_when_include_exists(tmp_path: pathlib.Path):
     for category in CATEGORIES:
         path = tmp_path / category / f'_lib-{category}.md'
         assert path.read_text() == 'existing'
+
+
+def test_fallback_writes_empty_testing_toctree_when_missing(tmp_path: pathlib.Path):
+    """An empty include, so that having no testing packages at all isn't a warning."""
+    for category in CATEGORIES:
+        (tmp_path / category).mkdir()
+
+    fallback._fallback(_app(tmp_path))
+
+    path = tmp_path / 'reference' / '_testing-packages.md'
+    assert path.exists()
+    assert path.read_text() == ''
+
+
+def test_fallback_skips_the_testing_toctree_when_it_exists(tmp_path: pathlib.Path):
+    """The preprocessor's toctree must survive: it's the real content, not a fallback."""
+    for category in CATEGORIES:
+        (tmp_path / category).mkdir()
+    path = tmp_path / 'reference' / '_testing-packages.md'
+    path.parent.mkdir()
+    path.write_text('existing')
+
+    fallback._fallback(_app(tmp_path))
+
+    assert path.read_text() == 'existing'

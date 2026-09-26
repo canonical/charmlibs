@@ -7,5 +7,6 @@ general-libs
 interface-libs
 charmlibs
 charmlibs-interfaces
+testing
 interfaces
 ```

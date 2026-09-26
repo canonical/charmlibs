@@ -12,14 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""The {{ cookiecutter.__import_pkg }}_testing package."""
+"""The {{ cookiecutter.__import_pkg }}_testing package.
 
-from ._testing import relation_for_provider, relation_for_requirer
+Two independent pieces of API. :class:`RemoteProvider` and :class:`RemoteRequirer` stand in
+for the charm on the other end of a ``{{ cookiecutter.project_slug }}`` relation, running
+the charm under test to build the state; and :func:`mocked` mocks the library's internals
+for the duration of a test. Every state-producing call must be made inside a :func:`mocked`
+scope.
+
+A requirer charm under test is paired with a :class:`RemoteProvider`, and a provider charm
+with a :class:`RemoteRequirer` -- the remote plays the opposite role.
+"""
+
+from ._mocking import mocked
+from ._testing import RemoteProvider, RemoteRequirer
 from ._version import __version__ as __version__
 
 __all__ = [
     # only the names listed in __all__ are imported when executing:
     # from {{ cookiecutter.__import_pkg }}_testing import *
-    'relation_for_provider',
-    'relation_for_requirer',
+    'RemoteProvider',
+    'RemoteRequirer',
+    'mocked',
 ]

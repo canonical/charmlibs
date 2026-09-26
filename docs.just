@@ -148,6 +148,7 @@ clean:
     # package reference docs
     rm -rf reference/charmlibs
     rm -rf reference/interfaces
+    rm -rf reference/testing
     rm -rf .save
     # per-library diataxis docs
     rm -rf tutorials/charmlibs
@@ -156,6 +157,7 @@ clean:
     rm -f tutorials/_lib-tutorials.md
     rm -f how-to/_lib-how-to.md
     rm -f explanation/_lib-explanation.md
+    rm -f reference/_testing-packages.md
 
 [doc('Run `pyright` for local sphinx extensions.')]
 ext-static *pyrightargs:

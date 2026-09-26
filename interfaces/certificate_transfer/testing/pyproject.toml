@@ -1,0 +1,71 @@
+[project]
+name = "charmlibs-interfaces-certificate-transfer-testing"
+description = "The charmlibs.interfaces.certificate_transfer_testing package."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    {name="The TLS team at Canonical"},
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+    "Intended Audience :: Developers",
+    "Operating System :: POSIX :: Linux",
+    "Development Status :: 5 - Production/Stable",
+]
+dynamic = ["version"]
+dependencies = [
+    # Pinned exactly: this package reuses the library's private databag models, so the two
+    # are released in lockstep and cannot be allowed to drift.
+    "charmlibs-interfaces-certificate-transfer==1.1.0",
+    "ops[testing]",
+    "pydantic",  # match the library's constraint
+]
+
+[dependency-groups]
+lint = [  # installed for `just lint interfaces/certificate_transfer/testing` (unit, functional, and integration are also installed)
+    # generate_raw.py only, which is checked but never shipped or imported at runtime.
+    "cryptography",
+]
+unit = [  # installed for `just unit interfaces/certificate_transfer/testing`
+]
+functional = []  # group required by CI, but functional tests aren't recommended for testing packages
+integration = []  # group required by CI, but integration tests aren't recommended for testing packages
+
+[project.urls]
+"Documentation" = "https://canonical.com/juju/docs/charmlibs/reference/testing/charmlibs-interfaces-certificate-transfer-testing"
+"Repository" = "https://github.com/canonical/charmlibs/tree/main/interfaces/certificate_transfer/testing"
+"Issues" = "https://github.com/canonical/charmlibs/issues"
+"Changelog" = "https://github.com/canonical/charmlibs/blob/main/interfaces/certificate_transfer/testing/CHANGELOG.md"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/charmlibs"]
+
+[tool.hatch.version]
+path = "src/charmlibs/interfaces/certificate_transfer_testing/_version.py"
+
+[tool.uv.sources]
+charmlibs-interfaces-certificate-transfer = { path = "../", editable = true }
+
+[tool.ruff]
+extend = "../pyproject.toml"
+src = ["src", "tests/unit"]  # correctly sort local imports in tests
+
+[tool.ruff.format]
+# The library preserves the quote style it was migrated with; this package is new, so it
+# takes the repo default instead.
+quote-style = "single"
+
+[tool.ruff.lint.extend-per-file-ignores]
+"tests/*" = [
+    "E501",  # line too long
+]
+
+[tool.pyright]
+extends = "../pyproject.toml"
+include = ["src", "tests", "generate_raw.py"]
+pythonVersion = "3.10"  # check no python > 3.10 features are used

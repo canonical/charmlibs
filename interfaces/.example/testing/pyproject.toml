@@ -29,8 +29,10 @@ functional = []  # group required by CI, but functional tests aren't recommended
 integration = []  # group required by CI, but integration tests aren't recommended for testing packages
 
 [project.urls]
-"Repository" = "https://github.com/canonical/charmlibs"
+"Documentation" = "https://canonical.com/juju/docs/charmlibs/reference/testing/charmlibs-interfaces-example-interface-testing"
+"Repository" = "https://github.com/canonical/charmlibs/tree/main/interfaces/example-interface/testing"
 "Issues" = "https://github.com/canonical/charmlibs/issues"
+"Changelog" = "https://github.com/canonical/charmlibs/blob/main/interfaces/example-interface/testing/CHANGELOG.md"
 
 [build-system]
 requires = ["hatchling"]
@@ -40,6 +42,8 @@ build-backend = "hatchling.build"
 packages = ["src/charmlibs"]
 
 [tool.hatch.version]
+# A testing package only exists for an interface library, so `__path_prefix` is always
+# `interfaces/` here -- it's written this way to match the library's own pyproject.toml.
 path = "src/charmlibs/interfaces/example_interface_testing/_version.py"
 
 [tool.uv.sources]

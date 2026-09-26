@@ -27,6 +27,13 @@ dependencies = [
     "pydantic>=2",
 ]
 
+[project.optional-dependencies]
+testing = [
+    # Lockstep versioning: the testing package reuses the library's databag models, so the
+    # two are released together and pin each other exactly.
+    "charmlibs-interfaces-tracing-testing==1.1.0",
+]
+
 [dependency-groups]
 lint = [  # installed for `just lint interfaces/tracing` (unit, functional, and integration are also installed)
     # "typing_extensions",
@@ -56,6 +63,9 @@ packages = ["src/charmlibs"]
 
 [tool.hatch.version]
 path = "src/charmlibs/interfaces/tracing/_version.py"
+
+[tool.uv.sources]
+charmlibs-interfaces-tracing-testing = { path = "testing", editable = true }
 
 [tool.ruff]
 extend = "../../pyproject.toml"

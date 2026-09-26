@@ -25,10 +25,22 @@ The placeholder rst files these builds read are written up front by the companio
 during ``source-read`` for the current package. This is what makes it safe to run per-package
 sphinx-build invocations concurrently: they share the same source tree but never mutate each
 other's rst files.
+
+Library packages are documented under ``reference/charmlibs``, mirroring their import path.
+Testing packages -- a package in a ``testing`` directory next to the library it provides testing
+helpers for -- are documented under ``reference/testing`` instead, so that they get their own
+section in the reference table of contents, and each testing package's page is cross-linked with
+the page for the library it's for.
+
+``_page()`` (and the rest of the ``_Page`` machinery below) is the single source of truth for
+where a package's reference docs live and how they're titled and labelled. It has no dependency
+on Sphinx, so ``scripts/package_docs_preprocessor.py`` imports it directly rather than
+duplicating this logic.
 """
 
 from __future__ import annotations
 
+import dataclasses
 import pathlib
 import pickle  # noqa: S403
 import re
@@ -43,6 +55,71 @@ AUTOMODULE_TEMPLATE = """
 
 .. automodule:: {package}
 """.rstrip()
+SEEALSO_TEMPLATE = """
+
+.. seealso:: {text} :ref:`{import_path} <{label}>`
+""".rstrip()
+TESTING_DIR = 'testing'
+
+
+@dataclasses.dataclass(frozen=True)
+class _Page:
+    """Where a package's generated reference docs live, and how they're titled and labelled."""
+
+    docname: str
+    """Sphinx document name, for example ``reference/charmlibs/interfaces/tls-certificates``."""
+    import_name: str
+    """Final component of the import path, for example ``tls_certificates``."""
+    import_prefix: str
+    """Everything before ``import_name``, for example ``charmlibs.interfaces.``."""
+    label: str
+    """Cross-reference label, for example ``charmlibs-interfaces-tls-certificates``."""
+    is_testing: bool
+    """Whether this is the page for a library's testing package."""
+
+    @property
+    def import_path(self) -> str:
+        """Full import path, for example ``charmlibs.interfaces.tls_certificates``."""
+        return f'{self.import_prefix}{self.import_name}'
+
+
+def _page(package: str) -> _Page:
+    """Return reference page information for the package at this repository relative path.
+
+    Library packages are documented at a document name mirroring their import path, for example
+    ``interfaces/tls-certificates`` -> ``reference/charmlibs/interfaces/tls-certificates``.
+    Testing packages are documented in their own directory, named after their full import path,
+    for example ``interfaces/tls-certificates/testing`` ->
+    ``reference/testing/charmlibs-interfaces-tls-certificates-testing``.
+    """
+    parts = list(pathlib.PurePosixPath(package).parts)
+    # A top-level package could legitimately be called 'testing', so require a parent package.
+    is_testing = len(parts) > 1 and parts[-1] == TESTING_DIR
+    if is_testing:
+        parts.pop()
+    names = ['charmlibs', *(_normalize(part) for part in parts)]
+    if is_testing:
+        names[-1] = f'{names[-1]}-{TESTING_DIR}'
+    label = '-'.join(names)
+    return _Page(
+        docname=f'reference/{TESTING_DIR}/{label}'
+        if is_testing
+        else '/'.join(['reference', *names]),
+        import_name=names[-1].replace('-', '_'),
+        import_prefix=''.join(f'{name.replace("-", "_")}.' for name in names[:-1]),
+        label=label,
+        is_testing=is_testing,
+    )
+
+
+def _related_page(package: str, pages: dict[str, _Page]) -> _Page | None:
+    """Return the page to cross-link from this package's page, if there is one.
+
+    A testing package links to the library it's for, and vice versa.
+    """
+    if pages[package].is_testing:
+        return pages.get(str(pathlib.PurePosixPath(package).parent))
+    return pages.get(f'{package}/{TESTING_DIR}')
 
 
 def setup(app: sphinx.application.Sphinx) -> dict[str, str | bool]:
@@ -66,15 +143,10 @@ def _append_automodule_on_source_read(
     package = app.config.package
     if package is None:
         return
-    subdir, _, p = package.rpartition('/')
-    canonical_path = ['charmlibs']
-    if subdir:
-        canonical_path.append(_normalize(subdir))
-    canonical_path.append(_normalize(p))
-    if docname != '/'.join(('reference', *canonical_path)):
+    page = _page(package)
+    if docname != page.docname:
         return
-    import_name = canonical_path[-1].replace('-', '_')
-    source[0] = source[0] + AUTOMODULE_TEMPLATE.format(package=import_name)
+    source[0] = source[0] + AUTOMODULE_TEMPLATE.format(package=page.import_name)
 
 
 def _load_on_doctree_read(app: sphinx.application.Sphinx, doctree: docutils.nodes.document):
@@ -104,7 +176,7 @@ def _save_on_doctree_resolved(
     package = app.config.package
     # only save when building docs for a specific package
     # only save package reference docs
-    if package is None or docname != f'reference/charmlibs/{_normalize(package)}':
+    if package is None or docname != _page(package).docname:
         return
     objects = app.env.domains['py'].data['objects']
     modules = app.env.domains['py'].data['modules']

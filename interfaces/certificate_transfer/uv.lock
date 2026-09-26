@@ -19,6 +19,11 @@ dependencies = [
     { name = "pydantic" },
 ]
 
+[package.optional-dependencies]
+testing = [
+    { name = "charmlibs-interfaces-certificate-transfer-testing" },
+]
+
 [package.dev-dependencies]
 unit = [
     { name = "ops", extra = ["testing"] },
@@ -27,9 +32,11 @@ unit = [
 
 [package.metadata]
 requires-dist = [
+    { name = "charmlibs-interfaces-certificate-transfer-testing", marker = "extra == 'testing'", editable = "testing" },
     { name = "ops" },
     { name = "pydantic" },
 ]
+provides-extras = ["testing"]
 
 [package.metadata.requires-dev]
 functional = []
@@ -39,6 +46,28 @@ unit = [
     { name = "ops", extras = ["testing"] },
     { name = "pytest" },
 ]
+
+[[package]]
+name = "charmlibs-interfaces-certificate-transfer-testing"
+source = { editable = "testing" }
+dependencies = [
+    { name = "charmlibs-interfaces-certificate-transfer" },
+    { name = "ops", extra = ["testing"] },
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "charmlibs-interfaces-certificate-transfer", editable = "." },
+    { name = "ops", extras = ["testing"] },
+    { name = "pydantic" },
+]
+
+[package.metadata.requires-dev]
+functional = []
+integration = []
+lint = [{ name = "cryptography" }]
+unit = []
 
 [[package]]
 name = "colorama"
