@@ -292,12 +292,12 @@ Integration tests involve packing your library into a charm and deploying it on 
 Read more: {ref}`tutorial-add-integration-tests`, {ref}`charmlibs-integration-tests`
 
 If you take a look at your `<library path>/tests/integration` directory, you'll see a `pack.sh` script.
-Currently it packs a simple `k8s` or `machine` charm, depending on the `CHARMLIBS_SUBSTRATE` variable that is set in CI.
+Currently it packs either `k8s-charm` or `machine-charm`, depending on the `CHARMLIBS_SUBSTRATE` variable that is set in CI.
 In CI, the script is executed by `just pack-k8s` or `just pack-machine`.
 The integration tests provided by the template use `jubilant` to deploy and test the packed charm.
 They're executed by `just integration-k8s` or `just integration-machine`.
 
-The simple `k8s` and `machine` charms are defined in the `<library path>/tests/integration/charms` directory.
+The `k8s-charm` and `machine-charm` charms are defined in the `<library path>/tests/integration/charms` directory.
 You're more than welcome to fit your existing integration tests into this structure.
 However, the use of the `pack.sh` script is completely optional -- you're free to remove it entirely, in which case that step is skipped in CI.
 This is especially useful if your integration tests used `pytest-operator` to pack and deploy charms from the tests themselves.

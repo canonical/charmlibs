@@ -23,6 +23,12 @@ class LdapProviderData(BaseModel):
         title='LDAP URLs',
         example=['ldap://ldap.canonical.com:3893', 'ldap://ldap.ubuntu.com:3893'],
     )
+    ldaps_urls: list[AnyUrl] = Field(
+        default=[],
+        description='List of LDAPS URLs',
+        title='LDAPS URLs',
+        example=['ldaps://ldap.canonical.com:3894', 'ldaps://ldap.ubuntu.com:3894'],
+    )
     base_dn: str = Field(
         description='The base entry as the starting point for LDAP search operation',
         title='Base DN',

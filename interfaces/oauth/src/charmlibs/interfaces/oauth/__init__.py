@@ -61,6 +61,19 @@ Then, to initialize the library:
                 OAUTH_GRANT_TYPES,
             )
             self.oauth.update_client_config(client_config)
+
+
+Provider
+--------
+
+Besides the ``client_created``/``client_changed`` events, a provider can read a requirer's
+published configuration at any time with ``OAuthProvider.get_client_config(relation)``. It
+returns ``None`` when the requirer has published nothing yet and raises ``DataValidationError``
+when what it published does not match the requirer schema. Use it to reconcile registered
+clients holistically rather than relying on an event having been delivered.
+
+Note that ``client_created``/``client_changed`` are not emitted when the requirer's data fails
+validation; the failure is logged and the relation is skipped rather than erroring the hook.
 """
 
 from ._oauth import (

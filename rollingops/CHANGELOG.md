@@ -1,3 +1,8 @@
+# 1.1.4 - 24 September 2026
+
+Bump dependencies: notably `dpcharmlibs-interfaces` to get the cross-model
+fixes
+
 # 1.1.3 - 25 August 2026
 
 Fix:

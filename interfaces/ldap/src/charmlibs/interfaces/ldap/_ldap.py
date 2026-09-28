@@ -115,6 +115,11 @@ class LdapProviderBaseData(BaseModel):
     base_dn: str = Field(frozen=True)
     starttls: StrictBool = Field(frozen=True)
 
+    @property
+    def ldaps_enabled(self) -> bool:
+        """Whether LDAPS is enabled based on the presence of LDAPS URLs."""
+        return bool(self.ldaps_urls)
+
     @field_validator('urls', mode='before')
     @classmethod
     def validate_ldap_urls(cls, vs: list[str] | str) -> list[str]:
