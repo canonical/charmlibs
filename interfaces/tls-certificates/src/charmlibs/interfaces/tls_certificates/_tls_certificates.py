@@ -1922,6 +1922,7 @@ class TLSCertificatesRequiresV4(Object):
         self.renewal_relative_time = renewal_relative_time
         self.framework.observe(charm.on[relationship_name].relation_created, self._configure)
         self.framework.observe(charm.on[relationship_name].relation_changed, self._configure)
+        self.framework.observe(charm.on.leader_elected, self._configure)
         self.framework.observe(
             charm.on[relationship_name].relation_broken, self._on_relation_broken
         )
@@ -2983,7 +2984,7 @@ class TLSCertificatesRequiresV4(Object):
                         secret.get_content(refresh=True)
                     else:
                         logger.debug("Creating new secret with label %s", secret_label)
-                        self.charm.unit.add_secret(
+                        self._get_app_or_unit_for_mode(mode).add_secret(
                             content={
                                 "certificate": str(provider_certificate.certificate),
                                 "csr": str(provider_certificate.certificate_signing_request),

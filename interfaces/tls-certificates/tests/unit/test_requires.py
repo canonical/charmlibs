@@ -1579,6 +1579,7 @@ class TestTLSCertificatesRequiresV4:
 
         assert self.certificate_secret_exists(state_out.secrets)
         secret = self.get_certificate_secret(state_out.secrets)
+        assert secret.owner == "unit"
         days_to_expiry = validity_days * relative_renewal_time
         assert secret.expire
         assert (
@@ -1591,6 +1592,64 @@ class TestTLSCertificatesRequiresV4:
             ).total_seconds()
             < 60
         )
+
+    @patch(BASE_CHARM_DIR + "._app_or_unit", MagicMock(return_value=Mode.APP))
+    def test_given_app_certificate_is_provided_when_leader_elected_then_certificate_secret_is_app_owned(
+        self,
+    ):
+        private_key = generate_private_key()
+        csr = generate_csr(
+            private_key=private_key,
+            common_name="example.com",
+        )
+        provider_private_key = generate_private_key()
+        provider_ca_certificate = generate_ca(
+            private_key=provider_private_key,
+            common_name="example.com",
+        )
+        certificate = generate_certificate(
+            ca_key=provider_private_key,
+            csr=csr,
+            ca=provider_ca_certificate,
+        )
+        certificates_relation = testing.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-requirer",
+            local_app_data={
+                "certificate_signing_requests": json.dumps([
+                    {
+                        "certificate_signing_request": csr,
+                        "ca": False,
+                    }
+                ])
+            },
+            remote_app_data={
+                "certificates": json.dumps([
+                    {
+                        "certificate": certificate,
+                        "certificate_signing_request": csr,
+                        "ca": provider_ca_certificate,
+                    }
+                ]),
+            },
+        )
+        private_key_secret = Secret(
+            {"private-key": private_key},
+            label=f"{LIBID}-private-key-app-{certificates_relation.endpoint}",
+            owner="app",
+        )
+        state_in = testing.State(
+            leader=True,
+            relations={certificates_relation},
+            config={"common_name": "example.com"},
+            secrets={private_key_secret},
+        )
+
+        state_out = self.ctx.run(self.ctx.on.leader_elected(), state_in)
+
+        certificate_secret = self.get_certificate_secret(state_out.secrets)
+        assert certificate_secret.owner == "app"
 
     def test_given_certificate_secret_exists_and_certificate_is_provided_when_relation_changed_then_certificate_secret_is_updated(
         self,
