@@ -36,6 +36,7 @@ jobs:
       tests: ${{ steps.tests.outputs.tests }}
       python: ${{ steps.python.outputs.versions }}
       min_python_version: ${{ steps.python.outputs.min_version }}
+      max_python_version: ${{ steps.python.outputs.max_version }}
       functional-matrix: ${{ steps.functional.outputs.matrix }}
       integration-substrates: ${{ steps.integration-substrates.outputs.substrates }}
       integration-tags: ${{ steps.integration-tags.outputs.tags }}
@@ -169,6 +170,9 @@ jobs:
   # resolve deps from their own lockfile at pack time, so a charmlib needs to
   # keep working across the full range of dependency versions its pyproject.toml
   # allows -- not just the one currently pinned in the package's uv.lock.
+  # lowest-direct runs on the minimum Python and highest on the maximum: on an
+  # older Python, a dependency that has dropped support for it resolves to an
+  # older release, which would hide the new release highest is there to catch.
   # continue-on-error until existing lower bounds are known-good.
   unit-resolution:
     needs: init
@@ -178,7 +182,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        resolution: [lowest-direct, highest]
+        include:
+          - resolution: lowest-direct
+            python: ${{ needs.init.outputs.min_python_version }}
+          - resolution: highest
+            python: ${{ needs.init.outputs.max_python_version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
@@ -189,7 +197,7 @@ jobs:
 
       - name: Run unit tests with --resolution=${{ matrix.resolution }}
         env:
-          PYTHON: ${{ needs.init.outputs.min_python_version }}
+          PYTHON: ${{ matrix.python }}
           RESOLUTION: ${{ matrix.resolution }}
         run: uvx --from rust-just just unit --python "$PYTHON" --resolution "$RESOLUTION" "$PACKAGE"
 
