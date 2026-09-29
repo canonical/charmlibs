@@ -383,6 +383,13 @@ class TestPackageParser:
             parser.parse_args(['--resolution', 'bogus', 'foo'])
         assert 'invalid choice' in capsys.readouterr().err
 
+    def test_without_resolution(self, capsys: pytest.CaptureFixture[str]):
+        parser = just._package_parser(just.combine_coverage, resolution=False)
+        assert parser.parse_args(['foo']).package == 'foo'
+        with pytest.raises(SystemExit):
+            parser.parse_args(['--resolution', 'lowest-direct', 'foo'])
+        assert 'unrecognized arguments' in capsys.readouterr().err
+
 
 class TestRun:
     def test_ok(self):

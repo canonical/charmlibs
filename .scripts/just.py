@@ -372,7 +372,7 @@ def _coverage_cmds(
 @_register
 def combine_coverage(argv: list[str]) -> int:
     """Combine a package's `coverage` reports."""
-    args = _package_parser(combine_coverage).parse_args(argv)
+    args = _package_parser(combine_coverage, resolution=False).parse_args(argv)
     pkg_dir = REPO_ROOT / args.package
     python = _resolve_python(args.package, args.python)
     env = _coverage_env()
@@ -538,25 +538,30 @@ def _parser(fn: FunctionType) -> argparse.ArgumentParser:
     return argparse.ArgumentParser(prog=prog, description=fn.__doc__)
 
 
-def _package_parser(fn: FunctionType) -> argparse.ArgumentParser:
-    """Return an `ArgumentParser` with the common `--python`, `--resolution`, `package` args."""
+def _package_parser(fn: FunctionType, *, resolution: bool = True) -> argparse.ArgumentParser:
+    """Return an `ArgumentParser` with the common `--python`, `--resolution`, `package` args.
+
+    Pass `resolution=False` for a recipe that doesn't resolve dependencies, so that it
+    rejects `--resolution` rather than accepting and ignoring it.
+    """
     parser = _parser(fn)
     parser.add_argument(
         '--python',
         default=None,
         help="Python version to use, e.g. `3.12` (defaults to the package's minimum).",
     )
-    parser.add_argument(
-        '--resolution',
-        default=None,
-        choices=('highest', 'lowest', 'lowest-direct'),
-        help=(
-            'Dependency resolution strategy to pass to `uv run --resolution=...`. '
-            "When set, the package's uv.lock is bypassed (no `--locked`). "
-            'Useful for testing against the lowest declared or highest available dependency '
-            'versions, since a charm resolves deps at pack time from its own lockfile.'
-        ),
-    )
+    if resolution:
+        parser.add_argument(
+            '--resolution',
+            default=None,
+            choices=('highest', 'lowest', 'lowest-direct'),
+            help=(
+                'Dependency resolution strategy to pass to `uv run --resolution=...`. '
+                "When set, the package's uv.lock is bypassed (no `--locked`). "
+                'Useful for testing against the lowest declared or highest available dependency '
+                'versions, since a charm resolves deps at pack time from its own lockfile.'
+            ),
+        )
     parser.add_argument('package', help='Path from the repo root to the package, e.g. `pathops`.')
     return parser
 
