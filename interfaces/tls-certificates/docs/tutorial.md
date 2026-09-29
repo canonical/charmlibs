@@ -113,6 +113,43 @@ class TlsCertificatesInterfaceDemoCharm(ops.CharmBase):
         ...
 ```
 
+The library generates an RSA-2048 private key by default. To generate a different key, pass
+`key_algorithm` and, optionally, `key_size`:
+
+```python
+from charmlibs.interfaces.tls_certificates import KeyAlgorithm
+
+self.certificates = TLSCertificatesRequiresV4(
+    charm=self,
+    relationship_name="certificates",
+    certificate_requests=[self._get_certificate_request_attributes()],
+    mode=Mode.UNIT,
+    key_algorithm=KeyAlgorithm.ECDSA,  # P-256 by default; pass key_size=384 for P-384
+)
+```
+
+RSA supports sizes 2048 (the default), 3072 and 4096; ECDSA supports 256 (the default) and 384.
+Signatures use SHA-384 for P-384 keys and SHA-256 otherwise.
+
+The library doesn't replace an existing key when you change these arguments. To rotate a key after
+changing the configuration, compare the stored key's `algorithm` and `key_size` with the
+configuration and call `regenerate_private_key()`:
+
+```python
+    def _rotate_key_if_configuration_changed(self) -> None:
+        key = self.certificates.private_key
+        if key is None:
+            return
+        if (key.algorithm, key.key_size) != (
+            self.certificates.key_algorithm,
+            self.certificates.key_size,
+        ):
+            self.certificates.regenerate_private_key()
+```
+
+Rotating the key removes the old certificate requests and sends new ones, so the charm receives a
+new certificate.
+
 Add a `_get_certificate_request_attributes` method that describes the attributes of the certificate we'd like to request.
 
 ```python

@@ -25,7 +25,7 @@ import pydantic
 from cryptography import x509
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.asymmetric import ec, rsa
 from cryptography.x509.oid import ExtensionOID, NameOID
 from ops import (
     BoundEvent,
@@ -61,7 +61,7 @@ logger = logging.getLogger(__name__)
 
 NESTED_JSON_KEY = "owasp_event"
 
-CertificateIssuerPrivateKeyTypes: TypeAlias = rsa.RSAPrivateKey
+CertificateIssuerPrivateKeyTypes: TypeAlias = rsa.RSAPrivateKey | ec.EllipticCurvePrivateKey
 
 
 @dataclass
@@ -380,11 +380,40 @@ class Mode(Enum):
     APP_AND_UNIT = 3
 
 
+class KeyAlgorithm(str, Enum):
+    """Enum representing the algorithm of a private key.
+
+    RSA (default): RSA key. Supported sizes are 2048 (default), 3072 and 4096 bits.
+    ECDSA: Elliptic curve key. Supported sizes are 256 (P-256, default) and 384 (P-384) bits.
+    """
+
+    RSA = "rsa"
+    ECDSA = "ecdsa"
+
+
+_DEFAULT_KEY_SIZES: dict[KeyAlgorithm, int] = {KeyAlgorithm.RSA: 2048, KeyAlgorithm.ECDSA: 256}
+_SUPPORTED_KEY_SIZES: dict[KeyAlgorithm, tuple[int, ...]] = {
+    KeyAlgorithm.RSA: (2048, 3072, 4096),
+    KeyAlgorithm.ECDSA: (256, 384),
+}
+
+
+def _signature_hash_algorithm(
+    private_key: CertificateIssuerPrivateKeyTypes,
+) -> hashes.SHA256 | hashes.SHA384:
+    """Return the hash to sign with: SHA-384 for P-384 keys, SHA-256 otherwise."""
+    if isinstance(private_key, ec.EllipticCurvePrivateKey) and isinstance(
+        private_key.curve, ec.SECP384R1
+    ):
+        return hashes.SHA384()
+    return hashes.SHA256()
+
+
 class PrivateKey:
     """This class represents a private key."""
 
     def __init__(
-        self, raw: str | None = None, x509_object: rsa.RSAPrivateKey | None = None
+        self, raw: str | None = None, x509_object: CertificateIssuerPrivateKeyTypes | None = None
     ) -> None:
         """Initialize the PrivateKey object.
 
@@ -422,37 +451,84 @@ class PrivateKey:
         """Create a PrivateKey object from a private key."""
         return cls(raw=private_key)
 
-    def is_valid(self) -> bool:
-        """Validate that the private key is PEM-formatted, RSA, and at least 2048 bits."""
-        try:
-            if not isinstance(self._private_key, rsa.RSAPrivateKey):
-                logger.warning("Private key is not an RSA key")
-                return False
+    @property
+    def algorithm(self) -> KeyAlgorithm:
+        """Return the algorithm of the private key.
 
+        Raises:
+            TLSCertificatesError: If the key is neither RSA nor ECDSA.
+        """
+        if isinstance(self._private_key, rsa.RSAPrivateKey):
+            return KeyAlgorithm.RSA
+        if isinstance(self._private_key, ec.EllipticCurvePrivateKey):
+            return KeyAlgorithm.ECDSA
+        raise TLSCertificatesError("Unsupported private key algorithm")
+
+    @property
+    def key_size(self) -> int:
+        """Return the key size in bits (RSA modulus size or EC curve size).
+
+        This describes any loaded RSA or EC key, not only supported ones. For example, a
+        P-521 key reports 521 and an RSA-1024 key reports 1024. Use :meth:`is_valid` to
+        check whether the key is acceptable.
+
+        Raises:
+            TLSCertificatesError: If the key is neither RSA nor ECDSA.
+        """
+        if isinstance(self._private_key, rsa.RSAPrivateKey | ec.EllipticCurvePrivateKey):
+            return self._private_key.key_size
+        raise TLSCertificatesError("Unsupported private key algorithm")
+
+    def is_valid(self) -> bool:
+        """Validate an RSA key (at least 2048 bits) or ECDSA P-256/P-384 key."""
+        if isinstance(self._private_key, rsa.RSAPrivateKey):
             if self._private_key.key_size < 2048:
                 logger.warning("RSA key size is less than 2048 bits")
                 return False
-
             return True
-        except ValueError:
-            logger.warning("Invalid private key format")
+        if isinstance(self._private_key, ec.EllipticCurvePrivateKey):
+            if isinstance(self._private_key.curve, (ec.SECP256R1, ec.SECP384R1)):
+                return True
+            logger.warning("Unsupported ECDSA curve: %s", self._private_key.curve.name)
             return False
+        logger.warning("Private key must be RSA or ECDSA P-256/P-384")
+        return False
 
     @classmethod
-    def generate(cls, key_size: int = 2048, public_exponent: int = 65537) -> PrivateKey:
-        """Generate a new RSA private key.
+    def generate(
+        cls,
+        key_size: int | None = None,
+        public_exponent: int = 65537,
+        key_algorithm: KeyAlgorithm | str = KeyAlgorithm.RSA,
+    ) -> PrivateKey:
+        """Generate a new RSA or ECDSA private key.
 
         Args:
-            key_size: The size of the key in bits.
-            public_exponent: The public exponent of the key.
+            key_size: The size of the key in bits. Defaults to 2048 for RSA and 256 for ECDSA.
+                ECDSA supports 256 (P-256) and 384 (P-384).
+            public_exponent: The public exponent of the key (RSA only).
+            key_algorithm: The key algorithm, :attr:`KeyAlgorithm.RSA` (default) or
+                :attr:`KeyAlgorithm.ECDSA`. Plain strings (``"rsa"``, ``"ecdsa"``) are accepted.
 
         Returns:
             PrivateKey: The generated private key.
+
+        Raises:
+            ValueError: If the algorithm is unsupported, or the ECDSA size is not 256 or 384.
         """
-        private_key = rsa.generate_private_key(
-            public_exponent=public_exponent,
-            key_size=key_size,
-        )
+        algorithm = KeyAlgorithm(key_algorithm)
+        if key_size is None:
+            key_size = _DEFAULT_KEY_SIZES[algorithm]
+        private_key: CertificateIssuerPrivateKeyTypes
+        if algorithm == KeyAlgorithm.RSA:
+            private_key = rsa.generate_private_key(
+                public_exponent=public_exponent, key_size=key_size
+            )
+        else:
+            curves = {256: ec.SECP256R1, 384: ec.SECP384R1}
+            if key_size not in curves:
+                raise ValueError("ECDSA key size must be 256 or 384 bits")
+            private_key = ec.generate_private_key(curves[key_size]())
         _OWASPLogger().log_event(
             event="private_key_generated",
             level=logging.INFO,
@@ -645,15 +721,15 @@ class Certificate:
             cert_public_key = self._cert.public_key()
             key_public_key = private_key._private_key.public_key()
 
-            if not isinstance(cert_public_key, rsa.RSAPublicKey):
-                logger.warning("Certificate does not use RSA public key")
-                return False
-
-            if not isinstance(key_public_key, rsa.RSAPublicKey):
-                logger.warning("Private key is not an RSA key")
-                return False
-
-            return cert_public_key.public_numbers() == key_public_key.public_numbers()
+            if isinstance(cert_public_key, rsa.RSAPublicKey) and isinstance(
+                key_public_key, rsa.RSAPublicKey
+            ):
+                return cert_public_key.public_numbers() == key_public_key.public_numbers()
+            if isinstance(cert_public_key, ec.EllipticCurvePublicKey) and isinstance(
+                key_public_key, ec.EllipticCurvePublicKey
+            ):
+                return cert_public_key.public_numbers() == key_public_key.public_numbers()
+            return False
         except Exception as e:
             logger.warning("Failed to validate certificate and private key match: %s", e)
             return False
@@ -713,7 +789,9 @@ class Certificate:
                 raise TLSCertificatesError("Could not add extension to certificate") from e
 
         # Sign the certificate with the CA's private key
-        cert = cert_builder.sign(private_key=private_key, algorithm=hashes.SHA256())
+        cert = cert_builder.sign(
+            private_key=private_key, algorithm=_signature_hash_algorithm(private_key)
+        )
         _OWASPLogger().log_event(
             event="certificate_generated",
             level=logging.INFO,
@@ -742,7 +820,7 @@ class Certificate:
         Returns:
             Certificate: The generated CA certificate.
         """
-        assert isinstance(private_key._private_key, rsa.RSAPrivateKey)
+        assert isinstance(private_key._private_key, CertificateIssuerPrivateKeyTypes)
 
         public_key = private_key._private_key.public_key()
 
@@ -764,7 +842,7 @@ class Certificate:
             .add_extension(
                 x509.KeyUsage(
                     digital_signature=True,
-                    key_encipherment=True,
+                    key_encipherment=isinstance(private_key._private_key, rsa.RSAPrivateKey),
                     key_cert_sign=True,
                     key_agreement=False,
                     content_commitment=False,
@@ -785,7 +863,12 @@ class Certificate:
         ):
             builder = builder.add_extension(san_extension, critical=False)
 
-        cert = cls(x509_object=builder.sign(private_key._private_key, algorithm=hashes.SHA256()))
+        cert = cls(
+            x509_object=builder.sign(
+                private_key._private_key,
+                algorithm=_signature_hash_algorithm(private_key._private_key),
+            )
+        )
 
         _OWASPLogger().log_event(
             event="ca_certificate_generated",
@@ -969,8 +1052,6 @@ class CertificateSigningRequest:
     def matches_private_key(self, key: PrivateKey) -> bool:
         """Check if a CSR matches a private key.
 
-        This function only works with RSA keys.
-
         Args:
             key (PrivateKey): Private key
         Returns:
@@ -979,22 +1060,24 @@ class CertificateSigningRequest:
         try:
             key_object_public_key = key._private_key.public_key()
             csr_object_public_key = self._csr.public_key()
-            if not isinstance(key_object_public_key, rsa.RSAPublicKey):
-                logger.warning("Key is not an RSA key")
-                return False
-            if not isinstance(csr_object_public_key, rsa.RSAPublicKey):
-                logger.warning("CSR is not an RSA key")
-                return False
-            if (
-                csr_object_public_key.public_numbers().n
-                != key_object_public_key.public_numbers().n
+            if isinstance(key_object_public_key, rsa.RSAPublicKey) and isinstance(
+                csr_object_public_key, rsa.RSAPublicKey
             ):
-                logger.warning("Public key numbers between CSR and key do not match")
-                return False
+                return (
+                    csr_object_public_key.public_numbers()
+                    == key_object_public_key.public_numbers()
+                )
+            if isinstance(key_object_public_key, ec.EllipticCurvePublicKey) and isinstance(
+                csr_object_public_key, ec.EllipticCurvePublicKey
+            ):
+                return (
+                    csr_object_public_key.public_numbers()
+                    == key_object_public_key.public_numbers()
+                )
+            return False
         except ValueError:
             logger.warning("Could not load certificate or CSR.")
             return False
-        return True
 
     def get_sha256_hex(self) -> str:
         """Calculate the hash of the provided data and return the hexadecimal representation."""
@@ -1061,7 +1144,9 @@ class CertificateSigningRequest:
         if attributes.additional_critical_extensions:
             for extension in attributes.additional_critical_extensions:
                 csr_builder = csr_builder.add_extension(extension, critical=True)
-        signed_certificate_request = csr_builder.sign(signing_key, hashes.SHA256())
+        signed_certificate_request = csr_builder.sign(
+            signing_key, _signature_hash_algorithm(signing_key)
+        )
         return cls(x509_object=signed_certificate_request)
 
 
@@ -1712,6 +1797,26 @@ def _generate_certificate_request_extensions(
                 ),
             )
         )
+    elif isinstance(csr.public_key(), ec.EllipticCurvePublicKey) and (
+        ExtensionOID.KEY_USAGE not in {ext.oid for ext in csr.extensions}
+    ):
+        cert_extensions_list.append(
+            x509.Extension(
+                ExtensionOID.KEY_USAGE,
+                critical=True,
+                value=x509.KeyUsage(
+                    digital_signature=True,
+                    content_commitment=False,
+                    key_encipherment=False,
+                    data_encipherment=False,
+                    key_agreement=False,
+                    key_cert_sign=False,
+                    crl_sign=False,
+                    encipher_only=False,
+                    decipher_only=False,
+                ),
+            )
+        )
 
     existing_oids = {ext.oid for ext in cert_extensions_list}
     for extension in csr.extensions:
@@ -1806,6 +1911,8 @@ class TLSCertificatesRequiresV4(Object):
         private_key: PrivateKey | None = None,
         renewal_relative_time: float = 0.9,
         certificate_requests_by_mode: _CertificateRequestsByModeArg = None,
+        key_algorithm: KeyAlgorithm | str = KeyAlgorithm.RSA,
+        key_size: int | None = None,
     ):
         """Create a new instance of the TLSCertificatesRequiresV4 class.
 
@@ -1853,6 +1960,14 @@ class TLSCertificatesRequiresV4(Object):
                 Default is 0.9, meaning 90% of the validity period.
                 The minimum value is 0.5, meaning 50% of the validity period.
                 If an invalid value is provided, an exception will be raised.
+            key_algorithm (KeyAlgorithm | str): Algorithm for library-generated keys,
+                :attr:`KeyAlgorithm.RSA` (default) or :attr:`KeyAlgorithm.ECDSA`.
+                Plain strings (``"rsa"``, ``"ecdsa"``) are accepted.
+            key_size (int | None): Size of library-generated keys in bits. RSA supports 2048,
+                3072 and 4096; ECDSA supports 256 (P-256) and 384 (P-384). Defaults to 2048 for
+                RSA and 256 for ECDSA. Applies to newly generated and regenerated keys, not to
+                persisted or imported keys; compare :attr:`PrivateKey.algorithm` and
+                :attr:`PrivateKey.key_size` and call :meth:`regenerate_private_key` to rotate.
             certificate_requests_by_mode
                 (Dict[Literal[Mode.APP, Mode.UNIT], List[CertificateRequestAttributes]]):
                 A dictionary mapping modes to their certificate request lists.
@@ -1881,9 +1996,23 @@ class TLSCertificatesRequiresV4(Object):
             raise TLSCertificatesError(
                 "Invalid mode. Must be Mode.UNIT, Mode.APP, or Mode.APP_AND_UNIT"
             )
+        try:
+            algorithm = KeyAlgorithm(key_algorithm)
+        except ValueError:
+            raise TLSCertificatesError(
+                "Invalid key algorithm or size: use RSA 2048/3072/4096 or ECDSA 256/384"
+            ) from None
+        if key_size is None:
+            key_size = _DEFAULT_KEY_SIZES[algorithm]
+        if key_size not in _SUPPORTED_KEY_SIZES[algorithm]:
+            raise TLSCertificatesError(
+                "Invalid key algorithm or size: use RSA 2048/3072/4096 or ECDSA 256/384"
+            )
         self.charm = charm
         self.relationship_name = relationship_name
         self.mode = mode
+        self.key_algorithm = algorithm
+        self.key_size = key_size
         self._certificate_requests_input = certificate_requests
         self._certificate_requests_by_mode = certificate_requests_by_mode
         if callable(certificate_requests) or callable(certificate_requests_by_mode):
@@ -2450,7 +2579,7 @@ class TLSCertificatesRequiresV4(Object):
         and generate new CSRs with the imported key.
 
         Args:
-            private_key: The private key to import. Must be a valid RSA key.
+            private_key: The private key to import. Must be a valid RSA or ECDSA key.
             mode: Optional mode when using APP_AND_UNIT. If None both will be rotated.
 
         Raises:
@@ -2462,7 +2591,8 @@ class TLSCertificatesRequiresV4(Object):
         """
         if not private_key.is_valid():
             raise TLSCertificatesError(
-                "Invalid private key provided. Must be a valid RSA key with at least 2048 bits."
+                "Invalid private key provided. Must be RSA (at least 2048 bits) "
+                "or ECDSA P-256/P-384."
             )
         self._perform_key_rotation(private_key=private_key, mode=mode)
 
@@ -2531,7 +2661,9 @@ class TLSCertificatesRequiresV4(Object):
         This is the case when the private key used is generated by the library.
             and not passed by the charm using the private_key parameter.
         """
-        self._store_private_key_in_secret(generate_private_key(), mode)
+        self._store_private_key_in_secret(
+            PrivateKey.generate(key_size=self.key_size, key_algorithm=self.key_algorithm), mode
+        )
         logger.info("Private key generated")
 
     def _store_private_key_in_secret(

@@ -8,7 +8,9 @@ This library began life as a port of ``tls_certificates_interface.tls_certificat
 
 When a charm uses `TLSCertificatesRequiresV4`, the library:
 
-- Generates an RSA private key on first use and stores it in a Juju secret owned by the requiring charm.
+- Generates an RSA-2048 private key by default on first use and stores it in a Juju secret owned by
+  the requiring charm. Requirers can select RSA-3072, RSA-4096, ECDSA P-256, or ECDSA P-384 with
+  the `key_algorithm` and `key_size` constructor arguments.
 - Builds a CSR from the `CertificateRequestAttributes` you supply and writes it to relation data.
 - Receives the signed certificate from the provider and emits a `certificate_available` event.
 - Tracks certificate expiry and triggers renewal automatically (see below).
@@ -37,7 +39,54 @@ The library stores the private key in a Juju secret owned by the requiring charm
 
 ### Key generation
 
-Private keys are generated using the [RSA algorithm](https://en.wikipedia.org/wiki/RSA_(cryptosystem)).
+Private keys use RSA-2048 by default. A requirer can choose another algorithm with the
+`KeyAlgorithm` enum:
+
+| `key_algorithm` | Supported `key_size` | Default `key_size` |
+|---|---|---|
+| `KeyAlgorithm.RSA` (default) | 2048, 3072, 4096 | 2048 |
+| `KeyAlgorithm.ECDSA` | 256 (P-256), 384 (P-384) | 256 |
+
+```python
+from charmlibs.interfaces.tls_certificates import KeyAlgorithm
+
+self.certificates = TLSCertificatesRequiresV4(
+    charm=self,
+    relationship_name="certificates",
+    certificate_requests=[CertificateRequestAttributes(common_name="example.com")],
+    key_algorithm=KeyAlgorithm.ECDSA,
+    key_size=384,  # optional; omit to use P-256
+)
+```
+
+Plain strings (`"rsa"`, `"ecdsa"`) are also accepted. An unsupported algorithm or size raises
+`TLSCertificatesError` when the object is created.
+
+The selected algorithm and size apply when the library first generates a key, or when
+`regenerate_private_key` is called. Existing persisted keys are kept, and normal certificate
+renewal reuses the current key. This means changing the configuration of a deployed charm doesn't
+rotate its key by itself. `PrivateKey` has read-only `algorithm` and `key_size` properties, so the
+charm can detect a mismatch and rotate the key itself. The tutorial shows how.
+
+### Signature hash
+
+The library chooses the signature hash from the signing key: SHA-384 for ECDSA P-384 keys and
+SHA-256 for all other keys. This applies to CSRs, issued certificates and self-signed CAs. For
+issued certificates, the hash depends on the CA's key, not the subject's key.
+
+### Key usage for ECDSA certificates
+
+An EC key can't be used for RSA-style key encipherment. When the library issues a non-CA
+certificate for an EC CSR that doesn't request a `KeyUsage` extension, it adds a critical
+`KeyUsage(digital_signature=True)`. This applies to any EC CSR, including CSRs that weren't
+created by this library. A `KeyUsage` extension requested in the CSR is kept as-is. CA
+certificates always get `key_cert_sign` and `crl_sign`.
+
+### Out of scope: Ed25519
+
+Ed25519 isn't supported. It needs a different signing call (no separate hash) and PKCS#8 key
+serialization, and support for it varies across certificate providers and TLS consumers. It can be
+added later if a deployment needs it end to end.
 
 ### Key labelling and multiple integrations
 

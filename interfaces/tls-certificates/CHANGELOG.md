@@ -1,3 +1,12 @@
+# 1.12.0 - 29 September 2026
+
+Allow requirers to configure library-generated private keys with the new `KeyAlgorithm` enum and
+the `key_algorithm` and `key_size` arguments of `TLSCertificatesRequiresV4`. Supported keys are
+RSA-2048 (the default), RSA-3072, RSA-4096, ECDSA P-256 and ECDSA P-384. `key_size` defaults to
+2048 for RSA and 256 for ECDSA, so `key_algorithm=KeyAlgorithm.ECDSA` works on its own. Plain
+strings (`"rsa"`, `"ecdsa"`) are also accepted. Existing persisted and externally supplied keys are
+kept, and renewal continues to reuse the current key.
+
 # 1.11.0 - 28 September 2026
 
 Fix certificate secret ownership to match the mode so APP secrets are always available to the leader unit.
