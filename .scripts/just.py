@@ -559,7 +559,9 @@ def _package_parser(fn: FunctionType, *, resolution: bool = True) -> argparse.Ar
                 'Dependency resolution strategy to pass to `uv run --resolution=...`. '
                 "When set, the package's uv.lock is bypassed (no `--locked`). "
                 'Useful for testing against the lowest declared or highest available dependency '
-                'versions, since a charm resolves deps at pack time from its own lockfile.'
+                'versions, since a charm resolves deps at pack time from its own lockfile. '
+                '`lowest` also lowers transitive dependencies, so expect it to fail; it is a '
+                'debugging aid rather than something CI runs.'
             ),
         )
     parser.add_argument('package', help='Path from the repo root to the package, e.g. `pathops`.')
