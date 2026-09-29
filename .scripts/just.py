@@ -34,6 +34,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import tempfile
 import textwrap
 import tomllib
 import typing
@@ -196,16 +197,12 @@ def check(argv: list[str]) -> int:
     """`lint`, `unit` test, and build the `docs` for a package."""
     args = _package_parser(check).parse_args(argv)
     python = _resolve_python(args.package, args.python)
-    lint_argv = [args.package, '--python', python]
+    package_argv = [args.package, '--python', python]
     if args.resolution is not None:
-        lint_argv.extend(['--resolution', args.resolution])
-    if failures := lint(lint_argv):
+        package_argv.extend(['--resolution', args.resolution])
+    if failures := lint(package_argv):
         sys.exit(failures)
-    coverage_cmds = _coverage_cmds(
-        REPO_ROOT / args.package, 'unit', python, ['-rA'], resolution=args.resolution
-    )
-    for cmd in coverage_cmds:
-        _run(cmd, cwd=REPO_ROOT / args.package, env=_coverage_env())
+    unit(package_argv)
     _run(['just', 'docs', 'html', args.package])
     return 0
 
@@ -291,9 +288,10 @@ def _static(
     cmd = ['--with', 'pytest-interface-tester'] if pkg_dir.parent.name == 'interfaces' else []
     cmd.extend(['pyright', f'--pythonversion={python}', *pyright_args])
     groups = ['lint', 'unit', 'functional', 'integration']
-    return _uv_run(
-        cmd, pkg_dir=pkg_dir, python=python, groups=groups, resolution=resolution, check=False
-    )
+    with _resolution_sandbox(pkg_dir, resolution):
+        return _uv_run(
+            cmd, pkg_dir=pkg_dir, python=python, groups=groups, resolution=resolution, check=False
+        )
 
 
 # --- Coverage recipes ---------------------------------------------------------------------------
@@ -308,7 +306,7 @@ def unit(argv: list[str]) -> int:
     cmds = _coverage_cmds(
         pkg_dir, 'unit', python, pytest_args or ['-rA'], resolution=args.resolution
     )
-    with _preserve_uv_lock(pkg_dir, active=args.resolution is not None):
+    with _resolution_sandbox(pkg_dir, args.resolution):
         for cmd in cmds:
             _run(cmd, cwd=pkg_dir, env=_coverage_env())
     return 0
@@ -344,7 +342,7 @@ def functional(argv: list[str]) -> int:
         """
     ).strip()
     pkg_dir = REPO_ROOT / args.package
-    with _preserve_uv_lock(pkg_dir, active=args.resolution is not None):
+    with _resolution_sandbox(pkg_dir, args.resolution):
         _run(['bash', '-c', script], cwd=pkg_dir, env=_coverage_env())
     return 0
 
@@ -459,19 +457,21 @@ def _integration(fn: FunctionType, substrate: str, argv: list[str]) -> int:
         help='Value for the CHARMLIBS_TAG environment var (defaults to $CHARMLIBS_TAG).',
     )
     args, pytest_args = parser.parse_known_args(argv)
-    return _uv_run(
-        [
-            *('pytest', '--tb=native', '-vv'),
-            *('-m', {'k8s': 'not machine_only', 'machine': 'not k8s_only'}[substrate]),
-            'tests/integration',
-            *(pytest_args or ['-rA']),
-        ],
-        pkg_dir=REPO_ROOT / args.package,
-        python=_resolve_python(args.package, args.python),
-        groups=['integration'],
-        resolution=args.resolution,
-        env={**os.environ, 'CHARMLIBS_SUBSTRATE': substrate, 'CHARMLIBS_TAG': args.tag},
-    )
+    pkg_dir = REPO_ROOT / args.package
+    with _resolution_sandbox(pkg_dir, args.resolution):
+        return _uv_run(
+            [
+                *('pytest', '--tb=native', '-vv'),
+                *('-m', {'k8s': 'not machine_only', 'machine': 'not k8s_only'}[substrate]),
+                'tests/integration',
+                *(pytest_args or ['-rA']),
+            ],
+            pkg_dir=pkg_dir,
+            python=_resolve_python(args.package, args.python),
+            groups=['integration'],
+            resolution=args.resolution,
+            env={**os.environ, 'CHARMLIBS_SUBSTRATE': substrate, 'CHARMLIBS_TAG': args.tag},
+        )
 
 
 # --- Other recipes -----------------------------------------------------------------------------
@@ -595,24 +595,32 @@ def _requires_python_minimum(pkg_dir: pathlib.Path) -> str:
 
 
 @contextlib.contextmanager
-def _preserve_uv_lock(pkg_dir: pathlib.Path, *, active: bool) -> Iterator[None]:
-    """Snapshot `pkg_dir/uv.lock` and restore it on exit.
+def _resolution_sandbox(pkg_dir: pathlib.Path, resolution: str | None) -> Iterator[None]:
+    """Keep a `--resolution` run from changing the package's `uv.lock` or `.venv`.
 
-    `uv run --resolution=<mode>` re-resolves dependencies and writes the result back to the
-    package's `uv.lock`. That's useful in CI (each job is a fresh checkout) but disruptive
-    for local devs who don't want their lockfile modified when they run tests against an
-    alternative resolution mode. When `active` is true, this restores the lock file bytes
-    afterwards so the working tree stays clean.
+    `uv run --resolution=<mode>` re-resolves dependencies, writes the result back to the
+    package's `uv.lock`, and syncs the project environment to match. That's fine in CI (each
+    job is a fresh checkout) but disruptive locally: the lockfile shows up as modified, and the
+    `.venv` an editor is probably using is left on the alternative versions. When `resolution`
+    is set, this points `UV_PROJECT_ENVIRONMENT` at a temporary directory for the duration, and
+    restores the lock file bytes afterwards.
     """
-    lock = pkg_dir / 'uv.lock'
-    if not active or not lock.exists():
+    if resolution is None:
         yield
         return
-    saved = lock.read_bytes()
+    lock = pkg_dir / 'uv.lock'
+    saved = lock.read_bytes() if lock.exists() else None
+    previous_env = os.environ.get('UV_PROJECT_ENVIRONMENT')
     try:
-        yield
+        with tempfile.TemporaryDirectory(prefix='charmlibs-resolution-') as tmp:
+            os.environ['UV_PROJECT_ENVIRONMENT'] = str(pathlib.Path(tmp) / 'venv')
+            yield
     finally:
-        if lock.read_bytes() != saved:
+        if previous_env is None:
+            os.environ.pop('UV_PROJECT_ENVIRONMENT', None)
+        else:
+            os.environ['UV_PROJECT_ENVIRONMENT'] = previous_env
+        if saved is not None and lock.read_bytes() != saved:
             lock.write_bytes(saved)
 
 

@@ -16,7 +16,9 @@
 
 """Unit tests for the just script."""
 
+import os
 import pathlib
+from collections.abc import Callable, Sequence
 from unittest.mock import patch
 
 import just
@@ -106,31 +108,34 @@ class TestUVCmd:
         assert '--locked' not in result
 
 
-class TestPreserveUVLock:
+class TestResolutionSandbox:
     def test_restores_modified_lock(self, tmp_path: pathlib.Path):
         lock = tmp_path / 'uv.lock'
         lock.write_bytes(b'original')
-        with just._preserve_uv_lock(tmp_path, active=True):
+        with just._resolution_sandbox(tmp_path, 'lowest-direct'):
             lock.write_bytes(b'mutated')
         assert lock.read_bytes() == b'original'
 
     def test_leaves_unmodified_lock_untouched(self, tmp_path: pathlib.Path):
         lock = tmp_path / 'uv.lock'
         lock.write_bytes(b'original')
-        with just._preserve_uv_lock(tmp_path, active=True):
+        with just._resolution_sandbox(tmp_path, 'lowest-direct'):
             pass
         assert lock.read_bytes() == b'original'
 
-    def test_inactive_does_not_restore(self, tmp_path: pathlib.Path):
+    def test_no_resolution_does_nothing(
+        self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.delenv('UV_PROJECT_ENVIRONMENT', raising=False)
         lock = tmp_path / 'uv.lock'
         lock.write_bytes(b'original')
-        with just._preserve_uv_lock(tmp_path, active=False):
+        with just._resolution_sandbox(tmp_path, None):
+            assert 'UV_PROJECT_ENVIRONMENT' not in os.environ
             lock.write_bytes(b'mutated')
         assert lock.read_bytes() == b'mutated'
 
-    def test_no_lock_file_is_a_noop(self, tmp_path: pathlib.Path):
-        # active=True but no uv.lock present -- must not create one.
-        with just._preserve_uv_lock(tmp_path, active=True):
+    def test_no_lock_file_is_not_created(self, tmp_path: pathlib.Path):
+        with just._resolution_sandbox(tmp_path, 'lowest-direct'):
             pass
         assert not (tmp_path / 'uv.lock').exists()
 
@@ -138,9 +143,56 @@ class TestPreserveUVLock:
         lock = tmp_path / 'uv.lock'
         lock.write_bytes(b'original')
         with pytest.raises(RuntimeError, match='boom'):
-            with just._preserve_uv_lock(tmp_path, active=True):
+            with just._resolution_sandbox(tmp_path, 'lowest-direct'):
                 lock.write_bytes(b'mutated')
                 raise RuntimeError('boom')
+        assert lock.read_bytes() == b'original'
+
+    def test_uses_a_temporary_project_environment(
+        self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.delenv('UV_PROJECT_ENVIRONMENT', raising=False)
+        with just._resolution_sandbox(tmp_path, 'lowest-direct'):
+            venv = pathlib.Path(os.environ['UV_PROJECT_ENVIRONMENT'])
+            assert not venv.is_relative_to(tmp_path)
+            assert venv.parent.is_dir()
+        assert 'UV_PROJECT_ENVIRONMENT' not in os.environ
+        assert not venv.parent.exists()
+
+    def test_restores_existing_project_environment(self, tmp_path: pathlib.Path):
+        with patch.dict('os.environ', {'UV_PROJECT_ENVIRONMENT': 'mine'}):
+            with just._resolution_sandbox(tmp_path, 'lowest-direct'):
+                assert os.environ['UV_PROJECT_ENVIRONMENT'] != 'mine'
+            assert os.environ['UV_PROJECT_ENVIRONMENT'] == 'mine'
+
+    @pytest.mark.parametrize(
+        'recipe',
+        [just.check, just.lint, just.static, just.unit, just.functional, just.integration_k8s],
+    )
+    def test_recipes_use_the_sandbox(
+        self,
+        tmp_path: pathlib.Path,
+        monkeypatch: pytest.MonkeyPatch,
+        recipe: Callable[[list[str]], int],
+    ):
+        monkeypatch.delenv('UV_PROJECT_ENVIRONMENT', raising=False)
+        (tmp_path / 'pyproject.toml').touch()
+        lock = tmp_path / 'uv.lock'
+        lock.write_bytes(b'original')
+        project_envs: list[str | None] = []
+
+        def fake_run(cmd: Sequence[str], *, env: dict[str, str] | None = None, **_: object):
+            if any('--resolution=' in str(part) for part in cmd):
+                lock.write_bytes(b'mutated')
+                project_envs.append(
+                    (os.environ if env is None else env).get('UV_PROJECT_ENVIRONMENT')
+                )
+            return 0
+
+        monkeypatch.setattr(just, '_run', fake_run)
+        recipe(['--python', '3.12', '--resolution', 'lowest-direct', str(tmp_path)])
+        assert project_envs
+        assert all(project_envs)
         assert lock.read_bytes() == b'original'
 
 
