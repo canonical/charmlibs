@@ -1,6 +1,7 @@
 # Unreleased
 
 - Updated project URLs.
+- Close the file handles returned by `Container.pull()`, rather than leaving them to the garbage collector.
 
 # 1.0.1 - 22 June 2026
 
