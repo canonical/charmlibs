@@ -9,8 +9,8 @@ from ipaddress import IPv6Address
 
 import pytest
 from cryptography import x509
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec, rsa
 from cryptography.hazmat.primitives.serialization import load_pem_private_key, pkcs12
 
 import certificate_validation
@@ -21,6 +21,7 @@ from charmlibs.interfaces.tls_certificates import (
     Certificate,
     CertificateRequestAttributes,
     CertificateSigningRequest,
+    KeyAlgorithm,
     PrivateKey,
     calculate_relative_datetime,
     chain_has_valid_order,
@@ -92,6 +93,300 @@ def test_given_key_size_provided_when_generate_private_key_then_private_key_is_g
     )
     assert isinstance(private_key_object, rsa.RSAPrivateKeyWithSerialization)
     assert private_key_object.key_size == key_size
+
+
+@pytest.mark.parametrize(
+    ("algorithm", "size"),
+    [
+        ("rsa", 2048),
+        ("rsa", 3072),
+        ("rsa", 4096),
+        ("ecdsa", 256),
+        ("ecdsa", 384),
+    ],
+)
+def test_given_supported_algorithm_and_size_when_generate_private_key_then_key_matches_configuration(
+    algorithm: str, size: int
+):
+    key = PrivateKey.generate(key_algorithm=algorithm, key_size=size)
+    restored = PrivateKey.from_string(str(key))
+
+    assert isinstance(key._private_key, rsa.RSAPrivateKey | ec.EllipticCurvePrivateKey)
+    assert key._private_key.key_size == size
+    assert restored.is_valid()
+    assert restored == key
+    assert restored.algorithm == KeyAlgorithm(algorithm)
+    assert restored.key_size == size
+
+
+@pytest.mark.parametrize(
+    ("algorithm", "expected_size"),
+    [(KeyAlgorithm.RSA, 2048), (KeyAlgorithm.ECDSA, 256), ("rsa", 2048), ("ecdsa", 256)],
+)
+def test_given_no_key_size_when_generate_private_key_then_algorithm_default_size_is_used(
+    algorithm: KeyAlgorithm | str, expected_size: int
+):
+    key = PrivateKey.generate(key_algorithm=algorithm)
+
+    assert key.algorithm == KeyAlgorithm(algorithm)
+    assert key.key_size == expected_size
+
+
+def test_given_no_algorithm_or_size_when_generate_private_key_then_rsa_2048_key_is_generated():
+    key = PrivateKey.generate()
+
+    assert key.algorithm == KeyAlgorithm.RSA
+    assert key.key_size == 2048
+
+
+@pytest.mark.parametrize(
+    ("algorithm", "size"),
+    [("ecdsa", 2048), ("ecdsa", 521), ("dsa", 2048)],
+)
+def test_given_unsupported_algorithm_or_size_when_generate_private_key_then_error_is_raised(
+    algorithm: str, size: int
+):
+    with pytest.raises(ValueError):
+        PrivateKey.generate(key_algorithm=algorithm, key_size=size)
+
+
+def test_given_rsa_key_size_below_2048_when_generate_private_key_then_key_is_generated_but_invalid():
+    key = PrivateKey.generate(key_size=1024)
+
+    assert key.algorithm == KeyAlgorithm.RSA
+    assert key.key_size == 1024
+    assert not key.is_valid()
+
+
+def test_given_rsa_key_size_below_2048_when_deprecated_generate_private_key_then_key_is_generated():
+    with pytest.warns(DeprecationWarning):
+        key = generate_private_key(key_size=1024)
+
+    assert key.key_size == 1024
+    assert not key.is_valid()
+
+
+def test_given_mismatched_key_types_when_certificate_matches_private_key_then_false():
+    rsa_key = PrivateKey.generate()
+    ec_key = PrivateKey.generate(key_algorithm=KeyAlgorithm.ECDSA)
+    ca = Certificate.generate_self_signed_ca(
+        CertificateRequestAttributes(common_name="ca.example.com"), rsa_key, timedelta(days=1)
+    )
+
+    assert not ca.matches_private_key(ec_key)
+
+
+def test_given_public_key_error_when_certificate_matches_private_key_then_false_and_warns(
+    caplog: pytest.LogCaptureFixture,
+):
+    key = PrivateKey.generate()
+    ca = Certificate.generate_self_signed_ca(
+        CertificateRequestAttributes(common_name="ca.example.com"), key, timedelta(days=1)
+    )
+
+    class BrokenKey:
+        def public_key(self):
+            raise RuntimeError("boom")
+
+    broken = PrivateKey.generate()
+    broken._private_key = BrokenKey()  # type: ignore[assignment]
+
+    assert not ca.matches_private_key(broken)
+    assert "Failed to validate certificate and private key match" in caplog.text
+
+
+@pytest.mark.parametrize(
+    ("algorithm", "size", "expected_hash"),
+    [
+        ("rsa", 2048, hashes.SHA256),
+        ("ecdsa", 256, hashes.SHA256),
+        ("ecdsa", 384, hashes.SHA384),
+    ],
+)
+def test_given_signing_key_when_signing_then_signature_hash_is_selected_from_key(
+    algorithm: str, size: int, expected_hash: type[hashes.HashAlgorithm]
+):
+    key = PrivateKey.generate(key_algorithm=algorithm, key_size=size)
+    ca = Certificate.generate_self_signed_ca(
+        CertificateRequestAttributes(common_name="ca.example.com"), key, timedelta(days=1)
+    )
+    csr = CertificateSigningRequest.generate(
+        CertificateRequestAttributes(common_name="example.com"), key
+    )
+    issued = csr.sign(ca=ca, ca_private_key=key, validity=timedelta(days=1))
+
+    assert isinstance(ca._cert.signature_hash_algorithm, expected_hash)
+    assert isinstance(csr._csr.signature_hash_algorithm, expected_hash)
+    assert isinstance(issued._cert.signature_hash_algorithm, expected_hash)
+
+
+def test_given_p384_ca_and_rsa_subject_when_issuing_then_ca_key_selects_hash():
+    ca_key = PrivateKey.generate(key_algorithm=KeyAlgorithm.ECDSA, key_size=384)
+    subject_key = PrivateKey.generate()
+    ca = Certificate.generate_self_signed_ca(
+        CertificateRequestAttributes(common_name="ca.example.com"), ca_key, timedelta(days=1)
+    )
+    csr = CertificateSigningRequest.generate(
+        CertificateRequestAttributes(common_name="example.com"), subject_key
+    )
+
+    issued = Certificate.generate(csr, ca, ca_key, timedelta(days=1))
+
+    assert isinstance(csr._csr.signature_hash_algorithm, hashes.SHA256)
+    assert isinstance(issued._cert.signature_hash_algorithm, hashes.SHA384)
+
+
+def test_given_ec_csr_when_issuing_ca_certificate_then_ca_key_usage_is_set():
+    subject_key = PrivateKey.generate(key_algorithm=KeyAlgorithm.ECDSA)
+    issuer_key = PrivateKey.generate()
+    ca = Certificate.generate_self_signed_ca(
+        CertificateRequestAttributes(common_name="ca.example.com"), issuer_key, timedelta(days=1)
+    )
+    csr = CertificateSigningRequest.generate(
+        CertificateRequestAttributes(common_name="intermediate.example.com"), subject_key
+    )
+
+    issued = Certificate.generate(csr, ca, issuer_key, timedelta(days=1), is_ca=True)
+    key_usage = issued._cert.extensions.get_extension_for_class(x509.KeyUsage)
+
+    assert key_usage.critical
+    assert key_usage.value.key_cert_sign
+    assert key_usage.value.crl_sign
+    assert not key_usage.value.digital_signature
+
+
+def test_given_external_ec_csr_without_key_usage_when_issuing_then_digital_signature_added():
+    subject_key = ec.generate_private_key(ec.SECP256R1())
+    csr = (
+        x509.CertificateSigningRequestBuilder()
+        .subject_name(x509.Name([x509.NameAttribute(x509.NameOID.COMMON_NAME, "ext.example.com")]))
+        .sign(subject_key, hashes.SHA256())
+    )
+    issuer_key = PrivateKey.generate()
+    ca = Certificate.generate_self_signed_ca(
+        CertificateRequestAttributes(common_name="ca.example.com"), issuer_key, timedelta(days=1)
+    )
+
+    issued = Certificate.generate(
+        CertificateSigningRequest(x509_object=csr), ca, issuer_key, timedelta(days=1)
+    )
+    key_usage = issued._cert.extensions.get_extension_for_class(x509.KeyUsage)
+
+    assert key_usage.critical
+    assert key_usage.value.digital_signature
+    assert not key_usage.value.key_encipherment
+
+
+def test_given_unsupported_curve_when_validate_private_key_then_key_is_invalid():
+    assert not PrivateKey(x509_object=ec.generate_private_key(ec.SECP521R1())).is_valid()
+
+
+@pytest.mark.parametrize("curve", [ec.SECP256R1(), ec.SECP384R1()])
+def test_given_ec_private_key_when_generating_csr_and_certificate_then_keys_match(
+    curve: ec.EllipticCurve,
+):
+    subject_key = PrivateKey(x509_object=ec.generate_private_key(curve))
+    assert subject_key.is_valid()
+    csr = CertificateSigningRequest.generate(
+        CertificateRequestAttributes(common_name="example.com"), subject_key
+    )
+    issuer_key = PrivateKey.generate()
+    ca = Certificate.generate_self_signed_ca(
+        CertificateRequestAttributes(common_name="ca.example.com"),
+        issuer_key,
+        timedelta(days=365),
+    )
+    certificate = Certificate.generate(csr, ca, issuer_key, timedelta(days=30))
+
+    assert csr.matches_private_key(subject_key)
+    assert certificate.matches_private_key(subject_key)
+    assert not csr.matches_private_key(issuer_key)
+    assert not certificate.matches_private_key(issuer_key)
+    assert certificate._cert.public_key() == csr._csr.public_key()
+    assert csr._csr.is_signature_valid
+    key_usage = certificate._cert.extensions.get_extension_for_class(x509.KeyUsage).value
+    assert key_usage.digital_signature
+    assert not key_usage.key_encipherment
+
+
+def test_given_csr_with_key_usage_when_generating_certificate_then_key_usage_is_preserved():
+    subject_key = PrivateKey(x509_object=ec.generate_private_key(ec.SECP256R1()))
+    requested_key_usage = x509.KeyUsage(
+        digital_signature=False,
+        content_commitment=True,
+        key_encipherment=False,
+        data_encipherment=False,
+        key_agreement=True,
+        key_cert_sign=False,
+        crl_sign=False,
+        encipher_only=False,
+        decipher_only=False,
+    )
+    csr = CertificateSigningRequest.generate(
+        CertificateRequestAttributes(
+            common_name="example.com",
+            additional_critical_extensions=[requested_key_usage],
+        ),
+        subject_key,
+    )
+    issuer_key = PrivateKey.generate()
+    ca = Certificate.generate_self_signed_ca(
+        CertificateRequestAttributes(common_name="ca.example.com"),
+        issuer_key,
+        timedelta(days=365),
+    )
+
+    certificate = Certificate.generate(csr, ca, issuer_key, timedelta(days=30))
+    actual_extension = certificate._cert.extensions.get_extension_for_class(x509.KeyUsage)
+
+    assert actual_extension.critical
+    assert actual_extension.value == requested_key_usage
+
+
+@pytest.mark.parametrize(
+    ("key_algorithm", "key_size"),
+    [("rsa", 2048), ("ecdsa", 256)],
+)
+def test_given_ca_key_when_generating_self_signed_ca_then_certificate_is_valid(
+    key_algorithm: str, key_size: int
+):
+    private_key = PrivateKey.generate(key_algorithm=key_algorithm, key_size=key_size)
+    certificate = Certificate.generate_self_signed_ca(
+        CertificateRequestAttributes(common_name="ca.example.com"),
+        private_key,
+        timedelta(days=365),
+    )
+    key_usage = certificate._cert.extensions.get_extension_for_class(x509.KeyUsage).value
+
+    certificate._cert.verify_directly_issued_by(certificate._cert)
+    assert certificate.matches_private_key(private_key)
+    assert key_usage.key_cert_sign
+    assert not key_usage.crl_sign
+    assert key_usage.digital_signature
+    assert key_usage.key_encipherment == (key_algorithm == "rsa")
+
+
+@pytest.mark.parametrize("subject_algorithm", ["rsa", "ecdsa"])
+def test_given_ec_ca_when_issuing_for_rsa_and_ecdsa_subjects_then_certificates_are_valid(
+    subject_algorithm: str,
+):
+    issuer_key = PrivateKey.generate(key_algorithm="ecdsa", key_size=384)
+    ca = Certificate.generate_self_signed_ca(
+        CertificateRequestAttributes(common_name="ca.example.com"),
+        issuer_key,
+        timedelta(days=365),
+    )
+    subject_key = PrivateKey.generate(
+        key_algorithm=subject_algorithm, key_size=2048 if subject_algorithm == "rsa" else 256
+    )
+    csr = CertificateSigningRequest.generate(
+        CertificateRequestAttributes(common_name="example.com"), subject_key
+    )
+    certificate = Certificate.generate(csr, ca, issuer_key, timedelta(days=30))
+
+    certificate._cert.verify_directly_issued_by(ca._cert)
+    assert certificate.matches_private_key(subject_key)
+    assert not certificate.matches_private_key(issuer_key)
 
 
 # Generate CSR

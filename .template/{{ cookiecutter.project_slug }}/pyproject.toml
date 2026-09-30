@@ -77,6 +77,10 @@ src = ["src", "tests/unit", "tests/functional", "tests/integration"]  # correctl
 extends = "{{ '../' if cookiecutter._interface else '' }}../pyproject.toml"
 include = ["src", "tests"]
 pythonVersion = "{{ cookiecutter.min_python_version }}"  # check no python > {{ cookiecutter.min_python_version }} features are used
+ignore = [
+    "tests/integration/charms/*/library",  # copy of the library itself linked into each test charm
+    "tests/integration/charms/common",  # symlink sources for test charms, checked via the symlinks
+]
 
 [tool.charmlibs.functional]
 ubuntu = []  # ubuntu versions to run functional tests with, e.g. "24.04" (defaults to just "latest")

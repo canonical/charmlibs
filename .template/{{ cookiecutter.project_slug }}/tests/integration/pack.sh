@@ -18,7 +18,7 @@ PACKED_DIR=".packed"  # where packed charms will be placed with name expected in
 
 : copy charm files to temporary directory for packing, dereferencing symlinks
 rm -rf "$TMP_DIR"
-cp --recursive --dereference "charms/$CHARMLIBS_SUBSTRATE/" "$TMP_DIR"
+cp --recursive --dereference "charms/$CHARMLIBS_SUBSTRATE-charm/" "$TMP_DIR"
 
 : pack charm
 cd "$TMP_DIR"

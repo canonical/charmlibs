@@ -413,12 +413,14 @@
     "name": "k8s_backup_target",
     "version": "0",
     "lib": "charmlibs.interfaces.k8s_backup_target",
-    "lib_url": "",
+    "lib_url": "https://pypi.org/project/charmlibs-interfaces-k8s-backup-target",
     "lib_docs_url": "https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/k8s-backup-target",
     "docs_url": "https://canonical.com/juju/docs/charmlibs/reference/interfaces/k8s_backup_target/",
     "summary": "Configure Kubernetes backup target specifications.",
     "description": "The `k8s_backup_target` interface allows client charms to specify Kubernetes backup requirements to a backup integrator charm.\nThe provider charm (client) provides backup specifications including namespaces, resource types, and retention policies, while the requirer charm (backup integrator) receives these specifications and forwards them to a backup operator.",
-    "tags": [],
+    "tags": [
+      "operations"
+    ],
     "status": "draft"
   },
   {
