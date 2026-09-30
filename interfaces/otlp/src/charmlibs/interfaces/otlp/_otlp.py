@@ -338,7 +338,7 @@ class OtlpProvider:
                 rules.logql.add(logql_result.rules)
             if promql_result.rules and not promql_result.errmsg:
                 rules.promql.add(promql_result.rules)
-            # Sigma rules: inject topology labels (no expression rewriting needed)
+            # Sigma rules: inject topology tags (no expression rewriting needed)
             if sigma_dict := requirer.rules.sigma:
                 rules.sigma.add(sigma_dict)
             for errmsg in [logql_result.errmsg, promql_result.errmsg]:

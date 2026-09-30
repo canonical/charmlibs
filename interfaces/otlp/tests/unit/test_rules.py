@@ -119,11 +119,12 @@ def test_sigma_rule_id_is_preserved_in_published_databag(
     # WHEN the rules are published
     state_out = otlp_requirer_ctx.run(otlp_requirer_ctx.on.update_status(), state=state)
     rules = next(iter(state_out.relations)).local_app_data.get('rules')
+    assert rules is not None
     sigma_rules = _decompress(json.loads(rules))['sigma']['rules']
 
     # THEN the original UUID survives untouched (it is never regenerated per hook)
     ids = {r.get('id') for r in sigma_rules}
-    assert SINGLE_SIGMA_RULE['id'] in ids
+    assert SINGLE_SIGMA_RULE.get('id') in ids
 
 
 @pytest.mark.parametrize('subordinate', [True, False])
@@ -475,10 +476,10 @@ def test_rulestore_add_single_sigma_rule():
     # THEN the sigma collection contains 1 rule
     sigma = store.sigma.as_dict()
     assert len(sigma.get('rules', [])) == 1
-    # AND topology labels are injected
-    labels = sigma['rules'][0].get('labels', {})
-    assert labels['juju_model'] == MODEL_NAME
-    assert labels['juju_application'] == 'test-app'
+    # AND topology is injected as tags
+    tags = sigma.get('rules', [])[0].get('tags', [])
+    assert f'juju_model.{MODEL_NAME}' in tags
+    assert 'juju_application.test-app' in tags
 
 
 def test_rulestore_add_sigma_collection():
@@ -491,7 +492,7 @@ def test_rulestore_add_sigma_collection():
     # THEN the sigma collection contains 2 rules
     sigma = store.sigma.as_dict()
     assert len(sigma.get('rules', [])) == 2
-    titles = {r['title'] for r in sigma['rules']}
+    titles = {r['title'] for r in sigma.get('rules', [])}
     assert titles == {'Failed SSH Login Attempt', 'High CPU Usage'}
 
 
@@ -518,7 +519,7 @@ def test_rulestore_combine_sigma():
     # THEN the target now contains the sigma rules
     sigma = target.sigma.as_dict()
     assert len(sigma.get('rules', [])) == 1
-    assert sigma['rules'][0]['title'] == 'Failed SSH Login Attempt'
+    assert sigma.get('rules', [])[0]['title'] == 'Failed SSH Login Attempt'
 
 
 def test_rulestore_combine_empty_sigma_does_not_clear_target():
@@ -559,10 +560,10 @@ def test_sigma_topology_in_databag(otlp_requirer_ctx: testing.Context[ops.CharmB
         decompressed = _decompress(relation.local_app_data.get('rules'))
         sigma_rules = decompressed.get('sigma', {}).get('rules', [])
         for rule in sigma_rules:
-            # THEN each sigma rule has topology labels
-            labels = rule.get('labels', {})
-            assert labels.get('juju_model') == MODEL_NAME
-            assert labels.get('juju_application') == 'otlp-requirer'
+            # THEN each sigma rule has topology tags
+            tags = rule.get('tags', [])
+            assert f'juju_model.{MODEL_NAME}' in tags
+            assert 'juju_application.otlp-requirer' in tags
 
 
 def test_provider_sigma_rules(otlp_provider_ctx: testing.Context[ops.CharmBase]):
@@ -592,14 +593,14 @@ def test_provider_sigma_rules(otlp_provider_ctx: testing.Context[ops.CharmBase])
 
         # THEN the sigma rules exist in the RuleStore
         assert len(sigma.get('rules', [])) == 1
-        rule = sigma['rules'][0]
+        rule = sigma.get('rules', [])[0]
         assert rule['title'] == 'Failed SSH Login Attempt'
 
-        # AND the rule has topology labels from the provider
-        labels = rule.get('labels', {})
-        assert labels.get('juju_model') == MODEL_NAME
-        assert labels.get('juju_model_uuid') == MODEL_UUID
-        assert labels.get('juju_application') == 'otlp-provider'
+        # AND the rule has topology tags from the provider
+        tags = rule.get('tags', [])
+        assert f'juju_model.{MODEL_NAME}' in tags
+        assert f'juju_model_uuid.{MODEL_UUID}' in tags
+        assert 'juju_application.otlp-provider' in tags
 
 
 @pytest.mark.parametrize(
@@ -634,8 +635,8 @@ def test_extra_alert_labels_injected_into_sigma(
         sigma_rules = decompressed.get('sigma', {}).get('rules', [])
         assert sigma_rules
 
-        # THEN each sigma rule has the extra alert labels
+        # THEN each sigma rule has the extra alert labels as tags
         for rule in sigma_rules:
-            labels = rule.get('labels', {})
+            tags = rule.get('tags', [])
             for k, v in expected_labels.items():
-                assert labels.get(k) == v
+                assert f'{k}.{v}' in tags

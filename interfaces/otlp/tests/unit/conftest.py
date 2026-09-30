@@ -29,6 +29,7 @@ from cosl.types import (
     AlertingRuleFormat,
     OfficialRuleFileFormat,
     RecordingRuleFormat,
+    SigmaRuleFileFormat,
     SigmaRuleFormat,
 )
 from ops import testing
@@ -87,7 +88,7 @@ SINGLE_SIGMA_RULE: SigmaRuleFormat = {
     'detection': {'selection': {'event_type': 'authentication_failure'}, 'condition': 'selection'},
     'level': 'medium',
 }
-SIGMA_COLLECTION: dict = {
+SIGMA_COLLECTION: SigmaRuleFileFormat = {
     'rules': [
         SINGLE_SIGMA_RULE,
         {

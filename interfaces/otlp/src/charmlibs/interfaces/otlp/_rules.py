@@ -276,6 +276,5 @@ def inject_extra_labels_into_rules(
         for group in rule_groups.get('groups', []):
             for rule in group.get('rules', []):
                 rule.setdefault('labels', {}).update(extra_alert_labels)
-    for sigma_rule in rules_copy.sigma.as_dict().get('rules', []):
-        sigma_rule.setdefault('labels', {}).update(extra_alert_labels)
+    rules_copy.sigma.add_extra_tags(extra_alert_labels)
     return rules_copy
