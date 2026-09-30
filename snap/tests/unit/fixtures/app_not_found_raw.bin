@@ -1,0 +1,1 @@
+{"type":"error","status-code":404,"status":"Not Found","result":{"message":"snap \"hello-world\" has no services","kind":"app-not-found"}}

@@ -14,16 +14,18 @@ classifiers = [
     "Development Status :: 5 - Production/Stable",
 ]
 dynamic = ["version"]
-dependencies = [
-    "opentelemetry-api",
-]
+dependencies = []
 
 [dependency-groups]
 lint = [  # installed for `just lint snap` (unit, functional, and integration are also installed)
     "typing_extensions",
 ]
-unit = []
-functional = []
+unit = [
+    "pytest",
+]
+functional = [
+    "pytest",
+]
 integration = []
 
 [project.urls]
@@ -52,6 +54,6 @@ include = ["src", "tests"]
 pythonVersion = "3.10"  # check no python > 3.10 features are used
 
 [tool.charmlibs.functional]
-ubuntu = ["22.04", "24.04"]  # ubuntu versions to run functional tests with, e.g. "24.04" (defaults to just "latest")
+ubuntu = ["22.04", "24.04", "26.04"]  # ubuntu versions to run functional tests with, e.g. "24.04" (defaults to just "latest")
 pebble = []  # pebble versions to run functional tests with, e.g. "v1.0.0", "master" (defaults to no pebble versions)
 sudo = true  # whether to run functional tests with sudo (defaults to false)

@@ -570,6 +570,23 @@ class ManagerOperationStore:
         """
         return self.peek_current() is not None
 
+    def has_queued_work(self) -> bool:
+        """Return whether any operation exists in this unit's etcd queues.
+
+        Unlike :meth:`has_pending_work`, this also considers operations that
+        are waiting to be claimed or that have been executed but not yet
+        post-processed by the worker. It is used to tell a transient gap in the
+        in-progress queue apart from a unit that genuinely has no etcd state.
+
+        Returns:
+            True if any operation is queued for this unit, otherwise False.
+        """
+        return (
+            self._pending.peek() is not None
+            or self._completed.peek() is not None
+            or self._inprogress.peek() is not None
+        )
+
     def clean_up(self) -> None:
         """Clear all operation queues for this unit.
 

@@ -10,8 +10,6 @@ import subprocess
 from pathlib import Path
 from urllib.request import urlopen
 
-import pytest
-
 import charmlibs.apt as apt
 
 logger = logging.getLogger(__name__)
@@ -138,7 +136,6 @@ def test_install_higher_version_package_from_external_repository():
     assert not shutil.which('fish')
 
 
-@pytest.mark.xfail  # https://github.com/canonical/charmlibs/issues/282
 def test_install_hardware_observer_ssacli():
     """Test the ability to install a package used by the hardware-observer charm.
 
@@ -158,8 +155,13 @@ def test_install_hardware_observer_ssacli():
     assert not shutil.which('ssacli')
     key_files: list[str] = []  # just for cleanup
     # steps
+    # Keys enumerated per HPE's current guidance at
+    # https://downloads.linux.hpe.com/SDR/keys.html: KEY1 verifies packages
+    # published after 2015, KEY2 verifies packages published after 2024, and
+    # the legacy HP keys cover pre-2015 packages that may still be pinned.
     for path in (
         KEY_DIR / 'HPEPUBLICKEY2048_KEY1.asc',
+        KEY_DIR / 'HPEPUBLICKEY2048_KEY2.asc',
         KEY_DIR / 'HPPUBLICKEY2048_KEY1.asc',
         KEY_DIR / 'HPPUBLICKEY2048.asc',
         KEY_DIR / 'HPPUBLICKEY1024.asc',

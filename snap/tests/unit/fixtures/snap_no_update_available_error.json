@@ -1,0 +1,10 @@
+{
+    "type": "error",
+    "status-code": 400,
+    "status": "Bad Request",
+    "result": {
+        "message": "snap has no updates available",
+        "kind": "snap-no-update-available",
+        "value": ""
+    }
+}

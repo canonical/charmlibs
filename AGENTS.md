@@ -69,6 +69,14 @@ uv tool install rust-just               # installs just (once uv is available)
 
 Run `just` or `just help` from anywhere in the repo to see all available commands. All `just` commands execute from the repo root regardless of where they're invoked.
 
+
+### Adding a new library
+
+Run `just init` to create a new general library, or `just init --interface` for a new interface library.
+We recommend following the [tutorial](https://canonical.com/juju/docs/charmlibs/tutorial) to learn how to add your library to the `charmlibs` monorepo.
+If you're migrating a library that was published elsewhere, read the [how-to guide for migrating an existing library to this repository](https://canonical.com/juju/docs/charmlibs/how-to/migrate/).
+See the pull request templates for [writing a new library](.github/PULL_REQUEST_TEMPLATE/adding-a-new-library.md) and [migrating an existing library](.github/PULL_REQUEST_TEMPLATE/migrating-a-library.md) for checklists.
+
 ### Inner loop
 
 The command you'll run most often is:
@@ -238,6 +246,8 @@ To bring an existing library's tutorials, how-to guides, and explanations into t
 - Then edit the imported pages to fit charmlibs conventions, following [How to add docs to a library](https://canonical.com/juju/docs/charmlibs/how-to/add-library-docs/).
 
 There is no `reference` docs category — reference docs are generated from docstrings.
+
+Note that this should only apply to documentation for library users -- general charm documentation should be hosted elsewhere.
 
 ## Common pitfalls
 

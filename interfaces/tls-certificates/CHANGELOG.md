@@ -1,3 +1,28 @@
+# 1.12.0 - 29 September 2026
+
+Allow requirers to configure library-generated private keys with the new `KeyAlgorithm` enum and
+the `key_algorithm` and `key_size` arguments of `TLSCertificatesRequiresV4`. Supported keys are
+RSA-2048 (the default), RSA-3072, RSA-4096, ECDSA P-256 and ECDSA P-384. `key_size` defaults to
+2048 for RSA and 256 for ECDSA, so `key_algorithm=KeyAlgorithm.ECDSA` works on its own. Plain
+strings (`"rsa"`, `"ecdsa"`) are also accepted. Existing persisted and externally supplied keys are
+kept, and renewal continues to reuse the current key.
+
+# 1.11.0 - 28 September 2026
+
+Fix certificate secret ownership to match the mode so APP secrets are always available to the leader unit.
+
+# 1.10.1 - 25 August 2026
+
+Fix `Mode.APP_AND_UNIT` requirers raising `RelationDataAccessError` on every non-leader unit. The library read the requirer's own application databag regardless of leadership, so once the leader had written its application certificate request, no other unit could complete a hook -- taking the unit scope down with the application one. Non-leaders now load the unit scope only, which is all they can act on: they can reach neither the application private key nor the application certificate secrets.
+
+# 1.10.0 - 13 July 2026
+
+Allow providers to advertise their certificate server's capabilities (`ProviderCapabilities`) in relation data, and let requirers read them via `get_provider_capabilities()` or by passing a callable `certificate_requests` that shapes requests from the advertised capabilities. Additive and backwards compatible.
+
+# 1.9.0 - 6 July 2026
+
+Store the `Mode.APP` private key under a new secret label and automatically migrate keys created by older versions (including pre-existing unit-owned keys) to an app-owned secret. The key material is preserved, so certificates are not regenerated on upgrade.
+
 # 1.8.3 - 5 June 2026
 
 Add a safety net to ensure expiring certificates are renewed even if the charm fails to trigger the renewal process.

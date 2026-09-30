@@ -1,0 +1,4 @@
+#!/bin/sh
+# A command with no purpose beyond being aliasable: the alias tests need a second snap that
+# can claim an alias name, so that a conflict with the first snap's alias can be provoked.
+echo "hello from test-alias-snap"

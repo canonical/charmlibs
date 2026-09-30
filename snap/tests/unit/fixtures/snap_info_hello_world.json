@@ -1,0 +1,77 @@
+{
+    "type": "sync",
+    "status-code": 200,
+    "status": "OK",
+    "result": {
+        "id": "buPKUD3TKqCOgLEjjHx5kSiCpIs5cMuQ",
+        "title": "Hello World",
+        "summary": "The 'hello-world' of snaps",
+        "description": "This is a simple hello world example.",
+        "icon": "/v2/icons/hello-world/icon",
+        "installed-size": 20480,
+        "install-date": "2026-02-26T12:20:32.316341429+13:00",
+        "name": "hello-world",
+        "publisher": {
+            "id": "canonical",
+            "username": "canonical",
+            "display-name": "Canonical",
+            "validation": "verified"
+        },
+        "developer": "canonical",
+        "status": "active",
+        "type": "app",
+        "version": "6.4",
+        "channel": "latest/stable",
+        "tracking-channel": "latest/stable",
+        "ignore-validation": false,
+        "revision": "29",
+        "confinement": "strict",
+        "grade": "",
+        "private": false,
+        "devmode": false,
+        "jailmode": false,
+        "apps": [
+            {
+                "snap": "hello-world",
+                "name": "env"
+            },
+            {
+                "snap": "hello-world",
+                "name": "evil"
+            },
+            {
+                "snap": "hello-world",
+                "name": "hello-world"
+            },
+            {
+                "snap": "hello-world",
+                "name": "sh"
+            }
+        ],
+        "mounted-from": "/var/lib/snapd/snaps/hello-world_29.snap",
+        "links": {
+            "contact": [
+                "mailto:snaps@canonical.com"
+            ]
+        },
+        "contact": "mailto:snaps@canonical.com",
+        "media": [
+            {
+                "type": "icon",
+                "url": "https://dashboard.snapcraft.io/site_media/appmedia/2015/03/hello.svg_NZLfWbh.png",
+                "width": 256,
+                "height": 256
+            },
+            {
+                "type": "screenshot",
+                "url": "https://dashboard.snapcraft.io/site_media/appmedia/2018/06/Screenshot_from_2018-06-14_09-33-31.png",
+                "width": 199,
+                "height": 118
+            },
+            {
+                "type": "video",
+                "url": "https://vimeo.com/194577403"
+            }
+        ]
+    }
+}
