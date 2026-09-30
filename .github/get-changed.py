@@ -38,7 +38,6 @@ _EXCLUSIONS = {
     '.github/PULL_REQUEST_TEMPLATE/blank.md',
     '.github/PULL_REQUEST_TEMPLATE/migrating-a-library.md',
     '.github/dependabot.yaml',
-    '.github/zizmor.yaml',
 }
 _REPO_ROOT = pathlib.Path(__file__).parent.parent
 

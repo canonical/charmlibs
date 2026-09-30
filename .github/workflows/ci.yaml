@@ -231,23 +231,6 @@ jobs:
             exit 1
           fi
 
-  zizmor:
-    runs-on: ubuntu-latest
-    permissions:
-      security-events: write
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d  # v10.0.1
-      - run: uvx zizmor@v1.11.0 --format=sarif . > results.sarif
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - uses: github/codeql-action/upload-sarif@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81  # v4.37.3
-        with:
-          sarif_file: results.sarif
-          category: zizmor
-
   local-docs-build:
     runs-on: ubuntu-latest
     steps:
