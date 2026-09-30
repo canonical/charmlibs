@@ -40,6 +40,7 @@ def test_fallback_writes_empty_include_when_missing(tmp_path: pathlib.Path):
     """Fallback writes empty include files when preprocessor hasn't run."""
     for category in CATEGORIES:
         (tmp_path / category).mkdir()
+    (tmp_path / 'reference').mkdir()
 
     fallback._fallback(_app(tmp_path))
 
@@ -47,6 +48,9 @@ def test_fallback_writes_empty_include_when_missing(tmp_path: pathlib.Path):
         path = tmp_path / category / f'_lib-{category}.md'
         assert path.exists()
         assert path.read_text() == ''
+    changelog = tmp_path / 'reference' / '_lib-changelog.md'
+    assert changelog.exists()
+    assert changelog.read_text() == ''
 
 
 def test_fallback_skips_when_include_exists(tmp_path: pathlib.Path):
@@ -54,9 +58,23 @@ def test_fallback_skips_when_include_exists(tmp_path: pathlib.Path):
     for category in CATEGORIES:
         (tmp_path / category).mkdir()
         (tmp_path / category / f'_lib-{category}.md').write_text('existing')
+    (tmp_path / 'reference').mkdir()
+    (tmp_path / 'reference' / '_lib-changelog.md').write_text('existing-changelog')
 
     fallback._fallback(_app(tmp_path))
 
     for category in CATEGORIES:
         path = tmp_path / category / f'_lib-{category}.md'
         assert path.read_text() == 'existing'
+    assert (tmp_path / 'reference' / '_lib-changelog.md').read_text() == 'existing-changelog'
+
+
+def test_fallback_creates_reference_dir(tmp_path: pathlib.Path):
+    """Fallback creates the reference directory if it doesn't already exist."""
+    for category in CATEGORIES:
+        (tmp_path / category).mkdir()
+    # No reference/ directory yet.
+
+    fallback._fallback(_app(tmp_path))
+
+    assert (tmp_path / 'reference' / '_lib-changelog.md').exists()
