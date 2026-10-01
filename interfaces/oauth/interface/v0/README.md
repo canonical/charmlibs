@@ -36,7 +36,7 @@ As mentioned above the field `client_secret_id` holds the id of a Juju Secret, t
 
 ### Requirer
 
-- Is expected to provide a user accessible `redirect_uri` using the HTTPS scheme.
+- Is expected to provide a user accessible `redirect_uri` using the HTTPS scheme, or a list of them, if it uses the `authorization_code` grant type.
 - Is expected to provide an audience for the issued tokens, if extra audience are required.
 - Is expected to provide the `grant_types` and `token_endpoint_auth_method` it wishes to use.
 - Is expected to provide the scopes that should be allowed for this client.
@@ -77,6 +77,19 @@ Requirer requires its client configurations. It should be placed in the **applic
 related-units: {}
 application-data: {
   "redirect_uri": "https://some_url/callback",
+  "audience": [],
+  "scope": "openid email",
+  "grant_types": ["authorization_code"],
+  "token_endpoint_auth_method": "client_secret_basic"
+}
+```
+
+A client that needs more than one redirect URI provides a list:
+
+```yaml
+related-units: {}
+application-data: {
+  "redirect_uri": ["https://some_url/callback", "https://other_url/callback"],
   "audience": [],
   "scope": "openid email",
   "grant_types": ["authorization_code"],
