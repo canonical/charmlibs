@@ -195,6 +195,23 @@ class ProviderApplicationData(DatabagModel):
         default=1,
     )
 
+    # Sets serialize in iteration order, which varies between processes (hash randomization).
+    # Sort them so that the same certificates always produce the same databag content,
+    # avoiding spurious relation-changed events on the requirer.
+    if IS_PYDANTIC_V1:
+
+        class Config(DatabagModel.Config):
+            """Pydantic config."""
+
+            json_encoders = {set: sorted}  # noqa: RUF012
+            """Serialize sets as sorted lists."""
+
+    else:
+
+        @pydantic.field_serializer("certificates")
+        def _serialize_certificates(self, certificates: set[str]) -> list[str]:
+            return sorted(certificates)
+
 
 class ProviderUnitDataV0(DatabagModel):
     """Provider Unit databag v0 model."""
@@ -377,7 +394,7 @@ class CertificateTransferProvides(Object):
 
             databag = relation.data[self.model.unit]
             if data:
-                certificates = list(data)
+                certificates = sorted(data)
                 ProviderUnitDataV0(
                     ca=certificates[0], certificate=certificates[0], chain=certificates
                 ).dump(databag, True)
