@@ -1,3 +1,9 @@
+# 1.1.2 - 02 October 2026
+
+Fix:
+- Publish the etcd request for an existing relation once the `cluster_id` becomes
+  available, instead of requiring the relation to be recreated.
+
 # 1.1.1 - 22 May 2026
 
 Fix:

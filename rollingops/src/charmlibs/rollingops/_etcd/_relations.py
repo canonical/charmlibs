@@ -15,11 +15,15 @@
 import logging
 
 from dpcharmlibs.interfaces import (
+    OpsRelationRepository,
     RequirerCommonModel,
+    RequirerDataContractV1,
     ResourceCreatedEvent,
     ResourceEndpointsChangedEvent,
     ResourceProviderModel,
     ResourceRequirerEventHandler,
+    gen_hash,
+    write_model,
 )
 from ops import Relation
 from ops.charm import (
@@ -234,6 +238,53 @@ class EtcdRequiresV1(Object):
         """Return the etcd relation if present."""
         relations = self.etcd_interface.relations
         return relations[0] if relations else None
+
+    def ensure_request_published(self) -> None:
+        """Publish this unit's etcd request for an already existing relation, if needed.
+
+        The underlying requirer event handler only writes the initial request to the
+        relation databag while handling the relation-created event. If the ``cluster_id``
+        (and therefore this requirer) only becomes available on a later event, that
+        one-time opportunity is missed and the request would never be sent, even though
+        the etcd relation already exists, leaving rollingops stuck on the peer backend.
+
+        This method mirrors that one-time write, so it can be retried on every event
+        until the request has actually been published. It is a no-op once a request has
+        already been written for this relation.
+        """
+        relation = self.etcd_relation
+        if relation is None:
+            return
+
+        if not self.charm.unit.is_leader():
+            return
+
+        repository = OpsRelationRepository(self.model, relation, self.charm.app)
+
+        if repository.get_field('requests'):
+            # A request was already published for this relation, either by the
+            # relation-created event handler, or by a previous call to this method.
+            return
+
+        requests = self.client_requests()
+
+        if repository.is_cross_model_relation and not repository.get_field('encryption-secret'):
+            for request in requests:
+                if request.entity_name:
+                    # The model will be written once the encryption key is set.
+                    return
+
+        for request in requests:
+            request.request_id = gen_hash(request.resource, request.salt)
+
+        full_request = RequirerDataContractV1[RequirerCommonModel](version='v1', requests=requests)
+        write_model(repository, full_request)
+        logger.info(
+            'Published etcd rollingops request for cluster_id=%s on relation %s/%s.',
+            self.cluster_id,
+            relation.name,
+            relation.id,
+        )
 
     def _on_relation_broken(self, event: RelationBrokenEvent) -> None:
         """Remove the stored information about the etcd server."""
