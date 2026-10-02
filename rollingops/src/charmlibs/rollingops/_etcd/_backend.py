@@ -111,6 +111,12 @@ class _EtcdRollingOpsBackend(Object):  # pyright: ignore[reportUnusedClass]
             shared_certificates=self.shared_certificates,
             base_dir=self._base_dir,
         )
+        # If the etcd relation already existed before the cluster_id (and the
+        # certificates it depends on) became available, the relation-created event
+        # that would normally publish our request has already fired and been missed.
+        # Ensure the request still gets published for that existing relation now,
+        # without requiring the relation to be recreated.
+        self.etcd.ensure_request_published()
         self._async_lock = EtcdLock(
             lock_key=self.keys.lock_key,
             owner=owner,
