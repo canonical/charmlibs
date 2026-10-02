@@ -5,7 +5,7 @@ In its integration tests, your library will be packed into one or more charms, t
 You can customise your integration tests in several ways, according to the needs of your library.
 You'll determine whether it makes sense to test on both K8s and machine clouds, with one or more charms, and whether to rerun the integration tests with other permutations.
 
-> Read more: {ref}`charmlibs-tests`
+Read more: {ref}`charmlibs-tests`
 
 Integration tests are only executed if the `<LIBRARY>/tests/integration` directory exists.
 If you don't need integration tests, remove the directory.

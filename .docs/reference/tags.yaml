@@ -1,0 +1,88 @@
+domain-tags:
+  substrate:
+    description: >-
+      Charm-to-machine interaction: package management, system configuration,
+      file operations, container resource management.
+    criteria: >-
+      The library wraps or abstracts an operating system or substrate-level
+      operation. It does not implement a charm-to-charm relation interface.
+
+  observability:
+    description: >-
+      Telemetry and monitoring: metrics, logging, tracing, profiling,
+      dashboarding, alerting, and integration with the Canonical Observability
+      Stack.
+    criteria: >-
+      The library implements an observability-related relation interface,
+      provides helpers for emitting or collecting telemetry, or integrates with
+      COS components.
+
+  identity-auth:
+    description: >-
+      Authentication, authorisation, and identity management: OAuth, OIDC,
+      SAML, LDAP, forward auth, fine-grained authorisation.
+    criteria: >-
+      The library implements an identity or auth-related relation interface, or
+      provides helpers for authentication and authorisation flows.
+
+  ingress:
+    description: >-
+      External access and routing: ingress configuration, load balancing,
+      reverse proxy integration.
+    criteria: >-
+      The library implements an ingress-related relation interface or provides
+      helpers for configuring external access to charmed applications.
+
+  networking:
+    description: >-
+      External connectivity, DNS, routing, and access management: ingress,
+      load balancing, reverse proxy integration, DNS record management, IP
+      routing, and service exposure.
+    criteria: >-
+      The library implements a networking-related relation interface or provides
+      helpers for external connectivity or routing. Superset of ingress: all
+      ingress-tagged libraries also carry this tag.
+
+  data:
+    description: >-
+      Database and storage integration: relational databases, NoSQL, object
+      storage, message queues, key-value stores.
+    criteria: >-
+      The library implements a data or storage-related relation interface or
+      provides helpers for interacting with data platforms.
+
+  security:
+    description: >-
+      TLS certificate management, certificate transfer, secret storage, and
+      security-related integrations.
+    criteria: >-
+      The library implements a TLS/certificate-related relation interface,
+      manages secrets, or provides security-related functionality.
+
+  operations:
+    description: >-
+      Charm lifecycle, coordination, and general-purpose utilities not specific
+      to any domain: rolling operations, leader coordination, status management.
+    criteria: >-
+      The library provides broadly applicable charm operational functionality
+      and does not belong exclusively to any of the above domain tags.
+
+  telco:
+    description: >-
+      Telecommunications and 5G network function integration: interfaces for
+      5G core network functions (AMF, UPF, NRF, etc.) and SD-Core management.
+    criteria: >-
+      The library implements a relation interface for a telecommunications
+      network function or provides helpers for integrating with SD-Core or 5G
+      network components.
+
+audience-tags:
+  internal:
+    description: >-
+      Scoped to a charm team. Shares implementation logic within a set of
+      related charms maintained together. Not intended for use by developers
+      outside the publishing team.
+    criteria: >-
+      The library is not designed as a stable public API for external consumers.
+      It typically carries the name of its publishing charm family (e.g.
+      mysql.*, postgresql_k8s.*).

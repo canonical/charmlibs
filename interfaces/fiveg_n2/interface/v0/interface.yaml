@@ -3,6 +3,7 @@ internal: true
 
 version: 0
 status: draft
+lib: charms.sdcore_amf_k8s.fiveg_n2
 
 providers:
   - name: sdcore-amf-operator

@@ -17,18 +17,15 @@
 from __future__ import annotations
 
 import grp
+import pathlib
 import pwd
 import re
 import shutil
-import typing
 from dataclasses import dataclass
 
 import pytest
 
 from charmlibs.pathops import LocalPath
-
-if typing.TYPE_CHECKING:
-    import pathlib
 
 
 class MockChown:
@@ -146,3 +143,29 @@ def test_write_text_newline_value_error(tmp_path: pathlib.Path):
         path.write_text('', newline='bad')
     with pytest.raises(ValueError):
         LocalPath(path).write_text('', newline='bad')
+
+
+class TestGlobPattern:
+    @pytest.fixture
+    def populated_dir(self, tmp_path: pathlib.Path) -> pathlib.Path:
+        (tmp_path / 'a.txt').write_text('')
+        (tmp_path / 'b.txt').write_text('')
+        (tmp_path / 'c.md').write_text('')
+        return tmp_path
+
+    def test_str_pattern(self, populated_dir: pathlib.Path):
+        result = sorted(p.name for p in LocalPath(populated_dir).glob('*.txt'))
+        assert result == ['a.txt', 'b.txt']
+
+    def test_pathlib_pattern(self, populated_dir: pathlib.Path):
+        pattern = pathlib.PurePosixPath('*.txt')
+        result = sorted(p.name for p in LocalPath(populated_dir).glob(pattern))
+        assert result == ['a.txt', 'b.txt']
+
+    def test_custom_pathlike_pattern(self, populated_dir: pathlib.Path):
+        class _Pattern:
+            def __fspath__(self) -> str:
+                return '*.md'
+
+        result = sorted(p.name for p in LocalPath(populated_dir).glob(_Pattern()))
+        assert result == ['c.md']

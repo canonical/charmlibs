@@ -8,4 +8,4 @@ To install, add `charmlibs-example` to your Python dependencies. Then in your Py
 from charmlibs import example
 ```
 
-See the [reference documentation](https://documentation.ubuntu.com/charmlibs/reference/charmlibs/example) for more.
+See the [reference documentation](https://canonical.com/juju/docs/charmlibs/reference/charmlibs/example) for more.

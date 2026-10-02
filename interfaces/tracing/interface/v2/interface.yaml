@@ -1,7 +1,7 @@
 name: tracing
 version: 2
 status: published
-lib: charms.tempo_coordinator_k8s.tracing
+lib: charmlibs.interfaces.tracing
 summary: Request endpoints for pushing trace data.
 description: |
   The `tracing` interface supports push-based tracing.

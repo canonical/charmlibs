@@ -3,6 +3,7 @@ internal: true
 
 version: 0
 status: draft
+lib: charms.hydra.hydra_endpoints
 
 providers:
   - name: hydra-operator

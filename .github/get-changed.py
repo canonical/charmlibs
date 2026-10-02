@@ -32,6 +32,14 @@ _GLOBAL_FILES = {
     'uv.lock',
     'test-requirements.txt',
 }
+_EXCLUSIONS = {
+    '.github/PULL_REQUEST_TEMPLATE.md',
+    '.github/PULL_REQUEST_TEMPLATE/adding-a-new-library.md',
+    '.github/PULL_REQUEST_TEMPLATE/blank.md',
+    '.github/PULL_REQUEST_TEMPLATE/migrating-a-library.md',
+    '.github/dependabot.yaml',
+    '.github/zizmor.yaml',
+}
 _REPO_ROOT = pathlib.Path(__file__).parent.parent
 
 logging.basicConfig(level=logging.DEBUG)
@@ -63,7 +71,7 @@ def _main() -> None:
 def _get_global_changes(git_base_ref: str) -> list[str]:
     cmd = ['git', 'diff', '--name-only', git_base_ref]
     diff = subprocess.check_output(cmd, text=True).strip().splitlines()
-    changes = {c.split('/')[0] for c in diff}
+    changes = {c.split('/')[0] for c in diff if c not in _EXCLUSIONS}
     return sorted(_GLOBAL_FILES.intersection(changes))
 
 

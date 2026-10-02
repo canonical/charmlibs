@@ -9,8 +9,8 @@
 # Environment variables:
 # $CHARMLIBS_SUBSTRATE will have the value 'k8s' or 'machine' (set by pack-k8s or pack-machine)
 # In CI, $CHARMLIBS_TAG is set based on pyproject.toml:tool.charmlibs.integration.tags
-# For local testing, set $CHARMLIBS_TAG directly or use the tag variable. For example:
-# just tag=24.04 pack-k8s some extra args
+# For local testing, set $CHARMLIBS_TAG directly or pass --tag. For example:
+# just pack-k8s --tag 24.04 some extra args
 set -xueo pipefail
 
 TMP_DIR=".tmp"  # clean temporary directory where charms will be packed
@@ -18,7 +18,7 @@ PACKED_DIR=".packed"  # where packed charms will be placed with name expected in
 
 : copy charm files to temporary directory for packing, dereferencing symlinks
 rm -rf "$TMP_DIR"
-cp --recursive --dereference "charms/$CHARMLIBS_SUBSTRATE/" "$TMP_DIR"
+cp --recursive --dereference "charms/$CHARMLIBS_SUBSTRATE-charm/" "$TMP_DIR"
 
 : pack charm
 cd "$TMP_DIR"

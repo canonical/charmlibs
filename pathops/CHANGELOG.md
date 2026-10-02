@@ -1,3 +1,18 @@
+# Unreleased
+
+`ContainerPath` now provides `is_relative_to` and `with_stem`, matching `pathlib.Path` on Python 3.9+.
+`with_stem` is also part of `PathProtocol`; `is_relative_to` is not, because `pathlib`'s signature doesn't settle until Python 3.12.
+`ContainerPath.match` now accepts a `str | os.PathLike[str]` pattern, matching `pathlib.Path.match` on Python 3.12+.
+`ContainerPath.match` also explicitly rejects `ContainerPath` arguments with a `TypeError` (since `ContainerPath` is not `os.PathLike`), restoring the pre-3.14 behaviour: Python 3.14's `pathlib.PurePath.match` accepts any object that implements `with_segments`, which would otherwise silently let a `ContainerPath` through.
+
+# 1.3.0.post0 - 16 June 2026
+
+Update project URLs.
+
+# 1.3.0 - 2 June 2026
+
+`PathProtocol.glob` and `LocalPath.glob` now accept a `str | os.PathLike[str]` pattern, matching `ContainerPath.glob` and `pathlib.Path.glob` on Python 3.13+.
+
 # 1.2.1 - 6 February 2026
 
 `PathProtocol` `iterdir` and `glob` now only promise to return an `Iterator` rather than a `Generator`.

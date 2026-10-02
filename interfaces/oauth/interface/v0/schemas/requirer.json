@@ -25,12 +25,16 @@
             "additionalProperties": true,
             "properties": {
                 "redirect_uri": {
-                    "type": "string",
+                    "type": ["string", "array"],
+                    "items": {
+                        "type": "string"
+                    },
                     "title": "Redirect URI",
-                    "description": "The client's redirect_uri, must be using the HTTPS scheme.",
+                    "description": "The client's redirect_uri, or a list of them, must be using the HTTPS scheme. Required when the client uses the authorization_code grant type.",
                     "default": null,
                     "examples": [
-                        "https://some_url/callback"
+                        "https://some_url/callback",
+                        ["https://some_url/callback", "https://other_url/callback"]
                     ]
                     },
                 "audience": {
@@ -67,7 +71,6 @@
                 }
             },
             "required": [
-                "redirect_uri",
                 "audience",
                 "scope",
                 "grant_types",

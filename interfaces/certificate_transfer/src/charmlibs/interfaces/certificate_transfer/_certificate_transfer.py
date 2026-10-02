@@ -372,6 +372,9 @@ class CertificateTransferProvides(Object):
                     relation.id,
                 )
 
+            app_databag = relation.data[self.model.app]
+            ProviderApplicationData(certificates=data).dump(app_databag, True)
+
             databag = relation.data[self.model.unit]
             if data:
                 certificates = list(data)
@@ -574,8 +577,9 @@ class CertificateTransferRequires(Object):
         try:
             databag = relation.data[relation.app]
             certificates = ProviderApplicationData().load(databag).certificates
-            if not certificates and relation.units:
-                databag = relation.data.get(relation.units.pop(), {})
+            if not certificates and databag.get("version", "0") != "1" and relation.units:
+                unit = next(iter(relation.units))
+                databag = relation.data.get(unit, {})
                 certs = ProviderUnitDataV0.load(databag).chain
                 if certs is None:
                     return set()

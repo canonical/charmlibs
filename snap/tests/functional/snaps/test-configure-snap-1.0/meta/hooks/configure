@@ -1,0 +1,8 @@
+#!/bin/sh -e
+# Validating configure hook: rejects any value for 'bad-key', accepts everything else.
+# Used by functional tests to exercise how snaps reject configuration at set time.
+bad="$(snapctl get bad-key)"
+if [ -n "$bad" ]; then
+    echo "bad-key is not allowed" >&2
+    exit 1
+fi

@@ -60,7 +60,7 @@ class SlothCharm(ops.CharmBase):
 
 ## Documentation
 
-For complete documentation, see the [charmlibs documentation](https://documentation.ubuntu.com/charmlibs/reference/charmlibs/interfaces/sloth).
+For complete documentation, see the [charmlibs documentation](https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/sloth).
 
 ## Contributing
 

@@ -142,6 +142,7 @@ class TestChown:
 def test_write_methods_chmod(
     container: ops.Container,
     tmp_path: pathlib.Path,
+    pebble_resolves_groups: bool,
     method: str,
     data: str | bytes,
     mode_str: str | None,
@@ -175,7 +176,9 @@ def test_write_methods_chmod(
     local_info = _get_fileinfo(local_path)
     # cleanup
     _unlink(path)
-    exclude = 'last_modified'
+    exclude = ['last_modified']
+    if not pebble_resolves_groups:
+        exclude.append('group')
     container_dict = utils.info_to_dict(container_info, exclude=exclude)
     local_dict = utils.info_to_dict(local_info, exclude=exclude)
     assert local_dict == container_dict
@@ -189,7 +192,13 @@ def test_write_methods_chmod(
 
 @pytest.mark.parametrize('mode_str', [*ALL_MODES, None])
 class TestMkdirChmod:
-    def test_ok(self, container: ops.Container, tmp_path: pathlib.Path, mode_str: str | None):
+    def test_ok(
+        self,
+        container: ops.Container,
+        tmp_path: pathlib.Path,
+        pebble_resolves_groups: bool,
+        mode_str: str | None,
+    ):
         mode = int(mode_str, base=8) if mode_str is not None else None
         path = tmp_path / 'directory'
         # container
@@ -217,13 +226,21 @@ class TestMkdirChmod:
         # cleanup -- pytest is bad at cleaning up when permissions are funky
         _rmdirs(path)
         # comparison
-        exclude = ('last_modified', 'permissions')
+        exclude = ['last_modified', 'permissions']
+        if not pebble_resolves_groups:
+            exclude.append('group')
         container_dict = utils.info_to_dict(container_info, exclude=exclude)
         local_dict = utils.info_to_dict(local_info, exclude=exclude)
         assert local_dict == container_dict
         assert _oct(local_info.permissions) == _oct(container_info.permissions)
 
-    def test_exists(self, container: ops.Container, tmp_path: pathlib.Path, mode_str: str | None):
+    def test_exists(
+        self,
+        container: ops.Container,
+        tmp_path: pathlib.Path,
+        pebble_resolves_groups: bool,
+        mode_str: str | None,
+    ):
         mode = int(mode_str, base=8) if mode_str is not None else None
         path = tmp_path / 'directory'
         path.mkdir()
@@ -244,7 +261,9 @@ class TestMkdirChmod:
         # cleanup -- pytest is bad at cleaning up when permissions are funky
         _rmdirs(path)
         # comparison
-        exclude = ('last_modified', 'permissions')
+        exclude = ['last_modified', 'permissions']
+        if not pebble_resolves_groups:
+            exclude.append('group')
         container_dict = utils.info_to_dict(container_info, exclude=exclude)
         local_dict = utils.info_to_dict(local_info, exclude=exclude)
         assert local_dict == container_dict
@@ -255,6 +274,7 @@ class TestMkdirChmod:
         self,
         container: ops.Container,
         tmp_path: pathlib.Path,
+        pebble_resolves_groups: bool,
         mode_str: str | None,
         subdir_path: str,
     ):
@@ -298,7 +318,9 @@ class TestMkdirChmod:
         # cleanup -- pytest is bad at cleaning up when permissions are funky
         _rmdirs(path, *parents)
         # comparison
-        exclude = ('last_modified', 'permissions')
+        exclude = ['last_modified', 'permissions']
+        if not pebble_resolves_groups:
+            exclude.append('group')
         container_dict = utils.info_to_dict(container_info, exclude=exclude)
         local_dict = utils.info_to_dict(local_info, exclude=exclude)
         assert local_dict == container_dict

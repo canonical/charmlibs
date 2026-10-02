@@ -83,8 +83,15 @@ def test_ensure_contents(
 @pytest.mark.parametrize('follow_symlinks', [True, False])
 @pytest.mark.parametrize('filename', utils.FILENAMES_PLUS)
 def test_get_fileinfo(
-    container: ops.Container, session_dir: pathlib.Path, filename: str, follow_symlinks: bool
+    container: ops.Container,
+    session_dir: pathlib.Path,
+    pebble_resolves_groups: bool,
+    filename: str,
+    follow_symlinks: bool,
 ):
+    exclude: list[str] = []
+    if not pebble_resolves_groups:
+        exclude.append('group')
     path = session_dir / filename
     try:
         pebble_result = _get_fileinfo(
@@ -95,4 +102,6 @@ def test_get_fileinfo(
             _get_fileinfo(path, follow_symlinks=follow_symlinks)
     else:
         synthetic_result = _get_fileinfo(path, follow_symlinks=follow_symlinks)
-        assert utils.info_to_dict(synthetic_result) == utils.info_to_dict(pebble_result)
+        synthetic_dict = utils.info_to_dict(synthetic_result, exclude=exclude)
+        pebble_dict = utils.info_to_dict(pebble_result, exclude=exclude)
+        assert synthetic_dict == pebble_dict

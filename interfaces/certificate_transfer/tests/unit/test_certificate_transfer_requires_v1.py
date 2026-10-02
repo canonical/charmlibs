@@ -166,6 +166,76 @@ class TestCertificateTransferRequiresV1:
         assert self.ctx.emitted_events[1].certificates == {"cert1"}
         assert self.ctx.emitted_events[1].relation_id == relation.id
 
+    def test_given_empty_v1_app_databag_and_v0_unit_data_when_read_repeatedly_then_empty_set_is_returned(
+        self,
+    ):
+        relation = scenario.Relation(
+            endpoint="certificate_transfer",
+            interface="certificate_transfer",
+            local_app_data={"version": "1"},
+            remote_app_data={"version": "1", "certificates": json.dumps([])},
+            remote_units_data={
+                0: {
+                    "certificate": json.dumps("cert1"),
+                    "ca": json.dumps("cert1"),
+                    "chain": json.dumps(["cert1"]),
+                    "version": json.dumps(0),
+                }
+            },
+        )
+        state_in = scenario.State(leader=True, relations=[relation])
+
+        with self.ctx(
+            self.ctx.on.action("is-ready", params={"relation-id": str(relation.id)}),
+            state_in,
+        ) as manager:
+            charm = manager.charm
+            first_read = charm.certificate_transfer.get_all_certificates(relation.id)
+            second_read = charm.certificate_transfer.get_all_certificates(relation.id)
+
+        assert first_read == set()
+        assert second_read == set()
+
+    def test_given_v0_unit_data_when_read_repeatedly_then_relation_units_are_not_mutated(
+        self,
+    ):
+        relation = scenario.Relation(
+            endpoint="certificate_transfer",
+            interface="certificate_transfer",
+            local_app_data={"version": "1"},
+            remote_units_data={
+                0: {
+                    "certificate": json.dumps("cert1"),
+                    "ca": json.dumps("cert1"),
+                    "chain": json.dumps(["cert1"]),
+                    "version": json.dumps(0),
+                },
+                1: {
+                    "certificate": json.dumps("cert2"),
+                    "ca": json.dumps("cert2"),
+                    "chain": json.dumps(["cert2"]),
+                    "version": json.dumps(0),
+                },
+            },
+        )
+        state_in = scenario.State(leader=True, relations=[relation])
+
+        with self.ctx(
+            self.ctx.on.action("is-ready", params={"relation-id": str(relation.id)}),
+            state_in,
+        ) as manager:
+            charm = manager.charm
+            remote_relation = charm.model.get_relation("certificate_transfer", relation.id)
+            assert remote_relation is not None
+            units_before = set(remote_relation.units)
+            first_read = charm.certificate_transfer.get_all_certificates(relation.id)
+            second_read = charm.certificate_transfer.get_all_certificates(relation.id)
+
+            assert set(remote_relation.units) == units_before
+
+        assert first_read == second_read
+        assert first_read in ({"cert1"}, {"cert2"})
+
     def test_given_none_of_the_expected_keys_in_relation_data_when_relation_changed_then_certificate_available_event_emitted_with_empty_cert(
         self,
     ):

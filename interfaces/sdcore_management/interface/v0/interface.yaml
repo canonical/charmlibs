@@ -3,6 +3,7 @@ internal: true
 
 version: 0
 status: draft
+lib: charms.sdcore_webui_k8s.sdcore_management
 
 providers: []
 requirers: []

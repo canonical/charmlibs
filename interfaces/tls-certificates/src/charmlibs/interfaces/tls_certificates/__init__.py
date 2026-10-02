@@ -14,10 +14,15 @@
 
 """Manage TLS certificates using the ``tls-certificates`` interface (V1).
 
-This is a port of ``tls_certificates_interface.tls_certificates`` v4.22.
+This library implements the Requirer and Provider roles for the ``k8s_backup_target`` relation,
+in the :class:`TLSCertificatesRequiresV4` and :class:`TLSCertificatesProvidesV4` classes.
 
-Learn more about how to use the TLS Certificates interface library by reading the
-`usage documentation on Charmhub <https://charmhub.io/tls-certificates-interface>`__.
+Read more:
+
+- `Tutorial <https://canonical.com/juju/docs/charmlibs/tutorials/charmlibs/interfaces/tls-certificates/tutorial/>`_
+- `Library reference <https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/tls-certificates/>`_
+- `How to configure certificate requests <https://canonical.com/juju/docs/charmlibs/how-to/charmlibs/interfaces/tls-certificates/configure-certificate-requests/>`_
+- `Explanation of the library design <https://canonical.com/juju/docs/charmlibs/explanation/charmlibs/interfaces/tls-certificates/design/>`_
 """
 
 from ._tls_certificates import (
@@ -30,8 +35,10 @@ from ._tls_certificates import (
     CertificateSigningRequest,
     CertificatesRequirerCharmEvents,
     DataValidationError,
+    KeyAlgorithm,
     Mode,
     PrivateKey,
+    ProviderCapabilities,
     ProviderCertificate,
     ProviderCertificateError,
     RequirerCertificateRequest,
@@ -57,8 +64,10 @@ __all__ = [
     "CertificateSigningRequest",
     "CertificatesRequirerCharmEvents",
     "DataValidationError",
+    "KeyAlgorithm",
     "Mode",
     "PrivateKey",
+    "ProviderCapabilities",
     "ProviderCertificate",
     "ProviderCertificateError",
     "RequirerCertificateRequest",

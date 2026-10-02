@@ -3,6 +3,7 @@ internal: true
 
 version: 0
 status: draft
+lib: charms.sdcore_nms_k8s.sdcore_config
 
 providers:
   - name: sdcore-nms-k8s

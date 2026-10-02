@@ -482,7 +482,7 @@ class NginxConfig:
                                     'resolve',
                                 ],
                             }
-                            for addr in addresses
+                            for addr in sorted(addresses)
                         ],
                     ],
                 })

@@ -8,4 +8,4 @@ To install, add `charmlibs-sysctl` to your Python dependencies. Then in your Pyt
 from charmlibs import sysctl
 ```
 
-See the [reference documentation](https://documentation.ubuntu.com/charmlibs/reference/charmlibs/sysctl) for more.
+See the [reference documentation](https://canonical.com/juju/docs/charmlibs/reference/charmlibs/sysctl) for more.

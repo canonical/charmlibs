@@ -3,6 +3,7 @@ internal: true
 
 version: 0
 status: draft
+lib: charms.identity_platform_login_ui_operator.login_ui_endpoints
 
 providers:
   - name: identity-platform-login-ui-operator

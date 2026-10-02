@@ -3,7 +3,7 @@
 
 Functional tests are executed much like your unit tests, but they provide more entry points for customisation to accommodate the need to interact with external processes.
 
-> Read more: {ref}`charmlibs-tests`
+Read more: {ref}`charmlibs-tests`
 
 Functional tests are only executed if the `<LIBRARY>/tests/functional` directory exists.
 If you don't need functional tests, remove the directory.

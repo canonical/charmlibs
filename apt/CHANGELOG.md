@@ -1,3 +1,7 @@
+# 1.0.0.post1 - 16 June 2026
+
+Update project URLs.
+
 # 1.0.0.post0 - 14 October 2025
 
 Update project URLs.

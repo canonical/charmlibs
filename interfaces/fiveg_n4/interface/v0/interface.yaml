@@ -3,6 +3,7 @@ internal: true
 
 version: 0
 status: draft
+lib: charms.sdcore_upf_k8s.fiveg_n4
 
 providers: []
 requirers: []

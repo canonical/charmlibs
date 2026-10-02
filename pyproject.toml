@@ -57,7 +57,7 @@ exclude = [
     "__pycache__",
     "*.egg_info",
     "htmlcov",
-    ".docs/.sphinx",
+    ".docs/_dev",
     ".docs/conf.py",
     ".template/\\{\\{ cookiecutter.project_slug \\}\\}",
 ]
@@ -143,6 +143,8 @@ ignore = [
     "S105",
     # Hard-coded password function argument.
     "S106",
+    # Complains about use of `random`.
+    "S311",
 
     # "Useless" expression.
     "B018",

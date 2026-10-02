@@ -41,6 +41,18 @@ def container() -> ops.Container:
 
 
 @pytest.fixture(scope='session')
+def pebble_resolves_groups(container: ops.Container, session_dir: pathlib.Path) -> bool:
+    """Whether Pebble can resolve GIDs to group names on this system.
+
+    Pebble uses Go's os/user package which doesn't support NSS/SSSD, so group
+    resolution fails when groups come from LDAP rather than /etc/group.
+    See: https://github.com/canonical/pebble/issues/868
+    """
+    info = container.list_files(str(session_dir), itself=True)[0]
+    return info.group != ''
+
+
+@pytest.fixture(scope='session')
 def another_container() -> ops.Container:
     return _make_container('test2')
 

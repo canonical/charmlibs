@@ -25,7 +25,7 @@ import pydantic
 from cryptography import x509
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.asymmetric import ec, rsa
 from cryptography.x509.oid import ExtensionOID, NameOID
 from ops import (
     BoundEvent,
@@ -46,8 +46,10 @@ from ops.model import (
     Unit,
 )
 
+from . import _backwards_compatibility
+
 if TYPE_CHECKING:
-    from collections.abc import Collection, Mapping, MutableMapping
+    from collections.abc import Callable, Collection, Mapping, MutableMapping
 
 # legacy Charmhub-hosted lib ID, used at runtime in this lib for labels
 LIBID = "afd8c2bccf834997afce12c2706d2ede"
@@ -59,7 +61,7 @@ logger = logging.getLogger(__name__)
 
 NESTED_JSON_KEY = "owasp_event"
 
-CertificateIssuerPrivateKeyTypes: TypeAlias = rsa.RSAPrivateKey
+CertificateIssuerPrivateKeyTypes: TypeAlias = rsa.RSAPrivateKey | ec.EllipticCurvePrivateKey
 
 
 @dataclass
@@ -311,11 +313,43 @@ class _RequestError(pydantic.BaseModel):
     error: CertificateError
 
 
+class ProviderCapabilities(pydantic.BaseModel):
+    """Best-effort description of what a provider's certificate server supports.
+
+    Capabilities are disambiguated at two levels, so a requirer can tell "the provider
+    hasn't told us yet" from "the provider told us, and it's unsupported":
+
+    - Whole object: :meth:`TLSCertificatesRequiresV4.get_provider_capabilities` (and the
+      capabilities argument passed to a ``certificate_requests`` callable) is ``None`` when
+      the provider has **not advertised any capabilities yet**. A requirer should treat this
+      as "not known yet / defer", not as "nothing is supported". Once the provider advertises
+      capabilities, a non-``None`` object is returned (even if it carries no fields).
+    - Per field: on a non-``None`` object, each attribute is independently optional.
+      ``True`` means supported, ``False`` means **advertised as unsupported**, and ``None``
+      means the provider advertised capabilities but left this one unspecified. A ``None``
+      field MUST NOT be interpreted as an assumed default by the requirer.
+    """
+
+    #: Whether IP addresses are accepted in SANs.
+    supports_ip_sans: bool | None = None
+    #: Whether wildcard DNS entries are accepted.
+    supports_wildcard_dns: bool | None = None
+    #: Whether subdomain certificates can be issued.
+    supports_subdomain: bool | None = None
+    #: Whether CA certificates can be issued.
+    supports_ca_certificates: bool | None = None
+    #: Optional list of allowed DNS domains.
+    allowed_domains: list[str] | None = None
+    #: Optional provider-type hint (e.g. "acme", "vault", "self-signed").
+    provider_type: str | None = None
+
+
 class _ProviderApplicationData(_DatabagModel):
     """Provider application data model."""
 
     certificates: list[_Certificate] = []
     request_errors: list[_RequestError] = []
+    capabilities: ProviderCapabilities | None = None
 
 
 class _RequirerData(_DatabagModel):
@@ -346,11 +380,40 @@ class Mode(Enum):
     APP_AND_UNIT = 3
 
 
+class KeyAlgorithm(str, Enum):
+    """Enum representing the algorithm of a private key.
+
+    RSA (default): RSA key. Supported sizes are 2048 (default), 3072 and 4096 bits.
+    ECDSA: Elliptic curve key. Supported sizes are 256 (P-256, default) and 384 (P-384) bits.
+    """
+
+    RSA = "rsa"
+    ECDSA = "ecdsa"
+
+
+_DEFAULT_KEY_SIZES: dict[KeyAlgorithm, int] = {KeyAlgorithm.RSA: 2048, KeyAlgorithm.ECDSA: 256}
+_SUPPORTED_KEY_SIZES: dict[KeyAlgorithm, tuple[int, ...]] = {
+    KeyAlgorithm.RSA: (2048, 3072, 4096),
+    KeyAlgorithm.ECDSA: (256, 384),
+}
+
+
+def _signature_hash_algorithm(
+    private_key: CertificateIssuerPrivateKeyTypes,
+) -> hashes.SHA256 | hashes.SHA384:
+    """Return the hash to sign with: SHA-384 for P-384 keys, SHA-256 otherwise."""
+    if isinstance(private_key, ec.EllipticCurvePrivateKey) and isinstance(
+        private_key.curve, ec.SECP384R1
+    ):
+        return hashes.SHA384()
+    return hashes.SHA256()
+
+
 class PrivateKey:
     """This class represents a private key."""
 
     def __init__(
-        self, raw: str | None = None, x509_object: rsa.RSAPrivateKey | None = None
+        self, raw: str | None = None, x509_object: CertificateIssuerPrivateKeyTypes | None = None
     ) -> None:
         """Initialize the PrivateKey object.
 
@@ -388,37 +451,84 @@ class PrivateKey:
         """Create a PrivateKey object from a private key."""
         return cls(raw=private_key)
 
-    def is_valid(self) -> bool:
-        """Validate that the private key is PEM-formatted, RSA, and at least 2048 bits."""
-        try:
-            if not isinstance(self._private_key, rsa.RSAPrivateKey):
-                logger.warning("Private key is not an RSA key")
-                return False
+    @property
+    def algorithm(self) -> KeyAlgorithm:
+        """Return the algorithm of the private key.
 
+        Raises:
+            TLSCertificatesError: If the key is neither RSA nor ECDSA.
+        """
+        if isinstance(self._private_key, rsa.RSAPrivateKey):
+            return KeyAlgorithm.RSA
+        if isinstance(self._private_key, ec.EllipticCurvePrivateKey):
+            return KeyAlgorithm.ECDSA
+        raise TLSCertificatesError("Unsupported private key algorithm")
+
+    @property
+    def key_size(self) -> int:
+        """Return the key size in bits (RSA modulus size or EC curve size).
+
+        This describes any loaded RSA or EC key, not only supported ones. For example, a
+        P-521 key reports 521 and an RSA-1024 key reports 1024. Use :meth:`is_valid` to
+        check whether the key is acceptable.
+
+        Raises:
+            TLSCertificatesError: If the key is neither RSA nor ECDSA.
+        """
+        if isinstance(self._private_key, rsa.RSAPrivateKey | ec.EllipticCurvePrivateKey):
+            return self._private_key.key_size
+        raise TLSCertificatesError("Unsupported private key algorithm")
+
+    def is_valid(self) -> bool:
+        """Validate an RSA key (at least 2048 bits) or ECDSA P-256/P-384 key."""
+        if isinstance(self._private_key, rsa.RSAPrivateKey):
             if self._private_key.key_size < 2048:
                 logger.warning("RSA key size is less than 2048 bits")
                 return False
-
             return True
-        except ValueError:
-            logger.warning("Invalid private key format")
+        if isinstance(self._private_key, ec.EllipticCurvePrivateKey):
+            if isinstance(self._private_key.curve, (ec.SECP256R1, ec.SECP384R1)):
+                return True
+            logger.warning("Unsupported ECDSA curve: %s", self._private_key.curve.name)
             return False
+        logger.warning("Private key must be RSA or ECDSA P-256/P-384")
+        return False
 
     @classmethod
-    def generate(cls, key_size: int = 2048, public_exponent: int = 65537) -> PrivateKey:
-        """Generate a new RSA private key.
+    def generate(
+        cls,
+        key_size: int | None = None,
+        public_exponent: int = 65537,
+        key_algorithm: KeyAlgorithm | str = KeyAlgorithm.RSA,
+    ) -> PrivateKey:
+        """Generate a new RSA or ECDSA private key.
 
         Args:
-            key_size: The size of the key in bits.
-            public_exponent: The public exponent of the key.
+            key_size: The size of the key in bits. Defaults to 2048 for RSA and 256 for ECDSA.
+                ECDSA supports 256 (P-256) and 384 (P-384).
+            public_exponent: The public exponent of the key (RSA only).
+            key_algorithm: The key algorithm, :attr:`KeyAlgorithm.RSA` (default) or
+                :attr:`KeyAlgorithm.ECDSA`. Plain strings (``"rsa"``, ``"ecdsa"``) are accepted.
 
         Returns:
             PrivateKey: The generated private key.
+
+        Raises:
+            ValueError: If the algorithm is unsupported, or the ECDSA size is not 256 or 384.
         """
-        private_key = rsa.generate_private_key(
-            public_exponent=public_exponent,
-            key_size=key_size,
-        )
+        algorithm = KeyAlgorithm(key_algorithm)
+        if key_size is None:
+            key_size = _DEFAULT_KEY_SIZES[algorithm]
+        private_key: CertificateIssuerPrivateKeyTypes
+        if algorithm == KeyAlgorithm.RSA:
+            private_key = rsa.generate_private_key(
+                public_exponent=public_exponent, key_size=key_size
+            )
+        else:
+            curves = {256: ec.SECP256R1, 384: ec.SECP384R1}
+            if key_size not in curves:
+                raise ValueError("ECDSA key size must be 256 or 384 bits")
+            private_key = ec.generate_private_key(curves[key_size]())
         _OWASPLogger().log_event(
             event="private_key_generated",
             level=logging.INFO,
@@ -611,15 +721,15 @@ class Certificate:
             cert_public_key = self._cert.public_key()
             key_public_key = private_key._private_key.public_key()
 
-            if not isinstance(cert_public_key, rsa.RSAPublicKey):
-                logger.warning("Certificate does not use RSA public key")
-                return False
-
-            if not isinstance(key_public_key, rsa.RSAPublicKey):
-                logger.warning("Private key is not an RSA key")
-                return False
-
-            return cert_public_key.public_numbers() == key_public_key.public_numbers()
+            if isinstance(cert_public_key, rsa.RSAPublicKey) and isinstance(
+                key_public_key, rsa.RSAPublicKey
+            ):
+                return cert_public_key.public_numbers() == key_public_key.public_numbers()
+            if isinstance(cert_public_key, ec.EllipticCurvePublicKey) and isinstance(
+                key_public_key, ec.EllipticCurvePublicKey
+            ):
+                return cert_public_key.public_numbers() == key_public_key.public_numbers()
+            return False
         except Exception as e:
             logger.warning("Failed to validate certificate and private key match: %s", e)
             return False
@@ -679,7 +789,9 @@ class Certificate:
                 raise TLSCertificatesError("Could not add extension to certificate") from e
 
         # Sign the certificate with the CA's private key
-        cert = cert_builder.sign(private_key=private_key, algorithm=hashes.SHA256())
+        cert = cert_builder.sign(
+            private_key=private_key, algorithm=_signature_hash_algorithm(private_key)
+        )
         _OWASPLogger().log_event(
             event="certificate_generated",
             level=logging.INFO,
@@ -708,7 +820,7 @@ class Certificate:
         Returns:
             Certificate: The generated CA certificate.
         """
-        assert isinstance(private_key._private_key, rsa.RSAPrivateKey)
+        assert isinstance(private_key._private_key, CertificateIssuerPrivateKeyTypes)
 
         public_key = private_key._private_key.public_key()
 
@@ -730,7 +842,7 @@ class Certificate:
             .add_extension(
                 x509.KeyUsage(
                     digital_signature=True,
-                    key_encipherment=True,
+                    key_encipherment=isinstance(private_key._private_key, rsa.RSAPrivateKey),
                     key_cert_sign=True,
                     key_agreement=False,
                     content_commitment=False,
@@ -751,7 +863,12 @@ class Certificate:
         ):
             builder = builder.add_extension(san_extension, critical=False)
 
-        cert = cls(x509_object=builder.sign(private_key._private_key, algorithm=hashes.SHA256()))
+        cert = cls(
+            x509_object=builder.sign(
+                private_key._private_key,
+                algorithm=_signature_hash_algorithm(private_key._private_key),
+            )
+        )
 
         _OWASPLogger().log_event(
             event="ca_certificate_generated",
@@ -935,8 +1052,6 @@ class CertificateSigningRequest:
     def matches_private_key(self, key: PrivateKey) -> bool:
         """Check if a CSR matches a private key.
 
-        This function only works with RSA keys.
-
         Args:
             key (PrivateKey): Private key
         Returns:
@@ -945,22 +1060,24 @@ class CertificateSigningRequest:
         try:
             key_object_public_key = key._private_key.public_key()
             csr_object_public_key = self._csr.public_key()
-            if not isinstance(key_object_public_key, rsa.RSAPublicKey):
-                logger.warning("Key is not an RSA key")
-                return False
-            if not isinstance(csr_object_public_key, rsa.RSAPublicKey):
-                logger.warning("CSR is not an RSA key")
-                return False
-            if (
-                csr_object_public_key.public_numbers().n
-                != key_object_public_key.public_numbers().n
+            if isinstance(key_object_public_key, rsa.RSAPublicKey) and isinstance(
+                csr_object_public_key, rsa.RSAPublicKey
             ):
-                logger.warning("Public key numbers between CSR and key do not match")
-                return False
+                return (
+                    csr_object_public_key.public_numbers()
+                    == key_object_public_key.public_numbers()
+                )
+            if isinstance(key_object_public_key, ec.EllipticCurvePublicKey) and isinstance(
+                csr_object_public_key, ec.EllipticCurvePublicKey
+            ):
+                return (
+                    csr_object_public_key.public_numbers()
+                    == key_object_public_key.public_numbers()
+                )
+            return False
         except ValueError:
             logger.warning("Could not load certificate or CSR.")
             return False
-        return True
 
     def get_sha256_hex(self) -> str:
         """Calculate the hash of the provided data and return the hexadecimal representation."""
@@ -1027,7 +1144,9 @@ class CertificateSigningRequest:
         if attributes.additional_critical_extensions:
             for extension in attributes.additional_critical_extensions:
                 csr_builder = csr_builder.add_extension(extension, critical=True)
-        signed_certificate_request = csr_builder.sign(signing_key, hashes.SHA256())
+        signed_certificate_request = csr_builder.sign(
+            signing_key, _signature_hash_algorithm(signing_key)
+        )
         return cls(x509_object=signed_certificate_request)
 
 
@@ -1678,6 +1797,26 @@ def _generate_certificate_request_extensions(
                 ),
             )
         )
+    elif isinstance(csr.public_key(), ec.EllipticCurvePublicKey) and (
+        ExtensionOID.KEY_USAGE not in {ext.oid for ext in csr.extensions}
+    ):
+        cert_extensions_list.append(
+            x509.Extension(
+                ExtensionOID.KEY_USAGE,
+                critical=True,
+                value=x509.KeyUsage(
+                    digital_signature=True,
+                    content_commitment=False,
+                    key_encipherment=False,
+                    data_encipherment=False,
+                    key_agreement=False,
+                    key_cert_sign=False,
+                    crl_sign=False,
+                    encipher_only=False,
+                    decipher_only=False,
+                ),
+            )
+        )
 
     existing_oids = {ext.oid for ext in cert_extensions_list}
     for extension in csr.extensions:
@@ -1739,6 +1878,24 @@ class CertificatesRequirerCharmEvents(CharmEvents):
     certificate_denied = EventSource(CertificateDeniedEvent)
 
 
+if TYPE_CHECKING:
+    _CertificateRequestsByMode: TypeAlias = dict[
+        Literal[Mode.APP, Mode.UNIT], list[CertificateRequestAttributes]
+    ]
+    # Each request input may be supplied either statically or as a capability-aware
+    # callable invoked with the provider's advertised ProviderCapabilities (or None).
+    _CertificateRequestsArg: TypeAlias = (
+        list[CertificateRequestAttributes]
+        | Callable[[ProviderCapabilities | None], list[CertificateRequestAttributes]]
+        | None
+    )
+    _CertificateRequestsByModeArg: TypeAlias = (
+        _CertificateRequestsByMode
+        | Callable[[ProviderCapabilities | None], _CertificateRequestsByMode]
+        | None
+    )
+
+
 class TLSCertificatesRequiresV4(Object):
     """A class to manage the TLS certificates interface for a unit or app."""
 
@@ -1748,26 +1905,32 @@ class TLSCertificatesRequiresV4(Object):
         self,
         charm: CharmBase,
         relationship_name: str,
-        certificate_requests: list[CertificateRequestAttributes] | None = None,
+        certificate_requests: _CertificateRequestsArg = None,
         mode: Mode = Mode.UNIT,
         refresh_events: list[BoundEvent] | None = None,
         private_key: PrivateKey | None = None,
         renewal_relative_time: float = 0.9,
-        certificate_requests_by_mode: dict[
-            Literal[Mode.APP, Mode.UNIT], list[CertificateRequestAttributes]
-        ]
-        | None = None,
+        certificate_requests_by_mode: _CertificateRequestsByModeArg = None,
+        key_algorithm: KeyAlgorithm | str = KeyAlgorithm.RSA,
+        key_size: int | None = None,
     ):
         """Create a new instance of the TLSCertificatesRequiresV4 class.
 
         Args:
             charm (CharmBase): The charm instance to relate to.
             relationship_name (str): The name of the relation that provides the certificates.
-            certificate_requests (List[CertificateRequestAttributes]):
-                A list with the attributes of the certificate requests.
+            certificate_requests (List[CertificateRequestAttributes] | Callable):
+                The attributes of the certificate requests.
                 - Use this when mode is Mode.UNIT or Mode.APP (single mode).
                 - Must be None or empty when using mode=Mode.APP_AND_UNIT.
                 - Mutually exclusive with certificate_requests_by_mode.
+                - May be supplied as a list, or as a capability-aware callable returning a
+                  list. The callable is invoked with the provider's currently advertised
+                  ``ProviderCapabilities`` (or ``None`` when none are advertised yet) and is
+                  resolved on every hook that builds requests (reconcile and renewal). Keep it
+                  a pure read with no side effects; gating churn is the charm's responsibility.
+                  Until the first resolution, the public ``certificate_requests`` attribute is
+                  empty.
             mode (Mode): Whether to use UNIT, APP or APP_AND_UNIT certificates mode. Default is
                 Mode.UNIT.
                 In UNIT mode the requirer will place the csr in the unit relation data.
@@ -1797,6 +1960,14 @@ class TLSCertificatesRequiresV4(Object):
                 Default is 0.9, meaning 90% of the validity period.
                 The minimum value is 0.5, meaning 50% of the validity period.
                 If an invalid value is provided, an exception will be raised.
+            key_algorithm (KeyAlgorithm | str): Algorithm for library-generated keys,
+                :attr:`KeyAlgorithm.RSA` (default) or :attr:`KeyAlgorithm.ECDSA`.
+                Plain strings (``"rsa"``, ``"ecdsa"``) are accepted.
+            key_size (int | None): Size of library-generated keys in bits. RSA supports 2048,
+                3072 and 4096; ECDSA supports 256 (P-256) and 384 (P-384). Defaults to 2048 for
+                RSA and 256 for ECDSA. Applies to newly generated and regenerated keys, not to
+                persisted or imported keys; compare :attr:`PrivateKey.algorithm` and
+                :attr:`PrivateKey.key_size` and call :meth:`regenerate_private_key` to rotate.
             certificate_requests_by_mode
                 (Dict[Literal[Mode.APP, Mode.UNIT], List[CertificateRequestAttributes]]):
                 A dictionary mapping modes to their certificate request lists.
@@ -1804,6 +1975,9 @@ class TLSCertificatesRequiresV4(Object):
                 - Must be None when mode is Mode.UNIT or Mode.APP.
                 - Keys must be Mode.APP and/or Mode.UNIT (not Mode.APP_AND_UNIT).
                 - Mutually exclusive with certificate_requests.
+                - May also be supplied as a capability-aware callable returning the dictionary
+                  (same resolution semantics as the callable form of certificate_requests),
+                  so APP_AND_UNIT requests can react to provider capabilities too.
 
         Example:
                     certificate_requests_by_mode={
@@ -1822,14 +1996,50 @@ class TLSCertificatesRequiresV4(Object):
             raise TLSCertificatesError(
                 "Invalid mode. Must be Mode.UNIT, Mode.APP, or Mode.APP_AND_UNIT"
             )
+        try:
+            algorithm = KeyAlgorithm(key_algorithm)
+        except ValueError:
+            raise TLSCertificatesError(
+                "Invalid key algorithm or size: use RSA 2048/3072/4096 or ECDSA 256/384"
+            ) from None
+        if key_size is None:
+            key_size = _DEFAULT_KEY_SIZES[algorithm]
+        if key_size not in _SUPPORTED_KEY_SIZES[algorithm]:
+            raise TLSCertificatesError(
+                "Invalid key algorithm or size: use RSA 2048/3072/4096 or ECDSA 256/384"
+            )
         self.charm = charm
         self.relationship_name = relationship_name
-        self.certificate_requests, self._certificate_mode_map = (
-            self._validate_and_map_certificate_requests(
-                mode, certificate_requests_by_mode, certificate_requests
-            )
-        )
         self.mode = mode
+        self.key_algorithm = algorithm
+        self.key_size = key_size
+        self._certificate_requests_input = certificate_requests
+        self._certificate_requests_by_mode = certificate_requests_by_mode
+        if callable(certificate_requests) or callable(certificate_requests_by_mode):
+            # A capability-aware callable is resolved on every hook that builds requests
+            # (reconcile and renewal), since it depends on relation data (the provider's
+            # advertised capabilities) that isn't readable at construction time. The
+            # mode/parameter pairing is validated eagerly; the callable's (deferred) content
+            # is validated each time it is resolved. Until then, certificate_requests is empty.
+            if mode == Mode.APP_AND_UNIT and certificate_requests:
+                raise TLSCertificatesError(
+                    "certificate_requests must be None in APP_AND_UNIT mode; "
+                    "use certificate_requests_by_mode."
+                )
+            if mode != Mode.APP_AND_UNIT and certificate_requests_by_mode is not None:
+                raise TLSCertificatesError(
+                    "certificate_requests_by_mode must be None when the mode is UNIT or APP."
+                )
+            self.certificate_requests: list[CertificateRequestAttributes] = []
+            self._certificate_mode_map: dict[
+                CertificateRequestAttributes, Literal[Mode.APP, Mode.UNIT]
+            ] = {}
+        else:
+            self.certificate_requests, self._certificate_mode_map = (
+                self._validate_and_map_certificate_requests(
+                    mode, certificate_requests_by_mode, certificate_requests
+                )
+            )
         if private_key and not private_key.is_valid():
             raise TLSCertificatesError("Invalid private key")
         if renewal_relative_time <= 0.5 or renewal_relative_time > 1.0:
@@ -1837,9 +2047,11 @@ class TLSCertificatesRequiresV4(Object):
                 "Invalid renewal relative time. Must be between 0.5 and 1.0"
             )
         self._private_key = private_key
+        self._private_key_cache: dict[Mode, PrivateKey | None] = {}
         self.renewal_relative_time = renewal_relative_time
         self.framework.observe(charm.on[relationship_name].relation_created, self._configure)
         self.framework.observe(charm.on[relationship_name].relation_changed, self._configure)
+        self.framework.observe(charm.on.leader_elected, self._configure)
         self.framework.observe(
             charm.on[relationship_name].relation_broken, self._on_relation_broken
         )
@@ -1949,11 +2161,44 @@ class TLSCertificatesRequiresV4(Object):
         if not self.model.get_relation(self.relationship_name):
             logger.debug("TLS relation not created yet.")
             return
+        self._resolve_certificate_requests()
         self._ensure_private_key()
         self._cleanup_certificate_requests()
         self._send_certificate_requests()
         self._find_available_certificates()
         self._renew_expiring_certificates()
+
+    def _resolve_certificate_requests(self) -> None:
+        """Resolve callable ``certificate_requests``/``certificate_requests_by_mode``.
+
+        When either request input was provided as a capability-aware callable, invoke it
+        with the provider's currently-advertised capabilities (or ``None`` when none are
+        advertised yet) and update ``self.certificate_requests`` and
+        ``self._certificate_mode_map``.
+
+        This is a no-op when both inputs were static, in which case they were validated and
+        mapped once in ``__init__``. It must be called from every code path that builds and
+        sends requests (both the reconcile path in ``_configure`` and the renewal path in
+        ``_renew_certificate_request``), so that renewals don't iterate an empty request set
+        when a callable is used.
+        """
+        if not (
+            callable(self._certificate_requests_input)
+            or callable(self._certificate_requests_by_mode)
+        ):
+            return
+        capabilities = self.get_provider_capabilities()
+        requests = self._certificate_requests_input
+        if callable(requests):
+            requests = requests(capabilities)
+        requests_by_mode = self._certificate_requests_by_mode
+        if callable(requests_by_mode):
+            requests_by_mode = requests_by_mode(capabilities)
+        self.certificate_requests, self._certificate_mode_map = (
+            self._validate_and_map_certificate_requests(
+                self.mode, requests_by_mode, requests or []
+            )
+        )
 
     def _mode_is_valid(self, mode: Mode) -> bool:
         return mode in [Mode.UNIT, Mode.APP, Mode.APP_AND_UNIT]
@@ -2010,13 +2255,17 @@ class TLSCertificatesRequiresV4(Object):
     def _get_private_key_for_mode(self, mode: Literal[Mode.APP, Mode.UNIT]) -> PrivateKey | None:
         if self._private_key:
             return self._private_key
+        if mode in self._private_key_cache:
+            return self._private_key_cache[mode]
         if mode == Mode.APP and not self.model.unit.is_leader():
             logger.warning("Only the leader can access the private key in APP mode")
             return None
         try:
             secret = self.charm.model.get_secret(label=self._get_private_key_secret_label(mode))
-            private_key = secret.get_content(refresh=True)["private-key"]
-            return PrivateKey.from_string(private_key)
+            private_key_str = secret.get_content(refresh=True)["private-key"]
+            private_key = PrivateKey.from_string(private_key_str)
+            self._private_key_cache[mode] = private_key
+            return private_key
         except (SecretNotFoundError, KeyError):
             return None
 
@@ -2029,7 +2278,22 @@ class TLSCertificatesRequiresV4(Object):
         if mode == Mode.APP and not self.model.unit.is_leader():
             logger.debug("Not leader, skipping private key generation in APP mode")
             return
+        if mode == Mode.APP and self._migrate_legacy_app_private_key():
+            return
         self._generate_private_key(mode)
+
+    def _migrate_legacy_app_private_key(self) -> bool:
+        """Adopt an APP private key stored under the legacy label by an older version."""
+
+        def store(private_key: str) -> None:
+            self._store_private_key_in_secret(PrivateKey.from_string(private_key), Mode.APP)
+
+        return _backwards_compatibility.migrate_legacy_app_private_key(
+            model=self.model,
+            libid=LIBID,
+            relationship_name=self.relationship_name,
+            store_app_private_key=store,
+        )
 
     def _validate_secret_exists(self, secret: Secret) -> None:
         secret.get_info()  # Will raise `SecretNotFoundError` if the secret does not exist
@@ -2132,6 +2396,10 @@ class TLSCertificatesRequiresV4(Object):
 
     def _renew_certificate_request(self, csr: CertificateSigningRequest):
         """Remove existing CSR from relation data and create a new one."""
+        # Resolve a callable request set here too: renewal runs on secret_expired,
+        # which does not go through _configure, so without this the new CSR would
+        # never be re-sent when certificate_requests is a callable.
+        self._resolve_certificate_requests()
         self._remove_requirer_csr_from_relation_data(csr)
         self._send_certificate_requests()
         logger.info("Renewed certificate request")
@@ -2311,7 +2579,7 @@ class TLSCertificatesRequiresV4(Object):
         and generate new CSRs with the imported key.
 
         Args:
-            private_key: The private key to import. Must be a valid RSA key.
+            private_key: The private key to import. Must be a valid RSA or ECDSA key.
             mode: Optional mode when using APP_AND_UNIT. If None both will be rotated.
 
         Raises:
@@ -2323,7 +2591,8 @@ class TLSCertificatesRequiresV4(Object):
         """
         if not private_key.is_valid():
             raise TLSCertificatesError(
-                "Invalid private key provided. Must be a valid RSA key with at least 2048 bits."
+                "Invalid private key provided. Must be RSA (at least 2048 bits) "
+                "or ECDSA P-256/P-384."
             )
         self._perform_key_rotation(private_key=private_key, mode=mode)
 
@@ -2392,12 +2661,15 @@ class TLSCertificatesRequiresV4(Object):
         This is the case when the private key used is generated by the library.
             and not passed by the charm using the private_key parameter.
         """
-        self._store_private_key_in_secret(generate_private_key(), mode)
+        self._store_private_key_in_secret(
+            PrivateKey.generate(key_size=self.key_size, key_algorithm=self.key_algorithm), mode
+        )
         logger.info("Private key generated")
 
     def _store_private_key_in_secret(
         self, private_key: PrivateKey, mode: Literal[Mode.UNIT, Mode.APP]
     ) -> None:
+        self._private_key_cache.pop(mode, None)
         app_or_unit = self._get_app_or_unit_for_mode(mode)
         try:
             secret = self.charm.model.get_secret(label=self._get_private_key_secret_label(mode))
@@ -2411,6 +2683,7 @@ class TLSCertificatesRequiresV4(Object):
 
     def _remove_private_key_secret(self, mode: Literal[Mode.UNIT, Mode.APP]) -> None:
         """Remove the private key secret."""
+        self._private_key_cache.pop(mode, None)
         if mode == Mode.APP and not self.model.unit.is_leader():
             logger.debug("Not leader, cannot remove app owned private key secret")
             return
@@ -2419,6 +2692,10 @@ class TLSCertificatesRequiresV4(Object):
             secret.remove_all_revisions()
         except SecretNotFoundError:
             logger.warning("Private key secret not found, nothing to remove")
+        if mode == Mode.APP:
+            _backwards_compatibility.remove_legacy_app_private_key(
+                self.model, LIBID, self.relationship_name
+            )
 
     def _csr_matches_certificate_request(
         self, certificate_signing_request: CertificateSigningRequest, is_ca: bool
@@ -2490,6 +2767,32 @@ class TLSCertificatesRequiresV4(Object):
         """
         return self._load_provider_certificate_errors()
 
+    def get_provider_capabilities(self) -> ProviderCapabilities | None:
+        """Return the capabilities advertised by the provider, best-effort.
+
+        Returns:
+            A ProviderCapabilities object when the provider advertises capabilities,
+            or None when there is no relation, no remote application, the provider has
+            not advertised capabilities, or the provider data is invalid. Never raises.
+            Individual fields of the returned object may be None (unspecified).
+        """
+        relation = self.model.get_relation(self.relationship_name)
+        if not relation:
+            logger.debug("No relation: %s", self.relationship_name)
+            return None
+        if not relation.app:
+            logger.debug("No remote app in relation: %s", self.relationship_name)
+            return None
+        try:
+            provider_relation_data = _ProviderApplicationData.load(relation.data[relation.app])
+        except DataValidationError:
+            logger.warning("Invalid relation data")
+            return None
+        except ModelError:
+            logger.warning("Relation data not available")
+            return None
+        return provider_relation_data.capabilities
+
     def get_request_error(self, csr: CertificateSigningRequest) -> ProviderCertificateError | None:
         """Get the request error for a specific CSR.
 
@@ -2517,6 +2820,9 @@ class TLSCertificatesRequiresV4(Object):
         except DataValidationError:
             logger.warning("Invalid relation data")
             return []
+        except ModelError:
+            logger.warning("Relation data not available")
+            return []
         return [
             certificate.to_provider_certificate(relation_id=relation.id)
             for certificate in provider_relation_data.certificates
@@ -2535,9 +2841,7 @@ class TLSCertificatesRequiresV4(Object):
             except DataValidationError:
                 logger.warning("Invalid relation data for unit - Skipping")
 
-        if self.mode == Mode.APP_AND_UNIT or (
-            self.mode == Mode.APP and self.model.unit.is_leader()
-        ):
+        if self.mode in (Mode.APP, Mode.APP_AND_UNIT) and self.model.unit.is_leader():
             try:
                 app_data = _RequirerData.load(relation.data[self.model.app])
                 csrs.extend(app_data.certificate_signing_requests)
@@ -2812,7 +3116,7 @@ class TLSCertificatesRequiresV4(Object):
                         secret.get_content(refresh=True)
                     else:
                         logger.debug("Creating new secret with label %s", secret_label)
-                        self.charm.unit.add_secret(
+                        self._get_app_or_unit_for_mode(mode).add_secret(
                             content={
                                 "certificate": str(provider_certificate.certificate),
                                 "csr": str(provider_certificate.certificate_signing_request),
@@ -2911,7 +3215,10 @@ class TLSCertificatesRequiresV4(Object):
         if mode == Mode.UNIT:
             return f"{LIBID}-private-key-{self._get_unit_number()}-{self.relationship_name}"
         elif mode == Mode.APP:
-            return f"{LIBID}-private-key-{self.relationship_name}"
+            # the "-app-" infix distinguishes this label from the one used by older
+            # versions, which may refer to a unit-owned secret
+            # (see _backwards_compatibility.legacy_app_private_key_secret_label)
+            return f"{LIBID}-private-key-app-{self.relationship_name}"
 
     def _get_csr_secret_label(
         self, csr: CertificateSigningRequest, mode: Literal[Mode.UNIT, Mode.APP]
@@ -2922,20 +3229,6 @@ class TLSCertificatesRequiresV4(Object):
             return f"{LIBID}-certificate-{unit_num}-{self.relationship_name}-{csr_in_sha256_hex}"
         elif mode == Mode.APP:
             return f"{LIBID}-certificate-{self.relationship_name}-{csr_in_sha256_hex}"
-
-    def _get_csr_secret_label_without_relation_name(
-        self, csr: CertificateSigningRequest, mode: Literal[Mode.UNIT, Mode.APP]
-    ) -> str:
-        """Get the old certificate secret label format (without relation name).
-
-        This method provides backward compatibility for secrets created
-        before the relation name was added to the label.
-        """
-        csr_in_sha256_hex = csr.get_sha256_hex()
-        if mode == Mode.UNIT:
-            return f"{LIBID}-certificate-{self._get_unit_number()}-{csr_in_sha256_hex}"
-        elif mode == Mode.APP:
-            return f"{LIBID}-certificate-{csr_in_sha256_hex}"
 
     def _get_certificate_secret(
         self, csr: CertificateSigningRequest, mode: Literal[Mode.UNIT, Mode.APP]
@@ -2958,7 +3251,11 @@ class TLSCertificatesRequiresV4(Object):
         except SecretNotFoundError:
             pass
 
-        old_secret_label = self._get_csr_secret_label_without_relation_name(csr, mode)
+        old_secret_label = _backwards_compatibility.certificate_secret_label_without_relation_name(
+            libid=LIBID,
+            csr_sha256_hex=csr.get_sha256_hex(),
+            unit_number=self._get_unit_number() if mode == Mode.UNIT else None,
+        )
         try:
             return self.model.get_secret(label=old_secret_label)
         except SecretNotFoundError:
@@ -3043,13 +3340,20 @@ class TLSCertificatesRequiresV4(Object):
 class TLSCertificatesProvidesV4(Object):
     """TLS certificates provider class to be instantiated by TLS certificates providers."""
 
-    def __init__(self, charm: CharmBase, relationship_name: str):
+    def __init__(
+        self,
+        charm: CharmBase,
+        relationship_name: str,
+        provider_capabilities: ProviderCapabilities | None = None,
+    ):
         super().__init__(charm, relationship_name)
+        self.framework.observe(charm.on[relationship_name].relation_created, self._configure)
         self.framework.observe(charm.on[relationship_name].relation_joined, self._configure)
         self.framework.observe(charm.on[relationship_name].relation_changed, self._configure)
         self.framework.observe(charm.on.update_status, self._configure)
         self.charm = charm
         self.relationship_name = relationship_name
+        self.provider_capabilities = provider_capabilities
         self._security_logger = _OWASPLogger(application=f"tls-certificates-{charm.app.name}")
 
     def _configure(self, _: EventBase) -> None:
@@ -3057,11 +3361,36 @@ class TLSCertificatesProvidesV4(Object):
 
         This is a common hook triggered on a regular basis.
 
-        Revoke certificates for which no csr exists
+        Revoke certificates for which no csr exists and refresh advertised capabilities.
         """
         if not self.model.unit.is_leader():
             return
         self._remove_certificates_for_which_no_csr_exists()
+        self._publish_capabilities()
+
+    def _publish_capabilities(self) -> None:
+        """Synchronise the provider's capabilities into every relation's application data.
+
+        Writes the capabilities supplied at initialization, or clears any previously
+        published capabilities when none are supplied (so requirers don't keep observing
+        stale data after a provider stops advertising). Writes are no-op-if-unchanged to
+        avoid ``relation-changed`` churn, and preserve the existing ``certificates`` and
+        ``request_errors`` keys (load-modify-dump).
+        """
+        for relation in self._get_tls_relations():
+            try:
+                provider_data = _ProviderApplicationData.load(relation.data[self.charm.app])
+            except DataValidationError:
+                logger.warning("Failed to load provider relation data")
+                continue
+            if provider_data.capabilities == self.provider_capabilities:
+                continue
+            provider_data.capabilities = self.provider_capabilities
+            try:
+                provider_data.dump(relation.data[self.model.app])
+                logger.info("Provider capabilities relation data updated")
+            except ModelError:
+                logger.warning("Failed to update relation data")
 
     def _remove_certificates_for_which_no_csr_exists(self) -> None:
         provider_certificates = self.get_provider_certificates()

@@ -31,7 +31,7 @@ class TLSConfigManager:
 
     KEY_PATH = '/etc/nginx/certs/server.key'
     CERT_PATH = '/etc/nginx/certs/server.cert'
-    CA_CERT_PATH = '/usr/local/share/ca-certificates/ca.cert'
+    CA_CERT_PATH = '/usr/local/share/ca-certificates/ca.crt'
 
     def __init__(
         self,

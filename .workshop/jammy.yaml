@@ -1,0 +1,4 @@
+name: jammy
+base: ubuntu@22.04
+sdks:
+  - name: project-charmlibs

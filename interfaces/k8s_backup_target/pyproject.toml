@@ -32,8 +32,10 @@ integration = [
 ]
 
 [project.urls]
-"Repository" = "https://github.com/canonical/charmlibs"
+"Documentation" = "https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/k8s-backup-target"
+"Repository" = "https://github.com/canonical/charmlibs/tree/main/interfaces/k8s_backup_target"
 "Issues" = "https://github.com/canonical/charmlibs/issues"
+"Changelog" = "https://github.com/canonical/charmlibs/blob/main/interfaces/k8s_backup_target/CHANGELOG.md"
 
 [build-system]
 requires = ["hatchling"]
