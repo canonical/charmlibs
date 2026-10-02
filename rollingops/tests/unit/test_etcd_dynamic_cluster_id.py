@@ -62,7 +62,7 @@ def dynamic_ctx() -> Context[DynamicClusterIdCharm]:
 
 
 @pytest.fixture(autouse=True)
-def _reset_cluster_id() -> Any:
+def _reset_cluster_id() -> Any:  # pyright: ignore[reportUnusedFunction] (autouse fixture)
     DynamicClusterIdCharm.cluster_id = None
     yield
     DynamicClusterIdCharm.cluster_id = None
