@@ -1,5 +1,4 @@
-# common charmcraft.yaml file symlinked by these charms
-# k8s charms can define containers + resources in metadata.yaml
+# machine charms have no containers or resources
 
 name: test
 type: charm

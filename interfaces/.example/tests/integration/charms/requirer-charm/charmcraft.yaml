@@ -1,0 +1,20 @@
+# no containers or resources, so this same charm deploys on both K8s and machine substrates
+
+name: requirer
+type: charm
+summary: A small requirer charm for use in integration tests.
+description: A small requirer charm for use in integration tests.
+
+base: ubuntu@24.04
+platforms:
+  amd64:
+
+requires:
+  endpoint:
+    interface: example-interface
+
+parts:
+  charm:
+    source: .
+    plugin: uv
+    build-snaps: [astral-uv]
