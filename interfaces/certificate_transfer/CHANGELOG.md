@@ -1,4 +1,4 @@
-# 1.0.1 - 5 October 2026
+# Unreleased
 
 Write the provided certificates in sorted order, so that the databag doesn't change (and trigger a `relation-changed` event on the requirer) when the set of certificates hasn't.
 
