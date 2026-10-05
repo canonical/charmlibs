@@ -12,6 +12,8 @@ from jubilant import Juju
 
 logger = logging.getLogger(__name__)
 
+pytestmark = pytest.mark.k8s_only
+
 TIMEOUT = 600
 PROVIDER = 'sloth-test-provider'
 REQUIRER = 'sloth-test-requirer'
