@@ -14,6 +14,7 @@
 
 """Source code of ``certificate_transfer_interface.certificate_transfer`` v1.15."""
 
+import hashlib
 import json
 import logging
 from collections.abc import MutableMapping
@@ -31,7 +32,7 @@ from ops import (
     RelationCreatedEvent,
 )
 from ops.charm import CharmBase
-from ops.framework import Object
+from ops.framework import Object, StoredState
 
 logger = logging.getLogger(__name__)
 
@@ -477,6 +478,7 @@ class CertificateTransferRequires(Object):
     """Certificate transfer requirer class to be instantiated by charms expecting certificates."""
 
     on = CertificateTransferRequirerCharmEvents()  # type: ignore
+    _stored = StoredState()
 
     def __init__(
         self,
@@ -492,6 +494,7 @@ class CertificateTransferRequires(Object):
         super().__init__(charm, relationship_name + "_v1")
         self.relationship_name = relationship_name
         self.charm = charm
+        self._stored.set_default(certificate_hashes={})
         self.framework.observe(
             charm.on[relationship_name].relation_changed, self._on_relation_changed
         )
@@ -503,7 +506,7 @@ class CertificateTransferRequires(Object):
         )
 
     def _on_relation_changed(self, event: RelationChangedEvent) -> None:
-        """Emit certificate set updated event.
+        """Emit certificate set updated event if the set of certificates has changed.
 
         Args:
             event: Juju event
@@ -511,11 +514,30 @@ class CertificateTransferRequires(Object):
         Returns:
             None
         """
-        remote_unit_relation_data = self.get_all_certificates(event.relation.id)
+        certificates = self.get_all_certificates(event.relation.id)
+        key = self._stored_hash_key(event.relation)
+        certificates_hash = self._hash_certificates(certificates)
+        if self._stored.certificate_hashes.get(key) == certificates_hash:
+            logger.debug(
+                "Certificates in relation %d are unchanged, not emitting certificate_set_updated",
+                event.relation.id,
+            )
+            return
+        self._stored.certificate_hashes[key] = certificates_hash
         self.on.certificate_set_updated.emit(
-            certificates=remote_unit_relation_data,
+            certificates=certificates,
             relation_id=event.relation.id,
         )
+
+    @staticmethod
+    def _stored_hash_key(relation: Relation) -> str:
+        """Return the key for a relation's certificate hash, in Juju's ``<endpoint>:<id>`` form."""
+        return f"{relation.name}:{relation.id}"
+
+    @staticmethod
+    def _hash_certificates(certificates: set[str]) -> str:
+        """Return a hash of the certificates that doesn't depend on their order."""
+        return hashlib.sha256(json.dumps(sorted(certificates)).encode()).hexdigest()
 
     def _on_relation_broken(self, event: RelationBrokenEvent) -> None:
         """Handle relation broken event.
@@ -526,6 +548,7 @@ class CertificateTransferRequires(Object):
         Returns:
             None
         """
+        self._stored.certificate_hashes.pop(self._stored_hash_key(event.relation), None)
         self.on.certificates_removed.emit(relation_id=event.relation.id)
 
     def _on_relation_created(self, event: RelationCreatedEvent) -> None:
