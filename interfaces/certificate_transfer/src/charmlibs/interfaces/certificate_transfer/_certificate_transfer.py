@@ -517,12 +517,27 @@ class CertificateTransferRequires(Object):
         certificates = self.get_all_certificates(event.relation.id)
         key = self._stored_hash_key(event.relation)
         certificates_hash = self._hash_certificates(certificates)
-        if self._stored.certificate_hashes.get(key) == certificates_hash:
-            logger.debug(
-                "Certificates in relation %d are unchanged, not emitting certificate_set_updated",
-                event.relation.id,
+        previous_hash = self._stored.certificate_hashes.get(key)
+        remote_unit = event.unit.name if event.unit else None
+        if previous_hash == certificates_hash:
+            logger.info(
+                "Relation %s changed (remote unit %s) but its %d certificate(s) are unchanged "
+                "(hash %s), not emitting certificate_set_updated",
+                key,
+                remote_unit,
+                len(certificates),
+                certificates_hash,
             )
             return
+        logger.info(
+            "Certificates in relation %s changed (remote unit %s): now %d certificate(s), "
+            "hash %s (previously %s), emitting certificate_set_updated",
+            key,
+            remote_unit,
+            len(certificates),
+            certificates_hash,
+            previous_hash,
+        )
         self._stored.certificate_hashes[key] = certificates_hash
         self.on.certificate_set_updated.emit(
             certificates=certificates,
