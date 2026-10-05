@@ -14,7 +14,7 @@
 
 """Manage TLS certificates using the ``tls-certificates`` interface (V1).
 
-This library implements the Requirer and Provider roles for the ``k8s_backup_target`` relation,
+This library implements the Requirer and Provider roles for the ``tls-certificates`` relation,
 in the :class:`TLSCertificatesRequiresV4` and :class:`TLSCertificatesProvidesV4` classes.
 
 Read more:
