@@ -12,8 +12,6 @@ from jubilant import Juju
 
 logger = logging.getLogger(__name__)
 
-pytestmark = pytest.mark.k8s_only
-
 TIMEOUT = 600
 PROVIDER = 'sloth-test-provider'
 REQUIRER = 'sloth-test-requirer'
@@ -25,7 +23,6 @@ def test_setup_provider(juju: Juju, sloth_provider_charm: str) -> None:
     juju.deploy(
         sloth_provider_charm,
         PROVIDER,
-        resources={'workload': 'ubuntu:latest'},
         config={
             'slo-service-name': 'test-service',
             'slo-objective': '99.9',
@@ -47,7 +44,6 @@ def test_setup_requirer(juju: Juju, sloth_requirer_charm: str) -> None:
     juju.deploy(
         sloth_requirer_charm,
         REQUIRER,
-        resources={'workload': 'ubuntu:latest'},
     )
 
     juju.wait(
@@ -138,7 +134,6 @@ def test_multiple_providers(juju: Juju, sloth_provider_charm: str) -> None:
     juju.deploy(
         sloth_provider_charm,
         provider2,
-        resources={'workload': 'ubuntu:latest'},
         config={
             'slo-service-name': 'second-service',
             'slo-objective': '99.0',
