@@ -23,6 +23,7 @@ import logging
 import time
 from typing import Any
 
+import ops
 from ops import ActionEvent, CharmBase, Framework
 from ops.model import ActiveStatus, MaintenanceStatus, WaitingStatus
 
@@ -36,6 +37,12 @@ from charmlibs.rollingops import (
 logger = logging.getLogger(__name__)
 
 TRACE_FILE = pathops.LocalPath('/var/lib/charm-rolling-ops/transitions.log')
+
+# Default cluster_id, used except while the toggle-cluster-id action has
+# cleared it to None. The actual value doesn't matter for manual testing;
+# only whether it is None (etcd setup skipped) or set (etcd setup attempted)
+# matters.
+CLUSTER_ID = 'cluster-12345'
 
 
 def _now_timestamp_str() -> str:
@@ -54,8 +61,12 @@ class MySyncBackend(SyncLockBackend):
 class Charm(CharmBase):
     """Charm the service."""
 
+    _stored = ops.StoredState()
+
     def __init__(self, framework: Framework):
         super().__init__(framework)
+        self._stored.set_default(cluster_id=CLUSTER_ID)
+
         callback_targets = {
             '_restart': self._restart,
             '_failed_restart': self._failed_restart,
@@ -67,7 +78,7 @@ class Charm(CharmBase):
             charm=self,
             peer_relation_name='restart',
             etcd_relation_name='etcd',
-            cluster_id='cluster-12345',
+            cluster_id=self._stored.cluster_id,
             callback_targets=callback_targets,
             sync_lock_targets={
                 'stop': sync_backend,
@@ -78,6 +89,7 @@ class Charm(CharmBase):
         self.framework.observe(self.on.failed_restart_action, self._on_failed_restart_action)
         self.framework.observe(self.on.deferred_restart_action, self._on_deferred_restart_action)
         self.framework.observe(self.on.sync_restart_action, self._on_sync_restart_action)
+        self.framework.observe(self.on.toggle_cluster_id_action, self._on_toggle_cluster_id_action)
 
     def _restart(self, delay: int = 0) -> None:
         self._record_transition('_restart:start', delay=delay)
@@ -152,6 +164,28 @@ class Charm(CharmBase):
         except TimeoutError:
             self._record_transition('_sync_restart:timeout', delay=delay, timeout=timeout)
         event.fail('Timed out acquiring sync lock')
+
+    def _on_toggle_cluster_id_action(self, event: ActionEvent) -> None:
+        """Toggle the etcd cluster_id between a fixed value and None.
+
+        The charm starts with cluster_id set. Run this action to clear it
+        (reproducing the race where the etcd relation exists but cluster_id
+        is None), then run it again to restore it and trigger the fix.
+
+        The charm's __init__ runs once per hook, so the new value only takes
+        effect for ``self.restart_manager`` starting with the *next* hook
+        (any hook) after this action completes -- it is not applied within
+        this same action's execution.
+        """
+        if self._stored.cluster_id:
+            self._stored.cluster_id = None
+        else:
+            self._stored.cluster_id = CLUSTER_ID
+
+        new_value = self._stored.cluster_id
+        self._record_transition('action:toggle-cluster-id', cluster_id=new_value)
+        logger.info('cluster_id is now %s (takes effect on the next hook).', new_value)
+        event.set_results({'cluster-id': new_value or ''})
 
     def _record_transition(self, name: str, **data: Any) -> None:
         TRACE_FILE.parent.mkdir(parents=True, exist_ok=True)

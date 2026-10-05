@@ -42,3 +42,11 @@ sync-restart:
       description: "Time (seconds) to wait before giving up."
       type: integer
       default: 60
+
+toggle-cluster-id:
+  description: >-
+    Toggles the etcd cluster_id between a fixed value (the default) and None,
+    for manually testing/reproducing the race where the etcd relation exists
+    while cluster_id is None, and the cluster_id only becomes available
+    afterwards. Takes effect starting with the next hook after this action
+    completes.
