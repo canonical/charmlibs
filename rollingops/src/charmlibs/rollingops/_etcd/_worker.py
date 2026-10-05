@@ -97,7 +97,7 @@ class EtcdRollingOpsAsyncWorker(BaseRollingOpsAsyncWorker):
         try:
             pid = int(pid)
         except (ValueError, TypeError):
-            logger.info('Missing PID or invalid PID found in etcd worker state.')
+            logger.debug('Missing PID or invalid PID found in etcd worker state.')
             pid = None
 
         return pid

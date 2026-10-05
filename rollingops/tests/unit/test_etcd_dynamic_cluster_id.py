@@ -11,7 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Regression tests for dynamic cluster_id becoming available after the etcd
+
+"""Tests for dynamic cluster_id becoming available after the etcd
 relation has already been created.
 
 These reproduce the race condition where:
@@ -23,6 +24,7 @@ These reproduce the race condition where:
      already fired and won't fire again.
 """
 
+import json
 from typing import Any, ClassVar
 from unittest.mock import MagicMock
 
@@ -133,3 +135,31 @@ def test_request_is_published_only_once(
     # The request_id (derived from a random salt) must stay stable across
     # republish attempts: it must not be regenerated into a brand new request.
     assert etcd_out.local_app_data['requests'] == first_requests
+
+
+def test_published_request_includes_the_client_certificate(
+    certificates_manager_patches: dict[str, MagicMock],
+    dynamic_ctx: Context[DynamicClusterIdCharm],
+):
+    """The request published for an already-existing relation must include the
+    client certificate, not just the cluster_id.
+    """
+    peer = PeerRelation(endpoint='restart')
+    etcd_relation = Relation(endpoint='etcd', interface='etcd_client')
+    state_in = State(leader=True, relations={peer, etcd_relation})
+
+    # Relation is created before cluster_id (and therefore the certificate)
+    # are available.
+    DynamicClusterIdCharm.cluster_id = None
+    state_mid = dynamic_ctx.run(dynamic_ctx.on.relation_created(etcd_relation), state_in)
+
+    # cluster_id becomes available on a later event, for an existing relation.
+    DynamicClusterIdCharm.cluster_id = 'cluster-12345'
+    state_out = dynamic_ctx.run(dynamic_ctx.on.update_status(), state_mid)
+
+    etcd_out = next(r for r in state_out.relations if r.endpoint == 'etcd')
+    requests = json.loads(etcd_out.local_app_data['requests'])
+    assert len(requests) == 1
+    assert requests[0]['secret-mtls'], (
+        'client certificate secret must be set on the published request'
+    )
