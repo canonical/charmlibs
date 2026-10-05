@@ -195,6 +195,22 @@ class ProviderApplicationData(DatabagModel):
         default=1,
     )
 
+    # Write the certificates in a stable order. A set's iteration order changes
+    # between hook invocations, and any change to the databag text triggers a
+    # relation-changed event on the requirer side.
+    if IS_PYDANTIC_V1:
+
+        class Config(DatabagModel.Config):
+            """Pydantic config."""
+
+            json_encoders = {set: sorted}  # noqa: RUF012
+
+    else:
+
+        @pydantic.field_serializer("certificates")
+        def _serialize_certificates(self, certificates: set[str]) -> list[str]:
+            return sorted(certificates)
+
 
 class ProviderUnitDataV0(DatabagModel):
     """Provider Unit databag v0 model."""
@@ -377,7 +393,7 @@ class CertificateTransferProvides(Object):
 
             databag = relation.data[self.model.unit]
             if data:
-                certificates = list(data)
+                certificates = sorted(data)
                 ProviderUnitDataV0(
                     ca=certificates[0], certificate=certificates[0], chain=certificates
                 ).dump(databag, True)

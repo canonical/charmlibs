@@ -764,3 +764,36 @@ the databags except using the public methods in the provider library and use ver
             "certificate1",
             "certificate2",
         }
+
+    def test_given_many_certificates_when_add_certificates_then_databags_are_sorted(self):
+        relation_v1 = scenario.Relation(
+            endpoint="certificate_transfer",
+            interface="certificate_transfer",
+            remote_app_data={"version": "1"},
+        )
+        relation_v0 = scenario.Relation(
+            endpoint="certificate_transfer",
+            interface="certificate_transfer",
+            remote_app_data={"version": "0"},
+        )
+        state_in = scenario.State(leader=True, relations=[relation_v1, relation_v0])
+        # With ten certificates, a set's iteration order is very unlikely to be
+        # sorted by chance, so this fails if the library writes set order.
+        certificates = [f"certificate{i}" for i in (7, 2, 9, 0, 5, 3, 8, 1, 6, 4)]
+
+        state_out = self.ctx.run(
+            self.ctx.on.action(
+                "add-certificates", params={"certificates": ", ".join(certificates)}
+            ),
+            state_in,
+        )
+
+        expected = sorted(certificates)
+        relation_v1_app_data = state_out.get_relation(relation_v1.id).local_app_data
+        assert json.loads(relation_v1_app_data["certificates"]) == expected
+        relation_v0_app_data = state_out.get_relation(relation_v0.id).local_app_data
+        assert json.loads(relation_v0_app_data["certificates"]) == expected
+        relation_v0_unit_data = state_out.get_relation(relation_v0.id).local_unit_data
+        assert json.loads(relation_v0_unit_data["chain"]) == expected
+        assert json.loads(relation_v0_unit_data["ca"]) == expected[0]
+        assert json.loads(relation_v0_unit_data["certificate"]) == expected[0]
