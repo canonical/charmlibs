@@ -180,7 +180,7 @@ class DatabagModel(pydantic.BaseModel):
 class ProviderApplicationData(DatabagModel):
     """Provider App databag model."""
 
-    if int(pydantic.version.VERSION.split(".")[0]) < 2:
+    if IS_PYDANTIC_V1:
         certificates: set[str] = pydantic.Field(
             description="The set of certificates that will be transferred to a requirer",
             default_factory=set,
@@ -203,6 +203,8 @@ class ProviderApplicationData(DatabagModel):
         class Config(DatabagModel.Config):
             """Pydantic config."""
 
+            # Unlike the v2 serializer below, this applies to every set field
+            # on the model. That's fine while `certificates` is the only one.
             json_encoders = {set: sorted}  # noqa: RUF012
 
     else:

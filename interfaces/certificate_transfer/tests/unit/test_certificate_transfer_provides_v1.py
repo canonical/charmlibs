@@ -795,5 +795,7 @@ the databags except using the public methods in the provider library and use ver
         assert json.loads(relation_v0_app_data["certificates"]) == expected
         relation_v0_unit_data = state_out.get_relation(relation_v0.id).local_unit_data
         assert json.loads(relation_v0_unit_data["chain"]) == expected
+        # The v0 shim puts the first certificate in `ca` and `certificate`; it
+        # isn't necessarily a CA. This only checks that the choice is stable.
         assert json.loads(relation_v0_unit_data["ca"]) == expected[0]
         assert json.loads(relation_v0_unit_data["certificate"]) == expected[0]
