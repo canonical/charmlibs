@@ -15,11 +15,15 @@
 import logging
 
 from dpcharmlibs.interfaces import (
+    OpsRelationRepository,
     RequirerCommonModel,
+    RequirerDataContractV1,
     ResourceCreatedEvent,
     ResourceEndpointsChangedEvent,
     ResourceProviderModel,
     ResourceRequirerEventHandler,
+    gen_hash,
+    write_model,
 )
 from ops import Relation
 from ops.charm import (
@@ -27,10 +31,9 @@ from ops.charm import (
     LeaderElectedEvent,
     RelationBrokenEvent,
     RelationChangedEvent,
-    RelationCreatedEvent,
     SecretChangedEvent,
 )
-from ops.framework import Handle, Object
+from ops.framework import Object
 from ops.model import ModelError
 
 from charmlibs import pathops
@@ -239,16 +242,12 @@ class EtcdRequiresV1(Object):
     def ensure_request_published(self) -> None:
         """Publish this unit's etcd request for an already existing relation, if needed.
 
-        ``self.etcd_interface`` (the requirer-side event handler) only publishes the request
-        to the relation databag on ``relation-created`` hook. If the ``cluster_id`` only becomes
-        available on a later event, that one-time hook has already run and the request was never
-        sent, even though the etcd relation already exists, leaving rollingops stuck on the peer
-        backend.
+        ``self.etcd_interface`` (the requirer-side) only publishes the request to the
+        relation databag while handling the Juju ``relation-created`` hook.
+        If the ``cluster_id`` becomes available on a later event, that one-time hook
+        has already run and the request was never sent.
 
-        This calls the handler's own relation-created logic directly.
-
-        This is a no-op once a request has already been written for this
-        relation, so the handler is only ever replayed once.
+        This is a no-op if a request has already been written for this relation
         """
         relation = self.etcd_relation
         if relation is None:
@@ -257,22 +256,25 @@ class EtcdRequiresV1(Object):
         if not self.charm.unit.is_leader():
             return
 
-        if relation.data[self.charm.app].get('requests'):
-            # A request was already published for this relation, either by the
-            # real relation-created event, or by a previous call to this method.
+        repository = OpsRelationRepository(self.model, relation, self.charm.app)
+
+        if repository.get_field('requests'):
+            # A request was already published for this relation
             return
 
+        requests = self.client_requests()
+
+        for request in requests:
+            request.request_id = gen_hash(request.resource, request.salt)
+
+        full_request = RequirerDataContractV1[RequirerCommonModel](version='v1', requests=requests)
+        write_model(repository, full_request)
         logger.info(
-            'Replaying missed etcd rollingops relation-created handling for '
-            'cluster_id=%s on relation %s/%s.',
+            'Published etcd rollingops request for cluster_id=%s on relation %s/%s.',
             self.cluster_id,
             relation.name,
             relation.id,
         )
-        event = RelationCreatedEvent(
-            Handle(self.etcd_interface, 'relation_created', None), relation, app=relation.app
-        )
-        self.etcd_interface._on_relation_created_event(event)
 
     def _on_relation_broken(self, event: RelationBrokenEvent) -> None:
         """Remove the stored information about the etcd server."""
