@@ -330,6 +330,8 @@ class EtcdRequiresV1(Object):
 
     def client_requests(self) -> list[RequirerCommonModel]:
         """Return the client requests for the etcd requirer interface."""
+        if not self.cluster_id:
+            return []
         cert = self.shared_certificates.get_local_request_cert()
         return [
             RequirerCommonModel(
