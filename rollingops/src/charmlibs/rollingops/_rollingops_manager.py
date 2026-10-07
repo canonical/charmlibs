@@ -140,7 +140,7 @@ class RollingOpsManager(Object):
             logger.debug('No etcd relation configured. Using peer backend only.')
 
         elif not cluster_id:
-            logger.info(
+            logger.debug(
                 'Etcd relation configured but no cluster_id yet. '
                 'Using peer backend until cluster_id provided.'
             )
@@ -168,7 +168,6 @@ class RollingOpsManager(Object):
                 callback_targets=callback_targets,
                 base_dir=base_dir,
             )
-            self._etcd_backend.shared_certificates.create_and_share_certificate()
 
         self.framework.observe(charm.on.rollingops_lock_granted, self._on_rollingops_lock_granted)
         self.framework.observe(charm.on.rollingops_etcd_failed, self._on_rollingops_etcd_failed)
@@ -317,7 +316,6 @@ class RollingOpsManager(Object):
             logger.error('Peer relation does not exists. Cannot run lock granted.')
             return
         if self._backend_state.is_peer_managed():
-            logger.info('Executing rollingop on peer backend.')
             self._peer_backend._on_rollingops_lock_granted(event)
             return
         self._run_etcd_and_mirror_or_fallback()
@@ -338,7 +336,6 @@ class RollingOpsManager(Object):
             return
 
         try:
-            logger.info('Executing rollingop on etcd backend.')
             outcome = self._etcd_backend._on_run_with_lock()
         except Exception as e:
             logger.warning(
