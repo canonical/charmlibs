@@ -14,14 +14,6 @@
 
 """Tests for dynamic cluster_id becoming available after the etcd
 relation has already been created.
-
-These reproduce the race condition where:
-  1. The etcd relation is created before the charm has a cluster_id, so the
-     etcd backend (and therefore the requirer that publishes the request) is
-     never set up for that relation-created event.
-  2. The cluster_id becomes available on a later event, but without a fix the
-     request is never (re)published because the relation-created event has
-     already fired and won't fire again.
 """
 
 import json
@@ -97,15 +89,14 @@ def test_request_published_once_cluster_id_becomes_available_for_existing_relati
     etcd_relation = Relation(endpoint='etcd', interface='etcd_client')
     state_in = State(leader=True, relations={peer, etcd_relation})
 
-    # Step 1: relation is created while cluster_id is not yet available.
+    # The relation is created while cluster_id is not yet available.
     DynamicClusterIdCharm.cluster_id = None
     state_mid = dynamic_ctx.run(dynamic_ctx.on.relation_created(etcd_relation), state_in)
 
     etcd_mid = next(r for r in state_mid.relations if r.endpoint == 'etcd')
     assert 'requests' not in etcd_mid.local_app_data
 
-    # Step 2: cluster_id becomes available on a later, unrelated event. The
-    # relation is NOT recreated.
+    # The cluster_id becomes available on a later event and the request is published.
     DynamicClusterIdCharm.cluster_id = 'cluster-12345'
     state_out = dynamic_ctx.run(dynamic_ctx.on.update_status(), state_mid)
 
@@ -132,8 +123,7 @@ def test_request_is_published_only_once(
     state_out = dynamic_ctx.run(dynamic_ctx.on.update_status(), state_mid)
     etcd_out = next(r for r in state_out.relations if r.endpoint == 'etcd')
 
-    # The request_id (derived from a random salt) must stay stable across
-    # republish attempts: it must not be regenerated into a brand new request.
+    # The request_id must stay stable across republish attempts.
     assert etcd_out.local_app_data['requests'] == first_requests
 
 
@@ -148,8 +138,7 @@ def test_published_request_includes_the_client_certificate(
     etcd_relation = Relation(endpoint='etcd', interface='etcd_client')
     state_in = State(leader=True, relations={peer, etcd_relation})
 
-    # Relation is created before cluster_id (and therefore the certificate)
-    # are available.
+    # Relation is created before cluster_id is available.
     DynamicClusterIdCharm.cluster_id = None
     state_mid = dynamic_ctx.run(dynamic_ctx.on.relation_created(etcd_relation), state_in)
 

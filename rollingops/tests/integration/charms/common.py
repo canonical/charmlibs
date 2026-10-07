@@ -38,10 +38,8 @@ logger = logging.getLogger(__name__)
 
 TRACE_FILE = pathops.LocalPath('/var/lib/charm-rolling-ops/transitions.log')
 
-# Default cluster_id, used except while the toggle-cluster-id action has
-# cleared it to None. The actual value doesn't matter for manual testing;
-# only whether it is None (etcd setup skipped) or set (etcd setup attempted)
-# matters.
+# Default cluster_id. It is toggled to None by the toggle-cluster-id action,
+# and restored to this value by the same action when run again.
 CLUSTER_ID = 'cluster-12345'
 
 
@@ -168,14 +166,12 @@ class Charm(CharmBase):
     def _on_toggle_cluster_id_action(self, event: ActionEvent) -> None:
         """Toggle the etcd cluster_id between a fixed value and None.
 
-        The charm starts with cluster_id set. Run this action to clear it
-        (reproducing the race where the etcd relation exists but cluster_id
-        is None), then run it again to restore it and trigger the fix.
+        The charm starts with cluster_id set. Run this action to clear it or restore it.
 
-        The charm's __init__ runs once per hook, so the new value only takes
-        effect for ``self.restart_manager`` starting with the *next* hook
-        (any hook) after this action completes -- it is not applied within
-        this same action's execution.
+        This is useful for testing the charm's race condition between the etcd relation
+        and the cluster ID.
+
+        The new value only takes effect starting with the *next* hook after this action completes.
         """
         if self._stored.cluster_id:
             self._stored.cluster_id = None

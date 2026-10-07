@@ -242,10 +242,8 @@ class EtcdRequiresV1(Object):
     def ensure_request_published(self) -> None:
         """Publish this unit's etcd request for an already existing relation, if needed.
 
-        ``self.etcd_interface`` (the requirer-side) only publishes the request to the
-        relation databag while handling the Juju ``relation-created`` hook.
-        If the ``cluster_id`` becomes available on a later event, that one-time hook
-        has already run and the request was never sent.
+        If the ``cluster_id`` becomes available afte the relation-created hook is run,
+        this method ensures that the request is published to the relation databag.
 
         This is a no-op if a request has already been written for this relation
         """
