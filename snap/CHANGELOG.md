@@ -1,3 +1,7 @@
+# 2.1.0 - 5 October 2026
+
+Add `ensure_vitality_hint`, a helper to ensure the specified snap is listed in snapd's [resilience.vitality-hint](https://snapcraft.io/docs/reference/administration/system-options/#system-resilience-vitality-hint), which configures the Linux kernel's out-of-memory killer to deprioritise the snap's services.
+
 # 2.0.0 - 31 August 2026
 
 A ground-up rewrite of `charmlibs.snap`. The 1.x library was a straight migration of `operator_libs_linux.v2.snap`; 2.0 is a new, deliberately smaller API. It talks to snapd exclusively over the REST API (it no longer shells out to the `snap` CLI), has no caching layer, and has no runtime dependencies (the `opentelemetry-api` dependency and its tracing are gone). Function names, argument semantics, and error behaviour follow the `snap` CLI, so what you know from the command line carries over.

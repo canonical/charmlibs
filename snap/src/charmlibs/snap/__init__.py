@@ -27,6 +27,7 @@ Also manage:
 - Config with :func:`get`, :func:`get_one`, :func:`set`, and :func:`unset`.
 - Connections between snaps with :func:`connect` and :func:`disconnect`.
 - Application aliases with :func:`alias` and :func:`unalias`.
+- Protection from the out-of-memory killer with :func:`ensure_vitality_hint`.
 
 Exceptions
 ----------
@@ -80,6 +81,7 @@ from ._errors import (
 )
 from ._functions import (
     ensure_installed,
+    ensure_vitality_hint,
 )
 from ._snapd_aliases import (
     alias,
@@ -136,6 +138,7 @@ __all__ = [
     'connect',
     'disconnect',
     'ensure_installed',
+    'ensure_vitality_hint',
     'get',
     'get_one',
     'hold',

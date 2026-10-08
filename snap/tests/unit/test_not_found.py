@@ -32,7 +32,12 @@ if typing.TYPE_CHECKING:
 # 1. DOES_NOT_RAISE if snap-not-found is handled but not raised.
 # 2. RAISES_NOT_IN_STORE if snap-not-found becomes NotInStoreError.
 # Otherwise the call is assumed to raise NotInstalledError.
-EXCLUDE = {'alias', 'unalias', 'unhold'}
+EXCLUDE = {
+    'alias',  # Only operates on installed snaps.
+    'unalias',  # Only operates on installed snaps.
+    'unhold',  # Only operates on installed snaps.
+    'ensure_vitality_hint',  # Only touches system config.
+}
 CALLS: dict[str, Callable[[], object]] = {
     'connect': lambda: snap.connect(('lxd', 'home')),
     'disconnect': lambda: snap.disconnect(('lxd', 'home')),
