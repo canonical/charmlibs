@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""K8s charm for testing."""
+"""Requirer charm for integration tests."""
 
 import logging
 
@@ -21,7 +21,7 @@ import ops
 
 logger = logging.getLogger(__name__)
 
-CONTAINER = 'workload'
+ENDPOINT = 'endpoint'
 
 
 class Charm(common.Charm):
@@ -29,11 +29,19 @@ class Charm(common.Charm):
 
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
-        framework.observe(self.on[CONTAINER].pebble_ready, self._on_pebble_ready)
+        # Initialize your library's requirer object here.
+        # self.lib_obj = example_interface.<...>Requirer(self, ENDPOINT, ...)
+        framework.observe(self.on[ENDPOINT].relation_changed, self._reconcile)
+        framework.observe(self.on.start, self._on_start)
 
-    def _on_pebble_ready(self, event: ops.PebbleReadyEvent):
-        """Handle pebble-ready event."""
+    def _on_start(self, event: ops.StartEvent):
+        """Handle start event."""
         self.unit.status = ops.ActiveStatus()
+
+    def _reconcile(self, event: ops.RelationChangedEvent):
+        """Handle endpoint relation events."""
+        # Do something with self.lib_obj here.
+        ...
 
 
 if __name__ == '__main__':  # pragma: no cover

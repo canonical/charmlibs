@@ -29,6 +29,7 @@ class RequirerCharm(ops.CharmBase):
 
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
+        # Initialize your library's requirer object here.
         # self.lib_obj = example_interface.<...>Requirer(self, 'endpoint', ...)
         framework.observe(self.on.update_status, self._reconcile)
 
