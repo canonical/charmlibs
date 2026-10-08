@@ -2,11 +2,10 @@ from __future__ import annotations
 
 from typing import Optional
 
-from interface_tester.schema_base import DataBagSchema
 from pydantic import BaseModel, Field
 
 
-class NginxRouteRequirerSchema(BaseModel):
+class RequirerAppData(BaseModel):
     service_hostname: str = Field(
         alias="service-hostname",
         description="The hostname of the service to create an ingress for.",
@@ -140,11 +139,6 @@ class NginxRouteRequirerSchema(BaseModel):
     )
 
 
-class ProviderSchema(DataBagSchema):
-    """Provider schema for nginx_route."""
-
-
-class RequirerSchema(DataBagSchema):
-    """Requirer schema for nginx_route."""
-
-    app: NginxRouteRequirerSchema
+ProviderAppData = None
+ProviderUnitData = None
+RequirerUnitData = None
