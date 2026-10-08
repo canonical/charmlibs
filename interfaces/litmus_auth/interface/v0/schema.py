@@ -1,10 +1,5 @@
-"""This file defines the schemas for the provider and requirer sides of this relation interface.
-It must expose two interfaces.schema_base.DataBagSchema subclasses called:
-- ProviderSchema
-- RequirerSchema
-"""
+"""This file defines the schemas for the provider and requirer sides of this relation interface."""
 
-from interface_tester.schema_base import DataBagSchema
 from pydantic import BaseModel, Field
 
 
@@ -29,13 +24,7 @@ class AppSchema(BaseModel):
     )
 
 
-class ProviderSchema(DataBagSchema):
-    """The schema for the provider side of this interface."""
-
-    app: AppSchema
-
-
-class RequirerSchema(DataBagSchema):
-    """The schema for the requirer side of this interface."""
-
-    app: AppSchema
+ProviderAppData = AppSchema
+ProviderUnitData = None
+RequirerAppData = AppSchema
+RequirerUnitData = None

@@ -2,19 +2,15 @@
 # See LICENSE file for licensing details.
 """This file defines the schemas for the provider and requirer sides of the tracing interface.
 
-It exposes two interfaces.schema_base.DataBagSchema subclasses called:
-- ProviderSchema
-- RequirerSchema
-
 Examples:
-    RequirerSchema:
+    Requirer:
         unit_data: <empty>
         application_data:
           receivers:
             - otlp_grpc
             - otlp_http
 
-    ProviderSchema:
+    Provider:
         # unit_data: <empty>
         application_data:
           receivers:
@@ -31,8 +27,7 @@ Examples:
 
 import enum
 
-from interface_tester.schema_base import DataBagSchema
-from pydantic import BaseModel, ConfigDict, Field, Json
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class TransportProtocolType(str, enum.Enum):
@@ -83,26 +78,18 @@ class Receiver(BaseModel):
     )
 
 
-class TracingProviderData(BaseModel):
-    receivers: Json[list[Receiver]] = Field(
+class ProviderAppData(BaseModel):
+    receivers: list[Receiver] = Field(
         ...,
         description="A list of enabled receivers in the form of the protocol they use and their resolvable server url.",
     )
 
 
-class TracingRequirerData(BaseModel):
-    receivers: Json[list[str]] = Field(
+class RequirerAppData(BaseModel):
+    receivers: list[str] = Field(
         ..., description="List of protocols that the requirer wishes to use."
     )
 
 
-class ProviderSchema(DataBagSchema):
-    """Provider schema for Tracing."""
-
-    app: TracingProviderData
-
-
-class RequirerSchema(DataBagSchema):
-    """Requirer schema for Tracing."""
-
-    app: TracingRequirerData
+ProviderUnitData = None
+RequirerUnitData = None
