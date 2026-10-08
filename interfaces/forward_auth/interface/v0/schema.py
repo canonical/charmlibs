@@ -2,12 +2,8 @@
 # See LICENSE file for licensing details.
 """This file defines the schemas for the provider and requirer sides.
 
-It exposes two interfaces.schema_base.DataBagSchema subclasses called:
-- ProviderSchema
-- RequirerSchema
-
 Examples:
-    ProviderSchema:
+    Provider:
         unit: <empty>
         app: {
             "decisions_address": "https://oauth2-proxy-k8s-0.oauth2-proxy-k8s.namespace.svc.cluster.local",
@@ -15,18 +11,17 @@ Examples:
             "headers": ["X-User", "X-Some-Header"]
         }
 
-    RequirerSchema:
+    Requirer:
         unit: <empty>
         app: {
             "ingress_app_names": ["charmed-app", "other-charmed-app"]
         }
 """
 
-from interface_tester.schema_base import DataBagSchema
 from pydantic import BaseModel, Field
 
 
-class ForwardAuthProvider(BaseModel):
+class ProviderAppData(BaseModel):
     """ForwardAuthProvider model."""
 
     decisions_address: str = Field(description='The internal decisions endpoint address.')
@@ -44,7 +39,7 @@ class ForwardAuthProvider(BaseModel):
     )
 
 
-class ForwardAuthRequirer(BaseModel):
+class RequirerAppData(BaseModel):
     """ForwardAuthRequirer model."""
 
     ingress_app_names: list[str] = Field(
@@ -52,13 +47,5 @@ class ForwardAuthRequirer(BaseModel):
     )
 
 
-class ProviderSchema(DataBagSchema):
-    """Provider schema for forward_auth."""
-
-    app: ForwardAuthProvider
-
-
-class RequirerSchema(DataBagSchema):
-    """Requirer schema for forward_auth."""
-
-    app: ForwardAuthRequirer
+ProviderUnitData = None
+RequirerUnitData = None

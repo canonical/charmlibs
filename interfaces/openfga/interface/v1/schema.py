@@ -2,12 +2,8 @@
 # See LICENSE file for licensing details.
 """This file defines the schemas for the provider and requirer sides of the openfga interface.
 
-It exposes two interfaces.schema_base.DataBagSchema subclasses called:
-- ProviderSchema
-- RequirerSchema
-
 Examples:
-    ProviderSchema:
+    Provider:
         unit: <empty>
         app: {"openfga":
                  {"grpc_api_url": "http://10.10.0.17:8081",
@@ -18,16 +14,15 @@ Examples:
                  }
              }
 
-    RequirerSchema:
+    Requirer:
         unit: <empty>
         app: {"store_name": "test-store-name"}
 """
 
-from interface_tester.schema_base import DataBagSchema
 from pydantic import BaseModel, Field, validator
 
 
-class OpenFGAProviderData(BaseModel):
+class ProviderAppData(BaseModel):
     """Provider data schema for OpenFGA v1."""
 
     grpc_api_url: str = Field(
@@ -68,13 +63,7 @@ class OpenFGAProviderData(BaseModel):
         return v
 
 
-class ProviderSchema(DataBagSchema):
-    """Provider schema for OpenFGA."""
-
-    app: OpenFGAProviderData
-
-
-class OpenFGARequirerData(BaseModel):
+class RequirerAppData(BaseModel):
     """Requirer data schema for OpenFGA v1."""
 
     store_name: str = Field(
@@ -84,7 +73,5 @@ class OpenFGARequirerData(BaseModel):
     )
 
 
-class RequirerSchema(DataBagSchema):
-    """Requirer schema for OpenFGA."""
-
-    app: OpenFGARequirerData
+ProviderUnitData = None
+RequirerUnitData = None
