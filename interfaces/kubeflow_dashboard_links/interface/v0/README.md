@@ -25,6 +25,8 @@ The requirer specifies zero or more sidebar items in the required format.
 
 #### Example
 
+The `dashboard_links` key might contain the following as a JSON-encoded string:
+
 ```json
 [
   {
