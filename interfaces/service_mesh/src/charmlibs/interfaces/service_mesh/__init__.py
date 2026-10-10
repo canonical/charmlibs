@@ -85,6 +85,7 @@ Provider usage::
 """
 
 from canonical_service_mesh.enums import MeshType, Method, PolicyTargetType
+from canonical_service_mesh.k8s.resource_manager import PolicyResourceManager
 
 from ._service_mesh import (
     AppPolicy,
@@ -110,6 +111,7 @@ __all__ = [
     'MeshType',
     'Method',
     'Policy',
+    'PolicyResourceManager',
     'PolicyTargetType',
     'ServiceMeshConsumer',
     'ServiceMeshProvider',
