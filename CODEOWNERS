@@ -7,11 +7,21 @@
 
 # infra
 /.github/ @canonical/charmlibs-maintainers
+/.gitignore @canonical/charmlibs-maintainers
+/.scripts/ @canonical/charmlibs-maintainers
+/.template/ @canonical/charmlibs-maintainers
+/.workshop/ @canonical/charmlibs-maintainers
+/AGENTS.md @canonical/charmlibs-maintainers
+/CODE_OF_CONDUCT.md @canonical/charmlibs-maintainers
+/CONTRIBUTING.md @canonical/charmlibs-maintainers
 /docs.just @canonical/charmlibs-maintainers
+/interface-test-requirements.txt @canonical/charmlibs-maintainers
 /justfile @canonical/charmlibs-maintainers
 /LICENSE @canonical/charmlibs-maintainers
 /pyproject.toml @canonical/charmlibs-maintainers
 /SECURITY.md @canonical/charmlibs-maintainers
+/test-requirements.txt @canonical/charmlibs-maintainers
+/uv.lock @canonical/charmlibs-maintainers
 
 # docs
 /.docs/ @canonical/charmlibs-maintainers
@@ -21,6 +31,11 @@
 # namespace reservation
 /.package/ @canonical/charmlibs-maintainers
 /interfaces/.package/ @canonical/charmlibs-maintainers
+
+# generated examples (kept in sync with the template by CI)
+/.example/ @canonical/charmlibs-maintainers
+/.tutorial/ @canonical/charmlibs-maintainers
+/interfaces/.example/ @canonical/charmlibs-maintainers
 
 # interfaces/index.json doesn't require CODEOWNERS review as its contents are validated in CI
 /interfaces/index.json
@@ -81,17 +96,52 @@
 /interfaces/filesystem_info/interface/ @canonical/hpc-team
 /interfaces/filesystem_info/ruff.toml @canonical/hpc-team
 
+# telco interfaces (fiveg_*, ip_router, sdcore_*)
+# The telco team was disbanded, so these are permanently owned by charmlibs-maintainers.
+
+# /interfaces/fiveg_core_gnb/
+/interfaces/fiveg_core_gnb/interface/ @canonical/charmlibs-maintainers
+/interfaces/fiveg_core_gnb/ruff.toml @canonical/charmlibs-maintainers
+
+# /interfaces/fiveg_f1/
+/interfaces/fiveg_f1/interface/ @canonical/charmlibs-maintainers
+/interfaces/fiveg_f1/ruff.toml @canonical/charmlibs-maintainers
+
+# /interfaces/fiveg_gnb_identity/
+/interfaces/fiveg_gnb_identity/interface/ @canonical/charmlibs-maintainers
+/interfaces/fiveg_gnb_identity/ruff.toml @canonical/charmlibs-maintainers
+
+# /interfaces/fiveg_n2/
+/interfaces/fiveg_n2/interface/ @canonical/charmlibs-maintainers
+/interfaces/fiveg_n2/ruff.toml @canonical/charmlibs-maintainers
+
+# /interfaces/fiveg_n3/
+/interfaces/fiveg_n3/interface/ @canonical/charmlibs-maintainers
+/interfaces/fiveg_n3/ruff.toml @canonical/charmlibs-maintainers
+
+# /interfaces/fiveg_n4/
+/interfaces/fiveg_n4/interface/ @canonical/charmlibs-maintainers
+/interfaces/fiveg_n4/ruff.toml @canonical/charmlibs-maintainers
+
+# /interfaces/fiveg_nrf/
+/interfaces/fiveg_nrf/interface/ @canonical/charmlibs-maintainers
+/interfaces/fiveg_nrf/ruff.toml @canonical/charmlibs-maintainers
+
+# /interfaces/fiveg_rfsim/
+/interfaces/fiveg_rfsim/interface/ @canonical/charmlibs-maintainers
+/interfaces/fiveg_rfsim/ruff.toml @canonical/charmlibs-maintainers
+
 # /interfaces/forward_auth/
 /interfaces/forward_auth @canonical/identity
 
 # /interfaces/gateway_metadata/
-/interfaces/gateway_metadata @canonical/service-mesh
+/interfaces/gateway_metadata/ @canonical/service-mesh
 
 # /interfaces/istio_ingress_route/
-/interfaces/istio_ingress_route @canonical/service-mesh
+/interfaces/istio_ingress_route/ @canonical/service-mesh
 
 # /interfaces/istio_metadata/
-/interfaces/istio_metadata @canonical/service-mesh
+/interfaces/istio_metadata/ @canonical/service-mesh
 
 # /interfaces/istio_request_auth/
 /interfaces/istio_request_auth/ @canonical/service-mesh
@@ -111,6 +161,10 @@
 # /interfaces/hydra_endpoints/
 /interfaces/hydra_endpoints/interface/ @canonical/identity
 /interfaces/hydra_endpoints/ruff.toml @canonical/identity
+
+# /interfaces/ip_router/ (telco, owned by charmlibs-maintainers -- see note above)
+/interfaces/ip_router/interface/ @canonical/charmlibs-maintainers
+/interfaces/ip_router/ruff.toml @canonical/charmlibs-maintainers
 
 # /interfaces/jwt/
 /interfaces/jwt/interface/ @canonical/data
@@ -216,11 +270,19 @@
 /interfaces/saml/interface/ @canonical/platform-engineering
 /interfaces/saml/ruff.toml @canonical/platform-engineering
 
+# /interfaces/sdcore_config/ (telco, owned by charmlibs-maintainers -- see note above)
+/interfaces/sdcore_config/interface/ @canonical/charmlibs-maintainers
+/interfaces/sdcore_config/ruff.toml @canonical/charmlibs-maintainers
+
+# /interfaces/sdcore_management/ (telco, owned by charmlibs-maintainers -- see note above)
+/interfaces/sdcore_management/interface/ @canonical/charmlibs-maintainers
+/interfaces/sdcore_management/ruff.toml @canonical/charmlibs-maintainers
+
 # /interfaces/sloth/
 /interfaces/sloth/ @canonical/tracing-and-profiling
 
 # /interfaces/service_mesh/
-/interfaces/service_mesh @canonical/service-mesh
+/interfaces/service_mesh/ @canonical/service-mesh
 
 # /interfaces/smtp/
 /interfaces/smtp/interface/ @canonical/platform-engineering

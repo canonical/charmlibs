@@ -465,6 +465,13 @@ def interfaces_json(argv: list[str]) -> int:
 
 
 @_register
+def check_codeowners(argv: list[str]) -> int:
+    """Check every package and interface has a CODEOWNERS entry, and no entries are bad."""
+    _parser(check_codeowners).parse_args(argv)  # supports `-h`
+    return _run(['.scripts/check_codeowners.py'], check=False)
+
+
+@_register
 def _scripts_unit(argv: list[str]) -> int:
     """Run the unit tests for the repository tooling in `.scripts/`."""
     _parser(_scripts_unit).parse_args(argv)

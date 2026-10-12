@@ -41,7 +41,6 @@ Package:
 
 Repository metadata:
 - [ ] `.docs/reference/libs.yaml` updated with entries for new and old libs.
-- [ ] `CODEOWNERS` updated with a `/<package>/` entry for the owning team.
 
 Tests and docs:
 - [ ] Unit tests migrated, plus functional and integration tests as appropriate.
