@@ -23,8 +23,8 @@ The ``pathops`` charm library provides:
 - :class:`LocalPath`: the concrete implementation of the interface for local paths, which includes
   both machine charms and the charm container of Kubernetes charms. Inherits from
   :class:`pathlib.PosixPath` and extends the signature of some methods.
-- Top-level helper functions such as :func:`ensure_contents`, which operate on both container
-  and local paths.
+- Top-level helper functions such as :func:`ensure_contents` and :func:`ensure_text_transform`,
+  which operate on both container and local paths.
 
 :class:`ContainerPath` methods that interact with the remote filesystem will raise a
 :class:`PebbleConnectionError` if the workload container isn't reachable.
@@ -39,7 +39,7 @@ from pathlib import Path as _Path  # for __version__
 from ops.pebble import ConnectionError as PebbleConnectionError
 
 from ._container_path import ContainerPath, RelativePathError
-from ._functions import ensure_contents
+from ._functions import ensure_contents, ensure_text_transform
 from ._local_path import LocalPath
 from ._types import PathProtocol
 
@@ -50,6 +50,7 @@ __all__ = (
     'PebbleConnectionError',
     'RelativePathError',
     'ensure_contents',
+    'ensure_text_transform',
 )
 
 __version__ = (_Path(__file__).parent / '_version.txt').read_text().strip()

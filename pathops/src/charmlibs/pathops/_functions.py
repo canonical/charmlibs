@@ -25,6 +25,7 @@ from ._local_path import LocalPath
 
 if typing.TYPE_CHECKING:
     import os
+    from collections.abc import Callable
     from typing import BinaryIO, TextIO
 
     from ops import pebble
@@ -71,16 +72,112 @@ def ensure_contents(
     except FileNotFoundError:
         pass  # file doesn't exist, so writing is required
     else:  # check if metadata and contents already match
-        if (
-            (info.permissions == mode)
-            and (user is None or info.user == user)
-            and (group is None or info.group == group)
-            and (path.read_bytes() == source)
-        ):
-            return False  # everything matches, so writing is not required
+        if _metadata_matches(info, mode=mode, user=user, group=group):
+            existing_bytes = path.read_bytes()
+            if existing_bytes == source:
+                return False  # everything matches, so writing is not required
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(source, mode=mode, user=user, group=group)
     return True
+
+
+def ensure_text_transform(
+    path: str | os.PathLike[str] | PathProtocol,
+    transform: Callable[[str | None], str],
+    *,
+    mode: int = _constants.DEFAULT_WRITE_MODE,
+    user: str | None = None,
+    group: str | None = None,
+) -> bool:
+    r"""Ensure ``path`` contains the text from ``transform``. Return True if any changes were made.
+
+    ``transform`` is called exactly once with the existing contents of ``path``, or ``None`` if the
+    file doesn't exist. The contents are decoded as UTF-8 and newlines are normalized to ``'\n'``.
+    The result of ``transform`` is encoded as UTF-8 and written to ``path`` if the bytes differ
+    from the current contents, or if ``path`` doesn't have the desired permissions and ownership.
+    Like :func:`ensure_contents`, missing parent directories are created if needed.
+
+    ``transform`` is responsible for any editing policy (for example, appending a line only if
+    it's not already present), and for its own idempotence. The read and the write are separate
+    operations, so concurrent modification of the file between them is not detected.
+
+    Newlines being normalised on read means that if the file uses ``'\r\n'`` or ``'\r'`` line
+    endings, the first call rewrites it with ``'\n'`` line endings (and returns ``True``),
+    even if ``transform`` returns its input unchanged.
+
+    If reading, decoding, or ``transform`` raises an exception, it's propagated without the file
+    being written or its metadata being changed.
+
+    Args:
+        path: A local or remote filesystem path.
+        transform: Called with the existing text, or ``None`` if the file doesn't exist.
+            Returns the desired text.
+        mode: The desired file permissions.
+        user: The desired file owner, or ``None`` to not change the owner.
+        group: The desired group, or ``None`` to not change the group.
+
+    Returns:
+        ``True`` if any changes were made (including file creation, newline normalisation,
+        and permissions or ownership changes), otherwise ``False``.
+
+    Raises:
+        TypeError: if ``transform`` doesn't return a ``str``.
+        UnicodeDecodeError: if the existing contents aren't valid UTF-8.
+        LookupError: if the user or group is unknown.
+        IsADirectoryError: if ``path`` is a directory.
+        NotADirectoryError: if the parent exists as a non-directory file.
+        PermissionError: if the user does not have permissions for the operation.
+        :class:`PebbleConnectionError`: if the remote Pebble client cannot be reached.
+    """
+    if _is_str_pathlike(path):
+        path = LocalPath(path)
+    try:
+        # path.read_bytes() rather than path.read_text() because:
+        # 1) We compare raw bytes so \r\n or \r line endings being converted to \n triggers
+        #    a rewrite even if the transform function returns its input unchanged.
+        # 2) We decode and encode as UTF-8, whereas (before Python 3.15) pathlib's read_text
+        #    uses the locale's encoding by default (which LocalPath inherits).
+        existing_bytes = path.read_bytes()
+    except FileNotFoundError:
+        existing_bytes = None
+    if existing_bytes is None:
+        # The file doesn't exist yet. Create it with the transformed content.
+        transformed_text = transform(None)
+        transformed_bytes = _encode_text(transformed_text)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(transformed_bytes, mode=mode, user=user, group=group)
+        return True
+    existing_text = existing_bytes.decode('utf-8').replace('\r\n', '\n').replace('\r', '\n')
+    transformed_text = transform(existing_text)
+    transformed_bytes = _encode_text(transformed_text)
+    if transformed_bytes != existing_bytes:
+        # The file exists but its contents differ from the transformed content
+        # (due to line ending normalization or genuine transformation).
+        path.write_bytes(transformed_bytes, mode=mode, user=user, group=group)
+        return True
+    info = _get_fileinfo(path)
+    if not _metadata_matches(info, mode=mode, user=user, group=group):
+        # The file exists and has the same content, but its metadata is different.
+        path.write_bytes(transformed_bytes, mode=mode, user=user, group=group)
+        return True
+    # The file exists and has the same content and metadata. No action is needed.
+    return False
+
+
+def _encode_text(text: str) -> bytes:
+    if not isinstance(text, str):  # pyright: ignore[reportUnnecessaryIsInstance]
+        raise TypeError(f'transform must return str, not {type(text).__name__}')
+    return text.encode('utf-8')
+
+
+def _metadata_matches(
+    info: pebble.FileInfo, *, mode: int, user: str | None, group: str | None
+) -> bool:
+    return (
+        (info.permissions == mode)
+        and (user is None or info.user == user)
+        and (group is None or info.group == group)
+    )
 
 
 def _is_str_pathlike(obj: object) -> TypeIs[str | os.PathLike[str]]:
