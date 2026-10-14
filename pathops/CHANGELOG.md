@@ -1,5 +1,6 @@
 # Unreleased
 
+`ensure_contents` now supports line replacements: pass a `matcher` to substitute each match with `source` (backreferences supported), optionally appending `source` when nothing matches.
 `ContainerPath` now provides `is_relative_to` and `with_stem`, matching `pathlib.Path` on Python 3.9+.
 `with_stem` is also part of `PathProtocol`; `is_relative_to` is not, because `pathlib`'s signature doesn't settle until Python 3.12.
 `ContainerPath.match` now accepts a `str | os.PathLike[str]` pattern, matching `pathlib.Path.match` on Python 3.12+.
