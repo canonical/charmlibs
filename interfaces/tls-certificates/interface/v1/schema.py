@@ -150,11 +150,13 @@ class ProviderAppData(BaseModel):
 class RequirerData(BaseModel):
     """Requirer data model.
 
-    The same model is used for the unit and application data.
+    The same model is used for the unit and application data. Depending on its mode, a
+    requirer writes its certificate signing requests to its unit databags, its application
+    databag, or both, so either may be empty.
     """
 
     certificate_signing_requests: list[CertificateSigningRequest] = Field(
-        description="List of certificate signing requests."
+        default_factory=list, description="List of certificate signing requests."
     )
 
 
