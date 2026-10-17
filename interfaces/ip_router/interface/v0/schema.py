@@ -44,7 +44,7 @@ Examples:
             }
 """
 
-from pydantic import BaseModel, IPvAnyAddress, IPvAnyNetwork
+from pydantic import BaseModel, Field, IPvAnyAddress, IPvAnyNetwork
 
 
 class Route(BaseModel):
@@ -59,11 +59,34 @@ class IPNetwork(BaseModel):
 
 
 class ProviderAppData(BaseModel):
-    networks: list[IPNetwork]
+    networks: list[IPNetwork] = Field(
+        description="All networks known to the router, with their routes",
+        examples=[
+            [
+                {
+                    "network": "192.168.250.0/24",
+                    "gateway": "192.168.250.1",
+                    "routes": [{"destination": "172.250.0.0", "gateway": "192.168.250.3"}],
+                },
+                {"network": "192.168.252.0/24", "gateway": "192.168.252.1", "routes": None},
+            ]
+        ],
+    )
 
 
 class RequirerAppData(BaseModel):
-    networks: list[IPNetwork]
+    networks: list[IPNetwork] = Field(
+        description="Networks the requirer is attached to, and the routes it needs",
+        examples=[
+            [
+                {
+                    "network": "192.168.250.0/24",
+                    "gateway": "192.168.250.1",
+                    "routes": [{"destination": "172.250.0.0", "gateway": "192.168.250.3"}],
+                }
+            ]
+        ],
+    )
 
 
 ProviderUnitData = None

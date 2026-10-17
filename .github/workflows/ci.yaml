@@ -1,7 +1,7 @@
 name: CI
 # runs linting for whole repository, and:
-# on PR: runs tests for packages and interfaces with changes (or all if global files are changed)
-# on push to main or on dipatch: runs tests for all packages and interfaces
+# on PR: runs tests for packages with changes (or all if global files are changed)
+# on push to main or on dipatch: runs tests for all packages
 
 on:
   push:
@@ -24,7 +24,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       packages: ${{ steps.packages.outputs.result }}
-      interfaces: ${{ steps.interfaces.outputs.result }}
       publish: ${{ steps.publish.outputs.result }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -45,11 +44,6 @@ jobs:
         env:
           REF_RESULT: ${{ steps.ref.outputs.result }}
         run: .github/get-changed.py packages $REF_RESULT
-      - name: Collect changed interfaces
-        id: interfaces
-        env:
-          REF_RESULT: ${{ steps.ref.outputs.result }}
-        run: .github/get-changed.py interfaces $REF_RESULT --name-only
       - name: Collect packages that would be published on merge
         id: publish
         env:
@@ -89,30 +83,6 @@ jobs:
           echo "$NEEDS_JSON" | jq  # logging
           exit 1
 
-  interface:
-    needs: [fast-lint, init]
-    if: ${{ needs.init.outputs.interfaces != '[]' }}
-    strategy:
-      fail-fast: false
-      matrix:
-        interface: ${{ fromJson(needs.init.outputs.interfaces) }}
-    uses: ./.github/workflows/test-interface.yaml
-    with:
-      interface: ${{ matrix.interface }}
-
-  interface-tests-passed:  # GitHub status checks require a static job name
-    needs: [interface]
-    if: ${{ !cancelled() }}  # run even if checks are skipped or failed
-    runs-on: ubuntu-latest
-    steps:
-      - name: Fail if any interface checks failed
-        if: ${{ needs.interface.result != 'success' && needs.interface.result != 'skipped' }}
-        env:
-          NEEDS_JSON: ${{ toJSON(needs) }}
-        run: |
-          echo "$NEEDS_JSON" | jq  # logging
-          exit 1
-
   interfaces-json-up-to-date:
     runs-on: ubuntu-latest
     steps:
@@ -124,6 +94,16 @@ jobs:
         run: |
           uvx --from rust-just just interfaces-json
           git diff --exit-code
+
+  interface-schemas-comply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+      - name: Do interface schemas follow the documented format?
+        run: uvx --from rust-just just interface-schemas
 
   meta:  # tests for the repository's own CI tooling and helper scripts
     runs-on: ubuntu-latest

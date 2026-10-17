@@ -42,7 +42,7 @@ charmlibs/
 │       └── ...
 ├── .docs/                  # Sphinx source for canonical.com/juju/docs/charmlibs
 ├── .template/              # Cookiecutter template used by `just init`
-├── .github/workflows/      # CI: ci.yaml, test-package.yaml, test-interface.yaml, publish.yaml
+├── .github/workflows/      # CI: ci.yaml, test-package.yaml, publish.yaml
 ├── justfile                # Task runner recipes
 ├── docs.just               # Docs-specific recipes
 ├── interface.just          # Interface-specific recipes

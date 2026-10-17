@@ -11,11 +11,14 @@ Examples:
         app:  <empty>
 """
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ProviderAppData(BaseModel):
-    upf_ip_address: str
+    upf_ip_address: str = Field(
+        description="IP address of the UPF's N3 interface",
+        examples=["192.168.252.3"],
+    )
 
 
 ProviderUnitData = None

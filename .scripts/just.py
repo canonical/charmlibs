@@ -465,6 +465,20 @@ def interfaces_json(argv: list[str]) -> int:
 
 
 @_register
+def interface_schemas(argv: list[str]) -> int:
+    """Check that interface schemas comply with the documented format."""
+    parser = _parser(interface_schemas)
+    parser.add_argument(
+        'interface', nargs='*', help='Interfaces to check, defaults to all of them.'
+    )
+    args = parser.parse_args(argv)
+    return _run(
+        ['.scripts/check-interface-schemas.py', *args.interface],
+        check=False,
+    )
+
+
+@_register
 def _scripts_unit(argv: list[str]) -> int:
     """Run the unit tests for the repository tooling in `.scripts/`."""
     _parser(_scripts_unit).parse_args(argv)
@@ -484,7 +498,10 @@ def _scripts_static(argv: list[str]) -> int:
         'run',
         '--no-project',
         f'--with-requirements={TEST_REQUIREMENTS}',
-        '--with=pyyaml',
+        '--with=pyyaml',  # for ls.py
+        '--with=pydantic',  # for check-interface-schemas.py
+        '--with=ops[testing]',  # for check-interface-schemas.py
+        '--with=polyfactory',  # for check-interface-schemas.py
         '--python=3.12',
         'pyright',
     ]
