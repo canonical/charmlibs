@@ -30,6 +30,7 @@ _CALLS: dict[str, Callable[[str], object]] = {
     'alias (app)': lambda v: snap.alias('lxd', v, 'testlxc'),
     'alias (alias)': lambda v: snap.alias('lxd', 'lxc', v),
     'ensure_installed': lambda v: snap.ensure_installed(v),
+    'ensure_vitality_hint': lambda v: snap.ensure_vitality_hint(v),
     'get': lambda v: snap.get(v),
     'get (key)': lambda v: snap.get('lxd', [v]),
     'get_one': lambda v: snap.get_one(v, 'mykey'),
