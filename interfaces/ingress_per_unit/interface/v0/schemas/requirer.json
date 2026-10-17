@@ -10,7 +10,11 @@
       "name": "app-name",
       "host": "hostname",
       "port": 4242,
-      "model": "model-name"
+      "model": "model-name",
+      "mode": "http",
+      "scheme": "https",
+      "strip-prefix": true,
+      "redirect-https": true
     }
   ],
   "required": [
@@ -60,6 +64,43 @@
         4242
       ]
     },
-    "additionalProperties": false
+    "mode": {
+      "$id": "#/properties/mode",
+      "type": "string",
+      "enum": ["http", "tcp"],
+      "title": "Mode",
+      "description": "Whether the unit wishes to be exposed over HTTP or TCP.",
+      "examples": [
+        "http"
+      ]
+    },
+    "scheme": {
+      "$id": "#/properties/scheme",
+      "type": "string",
+      "enum": ["http", "https"],
+      "title": "Scheme",
+      "description": "The scheme to use in the URL at which ingress is provided.",
+      "examples": [
+        "https"
+      ]
+    },
+    "strip-prefix": {
+      "$id": "#/properties/strip-prefix",
+      "type": "boolean",
+      "title": "Strip Prefix",
+      "description": "Whether to strip the prefix from the ingress URL before forwarding requests to the unit. Only set when true.",
+      "examples": [
+        true
+      ]
+    },
+    "redirect-https": {
+      "$id": "#/properties/redirect-https",
+      "type": "boolean",
+      "title": "Redirect HTTPS",
+      "description": "Whether to redirect HTTP requests to HTTPS. Only set when true.",
+      "examples": [
+        true
+      ]
+    }
   }
 }

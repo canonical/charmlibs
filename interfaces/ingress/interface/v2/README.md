@@ -51,6 +51,7 @@ All fields are json-serialized.
 
 Exposes the unit name (`name`), model name (`model`), hostname (`host`) and port (`port`) at which ingress should be provided. 
 `name`, `port` and `model` should be placed in the **application** databag. `host`, as it may differ per ingressed unit (e.g. if it's a fqdn), will be placed in the **unit** databags of the respective ingress-requesting units. 
+Optionally, the requirer also exposes whether the port is open (`is_port_open`) and a health check configuration (`healthcheck_params`) in the **application** databag, and the unit's IP address (`ip`) in each **unit** databag.
 
 #### Example
 ```yaml

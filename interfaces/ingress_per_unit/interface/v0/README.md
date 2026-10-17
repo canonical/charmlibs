@@ -28,7 +28,7 @@ The requirer and the provider need to adhere to a certain set of criteria to be 
 
 ### Requirer
 
-- Is expected to be able to provide a hostname, a port, a unit name and a model name (namespace). 
+- Is expected to be able to provide a hostname, a port, a unit name and a model name (namespace).
 
 ## Relation Data
 
@@ -36,23 +36,22 @@ The requirer and the provider need to adhere to a certain set of criteria to be 
 
 [\[JSON Schema\]](./schemas/provider.json)
 
-Exposes a `urls` field containing a mapping from unit name to the url at which ingress is available for that unit. Should be placed in the **application** databag, encoded as yaml and nested in a "data" field.
+Exposes an `ingress` field containing a mapping from unit name to an object whose `url` field is the url at which ingress is available for that unit. Should be placed in the **application** databag, encoded as yaml.
 
 #### Example
 
 ```yaml
-application_data: {
-  urls: { 
-    unit_name: "http://foo.bar:80/model_name-unit_name/0" 
-  }
-}
+application_data:
+  ingress: |
+    unit_name/0:
+      url: "http://foo.bar:80/model_name-unit_name/0"
 ```
 
 ### Requirer
 
 [\[JSON Schema\]](./schemas/requirer.json)
 
-Exposes the unit name, model name, hostname and port at which ingress should be provided. Should be placed in the **unit** databag of _each unit_ of the requirer application.
+Exposes the unit name, model name, hostname and port at which ingress should be provided. Optionally also exposes the mode (`http` or `tcp`), the scheme, and whether to strip the prefix (`strip-prefix`) and redirect to HTTPS (`redirect-https`). Should be placed in the **unit** databag of _each unit_ of the requirer application.
 
 #### Example
 ```yaml
@@ -60,7 +59,11 @@ unit-data: {
  name: "unit-name",
  host: "hostname",
  port: 4242,
- model: "model-name"
+ model: "model-name",
+ mode: "http",
+ scheme: "https",
+ strip-prefix: true,
+ redirect-https: true
 }
 ```
 
