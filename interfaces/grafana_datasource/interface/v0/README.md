@@ -39,11 +39,11 @@ The requirer and the provider need to adhere to a certain set of criteria to be 
 [\[Pydantic model\]](./schema.py)
 
 
-### Requirer
+### Provider
 
 
 Additionally to a subset of the the (mandatory) [juju topology fields](https://discourse.charmhub.io/t/juju-topology-labels/8874), 
-the requirer is expected to share the following fields:
+the provider is expected to share the following fields:
 - `type`: the grafana datasource type. For the possible values see [the upstream docs](https://grafana.com/docs/grafana/latest/datasources/#built-in-core-data-sources). Required.
 - `extra_fields`: used to configure certain datasources. Maps to the `jsonData` field. Optional.
 - `secure_extra_fields`: used to configure certain datasources. Maps to the `secureJsonData` field. Optional.
@@ -72,16 +72,17 @@ application_data: {
 }
 ```
 
-### Provider
+### Requirer
 
-The provider is expected to share back a unique identifier for each unit of the requirer, as a mapping.
+The requirer is expected to share back a unique identifier for each unit of the provider, as a mapping.
 This will be encoded as a json dict and nested under the `datasource_uids` field in the application databag.
-Also, is expected to share back a unique ID for the grafana application.
+Also, is expected to share back a unique ID for the grafana application, and may share its base URL (which may be ingressed) under `grafana_base_url`.
 
 #### Example
 ```yaml
 application-data: {
  grafana_uid: 0000-0000-0000-0000,
+ grafana_base_url: http://grafana.example.com/cos-grafana,
  datasource_uids: {
   "tempo/0": 0000-0000-0000-0001, 
   "tempo/1": 0000-0000-0000-0002,

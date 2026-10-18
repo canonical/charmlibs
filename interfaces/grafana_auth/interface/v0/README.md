@@ -57,12 +57,12 @@ The `provider` provides the authentication mode and its configuration.
 ### Requirer
 
 [\[JSON Schema\]](./schemas/requirer.json)
-The `provider` returns a `url` that the `requirer` charm uses as needed.
+The `requirer` advertises the URLs at which `Grafana` is reachable, as a list in a `urls` field.
 
 #### Example
 
 ```json
 {
-  "url": "https://grafana.example.com/"
+  "urls": ["https://grafana.example.com/"]
 }
 ```
