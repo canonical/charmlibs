@@ -5,7 +5,6 @@
   "title": "`k8s-service` requirer schema",
   "description": "The `k8s-service` root schema comprises the entire requirer databag for this interface.",
   "default": {},
-  "properties": {
-    "additionalProperties": true
-  }
+  "properties": {},
+  "additionalProperties": true
 }
