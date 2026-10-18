@@ -277,6 +277,10 @@
 /interfaces/smtp/interface/ @canonical/platform-engineering
 /interfaces/smtp/ruff.toml @canonical/platform-engineering
 
+# /interfaces/spark_service_account/
+/interfaces/spark_service_account/interface/ @canonical/processing
+/interfaces/spark_service_account/ruff.toml @canonical/processing
+
 # /interfaces/tempo_cluster/
 /interfaces/tempo_cluster/interface/ @canonical/tracing-and-profiling
 /interfaces/tempo_cluster/ruff.toml @canonical/tracing-and-profiling
@@ -310,3 +314,7 @@
 # /interfaces/wazuh_api_client/
 /interfaces/wazuh_api_client/interface/ @canonical/platform-engineering
 /interfaces/wazuh_api_client/ruff.toml @canonical/platform-engineering
+
+# /interfaces/zookeeper/
+/interfaces/zookeeper/interface/ @canonical/data-bigdata
+/interfaces/zookeeper/ruff.toml @canonical/data-bigdata
