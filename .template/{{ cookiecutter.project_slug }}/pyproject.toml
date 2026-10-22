@@ -22,8 +22,13 @@ dependencies = [
     # - https://github.com/canonical/operator/blob/2.23-maintenance/CHANGES.md
     # - https://github.com/canonical/operator/blob/main/CHANGES.md
     # Set the dependency bounds according to the features and fixes your library needs.
-    # "ops>=2.23.1,<4",
-]
+{% if cookiecutter._interface %}    # Interface libraries that read relation data with Relation.load() need Ops 3.8.1 or
+    # later. Before that, load() decoded every value in the databag before filtering down to
+    # the fields your data class declares, so any value that isn't JSON failed the whole
+    # load -- including the ones Juju writes into every unit databag. Also fixed in Ops 2.23.6.
+    # "ops>=3.8.1,<4",
+{% else %}    # "ops>=2.23.1,<4",
+{% endif %}]
 {% if cookiecutter._interface %}
 [project.optional-dependencies]
 testing = ["{{ cookiecutter.__dist_pkg }}-testing==0.0.0.dev0"]

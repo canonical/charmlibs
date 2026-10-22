@@ -166,4 +166,11 @@ This evaluates to something like `ops>=X.Y,<X+1`.
 This protects your library from breaking changes.
 When creating a new library, it’s fine to declare the latest `ops` release as the minimum supported version, as charms are encouraged to always use the latest version of `ops`.
 
+Interface libraries that read relation data with `ops.Relation.load` need `ops>=3.8.1,<4`.
+Before that release, `load` decoded every value in the databag before filtering down to the fields your data class declares, so a single value that wasn't JSON failed the whole load -- including `egress-subnets`, `ingress-address`, and `private-address`, which Juju writes into every unit databag as bare strings.
+The fix is also in `ops` 2.23.6, but there's no need to allow the 2.23 series: it exists for Python 3.8 and 3.9, and every interface library in this repository already requires Python 3.10.
+A patch-level floor needs `>=` rather than `~=`, because `ops~=3.8` allows 3.8.0.
+
+Read more: {ref}`design-interface-library-apis`
+
 For other dependencies, ideally follow a similar approach: `>=` the lowest version that you need, `<` the next potential (or actual) breaking version. Keeping these dependencies permissive increases the number of charms that will be able to use your library.
