@@ -28,8 +28,7 @@ If any side, Provider or Requirer doesn't support Juju Secrets, sensitive inform
 
 ### Provider
 - Is expected to create an application user inside the database cluster when the requirer provides the `database` field.
-- Is expected to provide relation user credentials (`username` and `password`) in a Juju Secret whenever the Requirer supplies the `database` field, but not the `entity-type` one.
-- Is expected to provide custom entity credentials (`entity-name` and `entity-password`) in a Juju Secret whenever the Requirer supplies both the `database` and `entity-type` fields.
+- Is expected to provide relation user credentials (`username` and `password`) in a Juju Secret whenever the Requirer supplies the `database` field.
 - Is expected to expose the Juju Secrets URI to the credentials through the `secret-user` field of the data bag.
 - Is expected to provide the `endpoints` field with the address of Primary, which can be used for Read/Write queries.
 - Is expected to provide the `database` field with the database that was actually created or the prefix requested by the requirer.
@@ -37,12 +36,12 @@ If any side, Provider or Requirer doesn't support Juju Secrets, sensitive inform
 - Is expected to provide the `read-only-uris` field with the connection string when requested as a secret field, in libpq's URI format, which can be used for direct connection to a read only edpoint of a cluster.
 - Is expected to provide optional `read-only-endpoints` field with a comma-separated list of hosts or one Kubernetes Service, which can be used for Read-only queries.
 - Is expected to provide the `version` field whenever database charm wants to communicate its database version.
-- Is expected to provide the `tls` field flag, indicating whether the provider has TLS enabled or not.
+- Is expected to provide the `tls` field flag, the string `True` or `False`, indicating whether the provider has TLS enabled or not.
 - Is expected to provide the CA chain in the `tls-ca` field of a Juju Secret, whenever the provider has TLS enabled (such as using the [TLS Certificates Operator](https://github.com/canonical/tls-certificates-operator)).
 - Is expected to share the TLS Juju Secret URI through the `secret-tls` field of the databag.
 - If the Requirer asks for additional secrets (via `requested-secrets`, see below) other than those stored in the `user` and `tls` secrets, Provider is expected to define a `secret-extra` field holding the URI of the Juju Secret containing all additional secret fields.
 - Is expected to express (via `external-node-connectivity`) whether external connectivity requests are to be respected or not, in case the charm is capable of such.
-- May require delays (via `subordinated`) to provide service on Requirer scale up. If so, it is expected to set unit level `state` data when it is `ready` to serve.
+- May require delays (via `subordinated`) to provide service on Requirer scale up. If so, it is expected to set `state` to `ready` in each unit's databag when that unit is ready to serve.
 - May respect the `entity-name` and `password` set in `requested-entity-secret`.
 - Is expected to populate `prefix-databases`, if a prefix was requested and any databases match the prefix.
 
@@ -66,9 +65,11 @@ If any side, Provider or Requirer doesn't support Juju Secrets, sensitive inform
 
 [\[Pydantic Schema\]](./schema.py)
 
+Every field may be absent. The reference library also writes a `data` field on each side: a JSON object holding the other side's application databag as last seen, used to detect changes.
+
 ### Provider
 
-Provider provides credentials, endpoints, TLS info and database-specific fields. It should be placed in the **application** databag.
+Provider provides credentials, endpoints, TLS info and database-specific fields. It should be placed in the **application** databag, except `state`, which goes in each provider **unit** databag.
 
 
 #### Example
@@ -86,7 +87,7 @@ Provider provides credentials, endpoints, TLS info and database-specific fields.
 
 ### Requirer
 
-Requirer provides database name. It should be placed in the **application** databag.
+Requirer provides database name. It should be placed in the **application** databag. The reference library also copies `requested-secrets` and `provided-secrets` to the leader unit's databag, and keeps its `data` field there.
 
 #### Example
 
@@ -96,5 +97,6 @@ Requirer provides database name. It should be placed in the **application** data
     related-endpoint: database
     application-data:
       database: myappA
-    requested-secrets: ["username", "password", "tls-ca", "uris"]
+      requested-secrets: '["username", "password", "tls", "tls-ca", "uris", "read-only-uris", "entity-name", "entity-password"]'
+      provided-secrets: '["mtls-cert"]'
 ```
