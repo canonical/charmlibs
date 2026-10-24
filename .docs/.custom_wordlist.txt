@@ -19,9 +19,12 @@ charmlib
 charmlibs
 CLI
 codebase
+codec
 ContainerPath
 databag
 databags
+dataclass
+dataclasses
 DCO
 deserialised
 dev
@@ -36,6 +39,7 @@ drwxr
 EBS
 EKS
 enablement
+enum
 favicon
 filesystem
 FQDN
@@ -94,6 +98,7 @@ podspec
 posix
 pre
 preprocessor
+Pydantic
 PYDEPS
 PyPI
 pytest
@@ -113,6 +118,8 @@ RSA
 RTD
 rw
 scaffolded
+serializer
+serializers
 stateful
 subclasses
 subdirectories

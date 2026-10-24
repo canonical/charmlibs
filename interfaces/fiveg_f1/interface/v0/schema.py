@@ -69,7 +69,10 @@ class ProviderAppData(BaseModel):
         ge=1,
         le=16777215,
     )
-    plmns: conlist(PLMNConfig, min_length=1)
+    plmns: conlist(PLMNConfig, min_length=1) = Field(
+        description="PLMNs served by the CU",
+        examples=[[{"mcc": "001", "mnc": "01", "sst": 1, "sd": 1}]],
+    )
 
 
 class RequirerAppData(BaseModel):
