@@ -8,4 +8,5 @@ interface-libs
 charmlibs
 charmlibs-interfaces
 interfaces
+changelogs
 ```
