@@ -28,7 +28,9 @@ from charmlibs.interfaces.tls_certificates import (
     Certificate,
     CertificateAvailableEvent,
     CertificateRequestAttributes,
+    CertificateRequestStatus,
     CertificateSigningRequest,
+    CertificateStatus,
     KeyAlgorithm,
     Mode,
     PrivateKey,
@@ -95,6 +97,178 @@ class TestTLSCertificatesRequiresV4:
             config=METADATA["config"],
             actions=METADATA["actions"],
         )
+
+    @pytest.mark.parametrize(
+        ("offset", "expected"),
+        [
+            (-1, CertificateStatus.NOT_YET_VALID),
+            (0, CertificateStatus.VALID),
+            (3599, CertificateStatus.VALID),
+            (3600, CertificateStatus.EXPIRED),
+        ],
+    )
+    def test_given_certificate_when_get_certificate_status_then_validity_boundaries_are_respected(
+        self, offset: int, expected: CertificateStatus
+    ):
+        private_key = generate_private_key()
+        certificate = Certificate.from_string(
+            generate_ca(
+                private_key=private_key,
+                common_name="example.com",
+                validity=datetime.timedelta(hours=1),
+            )
+        )
+        now = certificate.validity_start_time + datetime.timedelta(seconds=offset)
+        with self.ctx(self.ctx.on.update_status(), testing.State()) as manager:
+            with patch(LIB_DIR + "._tls_certificates.datetime") as clock:
+                clock.now.return_value = now
+                assert manager.charm.certificates.get_certificate_status(certificate) == expected
+
+    @pytest.mark.parametrize(
+        ("case", "expected"),
+        [
+            ("expired-withdrawn", CertificateStatus.WITHDRAWN),
+            ("other-withdrawn", CertificateStatus.VALID),
+        ],
+    )
+    def test_given_no_current_csr_when_get_certificate_status_then_withdrawal_is_checked(
+        self, case: str, expected: CertificateStatus
+    ):
+        private_key = generate_private_key()
+        csr = generate_csr(private_key=private_key, common_name="example.com")
+        ca = generate_ca(private_key=private_key, common_name="ca.example.com")
+        certificate = Certificate.from_string(
+            generate_certificate(csr=csr, ca=ca, ca_key=private_key)
+        )
+        advertised = (
+            generate_certificate(csr=csr, ca=ca, ca_key=private_key)
+            if case == "other-withdrawn"
+            else str(certificate)
+        )
+        provider_data = {
+            "certificates": json.dumps([
+                {
+                    "certificate": advertised,
+                    "certificate_signing_request": csr,
+                    "ca": ca,
+                    "revoked": True,
+                }
+            ])
+        }
+        relation = testing.Relation(endpoint="certificates", remote_app_data=provider_data)
+        state_in = testing.State(relations=[relation])
+        now = certificate.validity_start_time
+        if case == "expired-withdrawn":
+            now = certificate.expiry_time
+
+        with self.ctx(self.ctx.on.update_status(), state_in) as manager:
+            with patch(LIB_DIR + "._tls_certificates.datetime") as clock:
+                clock.now.return_value = now
+                assert manager.charm.certificates.get_certificate_status(certificate) == expected
+
+    @pytest.mark.parametrize(
+        ("case", "expected"),
+        [
+            ("absent", CertificateRequestStatus.UNAVAILABLE),
+            ("pending", CertificateRequestStatus.PENDING),
+            ("assigned", CertificateRequestStatus.AVAILABLE),
+            ("withdrawn", CertificateRequestStatus.UNAVAILABLE),
+            ("denied", CertificateRequestStatus.UNAVAILABLE),
+        ],
+    )
+    def test_given_relation_data_when_get_request_status_then_availability_is_inferred(
+        self, case: str, expected: CertificateRequestStatus
+    ):
+        private_key = generate_private_key()
+        csr = generate_csr(private_key=private_key, common_name="example.com")
+        ca_key = generate_private_key()
+        ca = generate_ca(private_key=ca_key, common_name="ca.example.com")
+        certificate = generate_certificate(csr=csr, ca=ca, ca_key=ca_key)
+        provider_data = {
+            "certificates": json.dumps(
+                [
+                    {
+                        "certificate": certificate,
+                        "certificate_signing_request": csr,
+                        "ca": ca,
+                        "revoked": case == "withdrawn",
+                    }
+                ]
+                if case in ("assigned", "withdrawn")
+                else []
+            ),
+            "request_errors": json.dumps(
+                [
+                    {
+                        "csr": csr,
+                        "error": {
+                            "code": 102,
+                            "name": "DOMAIN_NOT_ALLOWED",
+                            "message": "Domain is not allowed",
+                        },
+                    }
+                ]
+                if case == "denied"
+                else []
+            ),
+        }
+        requirer_data = {
+            "certificate_signing_requests": json.dumps(
+                [] if case == "absent" else [{"certificate_signing_request": csr, "ca": False}]
+            )
+        }
+        relation = testing.Relation(
+            endpoint="certificates",
+            local_unit_data=requirer_data,
+            remote_app_data=provider_data,
+        )
+        secret = Secret(
+            {"private-key": private_key},
+            label=f"{LIBID}-private-key-0-certificates",
+            owner="unit",
+        )
+        state_in = testing.State(
+            relations=[relation],
+            secrets=[secret],
+            config={"common_name": "example.com"},
+        )
+        request = CertificateRequestAttributes(common_name="example.com")
+
+        with self.ctx(self.ctx.on.update_status(), state_in) as manager:
+            assert manager.charm.certificates.get_request_status(request) == expected
+            assert not self.ctx.emitted_events
+            state_out = manager.run()
+
+        assert state_out.relations == state_in.relations
+        assert state_out.secrets == state_in.secrets
+
+    def test_given_app_and_unit_non_leader_when_get_request_status_then_app_is_unavailable(
+        self,
+    ):
+        ctx = testing.Context(
+            charm_type=DummyTLSCertificatesRequirerCharmAppAndUnit,
+            meta=METADATA,
+            config=METADATA["config"],
+        )
+        relation = testing.Relation(endpoint="certificates")
+        state = ctx.run(
+            ctx.on.relation_created(relation),
+            testing.State(relations=[relation], leader=False),
+        )
+
+        with ctx(ctx.on.update_status(), state) as manager:
+            assert (
+                manager.charm.certificates.get_request_status(
+                    CertificateRequestAttributes(common_name="unit.example.com")
+                )
+                == CertificateRequestStatus.PENDING
+            )
+            assert (
+                manager.charm.certificates.get_request_status(
+                    CertificateRequestAttributes(common_name="app.example.com")
+                )
+                == CertificateRequestStatus.UNAVAILABLE
+            )
 
     def test_given_private_key_not_created_and_not_passed_when_certificates_relation_created_then_private_key_is_generated(
         self,
@@ -1214,7 +1388,23 @@ class TestTLSCertificatesRequiresV4:
             },
         )
 
-        state_out = self.ctx.run(self.ctx.on.relation_changed(certificates_relation), state_in)
+        request = CertificateRequestAttributes(common_name="example.com")
+        with self.ctx(self.ctx.on.relation_changed(certificates_relation), state_in) as manager:
+            assert (
+                manager.charm.certificates.get_request_status(request)
+                == CertificateRequestStatus.UNAVAILABLE
+            )
+            state_out = manager.run()
+            assert (
+                manager.charm.certificates.get_request_status(request)
+                == CertificateRequestStatus.UNAVAILABLE
+            )
+            assert (
+                manager.charm.certificates.get_certificate_status(
+                    Certificate.from_string(certificate)
+                )
+                == CertificateStatus.WITHDRAWN
+            )
 
         assert state_out.secrets == frozenset({
             private_key_secret,
@@ -1978,9 +2168,26 @@ class TestTLSCertificatesRequiresV4:
             },
         )
 
-        state_out = self.ctx.run(
+        request = CertificateRequestAttributes(common_name="example.com")
+        with self.ctx(
             self.ctx.on.secret_expired(certificate_secret, revision=1), state_in
-        )
+        ) as manager:
+            assert (
+                manager.charm.certificates.get_request_status(request)
+                == CertificateRequestStatus.AVAILABLE
+            )
+            state_out = manager.run()
+            assert (
+                manager.charm.certificates.get_request_status(request)
+                == CertificateRequestStatus.PENDING
+            )
+            assert manager.charm.certificates.get_assigned_certificate(request) == (None, None)
+            assert (
+                manager.charm.certificates.get_certificate_status(
+                    Certificate.from_string(certificate)
+                )
+                == CertificateStatus.VALID
+            )
 
         assert state_out.relations == frozenset({
             testing.Relation(
@@ -2007,6 +2214,40 @@ class TestTLSCertificatesRequiresV4:
                 },
             )
         })
+
+        assert not self.certificate_secret_exists(state_out.secrets)
+        pending_relation = testing.Relation(
+            id=certificates_relation.id,
+            endpoint="certificates",
+            local_unit_data=state_out.get_relation(certificates_relation.id).local_unit_data,
+            remote_app_data={"certificates": "[]"},
+        )
+        pending_state = testing.State(
+            config={"common_name": "example.com"},
+            relations=[pending_relation],
+            secrets=state_out.secrets,
+        )
+        installed = Certificate.from_string(certificate)
+        with self.ctx(self.ctx.on.update_status(), pending_state) as manager:
+            assert (
+                manager.charm.certificates.get_request_status(request)
+                == CertificateRequestStatus.PENDING
+            )
+            assert manager.charm.certificates.get_assigned_certificate(request) == (None, None)
+            assert (
+                manager.charm.certificates.get_certificate_status(installed)
+                == CertificateStatus.VALID
+            )
+            with patch(LIB_DIR + "._tls_certificates.datetime") as clock:
+                clock.now.return_value = installed.expiry_time
+                assert (
+                    manager.charm.certificates.get_certificate_status(installed)
+                    == CertificateStatus.EXPIRED
+                )
+                assert (
+                    manager.charm.certificates.get_request_status(request)
+                    == CertificateRequestStatus.PENDING
+                )
 
     @patch(LIB_DIR + ".CertificateRequestAttributes.generate_csr")
     def test_given_certificate_when_renew_certificate_then_new_certificate_is_requested(
