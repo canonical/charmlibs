@@ -1,3 +1,13 @@
+# 1.13.0 - 30 October 2026
+
+Add `get_request_status(attributes)`, returning
+`AVAILABLE`, `PENDING`, or `UNAVAILABLE`. Add `get_certificate_status(certificate)` to check
+an individual certificate's validity dates and advertised withdrawal.
+
+During renewal, a request can be `PENDING` while the workload's existing certificate remains
+`VALID`. Both APIs inspect existing data; renewal, certificate storage, and the
+assigned-certificate getters are unchanged.
+
 # 1.12.0 - 29 September 2026
 
 Allow requirers to configure library-generated private keys with the new `KeyAlgorithm` enum and
