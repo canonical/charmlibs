@@ -15,60 +15,61 @@
 """Library to manage the integration with the SMTP Integrator charm.
 
 This library contains the Requires and Provides classes for handling the integration
-between an application and a charm providing the `smtp` and `smtp-legacy` integrations.
-If the requirer charm supports secrets, the preferred approach is to use the `smtp`
+between an application and a charm providing the ``smtp`` and ``smtp-legacy`` integrations.
+If the requirer charm supports secrets, the preferred approach is to use the ``smtp``
 relation to leverage them.
-This library also contains a `SmtpRelationData` class to wrap the SMTP data that will
+This library also contains a ``SmtpRelationData`` class to wrap the SMTP data that will
 be shared via the integration.
 
-### Requirer Charm
+Requirer Charm
+--------------
 
-```python
+.. code-block:: python
 
-from charmlibs.interfaces.smtp import SmtpDataAvailableEvent, SmtpRequires
+    import ops
+    from charmlibs.interfaces.smtp import SmtpDataAvailableEvent, SmtpRequires
 
-class SmtpRequirerCharm(ops.CharmBase):
-    def __init__(self, *args):
-        super().__init__(*args)
-        self.smtp = SmtpRequires(self)
-        self.framework.observe(self.smtp.on.smtp_data_available, self._handler)
-        ...
+    class SmtpRequirerCharm(ops.CharmBase):
+        def __init__(self, *args):
+            super().__init__(*args)
+            self.smtp = SmtpRequires(self)
+            self.framework.observe(self.smtp.on.smtp_data_available, self._handler)
+            ...
 
-    def _handler(self, events: SmtpDataAvailableEvent) -> None:
-        ...
-
-```
+        def _handler(self, events: SmtpDataAvailableEvent) -> None:
+            ...
 
 As shown above, the library provides a custom event to handle the scenario in
 which new SMTP data has been added or updated.
 
-### Provider Charm
+Provider Charm
+--------------
 
 Following the previous example, this is an example of the provider charm.
 
-```python
-from charmlibs.interfaces.smtp import SmtpProvides
+.. code-block:: python
 
-class SmtpProviderCharm(ops.CharmBase):
-    def __init__(self, *args):
-        super().__init__(*args)
-        self.smtp = SmtpProvides(self)
+    import ops
+    from charmlibs.interfaces.smtp import SmtpProvides
+
+    class SmtpProviderCharm(ops.CharmBase):
+        def __init__(self, *args):
+            super().__init__(*args)
+            self.smtp = SmtpProvides(self)
+            ...
+
+The ``SmtpProvides`` object wraps the list of relations into a ``relations`` property
+and provides an ``update_relation_data`` method to update the relation data by passing
+a ``SmtpRelationData`` data object.
+
+.. code-block:: python
+
+    class SmtpProviderCharm(ops.CharmBase):
         ...
 
-```
-The SmtpProvides object wraps the list of relations into a `relations` property
-and provides an `update_relation_data` method to update the relation data by passing
-a `SmtpRelationData` data object.
-
-```python
-class SmtpProviderCharm(ops.CharmBase):
-    ...
-
-    def _on_config_changed(self, _) -> None:
-        for relation in self.model.relations[self.smtp.relation_name]:
-            self.smtp.update_relation_data(relation, self._get_smtp_data())
-
-```
+        def _on_config_changed(self, _) -> None:
+            for relation in self.model.relations[self.smtp.relation_name]:
+                self.smtp.update_relation_data(relation, self._get_smtp_data())
 """
 
 from ._smtp import (

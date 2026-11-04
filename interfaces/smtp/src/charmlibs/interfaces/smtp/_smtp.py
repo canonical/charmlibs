@@ -73,7 +73,7 @@ class SecretError(SmtpError):
 class TransportSecurity(str, Enum):
     """Represent the transport security values.
 
-    Attributes:
+    Fields:
         NONE: none
         STARTTLS: starttls
         TLS: tls
@@ -87,7 +87,7 @@ class TransportSecurity(str, Enum):
 class AuthType(str, Enum):
     """Represent the auth type values.
 
-    Attributes:
+    Fields:
         NONE: none
         NOT_PROVIDED: not_provided
         PLAIN: plain
@@ -101,7 +101,7 @@ class AuthType(str, Enum):
 class SmtpRelationData(BaseModel):
     """Represent the relation data.
 
-    Attributes:
+    Fields:
         host: The hostname or IP address of the outgoing SMTP relay.
         port: The port of the outgoing SMTP relay.
         user: The SMTP AUTH user to use for the outgoing SMTP relay.
@@ -169,21 +169,7 @@ class SmtpRelationData(BaseModel):
 
 
 class SmtpDataAvailableEvent(ops.RelationEvent):
-    """Smtp event emitted when relation data has changed.
-
-    Attributes:
-        host: The hostname or IP address of the outgoing SMTP relay.
-        port: The port of the outgoing SMTP relay.
-        user: The SMTP AUTH user to use for the outgoing SMTP relay.
-        password: The SMTP AUTH password to use for the outgoing SMTP relay.
-        password_id: The secret ID where the SMTP AUTH password for the SMTP relay is stored.
-        auth_type: The type used to authenticate with the SMTP relay.
-        transport_security: The security protocol to use for the outgoing SMTP relay.
-        domain: The domain used by the emails sent from SMTP relay.
-        skip_ssl_verify: Specifies if certificate trust verification is skipped in the SMTP relay.
-        smtp_sender: Optional sender email address for outgoing notifications.
-        recipients: List of recipient email addresses for notifications.
-    """
+    """Smtp event emitted when relation data has changed."""
 
     @property
     def host(self) -> str:
@@ -267,20 +253,13 @@ class SmtpRequiresEvents(ops.CharmEvents):
     """SMTP events.
 
     This class defines the events that a SMTP requirer can emit.
-
-    Attributes:
-        smtp_data_available: the SmtpDataAvailableEvent.
     """
 
     smtp_data_available = ops.EventSource(SmtpDataAvailableEvent)
 
 
 class SmtpRequires(ops.Object):
-    """Requirer side of the SMTP relation.
-
-    Attributes:
-        on: events the provider can emit.
-    """
+    """Requirer side of the SMTP relation."""
 
     on = SmtpRequiresEvents()
 
