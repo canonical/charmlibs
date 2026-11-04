@@ -3,6 +3,8 @@
 
 """SMTP library unit tests"""
 
+# pyright: basic, reportArgumentType=false, reportOptionalMemberAccess=false
+
 import importlib
 import itertools
 import json
@@ -12,11 +14,29 @@ from ast import literal_eval
 import ops
 import pydantic
 import pytest
-from charms.smtp_integrator.v0 import smtp
-from charms.smtp_integrator.v0.smtp import SmtpRequires
 from ops.testing import Harness
 
-from lib.charms.smtp_integrator.v0.smtp import parse_recipients
+from charmlibs.interfaces import smtp
+from charmlibs.interfaces.smtp import SmtpRequires, _smtp, parse_recipients
+
+# The migrated tests use ops.testing.Harness, which is pending deprecation in ops.
+pytestmark = pytest.mark.filterwarnings("ignore::PendingDeprecationWarning")
+
+_harnesses: list[Harness] = []
+
+
+def _harness(*args, **kwargs):
+    harness = Harness(*args, **kwargs)
+    _harnesses.append(harness)
+    return harness
+
+
+@pytest.fixture(autouse=True)
+def _cleanup_harnesses():
+    yield
+    while _harnesses:
+        _harnesses.pop().cleanup()
+
 
 REQUIRER_METADATA = """
 name: smtp-consumer
@@ -125,7 +145,7 @@ def test_smtp_provider_update_relation_data():
     act: update the relation data.
     assert: the relation data is updated.
     """
-    harness = Harness(SmtpProviderCharm, meta=PROVIDER_METADATA)
+    harness = _harness(SmtpProviderCharm, meta=PROVIDER_METADATA)
     harness.begin()
     harness.set_leader(True)
     harness.add_relation("smtp-legacy", "smtp-provider")
@@ -183,7 +203,7 @@ def test_legacy_requirer_charm_does_not_emit_event_id_when_no_data():
     act: add an smtp-legacy relation.
     assert: no events are emitted.
     """
-    harness = Harness(SmtpRequirerCharm, meta=REQUIRER_METADATA)
+    harness = _harness(SmtpRequirerCharm, meta=REQUIRER_METADATA)
     harness.begin()
     harness.set_leader(True)
     harness.add_relation("smtp-legacy", "smtp-provider")
@@ -198,7 +218,7 @@ def test_requirer_charm_does_not_emit_event_id_when_no_data():
     act: add an smtp relation.
     assert: no SmtpDataAvailable events are emitted.
     """
-    harness = Harness(SmtpRequirerCharm, meta=REQUIRER_METADATA)
+    harness = _harness(SmtpRequirerCharm, meta=REQUIRER_METADATA)
     harness.begin()
     harness.set_leader(True)
     harness.add_relation("smtp", "smtp-provider")
@@ -214,7 +234,7 @@ def test_legacy_requirer_charm_with_valid_relation_data_emits_event(is_leader):
     act: add an smtp-legacy relation.
     assert: an SmtpDataAvailable event containing the relation data is emitted.
     """
-    harness = Harness(SmtpRequirerCharm, meta=REQUIRER_METADATA)
+    harness = _harness(SmtpRequirerCharm, meta=REQUIRER_METADATA)
     harness.begin()
     harness.set_leader(is_leader)
     harness.add_relation("smtp-legacy", "smtp-provider", app_data=SAMPLE_LEGACY_RELATION_DATA)
@@ -257,7 +277,7 @@ def test_requirer_charm_with_valid_relation_data_emits_event(is_leader):
     act: add an smtp relation.
     assert: an SmtpDataAvailable event containing the relation data is emitted.
     """
-    harness = Harness(SmtpRequirerCharm, meta=REQUIRER_METADATA)
+    harness = _harness(SmtpRequirerCharm, meta=REQUIRER_METADATA)
     harness.begin()
     harness.set_leader(is_leader)
 
@@ -297,7 +317,7 @@ def test_requirer_charm_with_invalid_relation_data_doesnt_emit_event(is_leader):
         "skip_ssl_verify": "False",
     }
 
-    harness = Harness(SmtpRequirerCharm, meta=REQUIRER_METADATA)
+    harness = _harness(SmtpRequirerCharm, meta=REQUIRER_METADATA)
     harness.begin()
     harness.set_leader(is_leader)
     harness.add_relation("smtp-legacy", "smtp-provider", app_data=relation_data)
@@ -311,7 +331,7 @@ def test_requirer_charm_get_relation_data_without_relation_data():
     act: call get_relation_data function.
     assert: get_relation_data should return None.
     """
-    harness = Harness(SmtpRequirerCharm, meta=REQUIRER_METADATA)
+    harness = _harness(SmtpRequirerCharm, meta=REQUIRER_METADATA)
     harness.begin()
     harness.set_leader(True)
     harness.add_relation("smtp", "smtp-provider", app_data={})
@@ -322,7 +342,7 @@ def test_requirer_charm_get_relation_data_without_relation_data():
     "left,right,result",
     [
         *[
-            list(left_and_right) + [True]
+            [*left_and_right, True]
             for left_and_right in itertools.permutations(
                 [
                     "secret://d41591b7-fa4d-4b2b-8ae2-d6015d5677da/d2rhncfmp25c765918hg",
@@ -335,7 +355,7 @@ def test_requirer_charm_get_relation_data_without_relation_data():
             )
         ],
         *[
-            list(left_and_right) + [False]
+            [*left_and_right, False]
             for left_and_right in itertools.product(
                 [
                     "secret://d41591b7-fa4d-4b2b-8ae2-d6015d5677da/d2rhncfmp25c765918hg",
@@ -354,7 +374,7 @@ def test_requirer_charm_get_relation_data_without_relation_data():
             )
         ],
         *[
-            list(left_and_right) + [False]
+            [*left_and_right, False]
             for left_and_right in itertools.product(
                 [
                     "secret://d41591b7-fa4d-4b2b-8ae2-d6015d5677da/d2rhncfmp25c765918hg",
@@ -386,7 +406,7 @@ def test_requirer_charm_receive_event_on_secret_changed():
     act: change secret content in the provider relation data.
     assert: event should raise for the relation containing the changed secret.
     """
-    harness = Harness(SmtpRequirerCharm, meta=REQUIRER_METADATA)
+    harness = _harness(SmtpRequirerCharm, meta=REQUIRER_METADATA)
     harness.begin()
     harness.set_leader(True)
     secret1 = harness.add_model_secret(
@@ -584,7 +604,7 @@ def test_legacy_requirer_event_includes_sender_and_recipients_when_present():
     act: add smtp-legacy relation with those fields.
     assert: emitted event exposes smtp_sender and recipients list.
     """
-    harness = Harness(SmtpRequirerCharm, meta=REQUIRER_METADATA)
+    harness = _harness(SmtpRequirerCharm, meta=REQUIRER_METADATA)
     harness.begin()
     harness.set_leader(True)
 
@@ -607,7 +627,7 @@ def test_event_sender_and_recipients_are_none_when_unset():
     act: add smtp-legacy relation.
     assert: properties return None.
     """
-    harness = Harness(SmtpRequirerCharm, meta=REQUIRER_METADATA)
+    harness = _harness(SmtpRequirerCharm, meta=REQUIRER_METADATA)
     harness.begin()
     harness.set_leader(True)
 
@@ -623,7 +643,7 @@ def test_get_relation_data_raises_secret_error_when_secret_missing(monkeypatch):
     act: Attempt to read relation data via get_relation_data_from_relation().
     assert: SecretError is raised.
     """
-    harness = Harness(SmtpRequirerCharm, meta=REQUIRER_METADATA)
+    harness = _harness(SmtpRequirerCharm, meta=REQUIRER_METADATA)
     harness.begin()
     harness.set_leader(True)
 
@@ -633,7 +653,7 @@ def test_get_relation_data_raises_secret_error_when_secret_missing(monkeypatch):
 
     relation.data[relation.app].update({**RELATION_DATA, "password_id": "missing"})  # nosec B105
 
-    def raise_model_error(*, id: str):  # pylint: disable=redefined-builtin
+    def raise_model_error(*, id: str):  # noqa: A002
         """Simulate Juju raising ModelError when a secret cannot be read.
 
         Args:
@@ -714,7 +734,7 @@ def test_smtp_module_imports_without_field_validator(monkeypatch):
     assert: module reload succeeds (v1 fallback path is selected).
     """
 
-    class _FakePydantic:  # noqa: DCO060
+    class _FakePydantic:
         """Minimal pydantic stub missing field_validator
 
         Attributes:
@@ -787,10 +807,10 @@ def test_smtp_module_imports_without_field_validator(monkeypatch):
 
             return decorator
 
-    monkeypatch.setattr(smtp, "pydantic", _FakePydantic(), raising=False)
+    monkeypatch.setattr(_smtp, "pydantic", _FakePydantic(), raising=False)
 
     # smtp.py should choose v1 validators when field_validator isn't available
-    importlib.reload(smtp)
+    importlib.reload(_smtp)
 
     # parse_recipients still exists after reload
-    assert callable(smtp.parse_recipients)
+    assert callable(_smtp.parse_recipients)
