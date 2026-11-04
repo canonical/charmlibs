@@ -15,6 +15,7 @@ classifiers = [
 ]
 dynamic = ["version"]
 dependencies = [
+    "email-validator>=2",
     # Libraries should use clear but wide dependency bounds to avoid overly constraining charms.
     # Ops 3 is backwards compatible with Ops 2, but drops Python 3.8 support.
     # Ops 3 has new features not present in Ops 2.23 (the last Ops 2 feature release).
@@ -23,10 +24,10 @@ dependencies = [
     # - https://github.com/canonical/operator/blob/main/CHANGES.md
     # Set the dependency bounds according to the features and fixes your library needs.
     # "ops>=2.23.1,<4",
+    "ops>=2.23.1,<4",
+    "pydantic>=1.10,<3",
 ]
 
-[project.optional-dependencies]
-testing = ["charmlibs-interfaces-smtp-testing==0.0.0.dev0"]
 
 [dependency-groups]
 lint = [  # installed for `just lint interfaces/smtp` (unit, functional, and integration are also installed)
@@ -34,7 +35,6 @@ lint = [  # installed for `just lint interfaces/smtp` (unit, functional, and int
 ]
 unit = [  # installed for `just unit interfaces/smtp`
     "ops[testing]",
-    "charmlibs-interfaces-smtp[testing]",
 ]
 functional = [  # installed for `just functional interfaces/smtp`
 ]
@@ -57,9 +57,6 @@ packages = ["src/charmlibs"]
 
 [tool.hatch.version]
 path = "src/charmlibs/interfaces/smtp/_version.py"
-
-[tool.uv.sources]
-charmlibs-interfaces-smtp-testing = { path = "testing", editable = true }
 
 [tool.ruff]
 extend = "../../pyproject.toml"
