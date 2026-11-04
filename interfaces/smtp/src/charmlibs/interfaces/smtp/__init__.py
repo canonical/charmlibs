@@ -72,9 +72,9 @@ class SmtpProviderCharm(ops.CharmBase):
 """
 
 from ._smtp import (
-    AuthType,
     DEFAULT_RELATION_NAME,
     LEGACY_RELATION_NAME,
+    AuthType,
     SecretError,
     SmtpDataAvailableEvent,
     SmtpError,
@@ -89,9 +89,9 @@ from ._smtp import (
 from ._version import __version__ as __version__
 
 __all__ = [
-    'AuthType',
     'DEFAULT_RELATION_NAME',
     'LEGACY_RELATION_NAME',
+    'AuthType',
     'SecretError',
     'SmtpDataAvailableEvent',
     'SmtpError',
