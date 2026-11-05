@@ -107,3 +107,18 @@ def test_chown(
         expected_user = user if user is not None else 'root'
         expected_group = group if group is not None else expected_user
         assert (result.results['user'], result.results['group']) == (expected_user, expected_group)
+
+
+def test_rmtree_success(juju: jubilant.Juju, charm: str):
+    result = juju.run(f'{charm}/0', 'rmtree', params={'scenario': 'success'})
+    assert result.results['result'] == 'ok'
+
+
+def test_rmtree_not_found(juju: jubilant.Juju, charm: str):
+    result = juju.run(f'{charm}/0', 'rmtree', params={'scenario': 'not-found'})
+    assert result.results['error'] == 'FileNotFoundError'
+
+
+def test_rmtree_not_a_directory(juju: jubilant.Juju, charm: str):
+    result = juju.run(f'{charm}/0', 'rmtree', params={'scenario': 'not-a-directory'})
+    assert result.results['error'] == 'NotADirectoryError'

@@ -17,13 +17,14 @@
 from __future__ import annotations
 
 import io
+import os
 import pathlib
 import typing
 
 import pytest
 
 import utils
-from charmlibs.pathops import ContainerPath, LocalPath, _constants, ensure_contents
+from charmlibs.pathops import ContainerPath, LocalPath, _constants, ensure_contents, rmtree
 from charmlibs.pathops._functions import _get_fileinfo
 
 if typing.TYPE_CHECKING:
@@ -105,3 +106,83 @@ def test_get_fileinfo(
         synthetic_dict = utils.info_to_dict(synthetic_result, exclude=exclude)
         pebble_dict = utils.info_to_dict(pebble_result, exclude=exclude)
         assert synthetic_dict == pebble_dict
+
+
+PathType = type[str] | type[pathlib.Path] | type[ContainerPath]
+PATH_TYPES: tuple[PathType, ...] = (str, pathlib.Path, LocalPath, ContainerPath)
+
+
+def as_path(
+    path: pathlib.Path, path_type: PathType, container: ops.Container
+) -> str | pathlib.Path | ContainerPath:
+    if issubclass(path_type, ContainerPath):
+        return ContainerPath(path, container=container)
+    return path_type(path)
+
+
+@pytest.mark.parametrize('path_type', PATH_TYPES)
+def test_rmtree_removes_tree(
+    tmp_path: pathlib.Path, container: ops.Container, path_type: PathType
+):
+    root = tmp_path / 'target'
+    (root / 'sub').mkdir(parents=True)
+    (root / 'file.txt').write_bytes(b'data')
+    (root / 'sub' / 'nested.txt').write_bytes(b'data')
+    (root / 'sub' / 'empty').mkdir()
+    rmtree(as_path(root, path_type, container))
+    assert not os.path.lexists(root)
+
+
+@pytest.mark.parametrize('path_type', PATH_TYPES)
+def test_rmtree_not_found(tmp_path: pathlib.Path, container: ops.Container, path_type: PathType):
+    with pytest.raises(FileNotFoundError):
+        rmtree(as_path(tmp_path / 'does_not_exist', path_type, container))
+
+
+@pytest.mark.parametrize('path_type', PATH_TYPES)
+def test_rmtree_regular_file(
+    tmp_path: pathlib.Path, container: ops.Container, path_type: PathType
+):
+    file = tmp_path / 'file.txt'
+    file.write_bytes(b'data')
+    with pytest.raises(NotADirectoryError):
+        rmtree(as_path(file, path_type, container))
+    assert file.read_bytes() == b'data'
+
+
+@pytest.mark.parametrize('target', ['real_dir', 'does_not_exist'])
+@pytest.mark.parametrize('path_type', PATH_TYPES)
+def test_rmtree_symlink(
+    tmp_path: pathlib.Path,
+    container: ops.Container,
+    path_type: PathType,
+    target: str,
+):
+    (tmp_path / 'real_dir').mkdir()
+    (tmp_path / 'real_dir' / 'file.txt').write_bytes(b'data')
+    link = tmp_path / 'link'
+    link.symlink_to(tmp_path / target)
+    with pytest.raises(NotADirectoryError):
+        rmtree(as_path(link, path_type, container))
+    assert os.path.lexists(link)
+    assert (tmp_path / 'real_dir' / 'file.txt').read_bytes() == b'data'
+
+
+@pytest.mark.parametrize('target', ['outside', 'outside/precious.txt', 'does_not_exist'])
+@pytest.mark.parametrize('path_type', PATH_TYPES)
+def test_rmtree_removes_symlinks_in_tree_without_following(
+    tmp_path: pathlib.Path,
+    container: ops.Container,
+    path_type: PathType,
+    target: str,
+):
+    outside = tmp_path / 'outside'
+    outside.mkdir()
+    (outside / 'precious.txt').write_bytes(b'keep me')
+    root = tmp_path / 'target'
+    (root / 'sub').mkdir(parents=True)
+    (root / 'sub' / 'link').symlink_to(tmp_path / target)
+    rmtree(as_path(root, path_type, container))
+    assert not os.path.lexists(root)
+    assert [p.name for p in outside.iterdir()] == ['precious.txt']
+    assert (outside / 'precious.txt').read_bytes() == b'keep me'
