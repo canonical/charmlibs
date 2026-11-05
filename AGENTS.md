@@ -153,7 +153,7 @@ Workshop configs are defined in `.workshop/`. Extra pytest flags are passed thro
 workshop exec noble -- sudo just functional snap -x -k test_install
 ```
 
-**Stop any workshop you launched or started once you're done with it.** Ready workshops keep running and are restarted automatically when the host boots, so forgotten ones accumulate across worktrees, using resources and preventing the host from suspending. Leave alone any workshops that were already running before you began.
+**Stop any workshop you launched or started once you're done with it.** Ready workshops keep running and are restarted automatically when the host boots, so forgotten ones accumulate across worktrees and actively use resources. Leave alone any workshops that were already running before you began.
 
 **Run `workshop remove` for a worktree's workshops before deleting the worktree.** Workshop can't stop or remove workshops whose project directory no longer exists, so deleting the directory first leaves them running (shown as `missing-project` in `workshop list --global`). To clean these up, recreate the directory with `mkdir` and then run `workshop remove -p <path> <name>`.
 
