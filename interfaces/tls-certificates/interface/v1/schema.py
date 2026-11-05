@@ -156,7 +156,8 @@ class RequirerData(BaseModel):
     """
 
     certificate_signing_requests: list[CertificateSigningRequest] = Field(
-        default_factory=list, description="List of certificate signing requests."
+        default_factory=list[CertificateSigningRequest],
+        description="List of certificate signing requests.",
     )
 
 
