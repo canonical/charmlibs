@@ -19,6 +19,7 @@ from __future__ import annotations
 import io
 import os
 import pathlib
+import tempfile
 import typing
 
 import pytest
@@ -186,3 +187,55 @@ def test_rmtree_removes_symlinks_in_tree_without_following(
     assert not os.path.lexists(root)
     assert [p.name for p in outside.iterdir()] == ['precious.txt']
     assert (outside / 'precious.txt').read_bytes() == b'keep me'
+
+
+def _rmtree_outcome(path: pathlib.Path | ContainerPath, root: pathlib.Path):
+    """Return the exception type raised (or None) and what remains under root."""
+    try:
+        rmtree(path)
+    except Exception as e:
+        error = type(e)
+    else:
+        error = None
+    remaining = sorted(
+        str(pathlib.Path(dirpath, name).relative_to(root))
+        for dirpath, dirnames, filenames in os.walk(root)
+        for name in (*dirnames, *filenames)
+    )
+    return error, remaining
+
+
+@pytest.mark.parametrize(
+    'filename',
+    [
+        *utils.FILENAMES_PLUS,
+        pytest.param(
+            f'{utils.EMPTY_FILE_NAME}/child',
+            marks=pytest.mark.xfail(
+                strict=True,
+                reason='ContainerPath raises FileNotFoundError when the parent is a file',
+            ),
+        ),
+        f'{utils.NESTED_DIR_NAME}/{utils.MISSING_FILE_NAME}',
+    ],
+)
+def test_rmtree_local_and_container_match(container: ops.Container, filename: str):
+    # Use a short temporary directory, as Unix socket paths are limited to 108 characters
+    with tempfile.TemporaryDirectory() as tmp:
+        local_root = pathlib.Path(tmp, 'local')
+        container_root = pathlib.Path(tmp, 'container')
+        local_root.mkdir()
+        container_root.mkdir()
+        cleanups = [
+            utils._populate_interesting_dir(local_root),
+            utils._populate_interesting_dir(container_root),
+        ]
+        try:
+            local_outcome = _rmtree_outcome(LocalPath(local_root, filename), local_root)
+            container_outcome = _rmtree_outcome(
+                ContainerPath(container_root, filename, container=container), container_root
+            )
+        finally:
+            for cleanup in cleanups:
+                cleanup()
+    assert local_outcome == container_outcome

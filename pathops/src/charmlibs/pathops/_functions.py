@@ -114,8 +114,16 @@ def rmtree(path: str | os.PathLike[str] | PathProtocol) -> None:
 
 
 def _rmtree_local(path: pathlib.Path) -> None:
-    # shutil.rmtree raises a bare OSError for symlinks, but handles other cases as we'd like.
-    if path.is_symlink():
+    # shutil.rmtree raises NotADirectoryError for regular files, but raises a bare OSError for
+    # other non-directory files (for example sockets or healthy symlinks).
+    # It raises FileNotFoundError for a broken symlink.
+    # On Python 3.10, shutil.rmtree hangs on a named pipe.
+    # We raise NotADirectoryError in all these cases:
+    # 1) To avoid raising bare OSErrors for ContainerPath.
+    # 2) So that users can catch NotADirectoryError when the path exists and isn't a directory.
+    # 3) To avoid hanging on a named pipe with Python 3.10.
+    # Note: If the path does not exist at all, shutil.rmtree raises FileNotFoundError.
+    if path.is_symlink() or (path.exists() and not path.is_dir()):
         _errors.raise_not_a_directory(str(path))
     shutil.rmtree(path)
 
