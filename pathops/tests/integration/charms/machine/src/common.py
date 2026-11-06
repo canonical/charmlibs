@@ -52,6 +52,7 @@ class Charm(ops.CharmBase):
         framework.observe(self.on['ensure-contents'].action, self._on_ensure_contents)
         framework.observe(self.on['iterdir'].action, self._on_iterdir)
         framework.observe(self.on['chown'].action, self._on_chown)
+        framework.observe(self.on['rmtree'].action, self._on_rmtree)
 
     def exec(self, cmd: Sequence[str]) -> int:
         """Run a command and return the exit code."""
@@ -117,6 +118,42 @@ class Charm(ops.CharmBase):
             elif path.exists():
                 path.unlink()
             self.remove_user(temp_user)
+
+    def _on_rmtree(self, event: ops.ActionEvent) -> None:
+        scenario: str = event.params['scenario']
+        base = self.root / 'rmtree-test-dir'
+        file = self.root / 'rmtree-test-file.txt'
+        try:
+            if scenario == 'success':
+                self.exec(['rm', '-rf', str(base)])
+                base.mkdir()
+                (base / 'file.txt').write_bytes(b'hello')
+                (base / 'sub').mkdir()
+                (base / 'sub' / 'nested.txt').write_bytes(b'world')
+                pathops.rmtree(base)
+                event.set_results({'result': 'ok'})
+            elif scenario == 'not-found':
+                try:
+                    pathops.rmtree(self.root / 'rmtree-nonexistent-XYZ')
+                except FileNotFoundError as e:
+                    event.set_results({'error': type(e).__name__})
+                else:
+                    event.fail('rmtree did not raise')
+            elif scenario == 'not-a-directory':
+                file.write_bytes(b'')
+                try:
+                    pathops.rmtree(file)
+                except NotADirectoryError as e:
+                    event.set_results({'error': type(e).__name__})
+                else:
+                    event.fail('rmtree did not raise')
+            else:
+                event.fail(f'Unknown scenario: {scenario!r}')
+        except Exception as e:
+            tb = traceback.format_exc()
+            event.fail(f'Exception: {e!r}\n{tb}')
+        finally:
+            self.exec(['rm', '-rf', str(base), str(file)])
 
     def add_user(self, user: str) -> None:
         retcode = self.exec(['useradd', user])
