@@ -274,8 +274,7 @@
 /interfaces/service_mesh @canonical/service-mesh
 
 # /interfaces/smtp/
-/interfaces/smtp/interface/ @canonical/platform-engineering
-/interfaces/smtp/ruff.toml @canonical/platform-engineering
+/interfaces/smtp/ @canonical/platform-engineering
 
 # /interfaces/tempo_cluster/
 /interfaces/tempo_cluster/interface/ @canonical/tracing-and-profiling
