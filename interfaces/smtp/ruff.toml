@@ -1,0 +1,19 @@
+extend = "../../pyproject.toml"
+src = ["src", "tests/unit", "tests/functional", "tests/integration"]  # correctly sort local imports in tests
+
+[format]
+quote-style = "preserve"
+
+[lint.extend-per-file-ignores]
+"./**/schema.py" = [
+    "CPY",  # copyright
+    "D",  # docs
+    "E501",  # line too long
+]
+"src/charmlibs/interfaces/smtp/_smtp.py" = [  # migrated from the Charmhub-hosted library
+    "E402",  # module level import not at top of file
+    "TC006",  # runtime-cast-value
+    "UP006",  # non-pep585-annotation
+    "UP035",  # deprecated-import
+    "UP045",  # non-pep604-annotation-optional
+]

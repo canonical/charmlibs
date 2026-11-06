@@ -58,31 +58,6 @@ packages = ["src/charmlibs"]
 [tool.hatch.version]
 path = "src/charmlibs/interfaces/smtp/_version.py"
 
-[tool.ruff]
-extend = "../../pyproject.toml"
-src = ["src", "tests/unit", "tests/functional", "tests/integration"]  # correctly sort local imports in tests
-
-[tool.ruff.format]
-quote-style = "preserve"
-
-[tool.ruff.lint.extend-per-file-ignores]
-# add additional per-file-ignores here to avoid overriding repo-level config
-"tests/**/*" = [
-    # "E501",  # line too long
-]
-"src/charmlibs/interfaces/smtp/_smtp.py" = [  # migrated verbatim from the Charmhub-hosted library
-    "E402",  # module level import not at top of file
-    "TC006",  # runtime-cast-value
-    "UP006",  # non-pep585-annotation
-    "UP035",  # deprecated-import
-    "UP045",  # non-pep604-annotation-optional
-]
-"./**/schema.py" = [
-    "CPY",  # copyright
-    "D",  # docs
-    "E501",  # line too long
-]
-
 [tool.pyright]
 extends = "../../pyproject.toml"
 include = ["src", "tests"]
