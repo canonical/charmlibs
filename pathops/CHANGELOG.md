@@ -1,6 +1,6 @@
 # Unreleased
 
-Add `rmtree`, which removes a local or container directory tree, following `shutil.rmtree` but raising `NotADirectoryError` for symlinks.
+Add `rmtree`, which removes a local or container directory tree, following `shutil.rmtree` but raising `NotADirectoryError` for any path that exists but isn't a directory, including symlinks.
 
 `ContainerPath` now provides `is_relative_to` and `with_stem`, matching `pathlib.Path` on Python 3.9+.
 `with_stem` is also part of `PathProtocol`; `is_relative_to` is not, because `pathlib`'s signature doesn't settle until Python 3.12.
