@@ -96,6 +96,36 @@ class TestTLSCertificatesProvidesV4:
             "csrs": [{"csr": csr_1, "is_ca": False}, {"csr": csr_2, "is_ca": False}]
         }
 
+    def test_given_unit_certificate_request_without_ca_when_get_requirer_csrs_then_false_is_returned(
+        self,
+    ):
+        private_key = generate_private_key()
+        csr = generate_csr(
+            private_key=private_key,
+            common_name="example.com",
+        )
+        certificates_relation = scenario.Relation(
+            endpoint="certificates",
+            interface="tls-certificates",
+            remote_app_name="certificate-requirer",
+            remote_units_data={
+                0: {
+                    "certificate_signing_requests": json.dumps([
+                        {"certificate_signing_request": csr},
+                    ])
+                }
+            },
+        )
+
+        state_in = scenario.State(
+            relations={certificates_relation},
+            leader=True,
+        )
+
+        self.ctx.run(self.ctx.on.action("get-certificate-requests"), state_in)
+
+        assert self.ctx.action_results == {"csrs": [{"csr": csr, "is_ca": False}]}
+
     def test_given_app_certificate_requests_when_get_requirer_csrs_then_csrs_are_returned(self):
         private_key = generate_private_key()
         csr_1 = generate_csr(
