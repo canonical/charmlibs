@@ -12,10 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Implementation of the SMTP interface library.
+# pyright: reportUnnecessaryTypeIgnoreComment=false, reportConstantRedefinition=false, reportArgumentType=false, reportUnnecessaryComparison=false, reportUnknownArgumentType=false, reportUnknownVariableType=false
 
-Migrated from the Charmhub-hosted library ``charms.smtp_integrator.v0.smtp``
-(LIBAPI 0, LIBPATCH 21).
+"""Implementation of the SMTP library.
+
+Migrated from ``charms.smtp_integrator.v0.smtp`` (LIBAPI 0, LIBPATCH 21).
 """
 
 # pylint: disable=wrong-import-position
@@ -24,9 +25,8 @@ import json
 import logging
 import typing
 from ast import literal_eval
-from collections.abc import Callable
 from enum import Enum
-from typing import Any, TypeVar, cast
+from typing import Any, Callable, Dict, List, Optional, TypeVar, cast
 
 import ops
 from pydantic import BaseModel, EmailStr, Field, ValidationError
@@ -41,11 +41,11 @@ try:
 
     _PYDANTIC_V2 = True
 except ImportError:
-    _pyd_field_validator = None
-    _PYDANTIC_V2 = False  # pyright: ignore[reportConstantRedefinition]
+    _pyd_field_validator = None  # type: ignore[assignment]
+    _PYDANTIC_V2 = False
 
 # Pydantic v1 field validation decorator (v2 uses field_validator)
-from pydantic import validator as _pyd_validator  # noqa: E402  # pyright: ignore[reportDeprecated]
+from pydantic import validator as _pyd_validator  # type: ignore[attr-defined]
 
 DEFAULT_RELATION_NAME = "smtp"
 LEGACY_RELATION_NAME = "smtp-legacy"
@@ -58,8 +58,8 @@ def recipients_validator() -> Callable[[_F], _F]:
         A decorator to validate/normalize the recipients field before EmailStr validation.
     """
     if _PYDANTIC_V2:
-        return cast("Any", _pyd_field_validator)("recipients", mode="before")
-    return cast("Any", _pyd_validator)("recipients", pre=True)
+        return cast(Any, _pyd_field_validator)("recipients", mode="before")
+    return cast(Any, _pyd_validator)("recipients", pre=True)
 
 
 class SmtpError(Exception):
@@ -117,15 +117,15 @@ class SmtpRelationData(BaseModel):
 
     host: str = Field(..., min_length=1)
     port: int = Field(..., ge=1, le=65536)
-    user: str | None = None
-    password: str | None = None
-    password_id: str | None = None
+    user: Optional[str] = None
+    password: Optional[str] = None
+    password_id: Optional[str] = None
     auth_type: AuthType
     transport_security: TransportSecurity
-    domain: str | None = None
-    skip_ssl_verify: bool | None = False
-    smtp_sender: EmailStr | None = None
-    recipients: list[EmailStr] = Field(default_factory=list)
+    domain: Optional[str] = None
+    skip_ssl_verify: Optional[bool] = False
+    smtp_sender: Optional[EmailStr] = None
+    recipients: List[EmailStr] = Field(default_factory=list)
 
     @recipients_validator()
     @classmethod
@@ -133,7 +133,7 @@ class SmtpRelationData(BaseModel):
         """Convert recipients input to list[str] before EmailStr validation."""
         return parse_recipients(value)
 
-    def to_relation_data(self) -> dict[str, str]:
+    def to_relation_data(self) -> Dict[str, str]:
         """Convert an instance of SmtpRelationData to the relation representation.
 
         Returns:
@@ -175,31 +175,31 @@ class SmtpDataAvailableEvent(ops.RelationEvent):
     def host(self) -> str:
         """Fetch the SMTP host from the relation."""
         assert self.relation.app
-        return typing.cast("str", self.relation.data[self.relation.app].get("host"))
+        return typing.cast(str, self.relation.data[self.relation.app].get("host"))
 
     @property
     def port(self) -> int:
         """Fetch the SMTP port from the relation."""
         assert self.relation.app
-        return int(typing.cast("str", self.relation.data[self.relation.app].get("port")))
+        return int(typing.cast(str, self.relation.data[self.relation.app].get("port")))
 
     @property
     def user(self) -> str:
         """Fetch the SMTP user from the relation."""
         assert self.relation.app
-        return typing.cast("str", self.relation.data[self.relation.app].get("user"))
+        return typing.cast(str, self.relation.data[self.relation.app].get("user"))
 
     @property
     def password(self) -> str:
         """Fetch the SMTP password from the relation."""
         assert self.relation.app
-        return typing.cast("str", self.relation.data[self.relation.app].get("password"))
+        return typing.cast(str, self.relation.data[self.relation.app].get("password"))
 
     @property
     def password_id(self) -> str:
         """Fetch the SMTP password from the relation."""
         assert self.relation.app
-        return typing.cast("str", self.relation.data[self.relation.app].get("password_id"))
+        return typing.cast(str, self.relation.data[self.relation.app].get("password_id"))
 
     @property
     def auth_type(self) -> AuthType:
@@ -217,18 +217,18 @@ class SmtpDataAvailableEvent(ops.RelationEvent):
     def domain(self) -> str:
         """Fetch the SMTP domain from the relation."""
         assert self.relation.app
-        return typing.cast("str", self.relation.data[self.relation.app].get("domain"))
+        return typing.cast(str, self.relation.data[self.relation.app].get("domain"))
 
     @property
     def skip_ssl_verify(self) -> bool:
         """Fetch the skip_ssl_verify flag from the relation."""
         assert self.relation.app
         return literal_eval(
-            typing.cast("str", self.relation.data[self.relation.app].get("skip_ssl_verify"))
+            typing.cast(str, self.relation.data[self.relation.app].get("skip_ssl_verify"))
         )
 
     @property
-    def smtp_sender(self) -> str | None:
+    def smtp_sender(self) -> Optional[str]:
         """Fetch the SMTP sender from the relation.
 
         Returns:
@@ -238,7 +238,7 @@ class SmtpDataAvailableEvent(ops.RelationEvent):
         return self.relation.data[self.relation.app].get("smtp_sender")
 
     @property
-    def recipients(self) -> list[str]:
+    def recipients(self) -> List[str]:
         """Fetch the SMTP recipients from the relation.
 
         Returns:
@@ -276,7 +276,7 @@ class SmtpRequires(ops.Object):
         self.framework.observe(charm.on[relation_name].relation_changed, self._on_relation_changed)
         self.framework.observe(charm.on.secret_changed, self._on_secret_changed)
 
-    def get_relation_data(self) -> SmtpRelationData | None:
+    def get_relation_data(self) -> Optional[SmtpRelationData]:
         """Retrieve the relation data.
 
         Returns:
@@ -285,7 +285,9 @@ class SmtpRequires(ops.Object):
         relation = self.model.get_relation(self.relation_name)
         return self.get_relation_data_from_relation(relation) if relation else None
 
-    def get_relation_data_from_relation(self, relation: ops.Relation) -> SmtpRelationData | None:
+    def get_relation_data_from_relation(
+        self, relation: ops.Relation
+    ) -> Optional[SmtpRelationData]:
         """Retrieve the relation data.
 
         Args:
@@ -302,7 +304,7 @@ class SmtpRequires(ops.Object):
         if not raw_relation_data:
             return None
 
-        data: dict[str, Any] = dict(raw_relation_data)
+        data: Dict[str, Any] = dict(raw_relation_data)
 
         password = data.get("password")
         if password is None and data.get("password_id"):
@@ -318,7 +320,7 @@ class SmtpRequires(ops.Object):
         # normalize recipients
         data["recipients"] = parse_recipients(data.get("recipients"))
 
-        return SmtpRelationData(**{**data, "password": password})  # pyright: ignore[reportArgumentType]
+        return SmtpRelationData(**{**data, "password": password})
 
     def _is_relation_data_valid(self, relation: ops.Relation) -> bool:
         """Validate the relation data.
@@ -377,7 +379,7 @@ class SmtpRequires(ops.Object):
         if changed_secret_uri is None:
             return
         for relation in self.charm.model.relations[self.relation_name]:
-            if relation.app is None:  # pyright: ignore[reportUnnecessaryComparison]
+            if relation.app is None:
                 continue
             relation_data = relation.data[relation.app]
             password_id = relation_data.get("password_id")
@@ -455,7 +457,7 @@ def parse_recipients(raw: Any) -> list[str]:
         return []
 
     if isinstance(raw, list):
-        return [str(x).strip() for x in cast("list[Any]", raw) if str(x).strip()]
+        return [str(x).strip() for x in raw if str(x).strip()]
 
     if not isinstance(raw, str):
         raise TypeError("recipients must be a string, list, or None")
@@ -469,14 +471,14 @@ def parse_recipients(raw: Any) -> list[str]:
         loaded = json.loads(s)
         if not isinstance(loaded, list):
             raise ValueError("recipients JSON must decode to a list")
-        return [str(x).strip() for x in cast("list[Any]", loaded) if str(x).strip()]
+        return [str(x).strip() for x in loaded if str(x).strip()]
 
     # JSON without a bracelet: '"a@x.com", "b@y.com"'
     if '"' in s and "," in s:
         loaded = json.loads(f"[{s}]")
         if not isinstance(loaded, list):
             raise ValueError("recipients must decode to a list")
-        return [str(x).strip() for x in cast("list[Any]", loaded) if str(x).strip()]
+        return [str(x).strip() for x in loaded if str(x).strip()]
 
     # comma-separated or single
     return [p.strip() for p in s.split(",") if p.strip()]
