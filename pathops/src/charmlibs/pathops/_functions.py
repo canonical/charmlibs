@@ -88,38 +88,41 @@ def ensure_contents(
 def rmtree(path: str | os.PathLike[str] | PathProtocol) -> None:
     """Remove the directory tree rooted at ``path``.
 
-    Strings or path-like objects are treated as local paths, and are removed with
+    Strings or ``os.PathLike`` objects are treated as local paths, and are removed with
     :func:`shutil.rmtree`. Otherwise ``path`` must be a :class:`ContainerPath`, which is removed
     with Pebble's recursive remove.
 
     ``path`` itself must be a directory, not a symlink to one. Symlinks inside the tree are
-    removed, not followed. Mount points inside the tree are not treated specially, so the contents
-    of any filesystem mounted below ``path`` are removed too.
-
-    Unlike :func:`shutil.rmtree`, there are no ``ignore_errors`` or ``onexc`` arguments, and a
-    symlink at ``path`` raises :class:`NotADirectoryError` rather than a plain :class:`OSError`.
+    removed, not followed.
 
     Args:
         path: A local or remote filesystem path to a directory.
 
     Raises:
         FileNotFoundError: if ``path`` does not exist.
-        NotADirectoryError: if ``path`` is not a directory, including if it is a symlink.
+        NotADirectoryError: if ``path`` is not a directory or is a symlink.
         PermissionError: if the user does not have permissions for the operation.
         TypeError: if ``path`` is not a ``str``, :class:`os.PathLike`, or :class:`ContainerPath`.
         :class:`PebbleConnectionError`: if the remote Pebble client cannot be reached.
     """
     if _is_str_pathlike(path):
-        local_path = pathlib.Path(path)
-        # shutil.rmtree raises a bare OSError for symlinks, but handles other cases as we'd like
-        if local_path.is_symlink():
-            _errors.raise_not_a_directory(str(local_path))
-        shutil.rmtree(local_path)
-        return
-    if not isinstance(path, ContainerPath):
+        _rmtree_local(pathlib.Path(path))
+    elif isinstance(path, ContainerPath):
+        _rmtree_container(path)
+    else:
         raise TypeError(f'Expected str, os.PathLike, or ContainerPath, got {type(path).__name__}')
+
+
+def _rmtree_local(path: pathlib.Path) -> None:
+    # shutil.rmtree raises a bare OSError for symlinks, but handles other cases as we'd like.
+    if path.is_symlink():
+        _errors.raise_not_a_directory(str(path))
+    shutil.rmtree(path)
+
+
+def _rmtree_container(path: ContainerPath) -> None:
     # Pebble's recursive remove succeeds silently for missing paths, and removes files and
-    # symlinks, so check the path is a real directory first
+    # symlinks, so check the path is a real directory first.
     info = _fileinfo.from_container_path(path, follow_symlinks=False)
     if info.type != ops.pebble.FileType.DIRECTORY:
         _errors.raise_not_a_directory(repr(path))
