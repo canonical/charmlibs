@@ -19,6 +19,7 @@ from __future__ import annotations
 import datetime
 import grp
 import pwd
+import re
 import stat
 import typing
 
@@ -65,7 +66,9 @@ def _get_fileinfo_directly(path: ContainerPath) -> pebble.FileInfo:
 
 def _get_fileinfo_from_parent(path: ContainerPath) -> pebble.FileInfo:
     try:
-        info_list = path._container.list_files(path._path.parent, pattern=path.name)
+        info_list = path._container.list_files(
+            path._path.parent, pattern=_escape_pattern(path.name)
+        )
     except (pebble.APIError, pebble.PathError) as e:
         msg = repr(path)
         _errors.raise_if_matches_file_not_found(e, msg=msg)
@@ -75,6 +78,14 @@ def _get_fileinfo_from_parent(path: ContainerPath) -> pebble.FileInfo:
         _errors.raise_file_not_found(repr(path))
     assert len(info_list) == 1, 'ops.Container.list_files with non-* pattern should return 1 item'
     return info_list[0]
+
+
+def _escape_pattern(name: str) -> str:
+    """Return a pattern matching only this literal name, for Pebble (Go) and ops.testing (fnmatch).
+
+    The two syntaxes differ, but both treat a single character in square brackets as a literal.
+    """
+    return re.sub(r'[*?\[\\]', lambda m: '[\\\\]' if m[0] == '\\' else f'[{m[0]}]', name)
 
 
 def from_pathlib_path(path: pathlib.Path, follow_symlinks: bool = True) -> pebble.FileInfo:
