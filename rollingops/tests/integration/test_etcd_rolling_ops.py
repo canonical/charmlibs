@@ -474,8 +474,14 @@ def test_lock_released_when_unit_removed(juju: jubilant.Juju, app_name: str) -> 
 
 @pytest.mark.machine_only
 def test_actions_still_work_after_etcd_relation_removed(
-    juju: jubilant.Juju, app_name: str
+    juju: jubilant.Juju, app_name: str, request: pytest.FixtureRequest
 ) -> None:
+    if juju.status().model.version.startswith('4.'):
+        # Juju 4 doesn't run peer relation-departed on the remaining units when a unit is
+        # removed, so the peer lock can stay granted to the unit removed in the previous test.
+        request.applymarker(
+            pytest.mark.xfail(reason='https://github.com/juju/juju/issues/23326', strict=False)
+        )
     second_app = f'{app_name}-secondary'
     primary_units = sorted(juju.status().apps[app_name].units.keys())
     secondary_units = sorted(juju.status().apps[second_app].units.keys())
