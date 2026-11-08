@@ -12,10 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests of behaviour that charm unit tests rely on, using the mock Pebble from ops.testing."""
+"""Tests of behaviour that charm unit tests rely on, using the mock Pebble from ops.testing.
+
+Harness and Scenario share the same mock Pebble filesystem, so each test runs against both.
+"""
 
 from __future__ import annotations
 
+import dataclasses
+import json
 import typing
 
 import ops
@@ -30,32 +35,40 @@ if typing.TYPE_CHECKING:
 
 pytestmark = pytest.mark.filterwarnings('ignore:Harness is deprecated')
 
-
-@pytest.fixture
-def harness() -> Iterator[ops.testing.Harness[ops.CharmBase]]:
-    harness = ops.testing.Harness(ops.CharmBase, meta='{name: charm, containers: {c: {}}}')
-    harness.begin()
-    harness.set_can_connect('c', True)
-    yield harness
-    harness.cleanup()
+META: dict[str, typing.Any] = {'name': 'charm', 'containers': {'c': {}}}
 
 
-@pytest.fixture
-def container(harness: ops.testing.Harness[ops.CharmBase]) -> ops.Container:
-    return harness.model.unit.get_container('c')
+@dataclasses.dataclass
+class MockContainer:
+    container: ops.Container
+    root: pathlib.Path  # local directory holding the files under `base` in the container
+    base: str
 
 
-@pytest.fixture
-def root(harness: ops.testing.Harness[ops.CharmBase]) -> pathlib.Path:
-    return harness.get_filesystem_root('c')
+@pytest.fixture(params=['harness', 'scenario'])
+def mock(request: pytest.FixtureRequest, tmp_path: pathlib.Path) -> Iterator[MockContainer]:
+    if request.param == 'harness':
+        harness = ops.testing.Harness(ops.CharmBase, meta=json.dumps(META))
+        harness.begin()
+        harness.set_can_connect('c', True)
+        yield MockContainer(
+            harness.model.unit.get_container('c'), harness.get_filesystem_root('c'), '/'
+        )
+        harness.cleanup()
+        return
+    ctx = ops.testing.Context(ops.CharmBase, meta=META)
+    mount = ops.testing.Mount(location='/data', source=tmp_path)
+    container = ops.testing.Container('c', can_connect=True, mounts={'data': mount})
+    with ctx(ctx.on.update_status(), ops.testing.State(containers={container})) as manager:
+        yield MockContainer(manager.charm.unit.get_container('c'), tmp_path, '/data')
 
 
 @pytest.mark.parametrize('name', ('s*', 's?bling', '[s]ibling', 'sibling[', 'back\\slash'))
-def test_name_isnt_a_pattern(container: ops.Container, root: pathlib.Path, name: str):
-    (root / 'sibling').touch()
-    path = ContainerPath('/', name, container=container)
+def test_name_isnt_a_pattern(mock: MockContainer, name: str):
+    (mock.root / 'sibling').touch()
+    path = ContainerPath(mock.base, name, container=mock.container)
     with pytest.raises(FileNotFoundError):
         path.unlink()
-    (root / name).touch()
+    (mock.root / name).touch()
     path.unlink()
-    assert (root / 'sibling').exists()
+    assert (mock.root / 'sibling').exists()
