@@ -1,6 +1,3 @@
-# common charmcraft.yaml file symlinked by these charms
-# k8s charms can define containers + resources in metadata.yaml
-
 name: test
 type: charm
 summary: A small charm for use in integration tests.

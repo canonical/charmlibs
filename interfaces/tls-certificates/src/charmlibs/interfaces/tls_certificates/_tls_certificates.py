@@ -361,6 +361,30 @@ class _RequirerData(_DatabagModel):
     certificate_signing_requests: list[_CertificateSigningRequest] = []
 
 
+class CertificateStatus(str, Enum):
+    """A certificate's validity dates and currently advertised withdrawal."""
+
+    #: Within its validity period, with no withdrawal visible in relation data.
+    VALID = "valid"
+    #: The certificate has reached the end of its validity period.
+    EXPIRED = "expired"
+    #: The certificate's validity period has not started yet.
+    NOT_YET_VALID = "not_yet_valid"
+    #: The provider explicitly marked the certificate as revoked in relation data.
+    WITHDRAWN = "withdrawn"
+
+
+class CertificateRequestStatus(str, Enum):
+    """Availability of a certificate for a request."""
+
+    #: A valid certificate and matching private key are available for the current CSR.
+    AVAILABLE = "available"
+    #: No valid certificate is available, but issuance is outstanding.
+    PENDING = "pending"
+    #: No valid certificate is available and issuance is not pending.
+    UNAVAILABLE = "unavailable"
+
+
 class Mode(Enum):
     """Enum representing the mode of the certificate request.
 
@@ -2930,10 +2954,67 @@ class TLSCertificatesRequiresV4(Object):
                     continue
                 self._request_certificate(csr=csr, is_ca=certificate_request.is_ca, mode=mode)
 
+    def get_request_status(
+        self, attributes: CertificateRequestAttributes
+    ) -> CertificateRequestStatus:
+        """Whether a valid certificate is available, pending, or unavailable for this request.
+
+        Inspect after syncing requests. Application requests are visible only to the leader.
+        During renewal this reports PENDING until the provider responds, independently of
+        whether the certificate already installed in the workload is still valid. No CSR
+        is sent and no relation data or secrets are changed by this method.
+        """
+        self._resolve_certificate_requests()
+        if attributes not in self.certificate_requests or not self._certificate_requested(
+            attributes
+        ):
+            return CertificateRequestStatus.UNAVAILABLE
+        csr = self._certificate_requested_for_attributes(attributes)
+        if csr is None:
+            return CertificateRequestStatus.UNAVAILABLE
+        mode = self._get_mode_for_certificate_request(attributes)
+        certificate = self._find_certificate_in_relation_data(csr, mode)
+        if certificate is not None:
+            if self.get_certificate_status(certificate.certificate) == CertificateStatus.VALID:
+                return CertificateRequestStatus.AVAILABLE
+            return CertificateRequestStatus.UNAVAILABLE
+        if self.get_request_error(csr.certificate_signing_request) is not None:
+            return CertificateRequestStatus.UNAVAILABLE
+        return CertificateRequestStatus.PENDING
+
+    def get_certificate_status(self, certificate: Certificate) -> CertificateStatus:
+        """Check validity dates and advertised withdrawal of an individual certificate.
+
+        An explicit ``revoked`` flag for this exact certificate gives WITHDRAWN, taking
+        precedence over its UTC validity dates. At or after expiry gives EXPIRED; before
+        the start gives NOT_YET_VALID; otherwise VALID. Missing relation data does not
+        invalidate a certificate.
+
+        This is not a trust-chain, hostname, private-key, CRL, or OCSP check. Invalid provider
+        data is logged and ignored by the underlying getter. Withdrawal history is not
+        retained after removal; do not reinstall a certificate previously withdrawn.
+        """
+        if any(
+            provided.certificate == certificate and provided.revoked
+            for provided in self.get_provider_certificates()
+        ):
+            return CertificateStatus.WITHDRAWN
+        now = datetime.now(timezone.utc)
+        if now < certificate.validity_start_time:
+            return CertificateStatus.NOT_YET_VALID
+        if now >= certificate.expiry_time:
+            return CertificateStatus.EXPIRED
+        return CertificateStatus.VALID
+
     def get_assigned_certificate(
         self, certificate_request: CertificateRequestAttributes
     ) -> tuple[ProviderCertificate | None, PrivateKey | None]:
-        """Get the certificate that was assigned to the given certificate request."""
+        """Get the certificate that was assigned to the given certificate request.
+
+        An empty result can mean issuance or renewal is pending, not that the workload's
+        certificate should be removed. Use :meth:`get_request_status` to inspect issuance and
+        :meth:`get_certificate_status` to check the installed certificate separately.
+        """
         _, private_key = self._get_mode_and_private_key(certificate_request)
         for requirer_csr in self.get_csrs_from_requirer_relation_data():
             if certificate_request == CertificateRequestAttributes.from_csr(
@@ -2960,6 +3041,9 @@ class TLSCertificatesRequiresV4(Object):
             A tuple of (certificates, private_key) where:
             - certificates: List of assigned certificates for the specified mode
             - private_key: The private key for those certificates
+
+        An empty list can mean issuance or renewal is pending. Use
+        :meth:`get_certificate_status` to check an installed certificate before removing it.
 
         Example usage in ``APP_AND_UNIT`` mode::
 

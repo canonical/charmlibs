@@ -2,11 +2,10 @@
 # See LICENSE file for licensing details.
 """This file defines the schema for the provider side of the smtp interface.
 
-It exposes one interfaces.schema_base.DataBagSchema subclass called:
-- ProviderSchema
+It defines one model, `ProviderAppData`.
 
 Examples:
-    ProviderSchema:
+    Provider:
         unit: <empty>
         app: {"smtp":
                  {
@@ -23,7 +22,6 @@ Examples:
 
 from enum import Enum
 
-from interface_tester.schema_base import DataBagSchema
 from pydantic import BaseModel, Field
 
 
@@ -43,7 +41,7 @@ class AuthType(str, Enum):
     PLAIN = "plain"
 
 
-class SmtpProviderData(BaseModel):
+class ProviderAppData(BaseModel):
     host: str = Field(
         min_length=1,
         description="SMTP host.",
@@ -89,11 +87,6 @@ class SmtpProviderData(BaseModel):
     )
 
 
-class ProviderSchema(DataBagSchema):
-    """Provider schema for SMTP."""
-
-    app: SmtpProviderData
-
-
-class RequirerSchema(DataBagSchema):
-    """Requirer schema for SMTP."""
+ProviderUnitData = None
+RequirerAppData = None
+RequirerUnitData = None
