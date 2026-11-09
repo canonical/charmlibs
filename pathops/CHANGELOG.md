@@ -1,6 +1,6 @@
 # Unreleased
 
-`LocalPath.write_bytes` and `LocalPath.write_text` now set the ownership and permissions on the open file before writing any content, so content is never briefly exposed with the default permissions or owner. A file with a read-only `mode` can now be written by a non-root user.
+`LocalPath.write_bytes` and `LocalPath.write_text` now set the ownership and permissions on the open file before writing any content, so content is never briefly exposed with the default permissions or owner.
 
 # 1.4.0 - 9 November 2026
 
