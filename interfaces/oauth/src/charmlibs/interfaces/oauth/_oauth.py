@@ -106,7 +106,8 @@ OAUTH_REQUIRER_JSON_SCHEMA: dict[str, Any] = {
     'type': 'object',
     'properties': {
         'redirect_uri': {
-            'type': 'string',
+            'type': ['string', 'array'],
+            'items': {'type': 'string'},
             'default': None,
         },
         'audience': {'type': 'array', 'default': [], 'items': {'type': 'string'}},
@@ -241,28 +242,45 @@ def _validate_data(data: dict[str, Any], schema: dict[str, Any]) -> None:
 
 @dataclass
 class ClientConfig:
-    """Helper class containing a client's configuration."""
+    """Helper class containing a client's configuration.
 
-    redirect_uri: str | None
+    ``redirect_uri`` is either a single URI or a list of them. Use ``redirect_uris`` to read
+    it without caring which form it was given in.
+    """
+
+    redirect_uri: str | list[str] | None
     scope: str
     grant_types: list[str]
     audience: list[str] = field(default_factory=lambda: [])
     token_endpoint_auth_method: str = 'client_secret_basic'  # noqa: S105
     client_id: str | None = None
 
+    @property
+    def redirect_uris(self) -> list[str]:
+        """The redirect URIs as a list, whichever form ``redirect_uri`` was given in."""
+        if not self.redirect_uri:
+            return []
+        if isinstance(self.redirect_uri, str):
+            return [self.redirect_uri]
+        return list(self.redirect_uri)
+
     def validate(self) -> None:
         """Validate the client configuration."""
-        if 'authorization_code' in self.grant_types and not self.redirect_uri:
+        redirect_uris = self.redirect_uris
+        if 'authorization_code' in self.grant_types and not redirect_uris:
             raise ClientConfigError(
                 'redirect_uri is required when using authorization_code grant_type'
             )
 
         # Validate redirect_uri when configured
-        if self.redirect_uri is not None and not re.match(url_regex, self.redirect_uri):
-            raise ClientConfigError(f'Invalid URL {self.redirect_uri}')
+        for redirect_uri in redirect_uris:
+            if not re.match(url_regex, redirect_uri):
+                raise ClientConfigError(f'Invalid URL {redirect_uri}')
 
-        if self.redirect_uri is not None and self.redirect_uri.startswith('http://'):
-            logger.warning("Provided Redirect URL uses http scheme. Don't do this in production")
+            if redirect_uri.startswith('http://'):
+                logger.warning(
+                    "Provided Redirect URL uses http scheme. Don't do this in production"
+                )
 
         # Validate grant_types
         for grant_type in self.grant_types:
@@ -455,8 +473,15 @@ class OAuthRequirer(OAuthRelation):
         if not relation or not relation.app:
             return
 
-        data = _dump_data(client_config.to_dict(), OAUTH_REQUIRER_JSON_SCHEMA)
-        relation.data[self.model.app].update(data)
+        data = client_config.to_dict()
+        # A single URI is published as a plain string, the only form that providers older
+        # than 1.2.0 accept, so the list form is used only when there is more than one.
+        if redirect_uris := client_config.redirect_uris:
+            data['redirect_uri'] = redirect_uris[0] if len(redirect_uris) == 1 else redirect_uris
+        else:
+            data.pop('redirect_uri', None)
+
+        relation.data[self.model.app].update(_dump_data(data, OAUTH_REQUIRER_JSON_SCHEMA))
 
     def is_client_created(self, relation_id: int | None = None) -> bool | None:
         """Check if the client has been created."""
@@ -500,7 +525,9 @@ class OAuthRequirer(OAuthRelation):
         client_secret_id = cast('str | None', data.get('client_secret_id'))
         if client_secret_id:
             client_secret_obj = self.get_client_secret(client_secret_id)
-            client_secret = client_secret_obj.get_content()[CLIENT_SECRET_FIELD]
+            # `refresh=True`: the provider cuts a new revision when it rotates the secret,
+            # and nothing here observes `secret-changed`, so the tracked revision goes stale.
+            client_secret = client_secret_obj.get_content(refresh=True)[CLIENT_SECRET_FIELD]
             data['client_secret'] = client_secret
 
         oauth_provider = OauthProviderConfig.from_dict(data)
@@ -525,7 +552,7 @@ class ClientCreatedEvent(EventBase):
     def __init__(
         self,
         handle: Handle,
-        redirect_uri: str,
+        redirect_uri: str | list[str] | None,
         scope: str,
         grant_types: list[str],
         audience: list[str],
@@ -553,7 +580,7 @@ class ClientCreatedEvent(EventBase):
 
     def restore(self, snapshot: dict[str, Any]) -> None:
         """Restore event."""
-        self.redirect_uri = cast('str', snapshot['redirect_uri'])
+        self.redirect_uri = cast('str | list[str] | None', snapshot['redirect_uri'])
         self.scope = cast('str', snapshot['scope'])
         self.grant_types = cast('list[str]', snapshot['grant_types'])
         self.audience = cast('list[str]', snapshot['audience'])
@@ -577,7 +604,7 @@ class ClientChangedEvent(EventBase):
     def __init__(
         self,
         handle: Handle,
-        redirect_uri: str,
+        redirect_uri: str | list[str] | None,
         scope: str,
         grant_types: list[str],
         audience: list[str],
@@ -608,7 +635,7 @@ class ClientChangedEvent(EventBase):
 
     def restore(self, snapshot: dict[str, Any]) -> None:
         """Restore event."""
-        self.redirect_uri = cast('str', snapshot['redirect_uri'])
+        self.redirect_uri = cast('str | list[str] | None', snapshot['redirect_uri'])
         self.scope = cast('str', snapshot['scope'])
         self.grant_types = cast('list[str]', snapshot['grant_types'])
         self.audience = cast('list[str]', snapshot['audience'])
@@ -688,8 +715,13 @@ class OAuthProvider(OAuthRelation):
             logger.info('No requirer relation data available.')
             return
 
-        client_data = _load_data(raw_data, OAUTH_REQUIRER_JSON_SCHEMA)
-        redirect_uri = cast('str | None', client_data.get('redirect_uri'))
+        try:
+            client_data = _load_data(raw_data, OAUTH_REQUIRER_JSON_SCHEMA)
+        except DataValidationError:
+            logger.warning('The requirer relation data is not valid yet.')
+            return
+
+        redirect_uri = cast('str | list[str] | None', client_data.get('redirect_uri'))
         scope = cast('str | None', client_data.get('scope'))
         grant_types = cast('list[str] | None', client_data.get('grant_types'))
         audience = cast('list[str] | None', client_data.get('audience'))
@@ -701,7 +733,15 @@ class OAuthProvider(OAuthRelation):
         if not provider_data_raw:
             logger.info('No provider relation data available.')
             return
-        provider_data = _load_data(provider_data_raw, OAUTH_PROVIDER_JSON_SCHEMA)
+
+        try:
+            provider_data = _load_data(provider_data_raw, OAUTH_PROVIDER_JSON_SCHEMA)
+        except DataValidationError:
+            # A partially written provider databag must not wedge the hook: the charm can
+            # only repair it from a later hook, which would never run.
+            logger.warning('The provider relation data is not complete yet.')
+            return
+
         client_id = cast('str | None', provider_data.get('client_id'))
 
         relation_id = event.relation.id
@@ -737,9 +777,15 @@ class OAuthProvider(OAuthRelation):
         self.on.client_deleted.emit(event.relation.id)
 
     def _create_juju_secret(self, client_secret: str, relation: Relation) -> Secret:
-        """Create a juju secret and grant it to a relation."""
-        secret = {CLIENT_SECRET_FIELD: client_secret}
-        juju_secret = self.model.app.add_secret(secret, label=self._get_secret_label(relation))
+        """Create or update a juju secret and grant it to a relation."""
+        content = {CLIENT_SECRET_FIELD: client_secret}
+        label = self._get_secret_label(relation)
+        try:
+            juju_secret = self.model.get_secret(label=label)
+        except SecretNotFoundError:
+            juju_secret = self.model.app.add_secret(content, label=label)
+        else:
+            juju_secret.set_content(content)
         juju_secret.grant(relation)
         return juju_secret
 
@@ -753,6 +799,43 @@ class OAuthProvider(OAuthRelation):
 
     def remove_secret(self, relation: Relation) -> None:
         return self._delete_juju_secret(relation)
+
+    def get_client_secret(self, relation: Relation) -> str | None:
+        """Return the client secret currently shared with the requirer, if there is one.
+
+        Re-registering a client with this value keeps the requirer working: writing a
+        different secret would cut a new revision that the requirer does not track.
+        """
+        try:
+            secret = self.model.get_secret(label=self._get_secret_label(relation))
+        except SecretNotFoundError:
+            return None
+
+        return secret.get_content(refresh=True).get(CLIENT_SECRET_FIELD)
+
+    def get_client_config(self, relation: Relation) -> ClientConfig | None:
+        """Read the requirer's client configuration from the integration databag.
+
+        Returns None when the requirer has not published its configuration yet.
+
+        Raises:
+            DataValidationError: if the published data does not match the requirer schema.
+        """
+        if not relation.app:
+            return None
+
+        data = relation.data[relation.app]
+        if not data:
+            return None
+
+        client_data = _load_data(data, OAUTH_REQUIRER_JSON_SCHEMA)
+        return ClientConfig(
+            redirect_uri=client_data.get('redirect_uri'),
+            scope=client_data['scope'],
+            grant_types=client_data['grant_types'],
+            audience=client_data['audience'],
+            token_endpoint_auth_method=client_data['token_endpoint_auth_method'],
+        )
 
     def set_provider_info_in_relation_data(
         self,
@@ -799,8 +882,6 @@ class OAuthProvider(OAuthRelation):
         relation = self.model.get_relation(self._relation_name, relation_id)
         if not relation or not relation.app:
             return
-        # TODO: What if we are refreshing the client_secret? We need to add a
-        # new revision for that
         secret = self._create_juju_secret(client_secret, relation)
         data = {'client_id': client_id, 'client_secret_id': secret.id}
         relation.data[self.model.app].update(_dump_data(data))

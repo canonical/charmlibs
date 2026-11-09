@@ -12,6 +12,10 @@ from charmlibs.interfaces.certificate_transfer import (
     CertificateTransferProvides,
 )
 
+# Enough certificates that an unsorted (set iteration) order is overwhelmingly unlikely
+# to coincide with sorted order by chance.
+UNSORTED_CERTIFICATES = [f"certificate{i:02d}" for i in range(20, 0, -1)]
+
 
 class DummyCertificateTransferProviderCharm(CharmBase):
     def __init__(self, *args: Any):
@@ -210,7 +214,12 @@ the databags except using the public methods in the provider library and use ver
         assert set(json.loads(certificates_relation_3)) == {"certificate1", "certificate2"}
         assert state_out.get_relation(relation_1.id).local_app_data["version"] == "1"
         assert state_out.get_relation(relation_2.id).local_app_data["version"] == "1"
-        assert "version" not in state_out.get_relation(relation_3.id).local_app_data
+        relation_3_app_data = state_out.get_relation(relation_3.id).local_app_data
+        assert relation_3_app_data["version"] == "1"
+        assert set(json.loads(relation_3_app_data["certificates"])) == {
+            "certificate1",
+            "certificate2",
+        }
 
     def test_given_multiple_relations_when_add_certificates_with_relation_id_then_certificate_sent_to_specific_relation(
         self,
@@ -293,6 +302,9 @@ the databags except using the public methods in the provider library and use ver
         relation_3_databag = set(json.loads(relation_3_unit_data["chain"]))
         assert len(relation_3_databag) == 2
         assert relation_3_databag == {"certificate1", "certificate2"}
+        relation_3_app_data = state_out.get_relation(relation_3.id).local_app_data
+        assert relation_3_app_data["version"] == "1"
+        assert set(json.loads(relation_3_app_data["certificates"])) == relation_3_databag
         logs = [(record.levelname, record.module, record.message) for record in caplog.records]
         expected_msg = str((
             f"Requirer in relation {relation_3.id} is using version 0 of the interface,",
@@ -344,6 +356,9 @@ the databags except using the public methods in the provider library and use ver
         relation_3_databag = set(json.loads(relation_3_unit_data["chain"]))
         assert len(relation_3_databag) == 2
         assert relation_3_databag == {"certificate1", "certificate2"}
+        relation_3_app_data = state_out.get_relation(relation_3.id).local_app_data
+        assert relation_3_app_data["version"] == "1"
+        assert set(json.loads(relation_3_app_data["certificates"])) == relation_3_databag
         logs = [(record.levelname, record.module, record.message) for record in caplog.records]
         expected_msg = str((
             f"Requirer in relation {relation_3.id} did not provide version field,",
@@ -580,6 +595,9 @@ the databags except using the public methods in the provider library and use ver
         }
         relation_3_unit_data = state_out.get_relation(relation_3.id).local_unit_data
         assert set(json.loads(relation_3_unit_data["chain"])) == {"certificate2"}
+        relation_3_app_data = state_out.get_relation(relation_3.id).local_app_data
+        assert relation_3_app_data["version"] == "1"
+        assert set(json.loads(relation_3_app_data["certificates"])) == {"certificate2"}
 
     def test_given_multiple_relations_when_remove_certificate_with_relation_id_no_version_then_certificate_removed_from_specific_relation(
         self,
@@ -631,6 +649,38 @@ the databags except using the public methods in the provider library and use ver
         }
         relation_3_unit_data = state_out.get_relation(relation_3.id).local_unit_data
         assert set(json.loads(relation_3_unit_data["chain"])) == {"certificate2"}
+        relation_3_app_data = state_out.get_relation(relation_3.id).local_app_data
+        assert relation_3_app_data["version"] == "1"
+        assert set(json.loads(relation_3_app_data["certificates"])) == {"certificate2"}
+
+    def test_given_v0_relation_when_remove_all_certificates_then_empty_app_snapshot_is_written(
+        self,
+    ):
+        relation = scenario.Relation(
+            endpoint="certificate_transfer",
+            interface="certificate_transfer",
+            remote_app_data={"version": "0"},
+            local_unit_data={
+                "certificate": json.dumps("certificate1"),
+                "ca": json.dumps("certificate1"),
+                "chain": json.dumps(["certificate1"]),
+                "version": json.dumps(0),
+            },
+        )
+        state_in = scenario.State(leader=True, relations=[relation])
+
+        state_out = self.ctx.run(
+            self.ctx.on.action(
+                "remove-all-certificates",
+                params={"relation-id": str(relation.id)},
+            ),
+            state_in,
+        )
+
+        relation_out = state_out.get_relation(relation.id)
+        assert relation_out.local_app_data["version"] == "1"
+        assert json.loads(relation_out.local_app_data["certificates"]) == []
+        assert json.loads(relation_out.local_unit_data["chain"]) == ["certificate1"]
 
     def test_given_multiple_relations_when_remove_all_certificates_then_certificates_removed_from_all_relations(
         self,
@@ -718,3 +768,84 @@ the databags except using the public methods in the provider library and use ver
             "certificate1",
             "certificate2",
         }
+
+    def test_given_v1_requirer_when_add_certificates_then_app_databag_is_sorted(self):
+        existing = UNSORTED_CERTIFICATES[:10]
+        added = UNSORTED_CERTIFICATES[10:]
+        relation = scenario.Relation(
+            endpoint="certificate_transfer",
+            interface="certificate_transfer",
+            remote_app_data={"version": "1"},
+            local_app_data={"certificates": json.dumps(existing)},
+        )
+        state_in = scenario.State(leader=True, relations=[relation])
+
+        state_out = self.ctx.run(
+            self.ctx.on.action("add-certificates", params={"certificates": ", ".join(added)}),
+            state_in,
+        )
+
+        app_data = state_out.get_relation(relation.id).local_app_data
+        assert app_data["certificates"] == json.dumps(sorted(UNSORTED_CERTIFICATES))
+
+    def test_given_v1_requirer_when_remove_certificate_then_app_databag_is_sorted(self):
+        relation = scenario.Relation(
+            endpoint="certificate_transfer",
+            interface="certificate_transfer",
+            remote_app_data={"version": "1"},
+            local_app_data={"certificates": json.dumps(UNSORTED_CERTIFICATES)},
+        )
+        state_in = scenario.State(leader=True, relations=[relation])
+
+        state_out = self.ctx.run(
+            self.ctx.on.action("remove-certificate", params={"certificate": "certificate05"}),
+            state_in,
+        )
+
+        expected = sorted(c for c in UNSORTED_CERTIFICATES if c != "certificate05")
+        app_data = state_out.get_relation(relation.id).local_app_data
+        assert app_data["certificates"] == json.dumps(expected)
+
+    def test_given_v0_requirer_when_add_certificates_then_databags_are_sorted(self):
+        relation = scenario.Relation(
+            endpoint="certificate_transfer",
+            interface="certificate_transfer",
+            remote_app_data={"version": "0"},
+        )
+        state_in = scenario.State(leader=True, relations=[relation])
+
+        state_out = self.ctx.run(
+            self.ctx.on.action(
+                "add-certificates",
+                params={"certificates": ", ".join(UNSORTED_CERTIFICATES)},
+            ),
+            state_in,
+        )
+
+        expected = sorted(UNSORTED_CERTIFICATES)
+        relation_out = state_out.get_relation(relation.id)
+        assert relation_out.local_app_data["certificates"] == json.dumps(expected)
+        assert relation_out.local_unit_data["chain"] == json.dumps(expected)
+        assert relation_out.local_unit_data["ca"] == json.dumps(expected[0])
+        assert relation_out.local_unit_data["certificate"] == json.dumps(expected[0])
+
+    def test_given_same_certificates_in_different_order_when_add_then_databag_unchanged(self):
+        expected = json.dumps(sorted(UNSORTED_CERTIFICATES))
+        relation = scenario.Relation(
+            endpoint="certificate_transfer",
+            interface="certificate_transfer",
+            remote_app_data={"version": "1"},
+            local_app_data={"certificates": expected, "version": "1"},
+        )
+        state_in = scenario.State(leader=True, relations=[relation])
+
+        state_out = self.ctx.run(
+            self.ctx.on.action(
+                "add-certificates",
+                params={"certificates": ", ".join(UNSORTED_CERTIFICATES)},
+            ),
+            state_in,
+        )
+
+        app_data = state_out.get_relation(relation.id).local_app_data
+        assert app_data == {"certificates": expected, "version": "1"}

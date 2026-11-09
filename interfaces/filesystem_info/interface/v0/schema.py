@@ -1,19 +1,16 @@
 """This file defines the schemas for the provider and requirer sides of the filesystem_info interface.
-It exposes two interfaces.schema_base.DataBagSchema subclasses called:
-- ProviderSchema
-- RequirerSchema
+It defines one model, `ProviderAppData`.
 Examples:
-    ProviderSchema:
+    Provider:
         app: {
             "endpoint": "nfs://(192.168.1.1:65535)/export"
         }
         unit: <empty>
-    RequirerSchema:
+    Requirer:
         unit: <empty>
         app: <empty>
 """
 
-from interface_tester.schema_base import DataBagSchema
 from pydantic import BaseModel, Field
 
 
@@ -30,11 +27,6 @@ class ProviderAppData(BaseModel):
     )
 
 
-class ProviderSchema(DataBagSchema):
-    """Provider schema for filesystem_info."""
-
-    app: ProviderAppData
-
-
-class RequirerSchema(DataBagSchema):
-    """Requirer schema for filesystem_info."""
+ProviderUnitData = None
+RequirerAppData = None
+RequirerUnitData = None

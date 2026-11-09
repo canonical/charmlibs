@@ -14,6 +14,7 @@
 
 import json
 
+import pytest
 from ops.testing import Context, Model, Relation, Secret, State
 
 from charmlibs.interfaces.ldap import LdapReadyEvent, LdapUnavailableEvent
@@ -79,6 +80,31 @@ def test_consume_ldap_relation_data(context: Context, provider_data: dict[str, s
     assert result.bind_dn == provider_data['bind_dn']
     assert result.bind_password == password
     assert result.bind_password_secret == secret.id
+    assert result.ldaps_enabled is True
+
+
+@pytest.mark.parametrize(
+    'ldaps_urls_json, expected',
+    [
+        ('["ldaps://path.to.glauth:3894"]', True),
+        ('[]', False),
+    ],
+)
+def test_consume_ldap_relation_data_ldaps_enabled(
+    context: Context, provider_data: dict[str, str], ldaps_urls_json: str, expected: bool
+) -> None:
+    password = 'p4ssw0rd'
+    secret = Secret(id='secret:bind-0003', tracked_content={'password': password})
+    data = {**provider_data, 'bind_password_secret': secret.id, 'ldaps_urls': ldaps_urls_json}
+    relation = Relation('ldap', remote_app_data=data)
+    state = create_state(leader=True, relations=[relation], secrets=[secret], containers=[])
+
+    with context(context.on.relation_changed(relation), state) as mgr:
+        mgr.run()
+        result = mgr.charm.ldap_requirer.consume_ldap_relation_data()
+
+    assert result is not None
+    assert result.ldaps_enabled is expected
 
 
 def test_consume_ldap_relation_data_inaccessible_secret(

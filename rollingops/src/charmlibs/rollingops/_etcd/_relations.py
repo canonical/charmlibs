@@ -15,11 +15,15 @@
 import logging
 
 from dpcharmlibs.interfaces import (
+    OpsRelationRepository,
     RequirerCommonModel,
+    RequirerDataContractV1,
     ResourceCreatedEvent,
     ResourceEndpointsChangedEvent,
     ResourceProviderModel,
     ResourceRequirerEventHandler,
+    gen_hash,
+    write_model,
 )
 from ops import Relation
 from ops.charm import (
@@ -235,6 +239,41 @@ class EtcdRequiresV1(Object):
         relations = self.etcd_interface.relations
         return relations[0] if relations else None
 
+    def ensure_request_published(self) -> None:
+        """Publish this unit's etcd request for an already existing relation, if needed.
+
+        If the ``cluster_id`` becomes available afte the relation-created hook is run,
+        this method ensures that the request is published to the relation databag.
+
+        This is a no-op if a request has already been written for this relation
+        """
+        relation = self.etcd_relation
+        if relation is None:
+            return
+
+        if not self.charm.unit.is_leader():
+            return
+
+        repository = OpsRelationRepository(self.model, relation, self.charm.app)
+
+        if repository.get_field('requests'):
+            # A request was already published for this relation
+            return
+
+        requests = self.client_requests()
+
+        for request in requests:
+            request.request_id = gen_hash(request.resource, request.salt)
+
+        full_request = RequirerDataContractV1[RequirerCommonModel](version='v1', requests=requests)
+        write_model(repository, full_request)
+        logger.info(
+            'Published etcd rollingops request for cluster_id=%s on relation %s/%s.',
+            self.cluster_id,
+            relation.name,
+            relation.id,
+        )
+
     def _on_relation_broken(self, event: RelationBrokenEvent) -> None:
         """Remove the stored information about the etcd server."""
         self.etcdctl.cleanup()
@@ -291,6 +330,8 @@ class EtcdRequiresV1(Object):
 
     def client_requests(self) -> list[RequirerCommonModel]:
         """Return the client requests for the etcd requirer interface."""
+        if not self.cluster_id:
+            return []
         cert = self.shared_certificates.get_local_request_cert()
         return [
             RequirerCommonModel(

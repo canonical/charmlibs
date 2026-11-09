@@ -9,16 +9,9 @@ status: draft
 providers:
   - name: pyroscope-coordinator-k8s
     url: https://github.com/canonical/pyroscope-operators
-    test_setup:
-      charm_root: coordinator
-      location: tests/interface/conftest.py
-      identifier: profiling_tester
-      pre_run: uv pip compile pyproject.toml --quiet --output-file requirements.txt
 
 requirers:
   - name: opentelemetry-collector-k8s
     url: https://github.com/canonical/opentelemetry-collector-k8s-operator
-    test_setup:
-      pre_run: uv pip compile pyproject.toml --quiet --output-file requirements.txt
 
 maintainer: "observability"

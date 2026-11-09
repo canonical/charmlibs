@@ -6,27 +6,36 @@ from datetime import datetime, timedelta, timezone
 
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.asymmetric import ec, rsa
 
 
 def generate_private_key(
     key_size: int = 2048,
     public_exponent: int = 65537,
+    key_algorithm: str = "rsa",
 ) -> str:
     """Generate a private key.
 
     Args:
-        password (bytes): Password for decrypting the private key
-        key_size (int): Key size in bytes
-        public_exponent: Public exponent.
+        key_size: Key size in bits.
+        public_exponent: RSA public exponent.
+        key_algorithm: ``"rsa"`` or ``"ecdsa"``.
 
     Returns:
         str: Private Key
     """
-    private_key = rsa.generate_private_key(
-        public_exponent=public_exponent,
-        key_size=key_size,
-    )
+    if key_algorithm == "rsa":
+        private_key = rsa.generate_private_key(
+            public_exponent=public_exponent,
+            key_size=key_size,
+        )
+    elif key_algorithm == "ecdsa":
+        curves = {256: ec.SECP256R1, 384: ec.SECP384R1}
+        if key_size not in curves:
+            raise ValueError("ECDSA key size must be 256 or 384 bits")
+        private_key = ec.generate_private_key(curves[key_size]())
+    else:
+        raise ValueError("Key algorithm must be 'rsa' or 'ecdsa'")
     key_bytes = private_key.private_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.TraditionalOpenSSL,

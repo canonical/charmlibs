@@ -29,6 +29,7 @@ class ProviderCharm(ops.CharmBase):
 
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
+        # Initialize your library's provider object here.
         # self.lib_obj = {{ cookiecutter.__pkg }}.<...>Provider(self, 'endpoint', ...)
         framework.observe(self.on.update_status, self._reconcile)
 
