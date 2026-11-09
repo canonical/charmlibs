@@ -1737,7 +1737,7 @@ interfaces:
   kind: PyPI
   rel_name: smtp
   rel_url_charmhub: https://charmhub.io/integrations/smtp
-  rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/smtp/v0
+  rel_url_schema: https://github.com/canonical/charmlibs/tree/main/interfaces/smtp/interface/v0
   description: Library to manage the integration with the SMTP Integrator charm.
   tags:
   - operations
