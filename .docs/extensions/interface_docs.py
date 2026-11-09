@@ -102,39 +102,160 @@ def _expand_schema_tables(readme: str, version_dir: pathlib.Path) -> str:
     """Replace each schema-table marker in the README with a table generated from the schema."""
 
     def replace(match: re.Match[str]) -> str:
-        schema = json.loads((version_dir / match.group(1)).read_text())
-        return _schema_table(schema)
+        return _schema_table(_load_schema(version_dir, match.group(1)))
 
     return SCHEMA_TABLE_MARKER.sub(replace, readme)
+
+
+# Run in a separate environment, so that the docs build doesn't need the schema dependencies.
+_DUMP_PYDANTIC_SCHEMA = """
+import importlib.util, json, sys
+spec = importlib.util.spec_from_file_location('schema', sys.argv[1])
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+print(json.dumps(getattr(module, sys.argv[2]).model_json_schema()))
+"""
+
+
+def _load_schema(version_dir: pathlib.Path, source: str) -> dict[str, typing.Any]:
+    """Load the JSON schema named by a schema-table marker.
+
+    The source is either a JSON schema file (`schemas/provider.json`), or a Python file and the
+    name of a pydantic model in it (`schema.py:ProviderAppData`).
+    """
+    filename, _, model = source.partition(':')
+    path = version_dir / filename
+    if not model:
+        return json.loads(path.read_text())
+    root = pathlib.Path(__file__).parent.parent.parent
+    cmd = [
+        'uv', 'run', '--no-project', '--quiet',
+        '--with-requirements', str(root / 'schema-requirements.txt'),
+        'python', '-c', _DUMP_PYDANTIC_SCHEMA, str(path), model,
+    ]  # fmt: skip
+    return json.loads(subprocess.check_output(cmd, text=True))
 
 
 def _schema_table(schema: dict[str, typing.Any]) -> str:
     """Render the fields of a JSON schema as a Markdown table.
 
     Nested object properties and array items are flattened using dotted paths, with `[]` marking
-    array items.
+    array items and `{...}` marking keys matched by a pattern or allowed as additional properties.
+    Local `$ref`s are followed, and the alternatives of an `anyOf` or `oneOf` are merged.
     """
     rows = ['| Field | Type | Required | Description |', '| --- | --- | --- | --- |']
-    rows.extend(_schema_rows(schema, prefix=''))
+    # Alternatives that share a field would otherwise list it more than once.
+    rows.extend(dict.fromkeys(_schema_rows(schema, root=schema, prefix='', seen=())))
     return '\n'.join(rows)
 
 
-def _schema_rows(schema: dict[str, typing.Any], prefix: str) -> list[str]:
+def _resolve(schema: dict[str, typing.Any], root: dict[str, typing.Any]) -> dict[str, typing.Any]:
+    """Follow a local `$ref` (to `#/$defs/...` or `#/definitions/...`), keeping sibling keys."""
+    ref = schema.get('$ref')
+    if not isinstance(ref, str) or not ref.startswith('#/'):
+        return schema
+    target: typing.Any = root
+    for part in ref[2:].split('/'):
+        target = target[part]
+    siblings = {k: v for k, v in schema.items() if k != '$ref'}
+    return {**_resolve(target, root), **siblings}
+
+
+def _alternatives(
+    schema: dict[str, typing.Any], root: dict[str, typing.Any]
+) -> list[dict[str, typing.Any]]:
+    """Return the resolved alternatives of a schema, or the schema itself if it has none."""
+    if not isinstance(schema, dict):  # a boolean schema (`true` or `false`) has no fields
+        return []
+    schema = _resolve(schema, root)
+    options = schema.get('anyOf') or schema.get('oneOf')
+    if not options:
+        return [schema]
+    rest = {k: v for k, v in schema.items() if k not in ('anyOf', 'oneOf')}
+    result: list[dict[str, typing.Any]] = []
+    for option in options:
+        result.extend(_alternatives({**rest, **option}, root))
+    return result
+
+
+def _type_names(schema: dict[str, typing.Any]) -> list[str]:
+    ref = schema.get('$ref')
+    if isinstance(ref, str):  # only local references are resolved, so link to anything else
+        return [f'[external schema]({ref})']
+    type_ = schema.get('type')
+    if isinstance(type_, list):
+        return [str(t) for t in type_]
+    if type_:
+        name = str(type_)
+    elif 'enum' in schema or 'const' in schema:
+        name = 'string'
+    elif 'properties' in schema:
+        name = 'object'
+    else:
+        return []
+    if 'enum' in schema:
+        name += ' (' + ', '.join(f'`{v}`' for v in schema['enum']) + ')'
+    elif 'const' in schema:
+        name += f' (`{schema["const"]}`)'
+    return [name]
+
+
+def _schema_rows(
+    schema: dict[str, typing.Any],
+    root: dict[str, typing.Any],
+    prefix: str,
+    seen: tuple[str, ...],
+) -> list[str]:
     rows: list[str] = []
-    required = set(schema.get('required', []))
-    for name, prop in schema.get('properties', {}).items():
-        path = f'{prefix}{name}'
-        type_ = prop.get('type', '')
-        if isinstance(type_, list):
-            type_ = ' | '.join(type_)
-        description = prop.get('description') or prop.get('title') or ''
-        description = ' '.join(description.split()).replace('|', '\\|')
-        is_required = 'yes' if name in required else 'no'
-        rows.append(f'| `{path}` | {type_} | {is_required} | {description} |')
-        if prop.get('type') == 'array' and isinstance(prop.get('items'), dict):
-            rows.extend(_schema_rows(prop['items'], prefix=f'{path}[].'))
+    for alternative in _alternatives(schema, root):
+        required = set(alternative.get('required', []))
+        children = [
+            (name, prop, name in required)
+            for name, prop in alternative.get('properties', {}).items()
+        ]
+        children.extend(
+            (f'{{{pattern}}}', prop, False)
+            for pattern, prop in alternative.get('patternProperties', {}).items()
+        )
+        additional = alternative.get('additionalProperties')
+        if isinstance(additional, dict) and additional:
+            children.append(('{...}', additional, False))
+        for name, prop, is_required in children:
+            rows.extend(_field_rows(prop, root, f'{prefix}{name}', is_required, seen))
+        items = alternative.get('items')
+        if not prefix and alternative.get('type') == 'array' and isinstance(items, dict):
+            rows.extend(_schema_rows(items, root, prefix='[].', seen=seen))
+    return rows
+
+
+def _field_rows(
+    prop: dict[str, typing.Any],
+    root: dict[str, typing.Any],
+    path: str,
+    is_required: bool,
+    seen: tuple[str, ...],
+) -> list[str]:
+    if not isinstance(prop, dict):  # a boolean schema
+        prop = {}
+    ref = prop.get('$ref')
+    if isinstance(ref, str):
+        if ref in seen:  # a recursive schema: stop rather than loop forever
+            return []
+        seen = (*seen, ref)
+    alternatives = _alternatives(prop, root)
+    types: list[str] = []
+    for alternative in alternatives:
+        types.extend(t for t in _type_names(alternative) if t not in types)
+    description = _resolve(prop, root).get('description') or ''
+    description = ' '.join(description.split()).replace('|', '\\|')
+    required = 'yes' if is_required else 'no'
+    rows = [f'| `{path}` | {" or ".join(types)} | {required} | {description} |']
+    for alternative in alternatives:
+        items = alternative.get('items')
+        if alternative.get('type') == 'array' and isinstance(items, dict):
+            rows.extend(_schema_rows(items, root, prefix=f'{path}[].', seen=seen))
         else:
-            rows.extend(_schema_rows(prop, prefix=f'{path}.'))
+            rows.extend(_schema_rows(alternative, root, prefix=f'{path}.', seen=seen))
     return rows
 
 
