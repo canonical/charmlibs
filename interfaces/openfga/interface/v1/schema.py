@@ -28,16 +28,19 @@ class ProviderAppData(BaseModel):
     grpc_api_url: str = Field(
         description=('The URL of the gRPC API.'),
         title='gRPC URL',
+        examples=['http://10.10.0.17:8081'],
     )
     http_api_url: str = Field(
         description=('The URL of the HTTP API.'),
         title='HTTP URL',
+        examples=['http://10.10.0.17:8080'],
     )
     token_secret_id: str | None = Field(
         description=(
             'Secret ID of the preshared token to be used to connect to the OpenFGA service.'
         ),
         title='Secret ID of the OpenFGA token',
+        examples=['secret:cs8l6hvmp25c77r5ou5g'],
         default=None,
     )
     token: str | None = Field(
@@ -46,6 +49,7 @@ class ProviderAppData(BaseModel):
             'service, to be used when juju secrets are not available.'
         ),
         title='The OpenFGA token',
+        examples=['test-token'],
         default=None,
     )
     store_id: str | None = Field(
