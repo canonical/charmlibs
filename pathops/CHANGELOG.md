@@ -1,6 +1,9 @@
-# 1.4.0 - 9 November 2026
+# Unreleased
 
 `LocalPath.write_bytes` and `LocalPath.write_text` now set the ownership and permissions on the open file before writing any content, so content is never briefly exposed with the default permissions or owner. A file with a read-only `mode` can now be written by a non-root user.
+
+# 1.4.0 - 9 November 2026
+
 `ContainerPath` now provides `is_relative_to` and `with_stem`, matching `pathlib.Path` on Python 3.9+.
 `with_stem` is also part of `PathProtocol`; `is_relative_to` is not, because `pathlib`'s signature doesn't settle until Python 3.12.
 `ContainerPath.match` now accepts a `str | os.PathLike[str]` pattern, matching `pathlib.Path.match` on Python 3.12+.
