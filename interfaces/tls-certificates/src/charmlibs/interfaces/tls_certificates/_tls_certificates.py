@@ -303,7 +303,7 @@ class _CertificateSigningRequest(pydantic.BaseModel):
     """Certificate signing request model."""
 
     certificate_signing_request: str
-    ca: bool | None
+    ca: bool | None = None
 
 
 class _RequestError(pydantic.BaseModel):
