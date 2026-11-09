@@ -85,16 +85,8 @@ class LocalPath(pathlib.PosixPath):
             PermissionError: if the local user does not have permissions for the operation.
         """
         _validate_user_and_group(user=user, group=group)
-        if mode is None:
-            # create the file with Pebble's default write mode if it doesn't exist
-            # doesn't change the mode if the file already exists
-            self.touch(mode=_constants.DEFAULT_WRITE_MODE)
-        bytes_written = super().write_bytes(data)
-        _chown_if_needed(self, user=user, group=group)
-        if mode is not None:
-            # explicitly set the mode if the user requested it
-            self.chmod(mode)
-        return bytes_written
+        with self._open_for_write(mode=mode, user=user, group=group, text=False) as f:
+            return f.write(memoryview(data))
 
     def write_text(
         self,
@@ -154,15 +146,42 @@ class LocalPath(pathlib.PosixPath):
             data = data.replace('\n', newline)
         elif newline not in ('', '\n', None):
             raise ValueError(f'illegal newline value: {newline!r}')
-        if mode is None:
-            # create the file with Pebble's default write mode
-            self.touch(mode=_constants.DEFAULT_WRITE_MODE)
-        bytes_written = super().write_text(data, encoding=encoding, errors=errors)
-        _chown_if_needed(self, user=user, group=group)
-        if mode is not None:
-            # explicitly set the mode if the user requested it
-            self.chmod(mode)
-        return bytes_written
+        with self._open_for_write(
+            mode=mode, user=user, group=group, text=True, encoding=encoding, errors=errors
+        ) as f:
+            return f.write(data)
+
+    def _open_for_write(
+        self,
+        *,
+        mode: int | None,
+        user: str | None,
+        group: str | None,
+        text: bool,
+        encoding: str | None = None,
+        errors: str | None = None,
+    ) -> typing.IO[typing.Any]:
+        # Set the permissions and ownership on the open file descriptor before any content is
+        # written, so that the content is never readable with the wrong permissions or owner.
+        # Because the descriptor is already open, this also works when the requested mode is
+        # not writable (for example, 0o444) and the local user is not root.
+        # A new file is created private if the caller specified a mode (the umask only ever
+        # removes permissions), or with Pebble's default write mode otherwise.
+        create_mode = _constants.DEFAULT_WRITE_MODE if mode is None else 0o600
+        fd = os.open(self, os.O_WRONLY | os.O_CREAT, create_mode)
+        try:
+            _fchown_if_needed(fd, user=user, group=group)
+            if mode is not None:
+                # explicitly set the mode if the user requested it
+                os.fchmod(fd, mode)
+            os.ftruncate(fd, 0)
+            if text:
+                # newline='' because newlines were already handled by the caller.
+                return open(fd, 'w', encoding=encoding, errors=errors, newline='')
+            return open(fd, 'wb')
+        except BaseException:
+            os.close(fd)
+            raise
 
     def glob(  # pyright: ignore[reportIncompatibleMethodOverride]
         self, pattern: str | os.PathLike[str]
@@ -222,6 +241,20 @@ def _validate_user_and_group(user: str | None, group: str | None):
         pwd.getpwnam(user)
     if group is not None:
         grp.getgrnam(group)
+
+
+def _fchown_if_needed(fd: int, user: str | None, group: str | None) -> None:
+    if user is None and group is None:
+        return
+    uid = -1
+    gid = -1
+    if user is not None:
+        info = pwd.getpwnam(user)
+        uid = info.pw_uid
+        gid = info.pw_gid  # use the user's group, following Pebble
+    if group is not None:
+        gid = grp.getgrnam(group).gr_gid
+    os.fchown(fd, uid, gid)
 
 
 def _chown_if_needed(path: pathlib.Path, user: str | int | None, group: str | int | None) -> None:

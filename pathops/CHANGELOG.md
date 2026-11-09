@@ -1,3 +1,7 @@
+# Unreleased
+
+`LocalPath.write_bytes` and `LocalPath.write_text` now set the ownership and permissions on the open file before writing any content, so content is never briefly exposed with the default permissions or owner.
+
 # 1.4.0 - 9 November 2026
 
 `ContainerPath` now provides `is_relative_to` and `with_stem`, matching `pathlib.Path` on Python 3.9+.

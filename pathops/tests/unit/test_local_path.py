@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import grp
+import os
 import pathlib
 import pwd
 import re
@@ -52,6 +53,12 @@ class MockGetPwNam:
 @dataclass
 class MockPwdStruct:
     pw_gid: int
+    pw_uid: int = 0
+
+
+@dataclass
+class MockGrpStruct:
+    gr_gid: int
 
 
 def mock_pass(*args: object, **kwargs: object) -> None:
@@ -64,8 +71,78 @@ def mock_chown():
 
 
 @pytest.mark.parametrize(
+    'method',
+    ['write_bytes', 'write_text'],
+)
+@pytest.mark.parametrize(
+    ('user', 'group', 'expected_ids'),
+    (
+        ('user-name', 'group-name', (7, 2)),
+        ('user-name', None, (7, 1)),
+        (None, 'group-name', (-1, 2)),
+        (None, None, None),
+    ),
+)
+def test_write_methods_chown_the_open_file(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: pathlib.Path,
+    method: str,
+    user: str | None,
+    group: str | None,
+    expected_ids: tuple[int, int] | None,
+):
+    calls: list[tuple[int, int]] = []
+
+    def fchown(_fd: int, uid: int, gid: int) -> None:
+        calls.append((uid, gid))
+
+    def getpwnam(_name: str) -> MockPwdStruct:
+        return MockPwdStruct(1, 7)
+
+    def getgrnam(_name: str) -> MockGrpStruct:
+        return MockGrpStruct(2)
+
+    monkeypatch.setattr(os, 'fchown', fchown)
+    monkeypatch.setattr(pwd, 'getpwnam', getpwnam)
+    monkeypatch.setattr(grp, 'getgrnam', getgrnam)
+    path = LocalPath(tmp_path, 'file')
+    getattr(path, method)(b'data' if method == 'write_bytes' else 'data', user=user, group=group)
+    assert path.read_bytes() == b'data'
+    assert calls == ([expected_ids] if expected_ids else [])
+
+
+@pytest.mark.parametrize('method', ['write_bytes', 'write_text'])
+@pytest.mark.parametrize('mode', [0o600, 0o444])
+@pytest.mark.parametrize('existing', [False, True])
+def test_write_methods_set_mode_before_writing_content(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: pathlib.Path,
+    method: str,
+    mode: int,
+    existing: bool,
+):
+    path = LocalPath(tmp_path, 'file')
+    if existing:
+        path.write_bytes(b'old content that is longer')
+        path.chmod(0o644)
+    modes_when_written: list[int] = []
+    real_ftruncate = os.ftruncate
+
+    def ftruncate(fd: int, length: int) -> None:
+        # Truncation happens after the mode is set and before any new content is written.
+        modes_when_written.append(os.fstat(fd).st_mode & 0o777)
+        real_ftruncate(fd, length)
+
+    monkeypatch.setattr(os, 'ftruncate', ftruncate)
+    getattr(path, method)(b'new' if method == 'write_bytes' else 'new', mode=mode)
+    assert modes_when_written == [mode]
+    assert path.read_bytes() == b'new'
+    assert path.stat().st_mode & 0o777 == mode
+
+
+@pytest.mark.parametrize(
     ('method', 'content'),
-    [('write_bytes', b'hell\r\no\r'), ('write_text', 'hell\r\no\r'), ('mkdir', None)],
+    [('mkdir', None)],
 )
 @pytest.mark.parametrize(
     ('user', 'group'),
