@@ -2,11 +2,9 @@
 # See LICENSE file for licensing details.
 
 """This file defines the schemas for the provider and requirer sides of the cos_agent interface.
-It exposes two interfaces.schema_base.DataBagSchema subclasses called:
-- ProviderSchema
-- RequirerSchema
+
 Examples:
-    ProviderSchema:
+    Provider:
         app: <empty>
         # The value of `config` key is a json-dumped data.
         unit: {
@@ -49,7 +47,7 @@ Examples:
                     "metrics_scrape_jobs": [{"job_name": "kafka_0", "path": "/metrics", "port": 9101}],
                   }
                 }
-    RequirerSchema:
+    Requirer:
         unit: <empty>
         app: <empty>
 """
@@ -59,12 +57,10 @@ import json
 import lzma
 from typing import Annotated
 
-from interface_tester.schema_base import DataBagSchema
 from pydantic import (
     AfterValidator,
     BaseModel,
     Field,
-    Json,
     PlainSerializer,
     WithJsonSchema,
 )
@@ -114,16 +110,11 @@ class NestedDataModel(BaseModel):
 class ProviderUnitData(BaseModel):
     """Unit databag model for `cos-agent` relation."""
 
-    config: Json[NestedDataModel] = Field(
+    config: NestedDataModel = Field(
         description='When dumped into a databag in JSON format, this configuration data will be nested under the key defaulted to "config".'
     )
 
 
-class ProviderSchema(DataBagSchema):
-    """Provider schema for CosAgent."""
-
-    unit: ProviderUnitData
-
-
-class RequirerSchema(DataBagSchema):
-    """Requirer schema for CosAgent."""
+ProviderAppData = None
+RequirerAppData = None
+RequirerUnitData = None
