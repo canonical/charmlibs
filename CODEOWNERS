@@ -81,11 +81,54 @@
 /interfaces/filesystem_info/interface/ @canonical/hpc-team
 /interfaces/filesystem_info/ruff.toml @canonical/hpc-team
 
+# /interfaces/fiveg_core_gnb/
+/interfaces/fiveg_core_gnb/interface/ @canonical/charmlibs-maintainers
+/interfaces/fiveg_core_gnb/ruff.toml @canonical/charmlibs-maintainers
+
+# /interfaces/fiveg_f1/
+/interfaces/fiveg_f1/interface/ @canonical/charmlibs-maintainers
+/interfaces/fiveg_f1/ruff.toml @canonical/charmlibs-maintainers
+
+# /interfaces/fiveg_gnb_identity/
+/interfaces/fiveg_gnb_identity/interface/ @canonical/charmlibs-maintainers
+/interfaces/fiveg_gnb_identity/ruff.toml @canonical/charmlibs-maintainers
+
+# /interfaces/fiveg_n2/
+/interfaces/fiveg_n2/interface/ @canonical/charmlibs-maintainers
+/interfaces/fiveg_n2/ruff.toml @canonical/charmlibs-maintainers
+
+# /interfaces/fiveg_n3/
+/interfaces/fiveg_n3/interface/ @canonical/charmlibs-maintainers
+/interfaces/fiveg_n3/ruff.toml @canonical/charmlibs-maintainers
+
+# /interfaces/fiveg_n4/
+/interfaces/fiveg_n4/interface/ @canonical/charmlibs-maintainers
+/interfaces/fiveg_n4/ruff.toml @canonical/charmlibs-maintainers
+
+# /interfaces/fiveg_nrf/
+/interfaces/fiveg_nrf/interface/ @canonical/charmlibs-maintainers
+/interfaces/fiveg_nrf/ruff.toml @canonical/charmlibs-maintainers
+
+# /interfaces/fiveg_rfsim/
+/interfaces/fiveg_rfsim/interface/ @canonical/charmlibs-maintainers
+/interfaces/fiveg_rfsim/ruff.toml @canonical/charmlibs-maintainers
+
 # /interfaces/forward_auth/
 /interfaces/forward_auth @canonical/identity
 
 # /interfaces/gateway_metadata/
 /interfaces/gateway_metadata @canonical/service-mesh
+
+# /interfaces/ingress/
+/interfaces/ingress/interface/ @canonical/platform-engineering
+/interfaces/ingress/ruff.toml @canonical/platform-engineering
+
+# /interfaces/ingress_per_unit/
+/interfaces/ingress_per_unit/interface/ @canonical/platform-engineering
+/interfaces/ingress_per_unit/ruff.toml @canonical/platform-engineering
+# /interfaces/ip_router/
+/interfaces/ip_router/interface/ @canonical/charmlibs-maintainers
+/interfaces/ip_router/ruff.toml @canonical/charmlibs-maintainers
 
 # /interfaces/istio_ingress_route/
 /interfaces/istio_ingress_route @canonical/service-mesh
@@ -215,6 +258,14 @@
 # /interfaces/saml/
 /interfaces/saml/interface/ @canonical/platform-engineering
 /interfaces/saml/ruff.toml @canonical/platform-engineering
+
+# /interfaces/sdcore_config/
+/interfaces/sdcore_config/interface/ @canonical/charmlibs-maintainers
+/interfaces/sdcore_config/ruff.toml @canonical/charmlibs-maintainers
+
+# /interfaces/sdcore_management/
+/interfaces/sdcore_management/interface/ @canonical/charmlibs-maintainers
+/interfaces/sdcore_management/ruff.toml @canonical/charmlibs-maintainers
 
 # /interfaces/sloth/
 /interfaces/sloth/ @canonical/tracing-and-profiling

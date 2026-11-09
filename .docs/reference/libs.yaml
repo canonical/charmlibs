@@ -783,7 +783,7 @@ interfaces:
   docs: ''
   src: https://github.com/canonical/opencti-operator/
   kind: Charmhub
-  rel_name: opencti-connector
+  rel_name: opencti_connector
   rel_url_charmhub: https://charmhub.io/integrations/opencti_connector
   rel_url_schema: https://canonical.com/juju/docs/charmlibs/reference/interfaces/opencti_connector/v0/
   description: ''
@@ -797,7 +797,7 @@ interfaces:
   kind: Charmhub
   rel_name: filesystem_info
   rel_url_charmhub: https://charmhub.io/integrations/filesystem_info
-  rel_url_schema: ''
+  rel_url_schema: https://canonical.com/juju/docs/charmlibs/reference/interfaces/filesystem_info/v0/
   description: ''
   tags:
   - data
@@ -1198,9 +1198,9 @@ interfaces:
   docs: ''
   src: https://github.com/canonical/grafana-k8s-operator
   kind: Charmhub
-  rel_name: grafana-source
-  rel_url_charmhub: https://charmhub.io/integrations/grafana-source
-  rel_url_schema: ''
+  rel_name: grafana_datasource
+  rel_url_charmhub: https://charmhub.io/integrations/grafana_datasource
+  rel_url_schema: https://canonical.com/juju/docs/charmlibs/reference/interfaces/grafana_datasource/v0/
   description: Provide a data source for Grafana dashboards.
   tags:
   - observability
@@ -1381,8 +1381,8 @@ interfaces:
   docs: ''
   src: https://github.com/canonical/lego-base-k8s-operator
   kind: Charmhub
-  rel_name: tls_certificates
-  rel_url_charmhub: https://charmhub.io/integrations/tls_certificates
+  rel_name: tls-certificates
+  rel_url_charmhub: https://charmhub.io/integrations/tls-certificates
   rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/tls_certificates/v1
   description: Legacy charm library used to implement the provider side of this interface.
   tags:
@@ -1442,8 +1442,8 @@ interfaces:
   docs: ''
   src: https://github.com/canonical/nginx-ingress-integrator-operator
   kind: Charmhub
-  rel_name: nginx_route
-  rel_url_charmhub: https://charmhub.io/integrations/nginx_route
+  rel_name: nginx-route
+  rel_url_charmhub: https://charmhub.io/integrations/nginx-route
   rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/nginx_route/v0
   description: Manage external HTTP access to Kubernetes workloads using Nginx.
   tags:
@@ -1747,8 +1747,8 @@ interfaces:
   docs: https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/tls_certificates
   src: https://github.com/canonical/charmlibs/tree/main/interfaces/tls_certificates
   kind: PyPI
-  rel_name: tls_certificates
-  rel_url_charmhub: https://charmhub.io/integrations/tls_certificates
+  rel_name: tls-certificates
+  rel_url_charmhub: https://charmhub.io/integrations/tls-certificates
   rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/tls_certificates/v1
   description: Manage TLS certificates.
   tags:
@@ -1759,8 +1759,8 @@ interfaces:
   docs: https://charmhub.io/tls-certificates-interface/
   src: https://github.com/canonical/tls-certificates-interface
   kind: Charmhub
-  rel_name: tls_certificates
-  rel_url_charmhub: https://charmhub.io/integrations/tls_certificates
+  rel_name: tls-certificates
+  rel_url_charmhub: https://charmhub.io/integrations/tls-certificates
   rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/tls_certificates/v1
   description: Manage TLS certificates. Deprecated in favor of ``charmlibs.interfaces.tls_certificates``.
   tags:
@@ -1834,8 +1834,8 @@ interfaces:
   docs: ''
   src: https://github.com/canonical/vault-k8s-operator
   kind: Charmhub
-  rel_name: vault_kv
-  rel_url_charmhub: https://charmhub.io/integrations/vault_kv
+  rel_name: vault-kv
+  rel_url_charmhub: https://charmhub.io/integrations/vault-kv
   rel_url_schema: https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/vault_kv/v0
   description: ''
   tags:
@@ -1859,7 +1859,7 @@ interfaces:
   docs: https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/istio-request-auth
   src: https://github.com/canonical/charmlibs/tree/main/interfaces/istio_request_auth
   kind: PyPI
-  rel_name: istio-request-auth
+  rel_name: istio_request_auth
   rel_url_charmhub: ''
   rel_url_schema: ''
   description: Configure Istio RequestAuthentication resources via relation data.
@@ -1872,7 +1872,7 @@ interfaces:
   docs: ''
   src: https://github.com/canonical/charmed-service-mesh-helpers
   kind: PyPI
-  rel_name: istio-request-auth
+  rel_name: istio_request_auth
   rel_url_charmhub: ''
   rel_url_schema: ''
   description: Deprecated in favour of charmlibs.interfaces.istio_request_auth.
@@ -1885,7 +1885,7 @@ interfaces:
   docs: https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/gateway-metadata
   src: https://github.com/canonical/charmlibs/tree/main/interfaces/gateway_metadata
   kind: PyPI
-  rel_name: gateway-metadata
+  rel_name: gateway_metadata
   rel_url_charmhub: ''
   rel_url_schema: ''
   description: Share Kubernetes Gateway API workload metadata between charms.
@@ -1897,7 +1897,7 @@ interfaces:
   docs: ''
   src: https://github.com/canonical/charmed-service-mesh-helpers
   kind: PyPI
-  rel_name: gateway-metadata
+  rel_name: gateway_metadata
   rel_url_charmhub: ''
   rel_url_schema: ''
   description: Deprecated in favour of ``charmlibs.interfaces.gateway_metadata``.
@@ -1923,7 +1923,7 @@ interfaces:
   kind: Charmhub
   rel_name: istio_metadata
   rel_url_charmhub: ''
-  rel_url_schema: ''
+  rel_url_schema: https://canonical.com/juju/docs/charmlibs/reference/interfaces/istio_metadata/v0/
   description: Deprecated in favour of ``charmlibs.interfaces.istio_metadata``.
   tags:
   - networking
@@ -1946,7 +1946,7 @@ interfaces:
   docs: https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/istio-ingress-route
   src: https://github.com/canonical/charmlibs/tree/main/interfaces/istio_ingress_route
   kind: PyPI
-  rel_name: istio-ingress-route
+  rel_name: istio_ingress_route
   rel_url_charmhub: ''
   rel_url_schema: ''
   description: Advanced ingress routing through the istio-ingress-k8s charm with multi-port
@@ -1960,7 +1960,7 @@ interfaces:
   docs: ''
   src: https://github.com/canonical/istio-ingress-k8s-operator
   kind: Charmhub
-  rel_name: istio-ingress-route
+  rel_name: istio_ingress_route
   rel_url_charmhub: ''
   rel_url_schema: ''
   description: Deprecated in favour of ``charmlibs.interfaces.istio_ingress_route``.
@@ -1979,3 +1979,72 @@ interfaces:
   description: Manage S3 (and Azure Blob Storage / GCS) credentials and metadata.
   tags:
   - data
+- name: charmlibs.interfaces.k8s_backup_target
+  status: recommended
+  url: https://pypi.org/project/charmlibs-interfaces-k8s-backup-target
+  docs: https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/k8s-backup-target
+  src: https://github.com/canonical/charmlibs/tree/main/interfaces/k8s_backup_target
+  kind: PyPI
+  rel_name: k8s_backup_target
+  rel_url_charmhub: https://charmhub.io/integrations/k8s_backup_target
+  rel_url_schema: https://canonical.com/juju/docs/charmlibs/reference/interfaces/k8s_backup_target/v0/
+  description: Specify Kubernetes backup requirements -- namespaces, resource types
+    and retention policies -- to a backup integrator charm.
+  tags:
+  - operations
+- name: charms.data_platform_libs.data_interfaces
+  status: ''
+  url: https://charmhub.io/data-platform-libs/libraries/data_interfaces
+  docs: ''
+  src: https://github.com/canonical/data-platform-libs
+  kind: Charmhub
+  rel_name: azure_service_principal
+  rel_url_charmhub: https://charmhub.io/integrations/azure_service_principal
+  rel_url_schema: https://canonical.com/juju/docs/charmlibs/reference/interfaces/azure_service_principal/v0/
+  description: Database charms from the Data Platform Team recommend using the generic
+    ``data_platform_libs.data_interfaces`` library to implement the interface.
+  tags:
+  - data
+  - identity-auth
+- name: charms.data_platform_libs.data_interfaces
+  status: ''
+  url: https://charmhub.io/data-platform-libs/libraries/data_interfaces
+  docs: ''
+  src: https://github.com/canonical/data-platform-libs
+  kind: Charmhub
+  rel_name: connect_client
+  rel_url_charmhub: https://charmhub.io/integrations/connect_client
+  rel_url_schema: https://canonical.com/juju/docs/charmlibs/reference/interfaces/connect_client/v0/
+  description: Database charms from the Data Platform Team recommend using the generic
+    ``data_platform_libs.data_interfaces`` library to implement the interface.
+  tags:
+  - data
+  - identity-auth
+- name: charms.data_platform_libs.data_interfaces
+  status: ''
+  url: https://charmhub.io/data-platform-libs/libraries/data_interfaces
+  docs: ''
+  src: https://github.com/canonical/data-platform-libs
+  kind: Charmhub
+  rel_name: kafka_client
+  rel_url_charmhub: https://charmhub.io/integrations/kafka_client
+  rel_url_schema: https://canonical.com/juju/docs/charmlibs/reference/interfaces/kafka_client/v0/
+  description: Database charms from the Data Platform Team recommend using the generic
+    ``data_platform_libs.data_interfaces`` library to implement the interface.
+  tags:
+  - data
+  - identity-auth
+- name: cosl
+  status: team
+  url: https://pypi.org/project/cosl/
+  docs: ''
+  src: https://github.com/canonical/cos-lib
+  kind: PyPI
+  rel_name: grafana_datasource_exchange
+  rel_url_charmhub: https://charmhub.io/integrations/grafana_datasource_exchange
+  rel_url_schema: https://canonical.com/juju/docs/charmlibs/reference/interfaces/grafana_datasource_exchange/v0/
+  description: Used internally by the Observability Charm Engineering Team. A dependency
+    (via ``PYDEPS``) of popular charm libs such as ``loki_push_api``.
+  tags:
+  - internal
+  - observability

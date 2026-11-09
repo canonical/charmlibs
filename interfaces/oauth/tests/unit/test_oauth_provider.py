@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 from os.path import join
 from typing import Any
 
@@ -206,6 +207,39 @@ def test_client_changed_event_emitted_when_client_config_changed(
     )
 
 
+def test_client_created_event_emitted_with_redirect_uri_list(
+    context: Context[OAuthProviderCharm],
+) -> None:
+    redirect_uris = ['https://oidc-client.com/callback', 'https://oidc-client.com/callback2']
+
+    requirer_data = {
+        'redirect_uri': json.dumps(redirect_uris),
+        'scope': 'openid email',
+        'grant_types': '["authorization_code"]',
+        'audience': '[]',
+        'token_endpoint_auth_method': 'client_secret_basic',
+    }
+
+    provider_data = {
+        'issuer_url': 'https://example.oidc.com',
+        'authorization_endpoint': 'https://example.oidc.com/oauth2/auth',
+        'token_endpoint': 'https://example.oidc.com/oauth2/token',
+        'introspection_endpoint': 'https://example.oidc.com/admin/oauth2/introspect',
+        'userinfo_endpoint': 'https://example.oidc.com/userinfo',
+        'jwks_endpoint': 'https://example.oidc.com/.well-known/jwks.json',
+        'scope': 'openid profile email phone',
+    }
+
+    relation = Relation('oauth', remote_app_data=requirer_data, local_app_data=provider_data)
+    state = create_state(leader=True, relations=[relation], containers=[])
+
+    context.run(context.on.relation_changed(relation), state)
+
+    event = next(e for e in context.emitted_events if isinstance(e, ClientCreatedEvent))
+    assert event.redirect_uri == redirect_uris
+    assert event.to_client_config().redirect_uris == redirect_uris
+
+
 @pytest.mark.xfail(
     reason='We no longer remove clients on relation removal, see https://github.com/canonical/hydra-operator/issues/268'
 )
@@ -259,6 +293,45 @@ def test_get_client_config(context: Context[OAuthProviderCharm]) -> None:
             audience=['app1'],
             token_endpoint_auth_method='client_secret_basic',
         )
+
+
+def test_get_client_config_with_redirect_uri_list(context: Context[OAuthProviderCharm]) -> None:
+    redirect_uris = ['https://oidc-client.com/callback', 'https://oidc-client.com/callback2']
+    requirer_data = {
+        'redirect_uri': json.dumps(redirect_uris),
+        'scope': 'openid email',
+        'grant_types': '["authorization_code"]',
+        'audience': '[]',
+        'token_endpoint_auth_method': 'client_secret_basic',
+    }
+    relation = Relation('oauth', remote_app_data=requirer_data)
+    state = create_state(leader=True, relations=[relation])
+
+    with context(context.on.relation_changed(relation), state) as mgr:
+        mgr.run()
+        config = mgr.charm.get_client_config(relation.id)
+        assert config is not None
+        assert config.redirect_uri == redirect_uris
+        assert config.redirect_uris == redirect_uris
+
+
+def test_get_client_config_with_invalid_redirect_uri_list(
+    context: Context[OAuthProviderCharm],
+) -> None:
+    requirer_data = {
+        'redirect_uri': '["https://oidc-client.com/callback", 1]',
+        'scope': 'openid email',
+        'grant_types': '["authorization_code"]',
+        'audience': '[]',
+        'token_endpoint_auth_method': 'client_secret_basic',
+    }
+    relation = Relation('oauth', remote_app_data=requirer_data)
+    state = create_state(leader=True, relations=[relation])
+
+    with context(context.on.relation_changed(relation), state) as mgr:
+        mgr.run()
+        with pytest.raises(DataValidationError):
+            mgr.charm.get_client_config(relation.id)
 
 
 def test_get_client_config_invalid_data(context: Context[OAuthProviderCharm]) -> None:

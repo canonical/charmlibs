@@ -1,6 +1,8 @@
 set working-directory := '.docs'
 
 build_dir := env('READTHEDOCS_OUTPUT', '_build')
+# read by conf.py to use the intersphinx inventories downloaded by the `_inventories` recipe
+export CHARMLIBS_DOCS_INVENTORY_DIR := build_dir / '_inventories'
 
 # this is the first recipe in the file, so it will run if just is called without a recipe
 [doc("""
@@ -22,6 +24,35 @@ _package_docs:
     ./scripts/package_docs_preprocessor.py
 
 [doc("""
+Download the intersphinx inventories once, for conf.py to read from CHARMLIBS_DOCS_INVENTORY_DIR.
+
+Otherwise every parallel package build fetches them at the same time, which gets connections reset.
+Fails if any inventory can't be downloaded, rather than letting each package build fail separately.
+""")]
+_inventories:
+    #!/usr/bin/env -S uv run --script --no-project
+    import os, pathlib, runpy, sys, time, urllib.request
+    inventory_dir = pathlib.Path(os.environ['CHARMLIBS_DOCS_INVENTORY_DIR'])
+    inventory_dir.mkdir(parents=True, exist_ok=True)
+    conf = runpy.run_path('conf.py', init_globals={'tags': set()})
+    attempts = 3
+    failed = []
+    for name, (url, _) in conf['intersphinx_mapping'].items():
+        for attempt in range(1, attempts + 1):
+            try:
+                with urllib.request.urlopen(f'{url}/objects.inv', timeout=30) as response:
+                    (inventory_dir / f'{name}.inv').write_bytes(response.read())
+                break
+            except OSError as e:
+                print(f'Failed to download {name} inventory (attempt {attempt}/{attempts}): {e}', file=sys.stderr)
+                if attempt < attempts:
+                    time.sleep(2**attempt)
+        else:
+            failed.append(name)
+    if failed:
+        sys.exit(f'Failed to download intersphinx inventories: {", ".join(failed)}')
+
+[doc("""
 Run html builder once per package, with its deps installed, setting the package argument and suppressing reference warnings.
 
 This allows us to generate the reference docs for that package with autodoc, saving the doctrees and reference information
@@ -34,7 +65,7 @@ recipe, injecting their own automodule in-memory during source-read (see
 builds don't race on the source tree. Each build's captured stdout/stderr is printed atomically
 after it finishes.
 """)]
-_packages *packages: _package_docs
+_packages *packages: _package_docs _inventories
     #!/usr/bin/env -S uv run --script --no-project
     import concurrent.futures, json, os, pathlib, subprocess, sys
     ROOT = pathlib.Path('{{justfile_directory()}}')

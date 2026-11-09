@@ -39,6 +39,7 @@ class DummyTLSCertificatesRequirerCharm(CharmBase):
                     self.on.leader_elected,
                     self.on.certificates_relation_joined,
                 ],
+                **self._get_key_kwargs(),
             )
         else:
             self._certificate_request = self._get_certificate_request()
@@ -48,6 +49,7 @@ class DummyTLSCertificatesRequirerCharm(CharmBase):
                 certificate_requests=[self._certificate_request],
                 mode=mode,
                 refresh_events=[self.on.config_changed],
+                **self._get_key_kwargs(),
             )
         self.framework.observe(self.on.collect_unit_status, self._on_collect_unit_status)
         self.framework.observe(self.on.get_certificate_action, self._on_get_certificate_action)
@@ -180,6 +182,16 @@ class DummyTLSCertificatesRequirerCharm(CharmBase):
             else:
                 return Mode.UNIT
         return Mode.UNIT
+
+    def _get_key_kwargs(self) -> dict[str, Any]:
+        # Only pass the key options when configured, so this charm still works
+        # with published library versions that predate them.
+        kwargs: dict[str, Any] = {}
+        if key_algorithm := self.model.config.get("key_algorithm"):
+            kwargs["key_algorithm"] = key_algorithm
+        if key_size := self.model.config.get("key_size"):
+            kwargs["key_size"] = key_size
+        return kwargs
 
     def _get_certificate_request(self) -> CertificateRequestAttributes:
         return CertificateRequestAttributes(

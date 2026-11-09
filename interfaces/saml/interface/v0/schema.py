@@ -2,11 +2,8 @@
 # See LICENSE file for licensing details.
 """This file defines the schema for the provider side of the saml interface.
 
-It exposes one interfaces.schema_base.DataBagSchema subclass called:
-- ProviderSchema
-
 Examples:
-    ProviderSchema:
+    Provider:
         unit: <empty>
         app: {"saml":
                  {
@@ -38,11 +35,10 @@ Examples:
              }
 """
 
-from interface_tester.schema_base import DataBagSchema
 from pydantic import AnyHttpUrl, BaseModel, Field
 
 
-class SamlProviderData(BaseModel):
+class ProviderAppData(BaseModel):
     metadata_url: AnyHttpUrl | None = Field(
         description="URL to the IdP's metadata.",
         title="Metadata URL",
@@ -124,11 +120,6 @@ class SamlProviderData(BaseModel):
     )
 
 
-class ProviderSchema(DataBagSchema):
-    """Provider schema for SAML."""
-
-    app: SamlProviderData
-
-
-class RequirerSchema(DataBagSchema):
-    """Requirer schema for SAML."""
+ProviderUnitData = None
+RequirerAppData = None
+RequirerUnitData = None

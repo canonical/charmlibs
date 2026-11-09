@@ -1,0 +1,14 @@
+# common pyproject.toml file symlinked by these charms
+
+[project]
+name = "integration-test-charm"
+version = "0.0.0.dev0"
+description = "Charm for integration tests."
+requires-python = ">={{ cookiecutter.min_python_version }}"
+dependencies = [
+    "ops==3.*",
+    "{{ cookiecutter.__dist_pkg }}",
+]
+
+[tool.uv.sources]
+"{{ cookiecutter.__dist_pkg }}" = { path = "library", editable = true }
