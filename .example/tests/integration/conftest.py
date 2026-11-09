@@ -19,7 +19,6 @@ import os
 import pathlib
 import sys
 import time
-import typing
 from collections.abc import Iterator
 
 import jubilant
@@ -31,15 +30,6 @@ logger = logging.getLogger(__name__)
 PACKED = pathlib.Path(__file__).parent / '.packed'
 
 
-def pytest_addoption(parser: pytest.OptionGroup):
-    parser.addoption(
-        '--keep-models',
-        action='store_true',
-        default=False,
-        help='keep temporarily-created models',
-    )
-
-
 @pytest.fixture(scope='session')
 def charm() -> str:
     """Return the app name, as deployed by the juju fixture."""
@@ -47,25 +37,26 @@ def charm() -> str:
 
 
 @pytest.fixture(scope='module')
-def juju(request: pytest.FixtureRequest, charm: str) -> Iterator[jubilant.Juju]:
-    """Pytest fixture that wraps :meth:`jubilant.with_model`.
+def juju(
+    request: pytest.FixtureRequest, juju: jubilant.Juju, charm: str
+) -> Iterator[jubilant.Juju]:
+    """Deploy the test charm into pytest-jubilant's temporary model.
 
-    This adds command line parameter ``--keep-models`` (see help for details).
+    pytest-jubilant creates the model and tears it down afterwards. See its
+    ``--no-juju-teardown`` and ``--juju-dump-logs`` options.
     """
-    keep_models = typing.cast('bool', request.config.getoption('--keep-models'))
-    with jubilant.temp_model(keep=keep_models) as juju:
-        juju.model_config({'logging-config': '<root>=INFO;unit=DEBUG'})
-        substrate = os.environ['CHARMLIBS_SUBSTRATE']
-        # tag = os.environ.get('CHARMLIBS_TAG', '')  # get the tag if needed
-        path = PACKED / f'{substrate}.charm'  # the charm ID is the substrate
-        if substrate == 'k8s':
-            juju.deploy(path, app=charm, resources={'workload': 'ubuntu:latest'})
-        else:
-            juju.deploy(path, app=charm)
-        juju.wait(jubilant.all_active)
-        yield juju
-        if request.session.testsfailed:
-            logger.info('Collecting Juju logs ...')
-            time.sleep(0.5)  # Wait for Juju to process logs.
-            log = juju.debug_log(limit=1000)
-            print(log, end='', file=sys.stderr)
+    juju.model_config({'logging-config': '<root>=INFO;unit=DEBUG'})
+    substrate = os.environ['CHARMLIBS_SUBSTRATE']
+    # tag = os.environ.get('CHARMLIBS_TAG', '')  # get the tag if needed
+    path = PACKED / f'{substrate}.charm'  # the charm ID is the substrate
+    if substrate == 'k8s':
+        juju.deploy(path, app=charm, resources={'workload': 'ubuntu:latest'})
+    else:
+        juju.deploy(path, app=charm)
+    juju.wait(jubilant.all_active)
+    yield juju
+    if request.session.testsfailed:
+        logger.info('Collecting Juju logs ...')
+        time.sleep(0.5)  # Wait for Juju to process logs.
+        log = juju.debug_log(limit=1000)
+        print(log, end='', file=sys.stderr)

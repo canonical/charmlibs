@@ -25,34 +25,26 @@ if typing.TYPE_CHECKING:
     from collections.abc import Iterator
 
 
-def pytest_addoption(parser: pytest.OptionGroup):
-    parser.addoption(
-        '--keep-models',
-        action='store_true',
-        default=False,
-        help='keep temporarily-created models',
-    )
-
-
 @pytest.fixture(scope='session')
 def charm() -> str:
     return os.environ['CHARMLIBS_SUBSTRATE']
 
 
 @pytest.fixture(scope='module')
-def juju(request: pytest.FixtureRequest, charm: str) -> Iterator[jubilant.Juju]:
-    """Pytest fixture that wraps :meth:`jubilant.with_model`.
+def juju(
+    request: pytest.FixtureRequest, juju: jubilant.Juju, charm: str
+) -> Iterator[jubilant.Juju]:
+    """Deploy into pytest-jubilant's temporary model.
 
-    This adds command line parameter ``--keep-models`` (see help for details).
+    pytest-jubilant creates the model and tears it down afterwards. See its
+    ``--no-juju-teardown`` and ``--juju-dump-logs`` options.
     """
-    keep_models = typing.cast('bool', request.config.getoption('--keep-models'))
-    with jubilant.temp_model(keep=keep_models) as juju:
-        _deploy(juju, charm)
-        juju.wait(jubilant.all_active)
-        yield juju
-        if request.session.testsfailed:
-            log = juju.debug_log(limit=1000)
-            print(log, end='')
+    _deploy(juju, charm)
+    juju.wait(jubilant.all_active)
+    yield juju
+    if request.session.testsfailed:
+        log = juju.debug_log(limit=1000)
+        print(log, end='')
 
 
 def _deploy(juju: jubilant.Juju, charm: str) -> None:

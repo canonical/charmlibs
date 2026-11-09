@@ -261,5 +261,5 @@ jobs:
         with:
           name: ${{ needs.init.outputs.package-name }}-juju-debug-logs-${{ matrix.substrate }}-${{ matrix.tag }}
           path: ${{ inputs.package }}/.logs/
-          if-no-files-found: ignore  # only packages using pytest-jubilant's juju_factory dump here
+          if-no-files-found: warn  # every package's integration tests use pytest-jubilant, so expect a dump
           include-hidden-files: true  # .logs starts with a dot

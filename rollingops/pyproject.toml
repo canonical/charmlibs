@@ -35,7 +35,7 @@ functional = [  # installed for `just functional rollingops`
 ]
 integration = [  # installed for `just integration rollingops`
     "jubilant",
-    "pytest-jubilant",
+    "pytest-jubilant>=2",
     "tenacity",
     "charmlibs-apt",
 ]

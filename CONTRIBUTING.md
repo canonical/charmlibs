@@ -62,6 +62,8 @@ just add pathops 'pydantic>=2'
 
 - Integration tests involve packing real test charms and deploying them on a Juju cloud. Pack first with `just pack-k8s <package>` or `just pack-machine <package>`, then run `just integration-k8s <package>` or `just integration-machine <package>`.
 
+  Integration tests use [pytest-jubilant](https://github.com/canonical/pytest-jubilant), so add `pytest-jubilant` to the package's `integration` dependency group. Its `juju` fixture creates a temporary model for each test module and tears it down afterwards. To deploy your test charms, override `juju` in `tests/integration/conftest.py` and request the original `juju` fixture as an argument, as the template does. Don't create models with `jubilant.temp_model` directly: CI passes `--juju-dump-logs` and uploads the `juju debug-log` for each model that pytest-jubilant creates. Pass `--no-juju-teardown` to keep the models after the tests finish.
+
 Read more: [the different types of tests](https://canonical.com/juju/docs/charmlibs/explanation/charmlibs-tests/).
 
 # Pull requests
