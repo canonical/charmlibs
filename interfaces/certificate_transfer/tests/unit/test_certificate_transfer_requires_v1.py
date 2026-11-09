@@ -1,6 +1,7 @@
 # Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+import dataclasses
 import json
 from typing import Any
 
@@ -12,6 +13,10 @@ from charmlibs.interfaces.certificate_transfer import (
     CertificatesAvailableEvent,
     CertificatesRemovedEvent,
     CertificateTransferRequires,
+)
+
+STORED_STATE_OWNER = (
+    "DummyCertificateTransferRequirerCharm/CertificateTransferRequires[certificate_transfer_v1]"
 )
 
 
@@ -165,6 +170,76 @@ class TestCertificateTransferRequiresV1:
         assert isinstance(self.ctx.emitted_events[1], CertificatesAvailableEvent)
         assert self.ctx.emitted_events[1].certificates == {"cert1"}
         assert self.ctx.emitted_events[1].relation_id == relation.id
+
+    def test_given_empty_v1_app_databag_and_v0_unit_data_when_read_repeatedly_then_empty_set_is_returned(
+        self,
+    ):
+        relation = scenario.Relation(
+            endpoint="certificate_transfer",
+            interface="certificate_transfer",
+            local_app_data={"version": "1"},
+            remote_app_data={"version": "1", "certificates": json.dumps([])},
+            remote_units_data={
+                0: {
+                    "certificate": json.dumps("cert1"),
+                    "ca": json.dumps("cert1"),
+                    "chain": json.dumps(["cert1"]),
+                    "version": json.dumps(0),
+                }
+            },
+        )
+        state_in = scenario.State(leader=True, relations=[relation])
+
+        with self.ctx(
+            self.ctx.on.action("is-ready", params={"relation-id": str(relation.id)}),
+            state_in,
+        ) as manager:
+            charm = manager.charm
+            first_read = charm.certificate_transfer.get_all_certificates(relation.id)
+            second_read = charm.certificate_transfer.get_all_certificates(relation.id)
+
+        assert first_read == set()
+        assert second_read == set()
+
+    def test_given_v0_unit_data_when_read_repeatedly_then_relation_units_are_not_mutated(
+        self,
+    ):
+        relation = scenario.Relation(
+            endpoint="certificate_transfer",
+            interface="certificate_transfer",
+            local_app_data={"version": "1"},
+            remote_units_data={
+                0: {
+                    "certificate": json.dumps("cert1"),
+                    "ca": json.dumps("cert1"),
+                    "chain": json.dumps(["cert1"]),
+                    "version": json.dumps(0),
+                },
+                1: {
+                    "certificate": json.dumps("cert2"),
+                    "ca": json.dumps("cert2"),
+                    "chain": json.dumps(["cert2"]),
+                    "version": json.dumps(0),
+                },
+            },
+        )
+        state_in = scenario.State(leader=True, relations=[relation])
+
+        with self.ctx(
+            self.ctx.on.action("is-ready", params={"relation-id": str(relation.id)}),
+            state_in,
+        ) as manager:
+            charm = manager.charm
+            remote_relation = charm.model.get_relation("certificate_transfer", relation.id)
+            assert remote_relation is not None
+            units_before = set(remote_relation.units)
+            first_read = charm.certificate_transfer.get_all_certificates(relation.id)
+            second_read = charm.certificate_transfer.get_all_certificates(relation.id)
+
+            assert set(remote_relation.units) == units_before
+
+        assert first_read == second_read
+        assert first_read in ({"cert1"}, {"cert2"})
 
     def test_given_none_of_the_expected_keys_in_relation_data_when_relation_changed_then_certificate_available_event_emitted_with_empty_cert(
         self,
@@ -334,3 +409,143 @@ the databags except using the public methods in the provider library and use ver
             result = charm.certificate_transfer.get_all_certificates_by_relation()
 
         assert result == {}
+
+    def _run_relation_changed(
+        self, relation: scenario.Relation, state_in: scenario.State
+    ) -> tuple[scenario.State, list[CertificatesAvailableEvent]]:
+        """Run relation-changed, returning the output state and the newly emitted events."""
+        already_emitted = len(self.ctx.emitted_events)
+        state_out = self.ctx.run(self.ctx.on.relation_changed(relation), state_in)
+        events = [
+            e
+            for e in self.ctx.emitted_events[already_emitted:]
+            if isinstance(e, CertificatesAvailableEvent)
+        ]
+        return state_out, events
+
+    def test_given_unchanged_certificates_when_relation_changed_again_then_event_not_emitted(
+        self,
+    ):
+        relation = scenario.Relation(
+            endpoint="certificate_transfer",
+            interface="certificate_transfer",
+            local_app_data={"version": "1"},
+            remote_app_data={"certificates": json.dumps(["cert1", "cert2"])},
+        )
+        state_out, events = self._run_relation_changed(
+            relation, scenario.State(relations=[relation])
+        )
+        assert len(events) == 1
+
+        _, events = self._run_relation_changed(relation, state_out)
+
+        assert events == []
+
+    def test_given_reordered_certificates_when_relation_changed_then_event_not_emitted(self):
+        relation = scenario.Relation(
+            endpoint="certificate_transfer",
+            interface="certificate_transfer",
+            local_app_data={"version": "1"},
+            remote_app_data={"certificates": json.dumps(["cert1", "cert2", "cert3"])},
+        )
+        state_out, events = self._run_relation_changed(
+            relation, scenario.State(relations=[relation])
+        )
+        assert len(events) == 1
+
+        reordered = dataclasses.replace(
+            relation, remote_app_data={"certificates": json.dumps(["cert3", "cert1", "cert2"])}
+        )
+        _, events = self._run_relation_changed(
+            reordered, dataclasses.replace(state_out, relations=[reordered])
+        )
+
+        assert events == []
+
+    def test_given_changed_certificates_when_relation_changed_then_event_emitted(self):
+        relation = scenario.Relation(
+            endpoint="certificate_transfer",
+            interface="certificate_transfer",
+            local_app_data={"version": "1"},
+            remote_app_data={"certificates": json.dumps(["cert1"])},
+        )
+        state_out, events = self._run_relation_changed(
+            relation, scenario.State(relations=[relation])
+        )
+        assert len(events) == 1
+
+        updated = dataclasses.replace(
+            relation, remote_app_data={"certificates": json.dumps(["cert1", "cert2"])}
+        )
+        _, events = self._run_relation_changed(
+            updated, dataclasses.replace(state_out, relations=[updated])
+        )
+
+        assert len(events) == 1
+        assert events[0].certificates == {"cert1", "cert2"}
+        assert events[0].relation_id == relation.id
+
+    def test_given_certificates_removed_then_restored_when_relation_changed_then_event_emitted(
+        self,
+    ):
+        relation = scenario.Relation(
+            endpoint="certificate_transfer",
+            interface="certificate_transfer",
+            local_app_data={"version": "1"},
+            remote_app_data={"certificates": json.dumps(["cert1"])},
+        )
+        state_out, _ = self._run_relation_changed(relation, scenario.State(relations=[relation]))
+        emptied = dataclasses.replace(relation, remote_app_data={"certificates": json.dumps([])})
+        state_out, events = self._run_relation_changed(
+            emptied, dataclasses.replace(state_out, relations=[emptied])
+        )
+        assert len(events) == 1
+        assert events[0].certificates == set()
+
+        _, events = self._run_relation_changed(
+            relation, dataclasses.replace(state_out, relations=[relation])
+        )
+
+        assert len(events) == 1
+        assert events[0].certificates == {"cert1"}
+
+    def test_given_multiple_relations_when_each_relation_changed_then_hashes_tracked_per_relation(
+        self,
+    ):
+        relation_1 = scenario.Relation(
+            endpoint="certificate_transfer",
+            interface="certificate_transfer",
+            local_app_data={"version": "1"},
+            remote_app_data={"certificates": json.dumps(["cert1"])},
+        )
+        relation_2 = scenario.Relation(
+            endpoint="certificate_transfer",
+            interface="certificate_transfer",
+            local_app_data={"version": "1"},
+            remote_app_data={"certificates": json.dumps(["cert1"])},
+        )
+        state_out, events = self._run_relation_changed(
+            relation_1, scenario.State(relations=[relation_1, relation_2])
+        )
+        assert len(events) == 1
+
+        _, events = self._run_relation_changed(relation_2, state_out)
+
+        assert len(events) == 1
+        assert events[0].relation_id == relation_2.id
+
+    def test_given_relation_broken_then_stored_hash_is_removed(self):
+        relation = scenario.Relation(
+            endpoint="certificate_transfer",
+            interface="certificate_transfer",
+            local_app_data={"version": "1"},
+            remote_app_data={"certificates": json.dumps(["cert1"])},
+        )
+        state_out, _ = self._run_relation_changed(relation, scenario.State(relations=[relation]))
+        stored = state_out.get_stored_state("_stored", owner_path=STORED_STATE_OWNER)
+        assert f"certificate_transfer:{relation.id}" in stored.content["certificate_hashes"]
+
+        state_out = self.ctx.run(self.ctx.on.relation_broken(relation), state_out)
+
+        stored = state_out.get_stored_state("_stored", owner_path=STORED_STATE_OWNER)
+        assert f"certificate_transfer:{relation.id}" not in stored.content["certificate_hashes"]

@@ -14,7 +14,7 @@
 
 """Manage TLS certificates using the ``tls-certificates`` interface (V1).
 
-This library implements the Requirer and Provider roles for the ``k8s_backup_target`` relation,
+This library implements the Requirer and Provider roles for the ``tls-certificates`` relation,
 in the :class:`TLSCertificatesRequiresV4` and :class:`TLSCertificatesProvidesV4` classes.
 
 Read more:
@@ -32,9 +32,12 @@ from ._tls_certificates import (
     CertificateError,
     CertificateRequestAttributes,
     CertificateRequestErrorCode,
+    CertificateRequestStatus,
     CertificateSigningRequest,
     CertificatesRequirerCharmEvents,
+    CertificateStatus,
     DataValidationError,
+    KeyAlgorithm,
     Mode,
     PrivateKey,
     ProviderCapabilities,
@@ -60,9 +63,12 @@ __all__ = [
     "CertificateError",
     "CertificateRequestAttributes",
     "CertificateRequestErrorCode",
+    "CertificateRequestStatus",
     "CertificateSigningRequest",
+    "CertificateStatus",
     "CertificatesRequirerCharmEvents",
     "DataValidationError",
+    "KeyAlgorithm",
     "Mode",
     "PrivateKey",
     "ProviderCapabilities",

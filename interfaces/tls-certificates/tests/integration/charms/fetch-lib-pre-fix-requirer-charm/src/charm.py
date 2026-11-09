@@ -1,0 +1,1 @@
+../../common/requirer-fetch-lib-charm.py

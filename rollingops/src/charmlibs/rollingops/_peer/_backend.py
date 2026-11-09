@@ -389,7 +389,9 @@ class _PeerRollingOpsBackend(Object):  # pyright: ignore[reportUnusedClass]
             operations.finish(OperationResult.RELEASE)
             return
         logger.info(
-            'Executing callback_id=%s, attempt=%s', operation.callback_id, operation.attempt
+            'Executing callback_id=%s, attempt=%s on peer backend',
+            operation.callback_id,
+            operation.attempt,
         )
         try:
             result = callback(**operation.kwargs)
@@ -415,6 +417,10 @@ class _PeerRollingOpsBackend(Object):  # pyright: ignore[reportUnusedClass]
         match outcome.status:
             case _RunWithLockStatus.NOT_GRANTED:
                 logger.info('Skipping mirror: etcd lock was not granted.')
+                return
+
+            case _RunWithLockStatus.OPERATION_PENDING:
+                logger.info('Skipping mirror: no operation is in progress yet.')
                 return
 
             case _RunWithLockStatus.NO_OPERATION:

@@ -1,16 +1,29 @@
-"""This file defines the schemas for the provider and requirer sides of the mongodb_client interface.
+"""This file defines the schemas for the provider and requirer sides of the mongodb_client interface."""
 
-It must expose two interfaces.schema_base.DataBagSchema subclasses called:
-- ProviderSchema
-- RequirerSchema
-"""
+import json
+from typing import Any
 
-from interface_tester.schema_base import DataBagSchema
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
 
 
-class MongoDBProviderData(BaseModel):
+class _BareStringDatabag(BaseModel):
+    """Base class for databag models that don't strictly JSON encode all entries."""
+
+    @staticmethod
+    def __juju_decoder__(value: str) -> str:
+        """Pass Juju's string through unmodified to be decoded by individual field validators."""
+        return value
+
+    @staticmethod
+    def __juju_encoder__(value: str | None) -> str:
+        """Convert `None` to "", erasing the value; Ops will error on a non-string."""
+        return "" if value is None else value
+
+
+class ProviderAppData(_BareStringDatabag):
     """The databag for the provider side of this interface."""
+
+    model_config = ConfigDict(strict=True, populate_by_name=True)
 
     database: str = Field(
         description="The database name delivered by the provider. Might not be the same as requested by the requirer",
@@ -74,8 +87,10 @@ class MongoDBProviderData(BaseModel):
     )
 
 
-class MongoDBRequirerData(BaseModel):
+class RequirerAppData(_BareStringDatabag):
     """The databag for the requirer side of this interface."""
+
+    model_config = ConfigDict(strict=True, populate_by_name=True)
 
     database: str = Field(
         description="The database name requested by the requirer",
@@ -85,7 +100,7 @@ class MongoDBRequirerData(BaseModel):
 
     requested_secrets: list[str] = Field(
         alias="requested-secrets",
-        description="Any provider field which should be transferred as Juju Secret",
+        description="Any provider field which should be transferred as Juju Secret. A JSON array on the wire.",
         examples=[["username", "password"]],
         title="Requested secrets",
     )
@@ -124,14 +139,17 @@ class MongoDBRequirerData(BaseModel):
         title="Entity permissions",
     )
 
+    @field_validator("requested_secrets", mode="before")
+    @classmethod
+    def _load_json(cls, value: Any) -> Any:
+        if not isinstance(value, str):
+            return value  # __init__ argument was already deserialized.
+        return json.loads(value)
 
-class ProviderSchema(DataBagSchema):
-    """The schema for the provider side of this interface."""
+    @field_serializer("requested_secrets")
+    def _dump_json(self, value: object) -> str:
+        return json.dumps(value)
 
-    app: MongoDBProviderData
 
-
-class RequirerSchema(DataBagSchema):
-    """The schema for the requirer side of this interface."""
-
-    app: MongoDBRequirerData
+ProviderUnitData = None
+RequirerUnitData = None

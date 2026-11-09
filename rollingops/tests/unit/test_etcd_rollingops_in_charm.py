@@ -40,6 +40,8 @@ from charmlibs.rollingops._common._models import (
     RollingOpsStatus,
     _Operation,
     _OperationQueue,
+    _RunWithLockOutcome,
+    _RunWithLockStatus,
 )
 from charmlibs.rollingops._etcd._models import SharedCertificate
 from charmlibs.rollingops._etcd._relations import CERT_SECRET_FIELD
@@ -332,6 +334,74 @@ def test_state_falls_back_to_peer_if_etcd_status_fails(ctx: Context[RollingOpsCh
             rolling_state = mgr.charm.restart_manager.state
             assert rolling_state.status == RollingOpsStatus.WAITING
             assert rolling_state.processing_backend == ProcessingBackend.PEER
+
+
+def _etcd_managed_peer_relation() -> PeerRelation:
+    return PeerRelation(
+        endpoint='restart',
+        interface='rollingops',
+        local_app_data={},
+        local_unit_data={
+            'state': 'request',
+            'operations': _OperationQueue([
+                _Operation.create('restart', {'delay': 1}, max_retry=2)
+            ]).to_string(),
+            'executed_at': '',
+            'processing_backend': 'etcd',
+            'etcd_cleanup_needed': 'false',
+        },
+    )
+
+
+def _run_update_status_with_outcome(
+    ctx: Context[RollingOpsCharm], peer_rel: PeerRelation, status: _RunWithLockStatus
+) -> State:
+    state = State(leader=False, relations={peer_rel})
+
+    with (
+        patch(
+            'charmlibs.rollingops._etcd._backend._EtcdRollingOpsBackend.is_available',
+            return_value=True,
+        ),
+        patch(
+            'charmlibs.rollingops._etcd._backend._EtcdRollingOpsBackend.is_processing',
+            return_value=True,
+        ),
+        patch(
+            'charmlibs.rollingops._etcd._backend._EtcdRollingOpsBackend._on_run_with_lock',
+            return_value=_RunWithLockOutcome(status=status),
+        ),
+    ):
+        return ctx.run(ctx.on.update_status(), state)
+
+
+def test_no_operation_in_progress_yet_does_not_fall_back_to_peer(ctx: Context[RollingOpsCharm]):
+    """A hook that runs while the worker is between operations must not fall back.
+
+    The etcd worker requeues a retried operation before claiming it again, and a
+    second hook can run in that window (or after another hook already executed
+    the claimed operation). Finding an empty in-progress queue then is normal.
+    """
+    peer_rel = _etcd_managed_peer_relation()
+    state_out = _run_update_status_with_outcome(
+        ctx, peer_rel, _RunWithLockStatus.OPERATION_PENDING
+    )
+
+    assert (
+        state_out.get_relation(peer_rel.id).local_unit_data['processing_backend']
+        == ProcessingBackend.ETCD
+    )
+
+
+def test_no_etcd_operation_at_all_falls_back_to_peer(ctx: Context[RollingOpsCharm]):
+    """etcd having no work while peer still does is a genuine divergence."""
+    peer_rel = _etcd_managed_peer_relation()
+    state_out = _run_update_status_with_outcome(ctx, peer_rel, _RunWithLockStatus.NO_OPERATION)
+
+    assert (
+        state_out.get_relation(peer_rel.id).local_unit_data['processing_backend']
+        == ProcessingBackend.PEER
+    )
 
 
 def test_is_waiting_returns_true_when_matching_operation_exists(ctx: Context[RollingOpsCharm]):

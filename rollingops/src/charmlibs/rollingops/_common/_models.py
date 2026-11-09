@@ -93,6 +93,15 @@ class _RunWithLockStatus(_StrEnum):
 
     NOT_GRANTED = 'not_granted'
     NO_OPERATION = 'no_operation'
+    """The lock is held but the backend has no work at all for this unit."""
+    OPERATION_PENDING = 'operation_pending'
+    """The lock is held and work is queued, but nothing is in progress yet.
+
+    This is a normal transient state: the worker requeues a retried operation
+    before claiming it again, and a second hook (for example ``update-status``)
+    can run in that window or after another hook already executed the claimed
+    operation.
+    """
     MISSING_CALLBACK = 'missing_callback'
     EXECUTED = 'executed'
     EXECUTED_NOT_COMMITTED = 'executed_not_committed'

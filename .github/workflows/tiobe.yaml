@@ -13,12 +13,12 @@ jobs:
   TICS:
     runs-on: [self-hosted, reactive, amd64, tiobe, noble]
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990  # v8.3.2
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e  # v10.3.2
 
       # We could store per-package coverage from the regular CI runs and merge
       # them here, but this is cheap to do fresh and keeps the TICS run
@@ -61,7 +61,7 @@ jobs:
           pip install flake8 pylint -r requirements.txt --break-system-packages
 
       - name: TICS GitHub Action
-        uses: tiobe/tics-github-action@333078bc527399e5916a166bd1a3a788be5a01a9  # v3.12.0
+        uses: tiobe/tics-github-action@48afe561ae55edd1e1ec484505dba636e90ba0a6  # v4.1.0
         with:
           mode: qserver
           viewerUrl: https://canonical.tiobe.com/tiobeweb/TICS/api/cfg?name=default

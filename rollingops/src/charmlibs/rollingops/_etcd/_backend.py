@@ -103,6 +103,8 @@ class _EtcdRollingOpsBackend(Object):  # pyright: ignore[reportUnusedClass]
             peer_relation_name=peer_relation_name,
             base_dir=self._base_dir,
         )
+        # Must happen before constructing EtcdRequiresV1 below
+        self.shared_certificates.create_and_share_certificate()
 
         self.etcd = EtcdRequiresV1(
             charm,
@@ -111,6 +113,10 @@ class _EtcdRollingOpsBackend(Object):  # pyright: ignore[reportUnusedClass]
             shared_certificates=self.shared_certificates,
             base_dir=self._base_dir,
         )
+        # If the etcd relation already existed before the cluster_id became available,
+        # the relation-created event that would publish the request has already fired
+        # and been missed. Ensure the request still gets published for that existing relation
+        self.etcd.ensure_request_published()
         self._async_lock = EtcdLock(
             lock_key=self.keys.lock_key,
             owner=owner,
@@ -155,7 +161,8 @@ class _EtcdRollingOpsBackend(Object):  # pyright: ignore[reportUnusedClass]
             return False
         try:
             self.etcdctl.ensure_initialized()
-        except Exception:
+        except Exception as e:
+            logger.debug('etcd backend unavailable: %s', e)
             return False
         return True
 
@@ -280,6 +287,12 @@ class _EtcdRollingOpsBackend(Object):  # pyright: ignore[reportUnusedClass]
             return _RunWithLockOutcome(status=_RunWithLockStatus.NOT_GRANTED)
 
         if not (operation := self.operations_store.peek_current()):
+            if self.operations_store.has_queued_work():
+                logger.info(
+                    'Lock granted but no operation is in progress yet. '
+                    'The worker will dispatch again once it claims the next operation.'
+                )
+                return _RunWithLockOutcome(status=_RunWithLockStatus.OPERATION_PENDING)
             logger.info('Lock granted but there is no operation to run.')
             return _RunWithLockOutcome(status=_RunWithLockStatus.NO_OPERATION)
 
@@ -295,7 +308,9 @@ class _EtcdRollingOpsBackend(Object):  # pyright: ignore[reportUnusedClass]
                 result=OperationResult.RELEASE,
             )
         logger.info(
-            'Executing callback_id=%s, attempt=%s', operation.callback_id, operation.attempt
+            'Executing callback_id=%s, attempt=%s on etcd backend',
+            operation.callback_id,
+            operation.attempt,
         )
 
         try:
