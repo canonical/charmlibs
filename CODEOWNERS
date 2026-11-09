@@ -274,7 +274,7 @@
 /interfaces/service_mesh @canonical/service-mesh
 
 # /interfaces/smtp/
-/interfaces/smtp/ @canonical/platform-engineering
+/interfaces/smtp/ @canonical/platform-engineering-emea 
 
 # /interfaces/tempo_cluster/
 /interfaces/tempo_cluster/interface/ @canonical/tracing-and-profiling
