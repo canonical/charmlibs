@@ -1,17 +1,11 @@
-"""This file defines the schemas for the provider and requirer sides of this relation interface.
-
-It must expose two interfaces.schema_base.DataBagSchema subclasses called:
-- ProviderSchema
-- RequirerSchema
-"""
+"""This file defines the schemas for the provider and requirer sides of this relation interface."""
 
 from collections.abc import Mapping
 
-from interface_tester.schema_base import DataBagSchema
-from pydantic import BaseModel, Field, Json
+from pydantic import BaseModel, Field
 
 
-class VaultKvProviderSchema(BaseModel):
+class ProviderAppData(BaseModel):
     vault_url: str = Field(description="The URL of the Vault server to connect to.")
     mount: str = Field(
         description=(
@@ -22,7 +16,7 @@ class VaultKvProviderSchema(BaseModel):
     ca_certificate: str = Field(
         description="The CA certificate to use when validating the Vault server's certificate."
     )
-    credentials: Json[Mapping[str, str]] = Field(
+    credentials: Mapping[str, str] = Field(
         description=(
             "Mapping of unit name and credentials for that unit."
             " Credentials are a juju secret containing a 'role-id' and a 'role-secret-id'."
@@ -32,7 +26,7 @@ class VaultKvProviderSchema(BaseModel):
     )
 
 
-class AppVaultKvRequirerSchema(BaseModel):
+class RequirerAppData(BaseModel):
     mount_suffix: str = Field(
         description="Suffix to append to the mount name to get the KV mount."
     )
@@ -47,7 +41,7 @@ class AppVaultKvRequirerSchema(BaseModel):
     )
 
 
-class UnitVaultKvRequirerSchema(BaseModel):
+class RequirerUnitData(BaseModel):
     egress_subnet: str = Field(
         description="A string of egress subnets separated by commas, in CIDR notation."
     )
@@ -58,14 +52,4 @@ class UnitVaultKvRequirerSchema(BaseModel):
     )
 
 
-class ProviderSchema(DataBagSchema):
-    """The schema for the provider side of this interface."""
-
-    app: VaultKvProviderSchema
-
-
-class RequirerSchema(DataBagSchema):
-    """The schema for the requirer side of this interface."""
-
-    app: AppVaultKvRequirerSchema
-    unit: UnitVaultKvRequirerSchema
+ProviderUnitData = None

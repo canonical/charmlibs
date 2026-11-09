@@ -1,9 +1,7 @@
 """This file defines the schemas for the provider and requirer sides of the `ip_router` interface.
-It exposes two interfaces.schema_base.DataBagSchema subclasses called:
-- ProviderSchema
-- RequirerSchema
+
 Examples:
-    ProviderSchema:
+    Provider:
         unit: <empty>
         app: {
               "networks": [
@@ -28,7 +26,7 @@ Examples:
                 }
               ]
             }
-    RequirerSchema:
+    Requirer:
         unit: <empty>
         app:  {
               "networks": [
@@ -46,7 +44,6 @@ Examples:
             }
 """
 
-from interface_tester.schema_base import DataBagSchema
 from pydantic import BaseModel, IPvAnyAddress, IPvAnyNetwork
 
 
@@ -61,21 +58,13 @@ class IPNetwork(BaseModel):
     routes: list[Route] | None
 
 
-class IPRouterProviderAppData(BaseModel):
+class ProviderAppData(BaseModel):
     networks: list[IPNetwork]
 
 
-class IPRouterRequirerAppData(BaseModel):
+class RequirerAppData(BaseModel):
     networks: list[IPNetwork]
 
 
-class ProviderSchema(DataBagSchema):
-    """Provider schema for ip_router."""
-
-    app: IPRouterProviderAppData
-
-
-class RequirerSchema(DataBagSchema):
-    """Requirer schema for ip_router."""
-
-    app: IPRouterRequirerAppData
+ProviderUnitData = None
+RequirerUnitData = None

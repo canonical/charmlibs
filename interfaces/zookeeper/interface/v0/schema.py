@@ -1,22 +1,32 @@
-"""This file defines the schemas for the provider and requirer sides of the zookeeper_client interface.
+"""This file defines the schemas for the provider and requirer sides of the zookeeper_client interface."""
 
-It must expose two interfaces.schema_base.DataBagSchema subclasses called:
-- ProviderSchema
-- RequirerSchema
-"""
+import json
+from typing import Any, TypeAlias
 
-from typing import TypeAlias
-
-from interface_tester.schema_base import DataBagSchema
-from pydantic import (
-    BaseModel,
-    Field,
-)
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
 
 Endpoints: TypeAlias = str
 
 
-class ZooKeeperProviderAppData(BaseModel):
+class _BareStringDatabag(BaseModel):
+    """Base class for databag models that don't strictly JSON encode all entries."""
+
+    @staticmethod
+    def __juju_decoder__(value: str) -> str:
+        """Pass Juju's string through unmodified to be decoded by individual field validators."""
+        return value
+
+    @staticmethod
+    def __juju_encoder__(value: str | None) -> str:
+        """Convert `None` to "", erasing the value; Ops will error on a non-string."""
+        return "" if value is None else value
+
+
+class ProviderAppData(_BareStringDatabag):
+    """The provider's application databag."""
+
+    model_config = ConfigDict(strict=True, populate_by_name=True)
+
     database: str = Field(
         description="The parent chroot zNode granted to the requirer",
         examples=["/myappB"],
@@ -37,7 +47,7 @@ class ZooKeeperProviderAppData(BaseModel):
     )
 
     secret_tls: str | None = Field(
-        None,
+        default=None,
         alias="secret-tls",
         description="The name of the TLS secret to use. Leaving this empty will configure a client with TLS disabled. The secret contains [tls].",
         examples=["secret://59060ecc-0495-4a80-8006-5f1fc13fd783/cjqub7fubg2s77p3niog"],
@@ -45,7 +55,11 @@ class ZooKeeperProviderAppData(BaseModel):
     )
 
 
-class ZooKeeperRequirerAppData(BaseModel):
+class RequirerAppData(_BareStringDatabag):
+    """The requirer's application databag."""
+
+    model_config = ConfigDict(strict=True, populate_by_name=True)
+
     database: str = Field(
         description="The parent chroot zNode requested by the requirer",
         examples=["/myappA"],
@@ -53,7 +67,7 @@ class ZooKeeperRequirerAppData(BaseModel):
     )
 
     extra_user_roles: str | None = Field(
-        None,
+        default=None,
         alias="extra-user-roles",
         description="ACL string representation for the parent chroot",
         examples=["cdrwa"],
@@ -67,14 +81,19 @@ class ZooKeeperRequirerAppData(BaseModel):
         title="Requested secrets",
     )
 
+    @field_validator("requested_secrets", mode="before")
+    @classmethod
+    def _load_json(cls, value: Any) -> Any:
+        if not isinstance(value, str):
+            return value  # __init__ argument was already deserialized.
+        return json.loads(value)
 
-class ProviderSchema(DataBagSchema):
-    """The schema for the provider side of this interface."""
+    @field_serializer("requested_secrets")
+    def _dump_json(self, value: object) -> str | None:
+        if value is None:
+            return None
+        return json.dumps(value)
 
-    app: ZooKeeperProviderAppData
 
-
-class RequirerSchema(DataBagSchema):
-    """The schema for the requirer side of this interface."""
-
-    app: ZooKeeperRequirerAppData
+ProviderUnitData = None
+RequirerUnitData = None
