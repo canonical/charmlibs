@@ -58,7 +58,7 @@ Following the previous example, this is an example of the provider charm.
             self.smtp = SmtpProvides(self)
             ...
 
-The ``SmtpProvides`` object wraps the list of relations into a ``relations`` property
+The ``SmtpProvides`` object stores the relation name in its ``relation_name`` property
 and provides an ``update_relation_data`` method to update the relation data by passing
 a ``SmtpRelationData`` data object.
 
