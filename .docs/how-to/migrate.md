@@ -200,8 +200,9 @@ Check how you're doing by running:
 just lint <library path>
 ```
 
-Consider running `just format --no-fix` to handle formatting first, then `just format` to also apply any automatically fixable `ruff check` errors.
-Splitting them this way lets you commit the formatting-only changes separately from the (occasionally more surprising) `ruff check --fix` changes.
+Consider running `just format --no-fix` to fix the formatting first.
+Then run `just format` to also fix any `ruff check` errors that can be fixed automatically.
+This lets you commit the formatting changes separately from the `ruff check --fix` changes, which are occasionally more surprising.
 
 You can also check if your docstrings are compatible with the format that Sphinx expects when building the reference docs.
 From anywhere in the repo, run `just docs`.
@@ -216,7 +217,8 @@ just docs html <library path>
 :class: tip
 
 Linting and formatting touch a lot of lines but rarely need careful review, so they're worth keeping in commits of their own.
-The `just format --no-fix` changes are pure formatting and safe to skim past; commit those first, then commit the `just format` (`ruff check --fix`) changes separately, since those can occasionally change behaviour and deserve a closer look.
+Commit the `just format --no-fix` changes first, because they only change formatting and are quick to review.
+Then commit the `just format` changes separately, because `ruff check --fix` can occasionally change behaviour.
 Include any `pyproject.toml` config changes or lint ignores.
 ```
 
