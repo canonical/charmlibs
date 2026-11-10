@@ -751,10 +751,12 @@ class ContainerPath:
         """
         if parents and not exist_ok and self.exists():
             _errors.raise_file_exists(repr(self))
-        if exist_ok and not parents and not self.parent.exists():
-            # The parent may be missing, or it may have a non-directory parent of its own.
-            _fileinfo.from_container_path(self.parent)  # raises the appropriate error
-            _errors.raise_file_not_found(repr(self.parent))  # the parent has since been created
+        if exist_ok and not parents:
+            # Pebble only ignores an existing directory when it's also making parents, which
+            # pathlib only does with parents=True. So check that the parent exists first: this
+            # raises FileNotFoundError if it doesn't, or the error for an untraversable parent of
+            # its own. A parent that exists as a non-directory fails in _mkdir.
+            _fileinfo.from_container_path(self.parent)
         if parents and mode != _constants.DEFAULT_MKDIR_MODE:
             # create parents with default permissions, following pathlib
             self._mkdir(
