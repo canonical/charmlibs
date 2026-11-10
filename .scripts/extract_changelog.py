@@ -42,41 +42,6 @@ _HEADING = re.compile(r'^(?P<hashes>#{1,6})[ \t]+(?P<title>\S.*)$')
 _FENCE = re.compile(r'^(?P<fence>`{3,}|~{3,})')
 
 
-def _headings(text: str) -> list[tuple[int, int, int]]:
-    """Return (level, start, end) for each heading outside a fenced code block.
-
-    A changelog entry for a breaking change tends to carry a before/after
-    example, and a Python comment inside that example starts with a '#'. Scanned
-    line by line rather than with one MULTILINE regex, a '# Before' inside a
-    fence would end the section there: the release notes would lose the example
-    and everything after it, and end on an unterminated fence.
-    """
-    headings: list[tuple[int, int, int]] = []
-    fence = ''
-    offset = 0
-    for line in text.splitlines(keepends=True):
-        stripped = line.lstrip()
-        indent = len(line) - len(stripped)
-        match = _FENCE.match(stripped)
-        if match:
-            candidate = match.group('fence')
-            if not fence:
-                fence = candidate
-            elif candidate[0] == fence[0] and len(candidate) >= len(fence):
-                # A closing fence is the same character and at least as long.
-                fence = ''
-        elif not fence:
-            heading = _HEADING.match(line)
-            if heading:
-                headings.append((
-                    len(heading.group('hashes')),
-                    offset + indent,
-                    offset + len(line.rstrip('\n')),
-                ))
-        offset += len(line)
-    return headings
-
-
 def _version_of(title: str) -> str:
     """Return the version a heading names, or '' if it doesn't name one.
 
@@ -85,21 +50,51 @@ def _version_of(title: str) -> str:
     return title.split()[0].strip('[]')
 
 
+def _sections(text: str) -> dict[str, list[str]]:
+    """Map each heading's version to the lines of its section.
+
+    A section runs to the next heading at the same level or shallower, so a
+    version's ``### Fixed``-style subheadings stay in its body. If a version
+    appears more than once, the first section wins.
+
+    Headings inside fenced code blocks are ignored. A changelog entry for a
+    breaking change tends to carry a before/after example, and a Python comment
+    inside that example starts with a '#': taken as a heading, a '# Before'
+    would end the section there, and the release notes would lose the example
+    and everything after it, and end on an unterminated fence.
+    """
+    sections: dict[str, list[str]] = {}
+    open_sections: list[tuple[int, list[str]]] = []  # (level, lines) still collecting
+    fence = ''
+    for line in text.splitlines():
+        match = _FENCE.match(line.lstrip())
+        if match:
+            candidate = match.group('fence')
+            if not fence:
+                fence = candidate
+            elif candidate[0] == fence[0] and len(candidate) >= len(fence):
+                # A closing fence is the same character and at least as long.
+                fence = ''
+        elif not fence and (heading := _HEADING.match(line)):
+            level = len(heading.group('hashes'))
+            # A heading closes any open section at the same level or deeper.
+            open_sections = [(lvl, lines) for lvl, lines in open_sections if lvl < level]
+            for _, lines in open_sections:
+                lines.append(line)
+            version = _version_of(heading.group('title'))
+            if version not in sections:
+                sections[version] = []
+                open_sections.append((level, sections[version]))
+            continue
+        for _, lines in open_sections:
+            lines.append(line)
+    return sections
+
+
 def extract(text: str, version: str) -> str | None:
     """Return the CHANGELOG section for ``version``, or ``None`` if absent."""
-    headings = _headings(text)
-    for i, (level, start, end) in enumerate(headings):
-        title = _HEADING.match(text[start:end])
-        assert title is not None  # `_headings` only returns what `_HEADING` matched.
-        if _version_of(title.group('title')) != version:
-            continue
-        section_end = len(text)
-        for later_level, later_start, _ in headings[i + 1 :]:
-            if later_level <= level:
-                section_end = later_start
-                break
-        return text[end:section_end].strip()
-    return None
+    lines = _sections(text).get(version)
+    return None if lines is None else '\n'.join(lines).strip()
 
 
 def main(argv: list[str] | None = None) -> int:
