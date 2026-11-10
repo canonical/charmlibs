@@ -28,7 +28,7 @@ databag's JSON Schema, or to ``null`` if the databag is empty.
 Two schema conventions are supported:
 
 * Module-level ``ProviderAppData``, ``ProviderUnitData``, ``RequirerAppData`` and
-  ``RequirerUnitData`` names, each a Pydantic model or ``None``.
+  ``RequirerUnitData`` names, each a Pydantic model or ``None``. All four must be defined.
 * ``ProviderSchema`` and ``RequirerSchema`` classes with ``app`` and ``unit`` fields, as
   defined with ``interface_tester.schema_base.DataBagSchema``.
 
@@ -88,7 +88,12 @@ def _databag_models(module: types.ModuleType) -> dict[str, typing.Any]:
         'requirer-unit': 'RequirerUnitData',
     }
     if any(hasattr(module, n) for n in names.values()):
-        return {databag: getattr(module, name, None) for databag, name in names.items()}
+        # An empty databag is an explicit `= None`, so a missing name is a mistake (a typo in
+        # the class name, for example) rather than an empty databag.
+        missing = [n for n in names.values() if not hasattr(module, n)]
+        if missing:
+            raise ValueError(f'schema does not define {", ".join(missing)} (use None if empty)')
+        return {databag: getattr(module, name) for databag, name in names.items()}
     if hasattr(module, 'ProviderSchema') or hasattr(module, 'RequirerSchema'):
         result: dict[str, typing.Any] = {}
         for side in ('provider', 'requirer'):

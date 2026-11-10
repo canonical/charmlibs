@@ -353,7 +353,7 @@ def _fields_table(schema: JsonSchema, defs: dict[str, JsonSchema]) -> list[str]:
         if field in required:
             req = 'yes'
         elif 'default' in prop and prop['default'] is not None:
-            req = f'no (default `{json.dumps(prop["default"])}`)'
+            req = f'no (default {_code(prop["default"])})'
         else:
             req = 'no'
         description = prop.get('description', '')
@@ -381,7 +381,7 @@ def _type(schema: JsonSchema, defs: dict[str, JsonSchema]) -> str:
     if 'allOf' in schema and len(schema['allOf']) == 1:
         return _type(schema['allOf'][0], defs)
     if 'const' in schema:
-        return f'`{json.dumps(schema["const"])}`'
+        return _code(schema['const'])
     if 'enum' in schema:
         return _enum(schema['enum'])
     if schema.get('contentMediaType') == 'application/json':
@@ -419,14 +419,21 @@ def _with_constraints(type_: str, schema: JsonSchema) -> str:
     text = type_
     if 'format' in schema:
         text += f' ({_FORMATS.get(schema["format"], schema["format"])})'
-    low = schema.get('minimum', schema.get('exclusiveMinimum'))
-    high = schema.get('maximum', schema.get('exclusiveMaximum'))
-    if low is not None and high is not None:
-        text += f', {low} to {high}'
-    elif low is not None:
-        text += f', at least {low}'
-    elif high is not None:
-        text += f', at most {high}'
+    if 'minimum' in schema and 'maximum' in schema:
+        text += f', {schema["minimum"]} to {schema["maximum"]}'
+    else:
+        bounds = [
+            f'{words} {schema[key]}'
+            for key, words in (
+                ('minimum', 'at least'),
+                ('exclusiveMinimum', 'more than'),
+                ('maximum', 'at most'),
+                ('exclusiveMaximum', 'less than'),
+            )
+            if key in schema
+        ]
+        if bounds:
+            text += ', ' + ' and '.join(bounds)
     if 'minLength' in schema:
         text += f', at least {_characters(schema["minLength"])}'
     if 'maxLength' in schema:
@@ -442,10 +449,15 @@ def _characters(n: int) -> str:
 
 def _enum(values: list[typing.Any]) -> str:
     if len(values) == 1:
-        return f'`{json.dumps(values[0]) if not isinstance(values[0], str) else values[0]}`'
-    return 'one of ' + ', '.join(
-        f'`{json.dumps(v) if not isinstance(v, str) else v}`' for v in values
-    )
+        return _code(values[0])
+    return 'one of ' + ', '.join(_code(v) for v in values)
+
+
+def _code(value: typing.Any) -> str:
+    """Format a JSON value as inline code, without quotes around non-empty strings."""
+    if isinstance(value, str) and value:
+        return f'`{value}`'
+    return f'`{json.dumps(value)}`'
 
 
 def _resolve(schema: JsonSchema, defs: dict[str, JsonSchema]) -> JsonSchema:

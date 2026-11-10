@@ -31,7 +31,7 @@ _ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
 
 PROVIDER_APP: dict[str, typing.Any] = {
     '$defs': {
-        'Mode': {'enum': ['tls', 'starttls'], 'type': 'string'},
+        'Mode': {'enum': ['tls', 'starttls'], 'type': 'string', 'description': 'How to connect.'},
         'Endpoint': {
             'properties': {
                 'url': {'type': 'string', 'format': 'uri', 'description': 'Where to connect.'},
@@ -56,7 +56,12 @@ PROVIDER_APP: dict[str, typing.Any] = {
     'type': 'object',
 }
 REQUIRER_UNIT: dict[str, typing.Any] = {
-    'properties': {'address': {'type': 'string', 'format': 'ipvanyaddress'}},
+    # The same nested model as the provider uses, which is only documented once.
+    '$defs': {'Endpoint': PROVIDER_APP['$defs']['Endpoint']},
+    'properties': {
+        'address': {'type': 'string', 'format': 'ipvanyaddress'},
+        'endpoint': {'$ref': '#/$defs/Endpoint'},
+    },
     'required': ['address'],
     'type': 'object',
 }
@@ -79,7 +84,7 @@ def test_relation_data_tables():
         |---|---|---|---|
         | `host` | string, at least 1 character | yes | The host \\| name. |
         | `port` | integer, 1 to 65535 | yes |  |
-        | `mode` | one of `tls`, `starttls` | no (default `"tls"`) |  |
+        | `mode` | one of `tls`, `starttls` | no (default `tls`) | How to connect. |
         | `user` | string or null | no |  |
         | `endpoints` | list of `Endpoint` objects | yes |  |
         | `labels` | JSON-encoded mapping of string to string | no |  |
@@ -95,6 +100,7 @@ def test_relation_data_tables():
         | Field | Type | Required | Description |
         |---|---|---|---|
         | `address` | string (IP address) | yes |  |
+        | `endpoint` | `Endpoint` object | no |  |
 
         Empty databags: provider unit, requirer application.""")
 
@@ -113,7 +119,13 @@ def test_relation_data_without_schema_link():
         ({'type': 'array'}, 'list'),
         ({'type': 'array', 'items': {'enum': ['a', 'b']}}, 'list, each one of `a`, `b`'),
         ({'type': 'object'}, 'object'),
-        ({'type': 'number', 'exclusiveMinimum': 0}, 'number, at least 0'),
+        ({'type': 'number', 'exclusiveMinimum': 0}, 'number, more than 0'),
+        (
+            {'type': 'number', 'exclusiveMinimum': 0, 'maximum': 1},
+            'number, more than 0 and at most 1',
+        ),
+        ({'type': 'integer', 'exclusiveMaximum': 10}, 'integer, less than 10'),
+        ({'const': ''}, '`""`'),
         (
             {'type': 'string', 'maxLength': 5, 'pattern': '^a'},
             'string, at most 5 characters, matching `^a`',
@@ -135,7 +147,7 @@ def test_direction_diagram():
             provider[Provider]
             requirer[Requirer]
             provider -->|"app: host, port, mode,<br>user, endpoints, labels"| requirer
-            requirer -->|"unit: address"| provider
+            requirer -->|"unit: address, endpoint"| provider
         ```""")
 
 
@@ -181,6 +193,12 @@ def test_add_generated_sections():
     assert 'Generated from the' not in result
 
 
+def test_add_generated_sections_direction_ends_at_title():
+    readme = '# `foo/v0`\n\n## Direction\n\nThe provider writes.\n\n# Another title\n'
+    lines = ip.add_generated_sections(readme, DATABAGS).splitlines()
+    assert lines.index('```mermaid') < lines.index('# Another title')
+
+
 def test_add_generated_sections_without_headings():
     result = ip.add_generated_sections('# `foo/v0`\n\nSome text.\n', DATABAGS)
     lines = result.splitlines()
@@ -218,6 +236,19 @@ def test_schema_script_handles_both_conventions(tmp_path: pathlib.Path):
                 unit: Unit
         """)
     )
+    misnamed = tmp_path / 'misnamed.py'
+    misnamed.write_text(
+        textwrap.dedent("""\
+            from pydantic import BaseModel
+
+            class ProviderAppAData(BaseModel):
+                host: str
+
+            ProviderUnitData = None
+            RequirerAppData = None
+            RequirerUnitData = None
+        """)
+    )
     broken = tmp_path / 'broken.py'
     broken.write_text('raise RuntimeError("nope")\n')
     output = subprocess.check_output(
@@ -230,6 +261,7 @@ def test_schema_script_handles_both_conventions(tmp_path: pathlib.Path):
             str(_ROOT / '.docs' / 'scripts' / 'interface_schemas.py'),
             str(new_style),
             str(old_style),
+            str(misnamed),
             str(broken),
         ],
         text=True,
@@ -242,4 +274,5 @@ def test_schema_script_handles_both_conventions(tmp_path: pathlib.Path):
     assert old_bags['provider-app'] is None
     assert old_bags['requirer-app'] is None
     assert list(old_bags['requirer-unit']['properties']) == ['address']
+    assert 'does not define ProviderAppData' in result[str(misnamed)]['error']
     assert 'RuntimeError: nope' in result[str(broken)]['error']
