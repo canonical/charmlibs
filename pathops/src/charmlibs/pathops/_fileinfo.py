@@ -65,8 +65,26 @@ def _get_fileinfo_directly(path: ContainerPath) -> pebble.FileInfo:
 
 def _get_fileinfo_from_parent(path: ContainerPath) -> pebble.FileInfo:
     parent = path.parent
+    # Listing a non-directory isn't an error: Pebble lists that path itself, then applies the
+    # pattern. So for /file/file, the only match is the parent, which isn't the path we asked for.
+    children = [
+        info for info in _list_by_name(parent, path.name, path) if info.path != str(parent)
+    ]
+    if not children:
+        # A directory never lists itself, so finding the parent here means it's not a directory.
+        if any(info.path == str(parent) for info in _list_by_name(parent, parent.name, path)):
+            _errors.raise_not_a_directory(repr(path))
+        _errors.raise_file_not_found(repr(path))
+    assert len(children) == 1, 'ops.Container.list_files with non-* pattern should return 1 item'
+    return children[0]
+
+
+def _list_by_name(
+    directory: ContainerPath, name: str, path: ContainerPath
+) -> list[pebble.FileInfo]:
+    """List entries of this directory with this literal name, reporting errors against path."""
     try:
-        info_list = path._container.list_files(parent._path, pattern=_escape_pattern(path.name))
+        return directory._container.list_files(directory._path, pattern=_escape_pattern(name))
     except (pebble.APIError, pebble.PathError) as e:
         msg = repr(path)
         _errors.raise_if_matches_file_not_found(e, msg=msg)
@@ -74,13 +92,6 @@ def _get_fileinfo_from_parent(path: ContainerPath) -> pebble.FileInfo:
         _errors.raise_if_matches_permission(e, msg=msg)
         _errors.raise_if_matches_too_many_levels_of_symlinks(e, msg=msg)
         raise
-    # Listing a non-directory isn't an error: Pebble lists that path itself, then applies the
-    # pattern. So for /file/file, the only match is the parent, which isn't the path we asked for.
-    children = [info for info in info_list if info.path != str(parent)]
-    if not children:
-        _errors.raise_file_not_found(repr(path))
-    assert len(children) == 1, 'ops.Container.list_files with non-* pattern should return 1 item'
-    return children[0]
 
 
 def _escape_pattern(name: str) -> str:

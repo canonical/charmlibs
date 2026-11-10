@@ -427,15 +427,10 @@ class TestRmDir:
     @pytest.mark.parametrize('filename', utils.NON_DIRECTORY_PARENT_NAMES)
     def test_file_parent(
         self,
-        request: pytest.FixtureRequest,
         container: ops.Container,
         session_dir: pathlib.Path,
         filename: str,
     ):
-        if filename in utils.DIRECT_NON_DIRECTORY_PARENT_NAMES:
-            request.applymarker(
-                pytest.mark.xfail(strict=True, reason='raises FileNotFoundError instead')
-            )
         path = session_dir / filename
         with pytest.raises(NotADirectoryError):
             path.rmdir()
@@ -535,10 +530,8 @@ class TestUnlink:
         filename: str,
         missing_ok: bool,
     ):
-        if filename in utils.DIRECT_NON_DIRECTORY_PARENT_NAMES:
-            request.applymarker(
-                pytest.mark.xfail(strict=True, reason="doesn't raise NotADirectoryError")
-            )
+        if missing_ok and filename in utils.DIRECT_NON_DIRECTORY_PARENT_NAMES:
+            request.applymarker(pytest.mark.xfail(strict=True, reason='succeeds silently'))
         path = session_dir / filename
         with pytest.raises(NotADirectoryError):
             path.unlink(missing_ok=missing_ok)

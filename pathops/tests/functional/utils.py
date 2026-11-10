@@ -135,7 +135,7 @@ NON_DIRECTORY_PARENT_NAMES = (
     f'{SOCKET_NAME}/{SOCKET_NAME}',
     f'{SOCKET_SYMLINK_NAME}/child',
 )
-# Paths whose immediate parent is a non-directory: rmdir and unlink don't match pathlib for these.
+# Paths whose immediate parent is a non-directory: unlink(missing_ok=True) succeeds for these.
 DIRECT_NON_DIRECTORY_PARENT_NAMES = tuple(
     name for name in NON_DIRECTORY_PARENT_NAMES if name.count('/') == 1
 )

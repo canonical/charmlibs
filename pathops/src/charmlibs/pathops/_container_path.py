@@ -553,7 +553,8 @@ class ContainerPath:
 
         Raises:
             FileNotFoundError: if the path does not exist.
-            NotADirectoryError: if the path exists but is not a directory.
+            NotADirectoryError: if the path exists but is not a directory,
+                or if the parent exists as a non-directory file.
             OSError: if a parent is a symbolic link loop (``errno.ELOOP``).
             PermissionError: if the Pebble user does not have permissions for the operation.
             PebbleConnectionError: if the remote Pebble client cannot be reached.
@@ -569,6 +570,9 @@ class ContainerPath:
         Raises:
             FileNotFoundError: if the path does not exist and ``missing_ok`` is false.
             IsADirectoryError: if the path exists but is a directory.
+            NotADirectoryError: if a parent exists as a non-directory file. A
+                :class:`ContainerPath` doesn't raise this if ``missing_ok`` is true and only
+                the immediate parent is a non-directory.
             OSError: if a parent is a symbolic link loop (``errno.ELOOP``).
             PermissionError: if the Pebble user does not have permissions for the operation.
             PebbleConnectionError: if the remote Pebble client cannot be reached.
@@ -577,6 +581,11 @@ class ContainerPath:
             info = _fileinfo.from_container_path(self, follow_symlinks=False)
         except FileNotFoundError:
             if missing_ok:
+                return
+            raise
+        except NotADirectoryError:
+            # This path doesn't exist if only its parent is a non-directory.
+            if missing_ok and self.parent.exists():
                 return
             raise
         if info.type == pebble.FileType.DIRECTORY:
