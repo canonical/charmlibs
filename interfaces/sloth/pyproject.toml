@@ -33,7 +33,7 @@ functional = [  # installed for `just functional interfaces/sloth`
 ]
 integration = [  # installed for `just integration interfaces/sloth`
     "jubilant",
-    "pytest-jubilant",
+    "pytest-jubilant>=2",
 ]
 
 [project.urls]
