@@ -237,6 +237,7 @@ class PathProtocol(typing.Protocol):
 
         Raises:
             FileNotFoundError: If this path does not exist.
+            OSError: if a parent is a symbolic link loop (``errno.ELOOP``).
             PermissionError: If the local or remote user does not have read permissions.
             UnicodeError: If the file's contents are not valid UTF-8.
             PebbleConnectionError: If the remote container cannot be reached.
@@ -251,6 +252,7 @@ class PathProtocol(typing.Protocol):
 
         Raises:
             FileNotFoundError: If this path does not exist.
+            OSError: if a parent is a symbolic link loop (``errno.ELOOP``).
             PermissionError: If the local or remote user does not have read permissions.
             PebbleConnectionError: If the remote container cannot be reached.
         """
@@ -386,6 +388,7 @@ class PathProtocol(typing.Protocol):
         Raises:
             FileNotFoundError: if the path does not exist.
             NotADirectoryError: if the path exists but is not a directory.
+            OSError: if a parent is a symbolic link loop (``errno.ELOOP``).
             PermissionError: if the local or remote user does not have the appropriate permissions.
             PebbleConnectionError: if the remote Pebble client cannot be reached.
         """
@@ -397,6 +400,7 @@ class PathProtocol(typing.Protocol):
         Raises:
             FileNotFoundError: if the path does not exist and ``missing_ok`` is false.
             IsADirectoryError: if the path exists but is a directory.
+            OSError: if a parent is a symbolic link loop (``errno.ELOOP``).
             PermissionError: if the local or remote user does not have the appropriate permissions.
             PebbleConnectionError: if the remote Pebble client cannot be reached.
         """
@@ -525,6 +529,8 @@ class PathProtocol(typing.Protocol):
             FileNotFoundError: if the parent directory does not exist and ``parents`` is ``False``.
             LookupError: if the user or group is unknown, or a group is provided without a user.
             NotADirectoryError: if the parent exists as a non-directory file.
+            OSError: if a parent is a symbolic link loop (``errno.ELOOP``). If ``parents`` is
+                ``True``, a :class:`ContainerPath` raises :class:`NotADirectoryError` instead.
             PermissionError: if the local user does not have permissions for the operation.
             PebbleConnectionError: if the remote Pebble client cannot be reached.
         """

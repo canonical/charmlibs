@@ -44,6 +44,41 @@ def container(tmp_path: pathlib.Path) -> Iterator[ops.Container]:
         yield manager.charm.unit.get_container('c')
 
 
+def test_missing_child_of_symlink_to_directory(container: ops.Container, tmp_path: pathlib.Path):
+    (tmp_path / 'dir').mkdir()
+    (tmp_path / 'link').symlink_to(tmp_path / 'dir')
+    path = ContainerPath(MOUNT, 'link/missing', container=container)
+    path.unlink(missing_ok=True)
+    assert not path.is_symlink()
+    with pytest.raises(FileNotFoundError):
+        path.unlink()
+    with pytest.raises(FileNotFoundError):
+        path.rmdir()
+
+
+def test_missing_child_of_directory(container: ops.Container, tmp_path: pathlib.Path):
+    (tmp_path / 'dir').mkdir()
+    path = ContainerPath(MOUNT, 'dir/missing', container=container)
+    path.unlink(missing_ok=True)
+    with pytest.raises(FileNotFoundError):
+        path.rmdir()
+
+
+def test_unlink_child_with_same_name_as_directory_parent(
+    container: ops.Container, tmp_path: pathlib.Path
+):
+    (tmp_path / 'name').mkdir()
+    (tmp_path / 'name' / 'name').touch()
+    ContainerPath(MOUNT, 'name/name', container=container).unlink()
+    assert not (tmp_path / 'name' / 'name').exists()
+    assert (tmp_path / 'name').exists()
+
+
+def test_exists_file_parent(container: ops.Container, tmp_path: pathlib.Path):
+    (tmp_path / 'file').touch()
+    assert not ContainerPath(MOUNT, 'file/child', container=container).exists()
+
+
 @pytest.mark.parametrize('name', ('s*', 's?bling', '[s]ibling', 'sibling[', 'back\\slash'))
 def test_name_isnt_a_pattern(container: ops.Container, tmp_path: pathlib.Path, name: str):
     (tmp_path / 'sibling').touch()

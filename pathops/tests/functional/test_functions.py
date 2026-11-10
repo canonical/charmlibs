@@ -83,12 +83,17 @@ def test_ensure_contents(
 @pytest.mark.parametrize('follow_symlinks', [True, False])
 @pytest.mark.parametrize('filename', utils.FILENAMES_PLUS)
 def test_get_fileinfo(
+    request: pytest.FixtureRequest,
     container: ops.Container,
     session_dir: pathlib.Path,
     pebble_resolves_groups: bool,
     filename: str,
     follow_symlinks: bool,
 ):
+    if not follow_symlinks and filename in utils.DIRECT_NON_DIRECTORY_PARENT_NAMES:
+        request.applymarker(
+            pytest.mark.xfail(strict=True, reason='raises FileNotFoundError instead')
+        )
     exclude: list[str] = []
     if not pebble_resolves_groups:
         exclude.append('group')

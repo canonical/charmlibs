@@ -64,18 +64,23 @@ def _get_fileinfo_directly(path: ContainerPath) -> pebble.FileInfo:
 
 
 def _get_fileinfo_from_parent(path: ContainerPath) -> pebble.FileInfo:
-    pattern = _escape_pattern(path.name)
+    parent = path.parent
     try:
-        info_list = path._container.list_files(path._path.parent, pattern=pattern)
+        info_list = path._container.list_files(parent._path, pattern=_escape_pattern(path.name))
     except (pebble.APIError, pebble.PathError) as e:
         msg = repr(path)
         _errors.raise_if_matches_file_not_found(e, msg=msg)
+        _errors.raise_if_matches_not_a_directory(e, msg=msg)
         _errors.raise_if_matches_permission(e, msg=msg)
+        _errors.raise_if_matches_too_many_levels_of_symlinks(e, msg=msg)
         raise
-    if not info_list:
+    # Listing a non-directory isn't an error: Pebble lists that path itself, then applies the
+    # pattern. So for /file/file, the only match is the parent, which isn't the path we asked for.
+    children = [info for info in info_list if info.path != str(parent)]
+    if not children:
         _errors.raise_file_not_found(repr(path))
-    assert len(info_list) == 1, 'ops.Container.list_files with non-* pattern should return 1 item'
-    return info_list[0]
+    assert len(children) == 1, 'ops.Container.list_files with non-* pattern should return 1 item'
+    return children[0]
 
 
 def _escape_pattern(name: str) -> str:

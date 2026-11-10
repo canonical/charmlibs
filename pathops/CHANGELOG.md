@@ -1,3 +1,14 @@
+# Unreleased
+
+`ContainerPath` now matches `pathlib.Path` in more cases for paths where a parent exists but can't be traversed as a directory, because it's a non-directory (for example `/some/file.txt/child`) or a symlink to one:
+- `exists`, `is_dir`, `is_file`, `is_fifo` and `is_socket` now return `False` instead of raising `NotADirectoryError`.
+- `glob` now yields nothing instead of raising `NotADirectoryError`.
+- `read_text` and `read_bytes` now raise `NotADirectoryError` instead of `ops.pebble.PathError`.
+- For paths with a more distant non-directory parent (for example `/some/file.txt/child/child`), `is_symlink` now returns `False`, and `rmdir` and `unlink` now raise `NotADirectoryError`, instead of raising `ops.pebble.APIError`.
+- For paths with the same name as their non-directory parent (for example `/some/file.txt/file.txt`), `is_symlink` now returns `False`, instead of describing the parent, and `rmdir` and `unlink` now raise `FileNotFoundError` like other children of a non-directory.
+
+For paths under a symlink loop, `is_symlink` now returns `False`, and `read_text`, `read_bytes`, `rmdir`, `unlink` and `mkdir` now raise `OSError` (`errno.ELOOP`), instead of raising `ops.pebble.APIError` or `ops.pebble.PathError`. The exception is `mkdir(parents=True)`, which raises `NotADirectoryError`, unlike `pathlib.Path`.
+
 # 1.4.1 - 10 November 2026
 
 `ContainerPath.is_symlink`, `rmdir` and `unlink` now treat the path's name literally, rather than as a glob pattern. Previously, names containing `*`, `?`, `[` or `\` could match the wrong entry, or none, and a name matching several entries raised an `AssertionError`.

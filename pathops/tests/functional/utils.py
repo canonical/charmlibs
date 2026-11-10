@@ -124,7 +124,32 @@ def _make_session_dir() -> tuple[pathlib.Path, Callable[[], None]]:
 # The session_dir fixture defined in conftest.py yields the path and calls the teardown function.
 _SESSION_DIR_PATH, _TEARDOWN_SESSION_DIR = _make_session_dir()
 FILENAMES = tuple(path.name for path in _SESSION_DIR_PATH.iterdir())
-FILENAMES_PLUS = (*FILENAMES, MISSING_FILE_NAME, f'{MISSING_FILE_NAME}/{MISSING_FILE_NAME}')
+NON_DIRECTORY_PARENT_NAMES = (
+    f'{EMPTY_FILE_NAME}/child',
+    # Pebble's listing of the parent for the child's name matches the parent itself here.
+    f'{EMPTY_FILE_NAME}/{EMPTY_FILE_NAME}',
+    f'{EMPTY_FILE_NAME}/child/child',
+    f'{FILE_SYMLINK_NAME}/child',
+    f'{FILE_SYMLINK_NAME}/{FILE_SYMLINK_NAME}',
+    f'{SOCKET_NAME}/child',
+    f'{SOCKET_NAME}/{SOCKET_NAME}',
+    f'{SOCKET_SYMLINK_NAME}/child',
+)
+# Paths whose immediate parent is a non-directory: rmdir and unlink don't match pathlib for these.
+DIRECT_NON_DIRECTORY_PARENT_NAMES = tuple(
+    name for name in NON_DIRECTORY_PARENT_NAMES if name.count('/') == 1
+)
+SYMLINK_LOOP_PARENT_NAMES = (
+    f'{OUROBOROS_SYMLINK_NAME}/child',
+    f'{OUROBOROS_SYMLINK_NAME}/{OUROBOROS_SYMLINK_NAME}',
+)
+FILENAMES_PLUS = (
+    *FILENAMES,
+    MISSING_FILE_NAME,
+    f'{MISSING_FILE_NAME}/{MISSING_FILE_NAME}',
+    *NON_DIRECTORY_PARENT_NAMES,
+    *SYMLINK_LOOP_PARENT_NAMES,
+)
 
 #########
 # utils #

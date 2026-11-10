@@ -313,6 +313,8 @@ class ContainerPath:
         Raises:
             FileNotFoundError: if the parent directory does not exist.
             IsADirectoryError: if the target is a directory.
+            NotADirectoryError: if the parent exists as a non-directory file.
+            OSError: if a parent is a symbolic link loop (``errno.ELOOP``).
             PermissionError: if the Pebble user does not have permissions for the operation.
             PebbleConnectionError: if the remote Pebble client cannot be reached.
         """
@@ -330,6 +332,8 @@ class ContainerPath:
         Raises:
             FileNotFoundError: if the parent directory does not exist.
             IsADirectoryError: if the target is a directory.
+            NotADirectoryError: if the parent exists as a non-directory file.
+            OSError: if a parent is a symbolic link loop (``errno.ELOOP``).
             PermissionError: if the Pebble user does not have permissions for the operation.
             PebbleConnectionError: if the remote Pebble client cannot be reached.
         """
@@ -348,7 +352,9 @@ class ContainerPath:
             msg = repr(self)
             _errors.raise_if_matches_file_not_found(e, msg=msg)
             _errors.raise_if_matches_is_a_directory(e, msg=msg)
+            _errors.raise_if_matches_not_a_directory(e, msg=msg)
             _errors.raise_if_matches_permission(e, msg=msg)
+            _errors.raise_if_matches_too_many_levels_of_symlinks(e, msg=msg)
             raise
 
     def iterdir(self) -> typing.Generator[Self]:
@@ -515,8 +521,12 @@ class ContainerPath:
         """
         try:
             info = _fileinfo.from_container_path(self, follow_symlinks=False)
-        except FileNotFoundError:
+        except (FileNotFoundError, NotADirectoryError):
             return False
+        except OSError as e:
+            if e.errno != errno.ELOOP:
+                raise
+            return False  # too many levels of symbolic links
         return info.type == pebble.FileType.SYMLINK
 
     def _exists_and_matches(self, filetype: pebble.FileType | None) -> bool:
@@ -530,7 +540,7 @@ class ContainerPath:
     def _try_get_fileinfo(self) -> pebble.FileInfo | None:
         try:
             return _fileinfo.from_container_path(self)
-        except FileNotFoundError:
+        except (FileNotFoundError, NotADirectoryError):
             pass
         except OSError as e:
             if e.errno != errno.ELOOP:
@@ -544,6 +554,7 @@ class ContainerPath:
         Raises:
             FileNotFoundError: if the path does not exist.
             NotADirectoryError: if the path exists but is not a directory.
+            OSError: if a parent is a symbolic link loop (``errno.ELOOP``).
             PermissionError: if the Pebble user does not have permissions for the operation.
             PebbleConnectionError: if the remote Pebble client cannot be reached.
         """
@@ -558,6 +569,7 @@ class ContainerPath:
         Raises:
             FileNotFoundError: if the path does not exist and ``missing_ok`` is false.
             IsADirectoryError: if the path exists but is a directory.
+            OSError: if a parent is a symbolic link loop (``errno.ELOOP``).
             PermissionError: if the Pebble user does not have permissions for the operation.
             PebbleConnectionError: if the remote Pebble client cannot be reached.
         """
@@ -732,13 +744,17 @@ class ContainerPath:
             FileNotFoundError: if the parent directory does not exist and ``parents`` is ``False``.
             LookupError: if the user or group is unknown, or a group is provided without a user.
             NotADirectoryError: if the parent exists as a non-directory file.
+            OSError: if a parent is a symbolic link loop (``errno.ELOOP``). If ``parents`` is
+                ``True``, a :class:`ContainerPath` raises :class:`NotADirectoryError` instead.
             PermissionError: if the remote user does not have permissions for the operation.
             PebbleConnectionError: if the remote Pebble client cannot be reached.
         """
         if parents and not exist_ok and self.exists():
             _errors.raise_file_exists(repr(self))
         if exist_ok and not parents and not self.parent.exists():
-            _errors.raise_file_not_found(repr(self.parent))
+            # The parent may be missing, or it may have a non-directory parent of its own.
+            _fileinfo.from_container_path(self.parent)  # raises the appropriate error
+            _errors.raise_file_not_found(repr(self.parent))  # the parent has since been created
         if parents and mode != _constants.DEFAULT_MKDIR_MODE:
             # create parents with default permissions, following pathlib
             self._mkdir(
@@ -781,6 +797,7 @@ class ContainerPath:
             _errors.raise_if_matches_file_exists(e, msg=msg)
             _errors.raise_if_matches_file_not_found(e, msg=msg)
             _errors.raise_if_matches_permission(e, msg=msg)
+            _errors.raise_if_matches_too_many_levels_of_symlinks(e, msg=msg)
             raise
 
     #############################
