@@ -32,8 +32,6 @@ if typing.TYPE_CHECKING:
 # The container's mount point for the test's temporary directory.
 MOUNT = '/data'
 
-_MISSING_OK = (False, pytest.param(True, marks=pytest.mark.xfail(strict=True)))
-
 
 @pytest.fixture
 def container(tmp_path: pathlib.Path) -> Iterator[ops.Container]:
@@ -67,7 +65,7 @@ def test_missing_child_of_directory(container: ops.Container, tmp_path: pathlib.
         path.rmdir()
 
 
-@pytest.mark.parametrize('missing_ok', _MISSING_OK)
+@pytest.mark.parametrize('missing_ok', (False, True))
 def test_unlink_file_parent(container: ops.Container, tmp_path: pathlib.Path, missing_ok: bool):
     (tmp_path / 'file').touch()
     path = ContainerPath(MOUNT, 'file/child', container=container)
@@ -75,7 +73,7 @@ def test_unlink_file_parent(container: ops.Container, tmp_path: pathlib.Path, mi
         path.unlink(missing_ok=missing_ok)
 
 
-@pytest.mark.parametrize('missing_ok', _MISSING_OK)
+@pytest.mark.parametrize('missing_ok', (False, True))
 def test_unlink_file_parent_with_same_name(
     container: ops.Container, tmp_path: pathlib.Path, missing_ok: bool
 ):
@@ -106,7 +104,7 @@ def non_directory_links(tmp_path: pathlib.Path) -> tuple[str, ...]:
     return tuple(links)
 
 
-@pytest.mark.parametrize('missing_ok', _MISSING_OK)
+@pytest.mark.parametrize('missing_ok', (False, True))
 @pytest.mark.parametrize('same_name', (False, True))
 def test_unlink_symlink_to_non_directory_parent(
     container: ops.Container,

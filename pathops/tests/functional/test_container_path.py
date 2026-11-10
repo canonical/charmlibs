@@ -425,12 +425,7 @@ class TestRmDir:
         assert ctx.value.errno == errno.ELOOP
 
     @pytest.mark.parametrize('filename', utils.NON_DIRECTORY_PARENT_NAMES)
-    def test_file_parent(
-        self,
-        container: ops.Container,
-        session_dir: pathlib.Path,
-        filename: str,
-    ):
+    def test_file_parent(self, container: ops.Container, session_dir: pathlib.Path, filename: str):
         path = session_dir / filename
         with pytest.raises(NotADirectoryError):
             path.rmdir()
@@ -524,14 +519,11 @@ class TestUnlink:
     @pytest.mark.parametrize('filename', utils.NON_DIRECTORY_PARENT_NAMES)
     def test_file_parent(
         self,
-        request: pytest.FixtureRequest,
         container: ops.Container,
         session_dir: pathlib.Path,
         filename: str,
         missing_ok: bool,
     ):
-        if missing_ok and filename in utils.DIRECT_NON_DIRECTORY_PARENT_NAMES:
-            request.applymarker(pytest.mark.xfail(strict=True, reason='succeeds silently'))
         path = session_dir / filename
         with pytest.raises(NotADirectoryError):
             path.unlink(missing_ok=missing_ok)

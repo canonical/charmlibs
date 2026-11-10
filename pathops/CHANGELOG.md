@@ -13,7 +13,9 @@ For paths under a symlink loop, `is_symlink` now returns `False`, and `read_text
 
 `ContainerPath.mkdir(exist_ok=True)` no longer calls `exists()` on the parent. Unit tests that patch `ContainerPath.exists` to fake a parent directory now need that directory to exist, for example in the `ops.testing` container filesystem.
 
-`ContainerPath.rmdir` and `unlink` now raise `NotADirectoryError` instead of `FileNotFoundError` for paths whose parent is a non-directory or a symlink to one, matching `pathlib.Path`. Unlike `pathlib.Path`, `unlink(missing_ok=True)` still succeeds silently for these paths.
+`ContainerPath.rmdir` and `unlink` now raise `NotADirectoryError` instead of `FileNotFoundError` for paths whose parent is a non-directory or a symlink to one, matching `pathlib.Path`.
+
+`ContainerPath.unlink(missing_ok=True)` now raises `NotADirectoryError` instead of succeeding silently for paths whose parent is a non-directory or a symlink to one, matching `pathlib.Path`.
 
 # 1.4.1 - 10 November 2026
 

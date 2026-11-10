@@ -401,9 +401,8 @@ class PathProtocol(typing.Protocol):
         Raises:
             FileNotFoundError: if the path does not exist and ``missing_ok`` is false.
             IsADirectoryError: if the path exists but is a directory.
-            NotADirectoryError: if a parent exists as a non-directory file. A
-                :class:`ContainerPath` doesn't raise this if ``missing_ok`` is true and only
-                the immediate parent is a non-directory.
+            NotADirectoryError: if the parent exists as a non-directory file,
+                regardless of ``missing_ok``.
             OSError: if a parent is a symbolic link loop (``errno.ELOOP``).
             PermissionError: if the local or remote user does not have the appropriate permissions.
             PebbleConnectionError: if the remote Pebble client cannot be reached.
