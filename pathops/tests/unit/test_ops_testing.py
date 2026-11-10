@@ -53,3 +53,14 @@ def test_name_isnt_a_pattern(container: ops.Container, tmp_path: pathlib.Path, n
     (tmp_path / name).touch()
     path.unlink()
     assert (tmp_path / 'sibling').exists()
+
+
+@pytest.mark.parametrize('name', ('s*', 's?bling', '[s]ibling', 'sibling[', 'back\\slash'))
+def test_is_symlink_name_isnt_a_pattern(
+    container: ops.Container, tmp_path: pathlib.Path, name: str
+):
+    (tmp_path / 'sibling').symlink_to(tmp_path)
+    path = ContainerPath(MOUNT, name, container=container)
+    assert not path.is_symlink()
+    (tmp_path / name).symlink_to(tmp_path)
+    assert path.is_symlink()
