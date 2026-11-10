@@ -207,7 +207,7 @@ jobs:
           # --notes-file`. Parse it here too, so a heading the extractor
           # can't match fails the PR rather than the release.
           VERSION=$(.scripts/ls.py packages --regex "^${PACKAGE}$" --exclude-examples --exclude-placeholders --output-only version --no-json)
-          python3 .scripts/extract_changelog.py "${PACKAGE}/CHANGELOG.md" "${VERSION}"
+          .scripts/extract_changelog.py "${PACKAGE}/CHANGELOG.md" "${VERSION}"
 
   changelogs-updated-if-releasing:  # GitHub status checks require a static job name
     needs: [changelog-updated]

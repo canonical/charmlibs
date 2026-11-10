@@ -1,3 +1,11 @@
+#!/usr/bin/env -S uv run --script --no-project
+
+# /// script
+# requires-python = ">=3.12"
+# dependencies = [
+# ]
+# ///
+
 # Copyright 2026 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -27,8 +35,9 @@ So a heading at any level counts if its first word, with any surrounding
 brackets removed, is the version we want, and its section runs to the next
 heading at the same level or shallower.
 
-Exits non-zero if the version is not found, so the caller notices the
-missing changelog entry rather than publishing an empty release body.
+Exits non-zero if the version is not found or its section is empty, so the
+caller notices the missing changelog entry rather than publishing an empty
+release body.
 """
 
 from __future__ import annotations
@@ -37,64 +46,15 @@ import argparse
 import pathlib
 import re
 import sys
+from typing import TYPE_CHECKING, NamedTuple
 
-_HEADING = re.compile(r'^(?P<hashes>#{1,6})[ \t]+(?P<title>\S.*)$')
-_FENCE = re.compile(r'^(?P<fence>`{3,}|~{3,})')
-
-
-def _version_of(title: str) -> str:
-    """Return the version a heading names, or '' if it doesn't name one.
-
-    Keep a Changelog brackets the version, so strip those.
-    """
-    return title.split()[0].strip('[]')
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 
-def _sections(text: str) -> dict[str, list[str]]:
-    """Map each heading's version to the lines of its section.
-
-    A section runs to the next heading at the same level or shallower, so a
-    version's ``### Fixed``-style subheadings stay in its body. If a version
-    appears more than once, the first section wins.
-
-    Headings inside fenced code blocks are ignored. A changelog entry for a
-    breaking change tends to carry a before/after example, and a Python comment
-    inside that example starts with a '#': taken as a heading, a '# Before'
-    would end the section there, and the release notes would lose the example
-    and everything after it, and end on an unterminated fence.
-    """
-    sections: dict[str, list[str]] = {}
-    open_sections: list[tuple[int, list[str]]] = []  # (level, lines) still collecting
-    fence = ''
-    for line in text.splitlines():
-        match = _FENCE.match(line.lstrip())
-        if match:
-            candidate = match.group('fence')
-            if not fence:
-                fence = candidate
-            elif candidate[0] == fence[0] and len(candidate) >= len(fence):
-                # A closing fence is the same character and at least as long.
-                fence = ''
-        elif not fence and (heading := _HEADING.match(line)):
-            level = len(heading.group('hashes'))
-            # A heading closes any open section at the same level or deeper.
-            open_sections = [(lvl, lines) for lvl, lines in open_sections if lvl < level]
-            for _, lines in open_sections:
-                lines.append(line)
-            version = _version_of(heading.group('title'))
-            if version not in sections:
-                sections[version] = []
-                open_sections.append((level, sections[version]))
-            continue
-        for _, lines in open_sections:
-            lines.append(line)
-    return sections
-
-
-def extract(text: str, version: str) -> str | None:
-    """Return the CHANGELOG section for ``version``, or ``None`` if absent."""
-    lines = _sections(text).get(version)
-    return None if lines is None else '\n'.join(lines).strip()
+class _Heading(NamedTuple):
+    level: int
+    version: str
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -103,17 +63,74 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument('changelog', type=pathlib.Path, help='Path to CHANGELOG.md.')
     parser.add_argument('version', help='Version to extract (e.g. 1.3.0.post0).')
     args = parser.parse_args(argv)
-
     section = extract(args.changelog.read_text(), args.version)
     if section is None:
-        print(
-            f'Version {args.version!r} not found in {args.changelog}',
-            file=sys.stderr,
-        )
+        msg = f'Version {args.version!r} not found in {args.changelog}'
+        print(msg, file=sys.stderr)
         return 1
-
+    if not section:
+        msg = f'Version {args.version!r} has an empty section in {args.changelog}'
+        print(msg, file=sys.stderr)
+        return 1
     print(section)
     return 0
+
+
+def extract(text: str, version: str) -> str | None:
+    """Return the CHANGELOG section for ``version``, or ``None`` if absent.
+
+    A heading with nothing under it gives an empty string.
+    If the version has more than one heading, the first one wins.
+    """
+    lines = _iter(text)
+    # Find the heading for this version.
+    for _, heading in lines:
+        if heading and heading.version == version:
+            break
+    else:  # No break, so no heading matched this version.
+        return None
+    # Collect and return the lines for this version.
+    body: list[str] = []
+    for line, other in lines:
+        if other and other.level <= heading.level:
+            break
+        body.append(line)
+    return '\n'.join(body).strip()
+
+
+def _iter(text: str) -> Iterator[tuple[str, _Heading | None]]:
+    """Yield each line of a changelog and heading data if it is a heading.
+
+    Lines inside fenced code blocks are never headings. A changelog entry for a
+    breaking change tends to carry a before/after example, and a Python comment
+    in it starts with a '#': taken as a heading, a '# Before' would end the
+    section there, and the release notes would lose the example and everything
+    after it.
+
+    A fence opens on three or more backticks or tildes, optionally followed by
+    an info string ('```python'). It closes on a line of only the same
+    character, at least as long, so a '```python' inside a '```' block is
+    content, not a close.
+    """
+    fence_re = re.compile(r'^(?P<fence>`{3,}|~{3,})')
+    heading_re = re.compile(r'^(?P<hashes>#{1,6})[ \t]+(?P<title>\S.*)$')
+    fence = ''  # The current code-fenced section's delimiter.
+    for line in text.splitlines():
+        heading = None
+        stripped = line.strip()
+        if fence:  # We're currently in a code-fenced section.
+            # If a line is a fence of equal or greater depth, the section ends.
+            if stripped.startswith(fence) and not stripped.strip(fence[0]):
+                fence = ''
+        # We're not in a code-fenced section, so check if one is starting.
+        elif match := fence_re.match(stripped):
+            fence = match['fence']
+        # We're not in or starting a code-fenced section, check if we're on a heading line.
+        elif match := heading_re.match(line):
+            # Keep a Changelog brackets the version: '## [0.5.0] - 2026-01-01'.
+            version = match['title'].split()[0].strip('[]')
+            heading = _Heading(level=len(match['hashes']), version=version)
+        yield line, heading
 
 
 if __name__ == '__main__':

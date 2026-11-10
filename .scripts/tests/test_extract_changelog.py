@@ -150,6 +150,22 @@ def test_both_fence_characters_are_honoured(fence: str):
     assert got.endswith('tail')
 
 
+def test_a_fence_with_an_info_string_does_not_close_a_block():
+    """Only a bare fence closes a block, so a '```python' inside one is content."""
+    text = '# 2.0.0\n\n```\n```python\n# not a heading\n```\n\ntail\n\n# 1.0.0\n\nold\n'
+    got = extract_changelog.extract(text, '2.0.0')
+    assert got is not None
+    assert '# not a heading' in got
+    assert got.endswith('tail')
+    assert extract_changelog.extract(text, '1.0.0') == 'old'
+
+
+def test_empty_section():
+    """A heading with nothing under it is found, just empty: main reports that."""
+    text = '# 1.1.0 - 2 June 2026\n\n# 1.0.0 - 1 June 2026\n\nFirst release.\n'
+    assert extract_changelog.extract(text, '1.1.0') == ''
+
+
 def test_main_prints_the_section(tmp_path: pathlib.Path, capsys: pytest.CaptureFixture[str]):
     changelog = tmp_path / 'CHANGELOG.md'
     changelog.write_text(CHANGELOG, encoding='utf-8')
@@ -157,6 +173,20 @@ def test_main_prints_the_section(tmp_path: pathlib.Path, capsys: pytest.CaptureF
     assert extract_changelog.main([str(changelog), '1.2.1']) == 0
 
     assert capsys.readouterr().out.strip() == extract_changelog.extract(CHANGELOG, '1.2.1')
+
+
+def test_main_reports_an_empty_section(tmp_path: pathlib.Path, capsys: pytest.CaptureFixture[str]):
+    """An empty release body is what the non-zero exit is there to prevent."""
+    changelog = tmp_path / 'CHANGELOG.md'
+    changelog.write_text('# 1.1.0 - 2 June 2026\n\n# 1.0.0\n\nold\n', encoding='utf-8')
+
+    assert extract_changelog.main([str(changelog), '1.1.0']) == 1
+
+    captured = capsys.readouterr()
+    assert captured.out == ''
+    assert '1.1.0' in captured.err
+    assert 'empty' in captured.err
+    assert str(changelog) in captured.err
 
 
 def test_main_reports_a_missing_version(
