@@ -109,6 +109,36 @@ def test_main_fails_early_on_missing_readme(
     assert sorted(p.name for p in ref_dir.iterdir()) == ['placeholder.md']
 
 
+def test_main_fails_after_writing_pages_if_there_were_warnings(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+):
+    """A warning while generating the pages fails the script, once every page is written."""
+    docs_dir = tmp_path / 'docs_site'
+    ref_dir = docs_dir / 'reference' / 'interfaces'
+    ref_dir.mkdir(parents=True)
+    v0_dir = tmp_path / 'interfaces' / 'foo' / 'interface' / 'v0'
+    v0_dir.mkdir(parents=True)
+    (v0_dir / 'README.md').write_text('# Foo v0\n')
+    (v0_dir / 'schema.py').write_text('')
+    monkeypatch.setattr(ip, '_DOCS_DIR', docs_dir)
+    monkeypatch.setattr(ip, '_REPO_ROOT', tmp_path)
+    monkeypatch.setattr(ip.subprocess, 'check_output', _fake_ls(['interfaces/foo']))
+    monkeypatch.setattr(ip, 'logger', ip._Logger())
+
+    def load_schemas(root: pathlib.Path, schema_paths: list[str]) -> dict[str, typing.Any]:
+        assert schema_paths == ['interfaces/foo/interface/v0/schema.py']
+        ip.logger.warning('Could not load the interface schemas: %s', 'no uv')
+        return {}
+
+    monkeypatch.setattr(ip, '_load_schemas', load_schemas)
+
+    with pytest.raises(SystemExit) as exc_info:
+        ip._main()
+
+    assert '1 warning(s)' in str(exc_info.value.code)
+    assert (ref_dir / 'foo' / 'v0.md').read_text() == '(interfaces-foo-v0)=\n# Foo v0\n'
+
+
 # --- _generate_interface_docs ---
 
 
