@@ -64,8 +64,9 @@ def _get_fileinfo_directly(path: ContainerPath) -> pebble.FileInfo:
 
 
 def _get_fileinfo_from_parent(path: ContainerPath) -> pebble.FileInfo:
+    pattern = _escape_pattern(path.name)
     try:
-        info_list = path._container.list_files(path._path.parent, pattern=path.name)
+        info_list = path._container.list_files(path._path.parent, pattern=pattern)
     except (pebble.APIError, pebble.PathError) as e:
         msg = repr(path)
         _errors.raise_if_matches_file_not_found(e, msg=msg)
@@ -75,6 +76,24 @@ def _get_fileinfo_from_parent(path: ContainerPath) -> pebble.FileInfo:
         _errors.raise_file_not_found(repr(path))
     assert len(info_list) == 1, 'ops.Container.list_files with non-* pattern should return 1 item'
     return info_list[0]
+
+
+def _escape_pattern(name: str) -> str:
+    """Return a Pebble pattern that matches only this literal name."""
+    # Each special character becomes a one-character class, which matches that literal character,
+    # both with Go's path.Match (used by Pebble) and with fnmatch (used by the ops.testing mock).
+    escapes = {
+        '*': '[*]',
+        '?': '[?]',
+        '[': '[[]',
+        # path.Match treats a backslash as an escape even inside a class, so a lone backslash
+        # there is a syntax error, and the class must contain an escaped one: [\\].
+        # fnmatch has no escape character, so it reads [\\] as a class listing a backslash twice,
+        # which still matches a single backslash.
+        # In the Python strings below, \\ is the escape for a single backslash.
+        '\\': '[\\\\]',
+    }
+    return name.translate(str.maketrans(escapes))
 
 
 def from_pathlib_path(path: pathlib.Path, follow_symlinks: bool = True) -> pebble.FileInfo:
