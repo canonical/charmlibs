@@ -28,7 +28,7 @@ import typing
 import pytest
 
 import utils
-from charmlibs.pathops import ContainerPath, LocalPath
+from charmlibs.pathops import ContainerPath, LocalPath, _constants
 
 if typing.TYPE_CHECKING:
     from collections.abc import Callable
@@ -758,13 +758,36 @@ class TestMkDir:
         filename: str,
         exist_ok: bool,
     ):
-        # Pebble's error doesn't identify the loop, so unlike pathlib we don't raise with ELOOP.
         path = session_dir / filename
         with pytest.raises(OSError) as ctx:
             path.mkdir(parents=True, exist_ok=exist_ok)
         assert ctx.value.errno == errno.ELOOP
-        with pytest.raises(NotADirectoryError):
+        with pytest.raises(OSError) as ctx:
             ContainerPath(path, container=container).mkdir(parents=True, exist_ok=exist_ok)
+        assert ctx.value.errno == errno.ELOOP
+
+    @pytest.mark.parametrize('exist_ok', (False, True))
+    @pytest.mark.parametrize('mode', (_constants.DEFAULT_MKDIR_MODE, 0o700))
+    @pytest.mark.parametrize(
+        'filename',
+        (f'{utils.BROKEN_SYMLINK_NAME}/child', f'{utils.BROKEN_SYMLINK_NAME}/child/child'),
+    )
+    def test_broken_symlink_parent_with_parents(
+        self,
+        container: ops.Container,
+        session_dir: pathlib.Path,
+        filename: str,
+        mode: int,
+        exist_ok: bool,
+    ):
+        path = session_dir / filename
+        with pytest.raises(FileExistsError):
+            path.mkdir(mode=mode, parents=True, exist_ok=exist_ok)
+        with pytest.raises(FileExistsError):
+            ContainerPath(path, container=container).mkdir(
+                mode=mode, parents=True, exist_ok=exist_ok
+            )
+        assert not (session_dir / utils.MISSING_FILE_NAME).exists()  # the target isn't created
 
     @pytest.mark.parametrize(('parents', 'exist_ok'), itertools.product((False, True), repeat=2))
     @pytest.mark.parametrize('filename', utils.NON_DIRECTORY_PARENT_NAMES)

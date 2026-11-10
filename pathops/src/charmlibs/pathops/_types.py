@@ -525,12 +525,12 @@ class PathProtocol(typing.Protocol):
                 The user and group are not changed if the directory already exists.
 
         Raises:
-            FileExistsError: if the directory already exists and ``exist_ok`` is ``False``.
+            FileExistsError: if the directory already exists and ``exist_ok`` is ``False``,
+                or if ``parents`` is ``True`` and a parent is a broken symbolic link.
             FileNotFoundError: if the parent directory does not exist and ``parents`` is ``False``.
             LookupError: if the user or group is unknown, or a group is provided without a user.
             NotADirectoryError: if the parent exists as a non-directory file.
-            OSError: if a parent is a symbolic link loop (``errno.ELOOP``). If ``parents`` is
-                ``True``, a :class:`ContainerPath` raises :class:`NotADirectoryError` instead.
+            OSError: if a parent is a symbolic link loop (``errno.ELOOP``).
             PermissionError: if the local user does not have permissions for the operation.
             PebbleConnectionError: if the remote Pebble client cannot be reached.
         """
