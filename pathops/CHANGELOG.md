@@ -1,21 +1,18 @@
-# Unreleased
+# 1.4.2 - 10 November 2026
 
-`ContainerPath` now matches `pathlib.Path` in more cases for paths where a parent exists but can't be traversed as a directory, because it's a non-directory (for example `/some/file.txt/child`) or a symlink to one:
+`ContainerPath` now matches `pathlib.Path` for paths where a parent exists but can't be traversed as a directory, because it's a non-directory (for example `/some/file.txt/child`) or a symlink to one:
 - `exists`, `is_dir`, `is_file`, `is_fifo` and `is_socket` now return `False` instead of raising `NotADirectoryError`.
 - `glob` now yields nothing instead of raising `NotADirectoryError`.
 - `read_text` and `read_bytes` now raise `NotADirectoryError` instead of `ops.pebble.PathError`.
-- For paths with a more distant non-directory parent (for example `/some/file.txt/child/child`), `is_symlink` now returns `False`, and `rmdir` and `unlink` now raise `NotADirectoryError`, instead of raising `ops.pebble.APIError`.
-- For paths with the same name as their non-directory parent (for example `/some/file.txt/file.txt`), `is_symlink` now returns `False`, instead of describing the parent, and `rmdir` and `unlink` now raise `FileNotFoundError` like other children of a non-directory.
+- `rmdir` and `unlink` now raise `NotADirectoryError` instead of `FileNotFoundError`. This includes `unlink(missing_ok=True)`, which previously succeeded silently.
+- For paths with a more distant non-directory parent (for example `/some/file.txt/child/child`), `is_symlink` now returns `False`, and `rmdir` and `unlink` raise `NotADirectoryError`, instead of raising `ops.pebble.APIError`.
+- For paths with the same name as their non-directory parent (for example `/some/file.txt/file.txt`), `is_symlink` now returns `False` instead of describing the parent.
 
 For paths under a symlink loop, `is_symlink` now returns `False`, and `read_text`, `read_bytes`, `rmdir`, `unlink` and `mkdir` now raise `OSError` (`errno.ELOOP`), instead of raising `ops.pebble.APIError` or `ops.pebble.PathError`, or `NotADirectoryError` for `mkdir(parents=True)`.
 
 `ContainerPath.mkdir(parents=True)` now raises `FileExistsError` instead of `NotADirectoryError` when a parent is a broken symlink, matching `pathlib.Path`.
 
 `ContainerPath.mkdir(exist_ok=True)` no longer calls `exists()` on the parent. Unit tests that patch `ContainerPath.exists` to fake a parent directory now need that directory to exist, for example in the `ops.testing` container filesystem.
-
-`ContainerPath.rmdir` and `unlink` now raise `NotADirectoryError` instead of `FileNotFoundError` for paths whose parent is a non-directory or a symlink to one, matching `pathlib.Path`.
-
-`ContainerPath.unlink(missing_ok=True)` now raises `NotADirectoryError` instead of succeeding silently for paths whose parent is a non-directory or a symlink to one, matching `pathlib.Path`.
 
 # 1.4.1 - 10 November 2026
 
