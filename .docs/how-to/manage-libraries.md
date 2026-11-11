@@ -91,11 +91,11 @@ The exact commit being referenced should be captured in `uv.lock` and committed 
 (manage-charmhub-libraries)=
 ## Manage legacy Charmhub-hosted libraries
 
-To use Charmhub-hosted libraries, list them in the {ref}`charm-libs section of charmcraft.yaml <charmcraft:charmcraft-yaml-key-charm-libs>` and then run {doc}`charmcraft fetch-libs <charmcraft:reference/commands/fetch-libs>`. This will download the libraries and place them in `lib/<charm>/v<api-version>/<lib-name>.py`. These files should be committed into your charm's version control.
+To use Charmhub-hosted libraries, list them in the {ref}`charm-libs section of charmcraft.yaml <charmcraft:charmcraft-yaml-key-charm-libs>` and then run {doc}`charmcraft fetch-libs <charmcraft:reference/commands/fetch-libs>`. This will download the libraries and place them in `lib/charms/<charm>/v<api-version>/<lib-name>.py`. These files should be committed into your charm's version control.
 
 Charm libraries all have an API version and a patch version, broadly equivalent to the major and minor version in semantic versioning. If a library is specified by API version only then rerunning `charmcraft fetch-libs` will update the library if a newer patch release is available.
 
-The `lib` directory is added to the `PYTHONPATH` by the charm's `dispatch` script, so these libraries are imported in charm code as `$charm.v$api-version.$lib-name`.
+The `lib` directory is added to the `PYTHONPATH` by the charm's `dispatch` script, so these libraries are imported in charm code as `charms.$charm.v$api-version.$lib-name`.
 
 For example, you might add this to `charmcraft.yaml`:
 
@@ -105,7 +105,7 @@ charm-libs:
     version: "2"
 ```
 
-And then in your charm code, you would write `from operator_libs_linux.v2 import snap`.
+And then in your charm code, you would write `from charms.operator_libs_linux.v2 import snap`.
 
 ```{warning}
 This is just an example -- don't  really do this! Add `charmlibs-snap` to your dependencies and write `from charmlibs import snap` instead.
