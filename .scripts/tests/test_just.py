@@ -307,6 +307,13 @@ class TestFormat:
             assert ['uv', 'run', '--only-group=fast-lint', 'ruff', 'format', '.'] in commands
             assert not any('check' in cmd for cmd in commands)
 
+    def test_no_fix_and_unsafe_fixes_are_exclusive(self):
+        with patch('just._run', return_value=0) as mock_run:
+            with pytest.raises(SystemExit) as exc_info:
+                just.format(['--no-fix', '--unsafe-fixes'])
+            assert exc_info.value.code == 2
+            mock_run.assert_not_called()
+
 
 class TestCoverageEnv:
     def test_ok(self):

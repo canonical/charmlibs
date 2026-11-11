@@ -210,12 +210,13 @@ def format(argv: list[str]) -> int:  # noqa: A001
     parser.add_argument(
         'path', nargs='?', default='.', help='Path to format, defaults to the repo.'
     )
-    parser.add_argument(
+    fixes = parser.add_mutually_exclusive_group()
+    fixes.add_argument(
         '--unsafe-fixes',
         action='store_true',
         help='Forward `--unsafe-fixes` to `ruff check`, applying fixes marked as unsafe.',
     )
-    parser.add_argument(
+    fixes.add_argument(
         '--no-fix',
         action='store_true',
         help='Skip `ruff check --fix`, only running `ruff format`.',
