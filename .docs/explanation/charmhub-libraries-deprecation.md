@@ -11,7 +11,7 @@ Charmhub-hosted charm libraries -- single-file Python modules fetched with `char
 
 ## Background
 
-Charms originally shared code by distributing single-file Python modules on Charmhub. Each module was associated with a specific charm. Charms fetched libraries using the `charmcraft fetch-lib` and `charmcraft fetch-libs` commands, and typically checked them into their version control. These libraries were stored under `lib/`, which was added to `PYTHONPATH` at runtime, allowing the module to be imported by charm name and API version. For example `from operator_libs_linux.v2 import snap`.
+Charms originally shared code by distributing single-file Python modules on Charmhub. Each module was associated with a specific charm. Charms fetched libraries using the `charmcraft fetch-lib` and `charmcraft fetch-libs` commands, and typically checked them into their version control. These libraries were stored under `lib/`, which was added to `PYTHONPATH` at runtime, allowing the module to be imported by charm name and API version. For example `from charms.operator_libs_linux.v2 import snap`.
 
 ## Timeline
 
