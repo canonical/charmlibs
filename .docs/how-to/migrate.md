@@ -202,7 +202,6 @@ just lint <library path>
 
 Consider running `just format --no-fix` to fix the formatting first.
 Then run `just format` to also fix any `ruff check` errors that can be fixed automatically.
-This lets you commit the formatting changes separately from the `ruff check --fix` changes, which are occasionally more surprising.
 
 You can also check if your docstrings are compatible with the format that Sphinx expects when building the reference docs.
 From anywhere in the repo, run `just docs`.
