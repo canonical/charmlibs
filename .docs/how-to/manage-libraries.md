@@ -125,4 +125,8 @@ charm-libs:
     version: "0"
 ```
 
+```{tip}
+When a Charmhub-hosted library you use is superseded by a Python package, switch your charm to the package -- see {ref}`how-to-migrate-charm`.
+```
+
 Read more: {ref}`charm-libs-charmhub-hosted`, {ref}`Charmcraft | Manage libraries <charmcraft:manage-libraries>`
