@@ -205,7 +205,7 @@ def check(argv: list[str]) -> int:
 
 @_register
 def format(argv: list[str]) -> int:  # noqa: A001
-    """Run `ruff check --fix` and `ruff format`, modifying files in place."""
+    """Run `ruff format`, then `ruff check --fix` unless `--no-fix`, modifying files in place."""
     parser = _parser(format)
     parser.add_argument(
         'path', nargs='?', default='.', help='Path to format, defaults to the repo.'
