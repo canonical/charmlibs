@@ -205,7 +205,7 @@ def check(argv: list[str]) -> int:
 
 @_register
 def format(argv: list[str]) -> int:  # noqa: A001
-    """Run `ruff format`, then `ruff check --fix` unless `--no-fix`, modifying files in place."""
+    """Run `ruff format`, then `ruff check --fix` unless `--format-only`. Edits files in place."""
     parser = _parser(format)
     parser.add_argument(
         'path', nargs='?', default='.', help='Path to format, defaults to the repo.'
@@ -217,14 +217,14 @@ def format(argv: list[str]) -> int:  # noqa: A001
         help='Forward `--unsafe-fixes` to `ruff check`, applying fixes marked as unsafe.',
     )
     fixes.add_argument(
-        '--no-fix',
+        '--format-only',
         action='store_true',
         help='Skip `ruff check --fix`, only running `ruff format`.',
     )
     args = parser.parse_args(argv)
     ruff = ['uv', 'run', '--only-group=fast-lint', 'ruff']
     _run([*ruff, 'format', args.path])
-    if args.no_fix:
+    if args.format_only:
         return 0
     check = [*ruff, 'check', '--fix']
     if args.unsafe_fixes:

@@ -300,17 +300,17 @@ class TestFormat:
                 '.',
             ] in commands
 
-    def test_no_fix_skips_check(self):
+    def test_format_only_skips_check(self):
         with patch('just._run', return_value=0) as mock_run:
-            assert just.format(['--no-fix']) == 0
+            assert just.format(['--format-only']) == 0
             commands = [call.args[0] for call in mock_run.call_args_list]
             assert ['uv', 'run', '--only-group=fast-lint', 'ruff', 'format', '.'] in commands
             assert not any('check' in cmd for cmd in commands)
 
-    def test_no_fix_and_unsafe_fixes_are_exclusive(self):
+    def test_format_only_and_unsafe_fixes_are_exclusive(self):
         with patch('just._run', return_value=0) as mock_run:
             with pytest.raises(SystemExit) as exc_info:
-                just.format(['--no-fix', '--unsafe-fixes'])
+                just.format(['--format-only', '--unsafe-fixes'])
             assert exc_info.value.code == 2
             mock_run.assert_not_called()
 
