@@ -7,23 +7,21 @@
     "default": {},
     "examples": [
         {
-            "urls": {
-              "unit_name": "http://foo.bar:80/model_name-unit_name/0"
-            }
+            "ingress": "prometheus-k8s/0:\n  url: http://foo.bar:80/model_name-prometheus-k8s/0\nprometheus-k8s/1:\n  url: http://foo.bar:80/model_name-prometheus-k8s/1\n"
         }
     ],
     "required": [
-        "urls"
+        "ingress"
     ],
     "properties": {
-        "data": {
-            "$id": "#/properties/urls",
+        "ingress": {
+            "$id": "#/properties/ingress",
             "type": "string",
-            "title": "URLs",
-            "description": "A yaml-encoded mapping from unit names to URLs for which ingress is provided.",
+            "title": "Ingress",
+            "description": "A yaml-encoded mapping from unit names to objects with a `url` field, giving the URL at which ingress is provided for that unit.",
             "default": null,
             "examples": [
-                    "prometheus-k8s/0: http://foo.bar:80/model_name-prometheus-k8s/0\nprometheus-k8s/1: http://foo.bar:80/model_name-prometheus-k8s/1"
+                "prometheus-k8s/0:\n  url: http://foo.bar:80/model_name-prometheus-k8s/0\nprometheus-k8s/1:\n  url: http://foo.bar:80/model_name-prometheus-k8s/1\n"
             ]
         }
     },

@@ -11,10 +11,10 @@ Examples:
 
     Requirer:
         unit: {
-              "name": "app-name",
               "host": "hostname"
               }
         app: {
+              "name": "app-name",
               "port": 4242,
               "model": "model-name"
               }
@@ -31,14 +31,37 @@ class ProviderAppData(BaseModel):
     ingress: Url
 
 
+class HealthCheck(BaseModel):
+    path: str = Field(description="The health check endpoint path.")
+    scheme: str | None = Field(
+        default=None, description="Replaces the server URL scheme for the health check endpoint."
+    )
+    hostname: str | None = Field(
+        default=None, description="Hostname to be set in the health check request."
+    )
+    port: int | None = Field(
+        default=None, description="Replaces the server URL port for the health check endpoint."
+    )
+    interval: str = Field(default="30s", description="Frequency of the health check calls.")
+    timeout: str = Field(default="5s", description="Maximum duration for a health check request.")
+
+
 class RequirerAppData(BaseModel):
     model: str = Field(description="The model the application is in.")
     port: int = Field(description="The port the unit wishes to be exposed. Stringified int.")
     name: str = Field(description="The name of the application requesting ingress.")
+    is_port_open: bool = Field(default=False, description="Whether the port is open.")
+    healthcheck_params: HealthCheck | None = Field(
+        default=None, description="Optional health check configuration for ingress."
+    )
 
 
 class RequirerUnitData(BaseModel):
     host: str = Field(description="Unit hostname to be exposed.")
+    ip: str | None = Field(
+        default=None,
+        description="IP address at which the unit is reachable, if Juju provides one.",
+    )
 
 
 ProviderUnitData = None
