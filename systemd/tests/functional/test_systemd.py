@@ -15,11 +15,23 @@
 """Functional tests for the `systemd` charm library."""
 
 import logging
+import time
+from collections.abc import Callable
 from subprocess import check_output
 
 from charmlibs import systemd
 
 logger = logging.getLogger(__name__)
+
+
+def _wait_for(condition: Callable[[], bool], timeout: float = 10) -> bool:
+    """Poll until condition() is true or the timeout expires."""
+    deadline = time.monotonic() + timeout
+    while not condition():
+        if time.monotonic() > deadline:
+            return False
+        time.sleep(0.1)
+    return True
 
 
 def test_service() -> None:
@@ -40,6 +52,7 @@ def test_service() -> None:
         with open(f'/etc/systemd/system/{name}', 'w+') as f:
             f.writelines([f'{line.strip()}\n' for line in content.split('\n')])
 
+        systemd.daemon_reload()
         systemd.service_restart(name)
 
     # Cron is pre-installed in the lxc images we are using.
@@ -53,8 +66,9 @@ def test_service() -> None:
     systemd.service_stop('test.service')
 
     # test failed status
+    # With Type=simple, the restart returns once bash is spawned, before the command fails.
     create_service('test.service', 'bad command')
-    assert systemd.service_failed('test.service')
+    assert _wait_for(lambda: systemd.service_failed('test.service'))
 
 
 def test_pause_and_resume() -> None:
