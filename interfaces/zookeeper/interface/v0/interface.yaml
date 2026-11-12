@@ -15,3 +15,5 @@ requirers:
     url: https://github.com/canonical/kafka-k8s-operator
   - name: kyuubi-k8s-operator
     url: https://github.com/canonical/kyuubi-k8s-operator
+
+maintainer: data-bigdata
