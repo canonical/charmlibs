@@ -70,7 +70,7 @@ _BLANK_ONLY_CALLS: dict[str, Callable[[str], object]] = {
 }
 
 # Functions with no name-like arguments at all are outside both contracts.
-_NO_ARGUMENTS = {'system_arch'}
+_NO_ARGUMENTS = {'system_info'}
 
 # A blank value is only ever a typo for something. The full set of characters Python and snapd
 # agree are whitespace is covered in test_utils.py; one is enough to pin each call site.

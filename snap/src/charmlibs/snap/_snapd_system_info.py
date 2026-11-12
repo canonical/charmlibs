@@ -21,27 +21,51 @@ import typing
 
 from . import _client, _errors
 
+if typing.TYPE_CHECKING:
+    from typing import Any
+
+    from typing_extensions import Self
+
 logger = logging.getLogger(__name__)
 
 # /v2/system-info
 
 
-def system_arch() -> str:
-    """Get the system architecture as reported by snapd.
+class SystemInfo:
+    """Information about the system, as reported by snapd."""
 
-    This is the architecture snapd and the snap store use to pick snap revisions, in
-    Debian/snap naming: for example ``amd64``, ``arm64``, ``ppc64el``, or ``s390x``.
-    The intended use is keying per-architecture data, such as a map from architecture
-    to a pinned snap revision.
+    def __init__(self, architecture: str):
+        self._architecture = architecture
 
-    The value is snapd's (userspace) architecture, which can differ from ``uname -m`` --
-    for example on a system running a 32-bit userspace over a 64-bit kernel.
+    @classmethod
+    def _from_dict(cls, info_dict: dict[str, Any]) -> Self:
+        return cls(architecture=info_dict['architecture'])
+
+    @property
+    def architecture(self) -> str:
+        """The system architecture snapd and the snap store use to pick snap revisions.
+
+        In Debian/snap naming: for example ``amd64``, ``arm64``, ``ppc64el``, or ``s390x``.
+        The intended use is keying per-architecture data, such as a map from architecture
+        to a pinned snap revision.
+
+        This is snapd's (userspace) architecture, which can differ from ``uname -m`` --
+        for example on a system running a 32-bit userspace over a 64-bit kernel.
+        """
+        return self._architecture
+
+    def __repr__(self) -> str:
+        return f'{type(self).__name__}(architecture={self.architecture!r})'
+
+
+def system_info() -> SystemInfo:
+    """Get information about the system as reported by snapd.
 
     Returns:
-        The architecture string, exactly as snapd reports it.
+        A :class:`SystemInfo` object with information about the system.
 
     Raises:
-        BadResponseError: if snapd's response has no readable architecture.
+        BadResponseError: if snapd's response isn't one we can read.
         Error: (or a subtype) if the information could not be retrieved for another reason.
     """
     result = _client.get('/v2/system-info')
@@ -50,11 +74,13 @@ def system_arch() -> str:
             message=f'Unexpected response type {type(result).__name__!r} for system information, expected a "dict"',  # noqa: E501
             response=result,
         )
-    result = typing.cast('dict[str, object]', result)
-    architecture = result.get('architecture')
-    if not isinstance(architecture, str) or not architecture:
+    result = typing.cast('dict[str, Any]', result)
+    try:
+        return SystemInfo._from_dict(result)
+    except (KeyError, TypeError, ValueError) as e:
+        # A field we require is missing, or holds something we can't parse. Reported rather than
+        # asserted, so that the documented contract -- every failure is an Error -- holds here too.
         raise _errors.BadResponseError(
-            message=f"Could not read snapd's system architecture: {architecture!r}",
+            message=f"Could not read snapd's system information: {e!r}",
             response=result,
-        )
-    return architecture
+        ) from None

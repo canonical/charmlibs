@@ -19,8 +19,8 @@ channel or revision.
 
 Manually manage snap installation with :func:`install`, :func:`refresh`, and :func:`remove`.
 Use :func:`list_one` to query the current state of an installed snap.
-Use :func:`system_arch` for the system architecture snapd and the snap store use to pick
-revisions.
+Use :func:`system_info` to query information about the system, such as the architecture
+snapd and the snap store use to pick revisions.
 
 Also manage:
 
@@ -116,7 +116,8 @@ from ._snapd_snaps import (
     unhold,
 )
 from ._snapd_system_info import (
-    system_arch,
+    SystemInfo,
+    system_info,
 )
 from ._version import __version__ as __version__
 
@@ -136,6 +137,7 @@ __all__ = [
     'OptionNotFoundError',
     'RevisionNotAvailableError',
     'SocketNotFoundError',
+    'SystemInfo',
     'TimeoutError',
     'alias',
     'connect',
@@ -153,7 +155,7 @@ __all__ = [
     'set',
     'start',
     'stop',
-    'system_arch',
+    'system_info',
     'unalias',
     'unhold',
     'unset',
