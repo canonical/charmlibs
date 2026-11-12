@@ -1,0 +1,59 @@
+[project]
+name = "charmlibs-interfaces-smtp"
+description = "The charmlibs.interfaces.smtp package."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    {name="The Charm Tech team at Canonical"},
+]
+license = "Apache-2.0"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Intended Audience :: Developers",
+    "Operating System :: POSIX :: Linux",
+    "Development Status :: 5 - Production/Stable",
+]
+dynamic = ["version"]
+dependencies = [
+    "email-validator>=2",
+    # Libraries should use clear but wide dependency bounds to avoid overly constraining charms.
+    # Ops 3 is backwards compatible with Ops 2, but drops Python 3.8 support.
+    # Ops 3 has new features not present in Ops 2.23 (the last Ops 2 feature release).
+    # See the Ops 2.23 maintenance branch changelog and the Ops 3 changelog for current information:
+    # - https://github.com/canonical/operator/blob/2.23-maintenance/CHANGES.md
+    # - https://github.com/canonical/operator/blob/main/CHANGES.md
+    # Set the dependency bounds according to the features and fixes your library needs.
+    # "ops>=2.23.1,<4",
+    "ops>=2.23.1,<4",
+    "pydantic>=1.10,<3",
+]
+
+
+[dependency-groups]
+lint = [  # installed for `just lint interfaces/smtp` (unit is also installed)
+    # "typing_extensions",
+]
+unit = [  # installed for `just unit interfaces/smtp`
+    "ops[testing]",
+]
+
+[project.urls]
+"Documentation" = "https://canonical.com/juju/docs/charmlibs/reference/charmlibs/interfaces/smtp"
+"Repository" = "https://github.com/canonical/charmlibs/tree/main/interfaces/smtp"
+"Issues" = "https://github.com/canonical/charmlibs/issues"
+"Changelog" = "https://github.com/canonical/charmlibs/blob/main/interfaces/smtp/CHANGELOG.md"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/charmlibs"]
+
+[tool.hatch.version]
+path = "src/charmlibs/interfaces/smtp/_version.py"
+
+[tool.pyright]
+extends = "../../pyproject.toml"
+include = ["src", "tests"]
+pythonVersion = "3.10"  # check no python > 3.10 features are used
