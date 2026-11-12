@@ -5,6 +5,7 @@
 
 import logging
 import os
+import platform
 import shutil
 import subprocess
 from pathlib import Path
@@ -90,27 +91,25 @@ def test_install_package_from_external_repository():
 
 
 def test_install_higher_version_package_from_external_repository():
-    repo_id = 'deb-https://ppa.launchpadcontent.net/fish-shell/release-3/ubuntu/-jammy'
+    # The release-4 PPA publishes a newer fish than the Ubuntu archive for each supported series.
+    codename = platform.freedesktop_os_release()['VERSION_CODENAME']
+    ppa_uri = 'https://ppa.launchpadcontent.net/fish-shell/release-4/ubuntu/'
+    repo_id = f'deb-{ppa_uri}-{codename}'
     repos = apt.RepositoryMapping()
     assert repo_id not in repos
     # version before
     if not shutil.which('fish'):
         apt.add_package('fish')
     assert shutil.which('fish')
-    version_before = subprocess.run(
-        ['fish', '--version'],
-        capture_output=True,
-        check=True,
-        text=True,
-    ).stdout
+    version_before = apt.DebianPackage.from_installed_package('fish').version
     apt.remove_package('fish')
     assert not shutil.which('fish')
     # steps
     repo = apt.DebianRepository(
         enabled=True,
         repotype='deb',
-        uri='https://ppa.launchpadcontent.net/fish-shell/release-3/ubuntu/',
-        release='jammy',
+        uri=ppa_uri,
+        release=codename,
         groups=['main'],
     )
     repos.add(repo)  # update_cache=False by default
@@ -120,13 +119,8 @@ def test_install_higher_version_package_from_external_repository():
     apt.update()
     apt.add_package('fish')
     assert shutil.which('fish')
-    version_after = subprocess.run(
-        ['fish', '--version'],
-        capture_output=True,
-        check=True,
-        text=True,
-    ).stdout
-    assert version_after > version_before  # lexical comparison :(
+    version_after = apt.DebianPackage.from_installed_package('fish').version
+    assert version_after > version_before
     # cleanup
     os.remove(key_file)
     apt._add_repository(repo, remove=True)
