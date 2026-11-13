@@ -222,6 +222,14 @@ def test_write_text_newline_value_error(tmp_path: pathlib.Path):
         LocalPath(path).write_text('', newline='bad')
 
 
+def test_write_text_unknown_encoding(tmp_path: pathlib.Path):
+    path = tmp_path / 'path'
+    with pytest.raises(LookupError):
+        path.write_text('', encoding='not-a-codec')
+    with pytest.raises(LookupError):
+        LocalPath(path).write_text('', encoding='not-a-codec')
+
+
 class TestGlobPattern:
     @pytest.fixture
     def populated_dir(self, tmp_path: pathlib.Path) -> pathlib.Path:

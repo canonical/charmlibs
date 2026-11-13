@@ -175,13 +175,14 @@ class LocalPath(pathlib.PosixPath):
                 # explicitly set the mode if the user requested it
                 os.fchmod(fd, mode)
             os.ftruncate(fd, 0)
-            if text:
-                # newline='' because newlines were already handled by the caller.
-                return open(fd, 'w', encoding=encoding, errors=errors, newline='')
-            return open(fd, 'wb')
         except BaseException:
             os.close(fd)
             raise
+        # open() owns the descriptor from here, and closes it itself if it fails.
+        if text:
+            # newline='' because newlines were already handled by the caller.
+            return open(fd, 'w', encoding=encoding, errors=errors, newline='')
+        return open(fd, 'wb')
 
     def glob(  # pyright: ignore[reportIncompatibleMethodOverride]
         self, pattern: str | os.PathLike[str]
