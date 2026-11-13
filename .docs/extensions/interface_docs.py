@@ -237,10 +237,12 @@ def _field_rows(
 ) -> list[str]:
     if not isinstance(prop, dict):  # a boolean schema
         prop = {}
+    # A recursive schema still gets a row for the field that recurses, but isn't expanded
+    # again, so the table doesn't loop forever or leave the field out.
+    recurse = True
     ref = prop.get('$ref')
     if isinstance(ref, str):
-        if ref in seen:  # a recursive schema: stop rather than loop forever
-            return []
+        recurse = ref not in seen
         seen = (*seen, ref)
     alternatives = _alternatives(prop, root)
     types: list[str] = []
@@ -250,6 +252,8 @@ def _field_rows(
     description = ' '.join(description.split()).replace('|', '\\|')
     required = 'yes' if is_required else 'no'
     rows = [f'| `{path}` | {" or ".join(types)} | {required} | {description} |']
+    if not recurse:
+        return rows
     for alternative in alternatives:
         items = alternative.get('items')
         if alternative.get('type') == 'array' and isinstance(items, dict):

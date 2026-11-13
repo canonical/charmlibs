@@ -161,6 +161,7 @@ def test_schema_table_stops_on_recursion():
     }
     assert _rows(schema) == [
         '| `node` | object | no |  |',
+        '| `node.child` | object | no |  |',
     ]
 
 
