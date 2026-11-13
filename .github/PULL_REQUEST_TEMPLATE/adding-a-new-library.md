@@ -46,6 +46,7 @@ Tests and docs:
 - [ ] Directory name exactly matches the interface name as written in `charmcraft.yaml`.
 - [ ] Interface metadata added under `interfaces/<name>/interface/` (readme, metadata, databag schema).
 - [ ] Testing package added under `interfaces/<name>/testing/` exporting `relation_for_provider` and `relation_for_requirer` if needed (see [how-to guide](https://canonical.com/juju/docs/charmlibs/how-to/provide-relation-data-for-charm-tests/)).
+- [ ] The charm-facing API has been checked against [how to design an interface library API](https://canonical.com/juju/docs/charmlibs/how-to/design-interface-library-apis/), and this PR documents where it differs.
 
 ## Commit strategy
 
