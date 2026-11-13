@@ -109,8 +109,6 @@ def test_install_higher_version_package_from_external_repository():
     # index and never see the newer fish. add-apt-repository drops [arch=...] options, so
     # disable variants for the duration of the test instead.
     no_variants_conf = Path('/etc/apt/apt.conf.d/zzz-charmlibs-test-no-variants')
-    no_variants_conf.write_text('#clear APT::Architecture-Variants;\n')
-    # steps
     repo = apt.DebianRepository(
         enabled=True,
         repotype='deb',
@@ -118,22 +116,31 @@ def test_install_higher_version_package_from_external_repository():
         release=codename,
         groups=['main'],
     )
-    repos.add(repo)  # update_cache=False by default
-    assert repo_id in repos
-    assert repo_id in apt.RepositoryMapping()
-    key_file = apt.import_key((KEY_DIR / 'FISH_KEY.asc').read_text())
-    apt.update()
-    policy = subprocess.run(
-        ['apt-cache', 'policy', 'fish'], capture_output=True, check=True, text=True
-    ).stdout
-    apt.add_package('fish')
-    assert shutil.which('fish')
-    version_after = apt.DebianPackage.from_installed_package('fish').version
-    assert version_after > version_before, policy
-    # cleanup
-    os.remove(key_file)
-    no_variants_conf.unlink()
-    apt._add_repository(repo, remove=True)
+    key_file = None
+    # The variants setting, key, and repository are machine-wide, so undo them even if the test
+    # fails, or the apt tests that run after this one see a different system.
+    try:
+        no_variants_conf.write_text('#clear APT::Architecture-Variants;\n')
+        # steps
+        repos.add(repo)  # update_cache=False by default
+        assert repo_id in repos
+        assert repo_id in apt.RepositoryMapping()
+        key_file = apt.import_key((KEY_DIR / 'FISH_KEY.asc').read_text())
+        apt.update()
+        policy = subprocess.run(
+            ['apt-cache', 'policy', 'fish'], capture_output=True, check=True, text=True
+        ).stdout
+        apt.add_package('fish')
+        assert shutil.which('fish')
+        version_after = apt.DebianPackage.from_installed_package('fish').version
+        assert version_after > version_before, policy
+    finally:
+        # cleanup
+        if key_file is not None:
+            os.remove(key_file)
+        no_variants_conf.unlink(missing_ok=True)
+        if repo_id in apt.RepositoryMapping():
+            apt._add_repository(repo, remove=True)
     assert repo_id not in apt.RepositoryMapping()
     apt.update()
     apt.remove_package('fish')
