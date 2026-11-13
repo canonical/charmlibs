@@ -50,6 +50,10 @@ compatible with the interface.
 
 The requirer specifies a set of certificate signing requests (CSR's).
 
+#### Fields
+
+<!-- schema-table: schema.py:RequirerUnitData -->
+
 #### Example
 
 ```json
@@ -86,6 +90,10 @@ The provider charm responds to CSRs submitted by the requirer:
 **Backward Compatibility**:
 The `request_errors` field is optional and additive. Older requirers that do not understand this field will continue to function normally, they will simply not receive error information for failed requests.
 Older providers that don't support `request_errors` will simply not include failed CSRs in any response.
+
+#### Fields
+
+<!-- schema-table: schema.py:ProviderAppData -->
 
 #### Example
 

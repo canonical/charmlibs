@@ -123,7 +123,7 @@ The build is intentionally multi-pass, because different libraries can have conf
 The logic for steps 2 and 3 lives in the local Sphinx extensions under `.docs/extensions/`, which are registered in `.docs/conf.py`. In particular:
 
 - `package_docs.py` drives the per-package autodoc passes and saves/restores each library's reference doctree.
-- `interface_docs.py` generates the interface specification pages. During the final pass it reads the interface `README.md` files, rewrites relative links to point at the repo on GitHub, and writes the pages under `reference/interfaces/`. (During the per-package passes it only writes a placeholder so the toctree glob doesn't fail.)
+- `interface_docs.py` generates the interface specification pages. During the final pass it reads the interface `README.md` files, rewrites relative links to point at the repo on GitHub, and writes the pages under `reference/interfaces/`. A README can also include a `<!-- schema-table: SOURCE -->` marker, which the extension replaces with a table of the schema's fields. `SOURCE` is either a JSON schema file in the interface version's directory, such as `schemas/provider.json`, or a Python file and the name of a pydantic model in it, such as `schema.py:ProviderAppData`. The model is imported in a separate environment built from `schema-requirements.txt`, so that file must list everything `schema.py` needs. (During the per-package passes it only writes a placeholder so the toctree glob doesn't fail.)
 
 ## Working on the docs extensions
 

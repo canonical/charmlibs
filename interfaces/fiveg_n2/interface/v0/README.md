@@ -31,6 +31,10 @@ Both the Requirer and the Provider need to adhere to criteria to be considered c
 
 [\[Pydantic Schema\]](./schema.py)
 
+### Provider app data
+
+<!-- schema-table: schema.py:ProviderAppData -->
+
 ### Example
 
 ```yaml

@@ -22,6 +22,8 @@ import re
 import subprocess
 import typing
 
+from sphinx.errors import ExtensionError
+
 ####################
 # Sphinx extension #
 ####################
@@ -64,6 +66,9 @@ INDEX_TEMPLATE = """
 ```
 """.strip()
 REPO_MAIN_URL = 'https://github.com/canonical/charmlibs/blob/main'
+# A README can contain `<!-- schema-table: schemas/provider.json -->` to have the field table for
+# that schema generated at docs build time, so that the schema is the only source of truth.
+SCHEMA_TABLE_MARKER = re.compile(r'<!--\s*schema-table:\s*(\S+?)\s*-->')
 
 
 def _main(docs_dir: pathlib.Path) -> None:
@@ -83,7 +88,7 @@ def _main(docs_dir: pathlib.Path) -> None:
         index = INDEX_TEMPLATE.format(label=label, interface_name=interface_name)
         _write_if_needed(path=ref_dir / f'{interface_name}.md', content=index)
         for v in (interface_dir / 'interface').glob('v[0-9]*'):
-            readme_raw = (v / 'README.md').read_text()
+            readme_raw = _expand_schema_tables((v / 'README.md').read_text(), v)
             base_url = f'{REPO_MAIN_URL}/interfaces/{interface_name}/interface/{v.name}'
             # match all non-http(s) markdown links and prepend base_url to matching links
             readme = re.sub(
@@ -93,6 +98,221 @@ def _main(docs_dir: pathlib.Path) -> None:
             )
             content = f'({label}-{v.name})=\n' + readme
             _write_if_needed(path=interface_ref_dir / f'{v.name}.md', content=content)
+
+
+def _expand_schema_tables(readme: str, version_dir: pathlib.Path) -> str:
+    """Replace each schema-table marker in the README with a table generated from the schema."""
+
+    def replace(match: re.Match[str]) -> str:
+        try:
+            schema = _load_schema(version_dir, match.group(1))
+        except (OSError, json.JSONDecodeError, _SchemaDumpError) as e:
+            raise ExtensionError(
+                f'{version_dir / "README.md"}: cannot build the table for {match.group(0)}: {e}'
+            ) from e
+        return _schema_table(schema)
+
+    return SCHEMA_TABLE_MARKER.sub(replace, readme)
+
+
+# Run in a separate environment, so that the docs build doesn't need the schema dependencies.
+_DUMP_PYDANTIC_SCHEMA = """
+import importlib.util, json, sys
+spec = importlib.util.spec_from_file_location('schema', sys.argv[1])
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+print(json.dumps(getattr(module, sys.argv[2]).model_json_schema()))
+"""
+
+
+def _load_schema(version_dir: pathlib.Path, source: str) -> dict[str, typing.Any]:
+    """Load the JSON schema named by a schema-table marker.
+
+    The source is either a JSON schema file (`schemas/provider.json`), or a Python file and the
+    name of a pydantic model in it (`schema.py:ProviderAppData`).
+    """
+    filename, _, model = source.partition(':')
+    path = version_dir / filename
+    if not model:
+        return json.loads(path.read_text())
+    root = pathlib.Path(__file__).parent.parent.parent
+    cmd = [
+        'uv', 'run', '--no-project', '--quiet',
+        '--with-requirements', str(root / 'schema-requirements.txt'),
+        'python', '-c', _DUMP_PYDANTIC_SCHEMA, str(path), model,
+    ]  # fmt: skip
+    result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    if result.returncode != 0:
+        raise _SchemaDumpError(result.stderr.strip() or f'exit code {result.returncode}')
+    return json.loads(result.stdout)
+
+
+class _SchemaDumpError(Exception):
+    """The subprocess dumping a pydantic model's schema failed; the message is its stderr."""
+
+
+def _schema_table(schema: dict[str, typing.Any]) -> str:
+    """Render the fields of a JSON schema as a Markdown table.
+
+    Nested object properties and array items are flattened using dotted paths, with `[]` marking
+    array items and `{...}` marking keys matched by a pattern or allowed as additional properties.
+    Local `$ref`s are followed, and the alternatives of an `anyOf` or `oneOf` are merged.
+    """
+    # Alternatives that share a field would otherwise list it more than once.
+    fields = list(dict.fromkeys(_schema_rows(schema, root=schema, prefix='', seen=())))
+    if not fields:
+        return 'This schema has no fields.'
+    rows = ['| Field | Type | Required | Description |', '| --- | --- | --- | --- |', *fields]
+    if _has_nested_fields(fields):
+        rows.extend(['', 'For a nested field, Required means required within its parent.'])
+    return '\n'.join(rows)
+
+
+def _has_nested_fields(rows: list[str]) -> bool:
+    """Whether any row is for a field inside another, such as `a.b` or `a[].b`.
+
+    A dot alone doesn't say so, since `{...}` and pattern keys can contain one.
+    """
+    paths = [row.split('`', 2)[1] for row in rows]
+    return any(
+        path.startswith('[]')
+        or any(
+            path.startswith((f'{parent}.', f'{parent}[]')) for parent in paths if parent != path
+        )
+        for path in paths
+    )
+
+
+def _resolve(schema: dict[str, typing.Any], root: dict[str, typing.Any]) -> dict[str, typing.Any]:
+    """Follow a local `$ref` (to `#/$defs/...` or `#/definitions/...`), keeping sibling keys."""
+    ref = schema.get('$ref')
+    if not isinstance(ref, str) or not ref.startswith('#/'):
+        return schema
+    target: typing.Any = root
+    for part in ref[2:].split('/'):
+        target = target[part]
+    siblings = {k: v for k, v in schema.items() if k != '$ref'}
+    return {**_resolve(target, root), **siblings}
+
+
+def _alternatives(
+    schema: dict[str, typing.Any], root: dict[str, typing.Any]
+) -> list[dict[str, typing.Any]]:
+    """Return the resolved alternatives of a schema, or the schema itself if it has none."""
+    if not isinstance(schema, dict):  # a boolean schema (`true` or `false`) has no fields
+        return []
+    schema = _resolve(schema, root)
+    options = schema.get('anyOf') or schema.get('oneOf')
+    if not options:
+        return [schema]
+    rest = {k: v for k, v in schema.items() if k not in ('anyOf', 'oneOf')}
+    result: list[dict[str, typing.Any]] = []
+    for option in options:
+        result.extend(_alternatives({**rest, **option}, root))
+    return result
+
+
+def _type_names(schema: dict[str, typing.Any]) -> list[str]:
+    ref = schema.get('$ref')
+    if isinstance(ref, str):  # only local references are resolved, so link to anything else
+        return [f'[external schema]({ref})']
+    type_ = schema.get('type')
+    if isinstance(type_, list):
+        return [str(t) for t in type_]
+    if type_:
+        name = str(type_)
+    elif 'enum' in schema or 'const' in schema:
+        values = schema['enum'] if 'enum' in schema else [schema['const']]
+        name = ' or '.join(dict.fromkeys(_json_type(v) for v in values))
+    elif 'properties' in schema:
+        name = 'object'
+    else:
+        return []
+    if 'enum' in schema:
+        name += ' (' + ', '.join(f'`{v}`' for v in schema['enum']) + ')'
+    elif 'const' in schema:
+        name += f' (`{schema["const"]}`)'
+    return [name]
+
+
+def _json_type(value: object) -> str:
+    """The JSON schema type name of a value, as it appears in an ``enum`` or ``const``."""
+    if value is None:
+        return 'null'
+    if isinstance(value, bool):  # before int, which bool is a subclass of
+        return 'boolean'
+    if isinstance(value, int):
+        return 'integer'
+    if isinstance(value, float):
+        return 'number'
+    if isinstance(value, list):
+        return 'array'
+    if isinstance(value, dict):
+        return 'object'
+    return 'string'
+
+
+def _schema_rows(
+    schema: dict[str, typing.Any],
+    root: dict[str, typing.Any],
+    prefix: str,
+    seen: tuple[str, ...],
+) -> list[str]:
+    rows: list[str] = []
+    for alternative in _alternatives(schema, root):
+        required = set(alternative.get('required', []))
+        children = [
+            (name, prop, name in required)
+            for name, prop in alternative.get('properties', {}).items()
+        ]
+        children.extend(
+            (f'{{{pattern}}}', prop, False)
+            for pattern, prop in alternative.get('patternProperties', {}).items()
+        )
+        additional = alternative.get('additionalProperties')
+        if isinstance(additional, dict) and additional:
+            children.append(('{...}', additional, False))
+        for name, prop, is_required in children:
+            rows.extend(_field_rows(prop, root, f'{prefix}{name}', is_required, seen))
+        items = alternative.get('items')
+        if not prefix and alternative.get('type') == 'array' and isinstance(items, dict):
+            rows.extend(_schema_rows(items, root, prefix='[].', seen=seen))
+    return rows
+
+
+def _field_rows(
+    prop: dict[str, typing.Any],
+    root: dict[str, typing.Any],
+    path: str,
+    is_required: bool,
+    seen: tuple[str, ...],
+) -> list[str]:
+    if not isinstance(prop, dict):  # a boolean schema
+        prop = {}
+    # A recursive schema still gets a row for the field that recurses, but isn't expanded
+    # again, so the table doesn't loop forever or leave the field out.
+    recurse = True
+    ref = prop.get('$ref')
+    if isinstance(ref, str):
+        recurse = ref not in seen
+        seen = (*seen, ref)
+    alternatives = _alternatives(prop, root)
+    types: list[str] = []
+    for alternative in alternatives:
+        types.extend(t for t in _type_names(alternative) if t not in types)
+    description = _resolve(prop, root).get('description') or ''
+    description = ' '.join(description.split()).replace('|', '\\|')
+    required = 'yes' if is_required else 'no'
+    rows = [f'| `{path}` | {" or ".join(types)} | {required} | {description} |']
+    if not recurse:
+        return rows
+    for alternative in alternatives:
+        items = alternative.get('items')
+        if alternative.get('type') == 'array' and isinstance(items, dict):
+            rows.extend(_schema_rows(items, root, prefix=f'{path}[].', seen=seen))
+        else:
+            rows.extend(_schema_rows(alternative, root, prefix=f'{path}.', seen=seen))
+    return rows
 
 
 def _write_if_needed(path: pathlib.Path, content: str) -> None:
