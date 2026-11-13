@@ -65,12 +65,12 @@ class LocalPath(pathlib.PosixPath):
                 :class:`bytearray` or :class:`memoryview`.
             mode: The permissions to set on the file. Defaults to 0o644 (-rw-r--r--) for new files.
                 If the file already exists, its permissions will be changed, using
-                :meth:`pathlib.PosixPath.chmod`, unless ``mode`` is ``None`` (default).
-            user: The name of the user to set for the file using :func:`shutil.chown`.
+                :func:`os.fchmod`, unless ``mode`` is ``None`` (default).
+            user: The name of the user to set for the file using :func:`os.fchown`.
                 Validated to be an existing user before writing.
                 If the file already exists, its user and group will be changed,
                 unless ``user`` is ``None`` (default).
-            group: The name of the group to set for the file using :func:`shutil.chown`.
+            group: The name of the group to set for the file using :func:`os.fchown`.
                 Validated to be an existing group before writing.
                 If the file already exists, its group will be changed,
                 unless ``user`` and ``group`` are ``None`` (default).
@@ -121,12 +121,12 @@ class LocalPath(pathlib.PosixPath):
                 then ``'\n'`` will be replaced with ``newline`` in memory before writing.
             mode: The permissions to set on the file. Defaults to 0o644 (-rw-r--r--) for new files.
                 If the file already exists, its permissions will be changed, using
-                :meth:`pathlib.PosixPath.chmod`, unless ``mode`` is ``None`` (default).
-            user: The name of the user to set for the file using :func:`shutil.chown`.
+                :func:`os.fchmod`, unless ``mode`` is ``None`` (default).
+            user: The name of the user to set for the file using :func:`os.fchown`.
                 Validated to be an existing user before writing.
                 If the file already exists, its user and group will be changed,
                 unless ``user`` is ``None`` (default).
-            group: The name of the group to set for the file using :func:`shutil.chown`.
+            group: The name of the group to set for the file using :func:`os.fchown`.
                 Validated to be an existing group before writing.
                 If the file already exists, its group will be changed,
                 unless ``user`` and ``group`` are ``None`` (default).
