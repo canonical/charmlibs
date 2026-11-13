@@ -117,10 +117,13 @@ def test_install_higher_version_package_from_external_repository():
     assert repo_id in apt.RepositoryMapping()
     key_file = apt.import_key((KEY_DIR / 'FISH_KEY.asc').read_text())
     apt.update()
+    policy = subprocess.run(
+        ['apt-cache', 'policy', 'fish'], capture_output=True, check=True, text=True
+    ).stdout
     apt.add_package('fish')
     assert shutil.which('fish')
     version_after = apt.DebianPackage.from_installed_package('fish').version
-    assert version_after > version_before
+    assert version_after > version_before, policy
     # cleanup
     os.remove(key_file)
     apt._add_repository(repo, remove=True)
