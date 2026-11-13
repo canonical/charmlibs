@@ -22,6 +22,8 @@ import re
 import subprocess
 import typing
 
+from sphinx.errors import ExtensionError
+
 ####################
 # Sphinx extension #
 ####################
@@ -102,7 +104,13 @@ def _expand_schema_tables(readme: str, version_dir: pathlib.Path) -> str:
     """Replace each schema-table marker in the README with a table generated from the schema."""
 
     def replace(match: re.Match[str]) -> str:
-        return _schema_table(_load_schema(version_dir, match.group(1)))
+        try:
+            schema = _load_schema(version_dir, match.group(1))
+        except (OSError, json.JSONDecodeError, _SchemaDumpError) as e:
+            raise ExtensionError(
+                f'{version_dir / "README.md"}: cannot build the table for {match.group(0)}: {e}'
+            ) from e
+        return _schema_table(schema)
 
     return SCHEMA_TABLE_MARKER.sub(replace, readme)
 
@@ -133,7 +141,14 @@ def _load_schema(version_dir: pathlib.Path, source: str) -> dict[str, typing.Any
         '--with-requirements', str(root / 'schema-requirements.txt'),
         'python', '-c', _DUMP_PYDANTIC_SCHEMA, str(path), model,
     ]  # fmt: skip
-    return json.loads(subprocess.check_output(cmd, text=True))
+    result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    if result.returncode != 0:
+        raise _SchemaDumpError(result.stderr.strip() or f'exit code {result.returncode}')
+    return json.loads(result.stdout)
+
+
+class _SchemaDumpError(Exception):
+    """The subprocess dumping a pydantic model's schema failed; the message is its stderr."""
 
 
 def _schema_table(schema: dict[str, typing.Any]) -> str:

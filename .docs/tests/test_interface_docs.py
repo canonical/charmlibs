@@ -19,14 +19,15 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import typing
 
 import interface_docs
+import pytest
+from sphinx.errors import ExtensionError
 
 if typing.TYPE_CHECKING:
     import pathlib
-
-    import pytest
 
 SCHEMA = {
     'required': ['jobs'],
@@ -168,13 +169,34 @@ def test_schema_table_stops_on_recursion():
 def test_load_schema_from_pydantic_model(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch):
     calls: list[list[str]] = []
 
-    def check_output(cmd: list[str], text: bool) -> str:
+    def run(cmd: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
         calls.append(cmd)
-        return json.dumps(SCHEMA)
+        return subprocess.CompletedProcess(cmd, 0, stdout=json.dumps(SCHEMA), stderr='')
 
-    monkeypatch.setattr(interface_docs.subprocess, 'check_output', check_output)
+    monkeypatch.setattr(interface_docs.subprocess, 'run', run)
     assert interface_docs._load_schema(tmp_path, 'schema.py:ProviderAppData') == SCHEMA
     (cmd,) = calls
     assert cmd[:3] == ['uv', 'run', '--no-project']
     assert cmd[-2:] == [str(tmp_path / 'schema.py'), 'ProviderAppData']
     assert any(arg.endswith('schema-requirements.txt') for arg in cmd)
+
+
+def test_bad_marker_names_the_readme(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch):
+    (tmp_path / 'empty.json').write_text('')
+
+    def run(cmd: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(cmd, 1, stdout='', stderr='AttributeError: Nope')
+
+    monkeypatch.setattr(interface_docs.subprocess, 'run', run)
+    cases = {
+        'missing.json': 'missing.json',
+        'empty.json': 'Expecting value',
+        'schema.py:Nope': 'AttributeError: Nope',
+    }
+    for source, reason in cases.items():
+        with pytest.raises(ExtensionError) as excinfo:
+            interface_docs._expand_schema_tables(f'<!-- schema-table: {source} -->', tmp_path)
+        message = str(excinfo.value)
+        assert str(tmp_path / 'README.md') in message
+        assert f'schema-table: {source}' in message
+        assert reason in message
