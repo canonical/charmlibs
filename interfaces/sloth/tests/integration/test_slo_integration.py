@@ -17,7 +17,7 @@ PROVIDER = 'sloth-test-provider'
 REQUIRER = 'sloth-test-requirer'
 
 
-@pytest.mark.setup
+@pytest.mark.juju_setup
 def test_setup_provider(juju: Juju, sloth_provider_charm: str) -> None:
     """Deploy the Sloth provider test charm."""
     juju.deploy(
@@ -39,7 +39,7 @@ def test_setup_provider(juju: Juju, sloth_provider_charm: str) -> None:
     )
 
 
-@pytest.mark.setup
+@pytest.mark.juju_setup
 def test_setup_requirer(juju: Juju, sloth_requirer_charm: str) -> None:
     """Deploy the Sloth requirer test charm."""
     juju.deploy(
@@ -203,7 +203,8 @@ def test_relation_removal(juju: Juju) -> None:
     logger.info('After relation removal, services: %s', services)
 
 
-@pytest.mark.teardown
+# Skipped by --no-juju-teardown, which keeps the model for debugging.
+@pytest.mark.juju_teardown
 def test_teardown(juju: Juju) -> None:
     """Clean up deployed charms."""
     status = juju.status()
