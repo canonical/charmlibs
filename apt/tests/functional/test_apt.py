@@ -106,8 +106,8 @@ def test_install_higher_version_package_from_external_repository():
     assert not shutil.which('fish')
     # The PPA only builds for base architectures, so on systems using an architecture variant
     # (such as amd64v3 on GitHub's ubuntu-26.04 runners) apt would read the PPA's empty variant
-    # index and never see the newer fish. add-apt-repository drops [arch=...] options, so
-    # disable variants for the duration of the test instead.
+    # index and never see the newer fish. add-apt-repository drops [arch=...] options (#790),
+    # so disable variants for the duration of the test instead.
     no_variants_conf = Path('/etc/apt/apt.conf.d/zzz-charmlibs-test-no-variants')
     repo = apt.DebianRepository(
         enabled=True,
