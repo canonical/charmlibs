@@ -17,13 +17,15 @@
 from __future__ import annotations
 
 import io
+import os
 import pathlib
+import tempfile
 import typing
 
 import pytest
 
 import utils
-from charmlibs.pathops import ContainerPath, LocalPath, _constants, ensure_contents
+from charmlibs.pathops import ContainerPath, LocalPath, _constants, ensure_contents, rmtree
 from charmlibs.pathops._functions import _get_fileinfo
 
 if typing.TYPE_CHECKING:
@@ -105,3 +107,135 @@ def test_get_fileinfo(
         synthetic_dict = utils.info_to_dict(synthetic_result, exclude=exclude)
         pebble_dict = utils.info_to_dict(pebble_result, exclude=exclude)
         assert synthetic_dict == pebble_dict
+
+
+PathType = type[str] | type[pathlib.Path] | type[ContainerPath]
+PATH_TYPES: tuple[PathType, ...] = (str, pathlib.Path, LocalPath, ContainerPath)
+
+
+def as_path(
+    path: pathlib.Path, path_type: PathType, container: ops.Container
+) -> str | pathlib.Path | ContainerPath:
+    if issubclass(path_type, ContainerPath):
+        return ContainerPath(path, container=container)
+    return path_type(path)
+
+
+@pytest.mark.parametrize('path_type', PATH_TYPES)
+def test_rmtree_removes_tree(
+    tmp_path: pathlib.Path, container: ops.Container, path_type: PathType
+):
+    root = tmp_path / 'target'
+    (root / 'sub').mkdir(parents=True)
+    (root / 'file.txt').write_bytes(b'data')
+    (root / 'sub' / 'nested.txt').write_bytes(b'data')
+    (root / 'sub' / 'empty').mkdir()
+    rmtree(as_path(root, path_type, container))
+    assert not os.path.lexists(root)
+
+
+@pytest.mark.parametrize('path_type', PATH_TYPES)
+def test_rmtree_not_found(tmp_path: pathlib.Path, container: ops.Container, path_type: PathType):
+    with pytest.raises(FileNotFoundError):
+        rmtree(as_path(tmp_path / 'does_not_exist', path_type, container))
+
+
+@pytest.mark.parametrize('path_type', PATH_TYPES)
+def test_rmtree_regular_file(
+    tmp_path: pathlib.Path, container: ops.Container, path_type: PathType
+):
+    file = tmp_path / 'file.txt'
+    file.write_bytes(b'data')
+    with pytest.raises(NotADirectoryError):
+        rmtree(as_path(file, path_type, container))
+    assert file.read_bytes() == b'data'
+
+
+@pytest.mark.parametrize('target', ['real_dir', 'does_not_exist'])
+@pytest.mark.parametrize('path_type', PATH_TYPES)
+def test_rmtree_symlink(
+    tmp_path: pathlib.Path,
+    container: ops.Container,
+    path_type: PathType,
+    target: str,
+):
+    (tmp_path / 'real_dir').mkdir()
+    (tmp_path / 'real_dir' / 'file.txt').write_bytes(b'data')
+    link = tmp_path / 'link'
+    link.symlink_to(tmp_path / target)
+    with pytest.raises(NotADirectoryError):
+        rmtree(as_path(link, path_type, container))
+    assert os.path.lexists(link)
+    assert (tmp_path / 'real_dir' / 'file.txt').read_bytes() == b'data'
+
+
+@pytest.mark.parametrize('target', ['outside', 'outside/precious.txt', 'does_not_exist'])
+@pytest.mark.parametrize('path_type', PATH_TYPES)
+def test_rmtree_removes_symlinks_in_tree_without_following(
+    tmp_path: pathlib.Path,
+    container: ops.Container,
+    path_type: PathType,
+    target: str,
+):
+    outside = tmp_path / 'outside'
+    outside.mkdir()
+    (outside / 'precious.txt').write_bytes(b'keep me')
+    root = tmp_path / 'target'
+    (root / 'sub').mkdir(parents=True)
+    (root / 'sub' / 'link').symlink_to(tmp_path / target)
+    rmtree(as_path(root, path_type, container))
+    assert not os.path.lexists(root)
+    assert [p.name for p in outside.iterdir()] == ['precious.txt']
+    assert (outside / 'precious.txt').read_bytes() == b'keep me'
+
+
+def _rmtree_outcome(path: pathlib.Path | ContainerPath, root: pathlib.Path):
+    """Return the exception type raised (or None) and what remains under root."""
+    try:
+        rmtree(path)
+    except Exception as e:
+        error = type(e)
+    else:
+        error = None
+    remaining = sorted(
+        str(pathlib.Path(dirpath, name).relative_to(root))
+        for dirpath, dirnames, filenames in os.walk(root)
+        for name in (*dirnames, *filenames)
+    )
+    return error, remaining
+
+
+@pytest.mark.parametrize(
+    'filename',
+    [
+        *utils.FILENAMES_PLUS,
+        pytest.param(
+            f'{utils.EMPTY_FILE_NAME}/child',
+            marks=pytest.mark.xfail(
+                strict=True,
+                reason='ContainerPath raises FileNotFoundError when the parent is a file',
+            ),
+        ),
+        f'{utils.NESTED_DIR_NAME}/{utils.MISSING_FILE_NAME}',
+    ],
+)
+def test_rmtree_local_and_container_match(container: ops.Container, filename: str):
+    # Use a short temporary directory, as Unix socket paths are limited to 108 characters
+    with tempfile.TemporaryDirectory() as tmp:
+        local_root = pathlib.Path(tmp, 'local')
+        container_root = pathlib.Path(tmp, 'container')
+        local_root.mkdir()
+        container_root.mkdir()
+        cleanups = [
+            utils._populate_interesting_dir(local_root),
+            utils._populate_interesting_dir(container_root),
+        ]
+        try:
+            local_outcome = _rmtree_outcome(LocalPath(local_root, filename), local_root)
+            container_outcome = _rmtree_outcome(
+                ContainerPath(container_root, filename, container=container), container_root
+            )
+        finally:
+            for cleanup in cleanups:
+                cleanup()
+    assert local_outcome == container_outcome
