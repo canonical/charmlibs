@@ -15,10 +15,9 @@ logger = logging.getLogger(__name__)
 
 @pytest.fixture(scope='module')
 def juju(juju: jubilant.Juju) -> Iterator[jubilant.Juju]:
-    """Deploy into pytest-jubilant's temporary model.
+    """Set the logging config on pytest-jubilant's temporary model.
 
-    pytest-jubilant creates the model and tears it down afterwards. See its
-    ``--no-juju-teardown`` and ``--juju-dump-logs`` options.
+    Sloth's test charms are deployed by the ``juju_setup`` tests, not here.
     """
     juju.model_config({'logging-config': '<root>=INFO;unit=DEBUG'})
     yield juju
