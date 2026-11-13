@@ -112,7 +112,7 @@
         "related-units": {
             "type": "object",
             "patternProperties": {
-                "^.*/d+$": {
+                "^.*/\\d+$": {
                     "type": "object",
                     "additionalProperties": true
                 }
