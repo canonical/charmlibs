@@ -185,3 +185,6 @@ interfaces/.example/**/uv.lock
 
 # Workshop lock file (machine-local state)
 .workshop.lock
+
+# Juju debug-logs from pytest-jubilant's --juju-dump-logs
+.logs/
