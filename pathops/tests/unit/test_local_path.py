@@ -125,19 +125,37 @@ def test_write_methods_set_mode_before_writing_content(
     if existing:
         path.write_bytes(b'old content that is longer')
         path.chmod(0o644)
-    modes_when_written: list[int] = []
-    real_ftruncate = os.ftruncate
+    sizes_when_chmodded: list[int] = []
+    real_fchmod = os.fchmod
 
-    def ftruncate(fd: int, length: int) -> None:
-        # Truncation happens after the mode is set and before any new content is written.
-        modes_when_written.append(os.fstat(fd).st_mode & 0o777)
-        real_ftruncate(fd, length)
+    def fchmod(fd: int, mode: int) -> None:
+        # Any old content is gone before the mode changes, and no new content is there yet.
+        sizes_when_chmodded.append(os.fstat(fd).st_size)
+        real_fchmod(fd, mode)
 
-    monkeypatch.setattr(os, 'ftruncate', ftruncate)
+    monkeypatch.setattr(os, 'fchmod', fchmod)
     getattr(path, method)(b'new' if method == 'write_bytes' else 'new', mode=mode)
-    assert modes_when_written == [mode]
+    assert sizes_when_chmodded == [0]
     assert path.read_bytes() == b'new'
     assert path.stat().st_mode & 0o777 == mode
+
+
+@pytest.mark.parametrize('method', ['write_bytes', 'write_text'])
+def test_write_methods_leave_an_empty_file_when_chmod_fails(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path, method: str
+):
+    # The old content is truncated before the mode changes, so a failure leaves neither the
+    # old content nor the new.
+    path = LocalPath(tmp_path, 'file')
+    path.write_bytes(b'old secret')
+
+    def fchmod(_fd: int, _mode: int) -> None:
+        raise PermissionError('nope')
+
+    monkeypatch.setattr(os, 'fchmod', fchmod)
+    with pytest.raises(PermissionError):
+        getattr(path, method)(b'new' if method == 'write_bytes' else 'new', mode=0o600)
+    assert path.read_bytes() == b''
 
 
 @pytest.mark.parametrize(

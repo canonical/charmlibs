@@ -163,18 +163,19 @@ class LocalPath(pathlib.PosixPath):
     ) -> typing.IO[typing.Any]:
         # Set the permissions and ownership on the open file descriptor before any content is
         # written, so that the content is never readable with the wrong permissions or owner.
+        # O_TRUNC empties an existing file before either changes, so its old content is never
+        # readable with the new permissions or by the new owner either.
         # Because the descriptor is already open, this also works when the requested mode is
         # not writable (for example, 0o444) and the local user is not root.
         # A new file is created private if the caller specified a mode (the umask only ever
         # removes permissions), or with Pebble's default write mode otherwise.
         create_mode = _constants.DEFAULT_WRITE_MODE if mode is None else 0o600
-        fd = os.open(self, os.O_WRONLY | os.O_CREAT, create_mode)
+        fd = os.open(self, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, create_mode)
         try:
             _fchown_if_needed(fd, user=user, group=group)
             if mode is not None:
                 # explicitly set the mode if the user requested it
                 os.fchmod(fd, mode)
-            os.ftruncate(fd, 0)
         except BaseException:
             os.close(fd)
             raise
