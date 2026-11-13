@@ -36,7 +36,7 @@ functional = [  # installed for `just functional example`
 ]
 integration = [  # installed for `just integration example`
     "jubilant",
-    "pytest-jubilant>=2",
+    "pytest-jubilant>=2.3.1",
 ]
 
 [project.urls]
