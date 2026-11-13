@@ -57,6 +57,7 @@ def _main(package: pathlib.Path) -> None:
     lines = [
         f'versions={json.dumps(versions)}',
         f'min_version={versions[0]}',
+        f'max_version={versions[-1]}',
     ]
     with pathlib.Path(os.environ['GITHUB_OUTPUT']).open('a') as f:
         for line in lines:

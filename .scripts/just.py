@@ -26,6 +26,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import os
 import pathlib
 import re
@@ -33,12 +34,13 @@ import shlex
 import shutil
 import subprocess
 import sys
+import tempfile
 import textwrap
 import tomllib
 import typing
 
 if typing.TYPE_CHECKING:
-    from collections.abc import Callable, Sequence
+    from collections.abc import Callable, Iterator, Sequence
     from types import FunctionType
     from typing import IO
 
@@ -195,10 +197,12 @@ def check(argv: list[str]) -> int:
     """`lint`, `unit` test, and build the `docs` for a package."""
     args = _package_parser(check).parse_args(argv)
     python = _resolve_python(args.package, args.python)
-    if failures := lint([args.package, '--python', python]):
+    package_argv = [args.package, '--python', python]
+    if args.resolution is not None:
+        package_argv.extend(['--resolution', args.resolution])
+    if failures := lint(package_argv):
         sys.exit(failures)
-    for cmd in _coverage_cmds(REPO_ROOT / args.package, 'unit', python, ['-rA']):
-        _run(cmd, cwd=REPO_ROOT / args.package, env=_coverage_env())
+    unit(package_argv)
     _run(['just', 'docs', 'html', args.package])
     return 0
 
@@ -234,7 +238,7 @@ def lint(argv: list[str]) -> int:
     args, pyright_args = _package_parser(lint).parse_known_args(argv)
     python = _resolve_python(args.package, args.python)
     failures = _fast_lint(args.package)
-    if _static(args.package, python, pyright_args) != 0:
+    if _static(args.package, python, pyright_args, resolution=args.resolution) != 0:
         failures += 1
     return failures
 
@@ -253,7 +257,7 @@ def static(argv: list[str]) -> int:
     """Run `pyright` static analysis for a package."""
     args, pyright_args = _package_parser(static).parse_known_args(argv)
     python = _resolve_python(args.package, args.python)
-    return _static(args.package, python, pyright_args)
+    return _static(args.package, python, pyright_args, resolution=args.resolution)
 
 
 def _fast_lint(path: str) -> int:
@@ -272,13 +276,22 @@ def _fast_lint(path: str) -> int:
     return failures
 
 
-def _static(package: str, python: str, pyright_args: Sequence[str]) -> int:
+def _static(
+    package: str,
+    python: str,
+    pyright_args: Sequence[str],
+    *,
+    resolution: str | None = None,
+) -> int:
     """Run `pyright` for a package against the given Python version, returning its exit code."""
     pkg_dir = REPO_ROOT / package
     cmd = ['--with', 'pytest-interface-tester'] if pkg_dir.parent.name == 'interfaces' else []
     cmd.extend(['pyright', f'--pythonversion={python}', *pyright_args])
     groups = ['lint', 'unit', 'functional', 'integration']
-    return _uv_run(cmd, pkg_dir=pkg_dir, python=python, groups=groups, check=False)
+    with _resolution_sandbox(pkg_dir, resolution):
+        return _uv_run(
+            cmd, pkg_dir=pkg_dir, python=python, groups=groups, resolution=resolution, check=False
+        )
 
 
 # --- Coverage recipes ---------------------------------------------------------------------------
@@ -289,9 +302,13 @@ def unit(argv: list[str]) -> int:
     """Run unit tests with `coverage` for a package."""
     args, pytest_args = _package_parser(unit).parse_known_args(argv)
     python = _resolve_python(args.package, args.python)
-    cmds = _coverage_cmds(REPO_ROOT / args.package, 'unit', python, pytest_args or ['-rA'])
-    for cmd in cmds:
-        _run(cmd, cwd=REPO_ROOT / args.package, env=_coverage_env())
+    pkg_dir = REPO_ROOT / args.package
+    cmds = _coverage_cmds(
+        pkg_dir, 'unit', python, pytest_args or ['-rA'], resolution=args.resolution
+    )
+    with _resolution_sandbox(pkg_dir, args.resolution):
+        for cmd in cmds:
+            _run(cmd, cwd=pkg_dir, env=_coverage_env())
     return 0
 
 
@@ -300,7 +317,13 @@ def functional(argv: list[str]) -> int:
     """Run functional tests with `coverage` for a package."""
     args, pytest_args = _package_parser(functional).parse_known_args(argv)
     python = _resolve_python(args.package, args.python)
-    cmds = _coverage_cmds(REPO_ROOT / args.package, 'functional', python, pytest_args or ['-rA'])
+    cmds = _coverage_cmds(
+        REPO_ROOT / args.package,
+        'functional',
+        python,
+        pytest_args or ['-rA'],
+        resolution=args.resolution,
+    )
     joined = ' && '.join(shlex.join(str(part) for part in cmd) for cmd in cmds)
     script = textwrap.dedent(
         f"""
@@ -318,27 +341,38 @@ def functional(argv: list[str]) -> int:
         exit "$returncode"
         """
     ).strip()
-    _run(['bash', '-c', script], cwd=REPO_ROOT / args.package, env=_coverage_env())
+    pkg_dir = REPO_ROOT / args.package
+    with _resolution_sandbox(pkg_dir, args.resolution):
+        _run(['bash', '-c', script], cwd=pkg_dir, env=_coverage_env())
     return 0
 
 
-def _coverage_cmds(pkg_dir: pathlib.Path, suite: str, python: str, pytest_args: list[str]):
+def _coverage_cmds(
+    pkg_dir: pathlib.Path,
+    suite: str,
+    python: str,
+    pytest_args: list[str],
+    *,
+    resolution: str | None = None,
+):
     """Return cmds for `coverage run -m pytest` and `coverage report` for package and suite."""
     data_file_arg = f'--data-file=.report/coverage-{suite}-{python}.db'
     run = [
         *('coverage', 'run', data_file_arg, '--source=src', '-m'),
         *('pytest', '--tb=native', '-vv', f'tests/{suite}', *pytest_args),
     ]
-    run_cmd = _uv_cmd(run, pkg_dir=pkg_dir, python=python, groups=[suite])
+    run_cmd = _uv_cmd(run, pkg_dir=pkg_dir, python=python, groups=[suite], resolution=resolution)
     report = ['coverage', 'report', data_file_arg]
-    report_cmd = _uv_cmd(report, pkg_dir=pkg_dir, python=python, groups=[suite])
+    report_cmd = _uv_cmd(
+        report, pkg_dir=pkg_dir, python=python, groups=[suite], resolution=resolution
+    )
     return run_cmd, report_cmd
 
 
 @_register
 def combine_coverage(argv: list[str]) -> int:
     """Combine a package's `coverage` reports."""
-    args = _package_parser(combine_coverage).parse_args(argv)
+    args = _package_parser(combine_coverage, resolution=False).parse_args(argv)
     pkg_dir = REPO_ROOT / args.package
     python = _resolve_python(args.package, args.python)
     env = _coverage_env()
@@ -423,18 +457,21 @@ def _integration(fn: FunctionType, substrate: str, argv: list[str]) -> int:
         help='Value for the CHARMLIBS_TAG environment var (defaults to $CHARMLIBS_TAG).',
     )
     args, pytest_args = parser.parse_known_args(argv)
-    return _uv_run(
-        [
-            *('pytest', '--tb=native', '-vv'),
-            *('-m', {'k8s': 'not machine_only', 'machine': 'not k8s_only'}[substrate]),
-            'tests/integration',
-            *(pytest_args or ['-rA']),
-        ],
-        pkg_dir=REPO_ROOT / args.package,
-        python=_resolve_python(args.package, args.python),
-        groups=['integration'],
-        env={**os.environ, 'CHARMLIBS_SUBSTRATE': substrate, 'CHARMLIBS_TAG': args.tag},
-    )
+    pkg_dir = REPO_ROOT / args.package
+    with _resolution_sandbox(pkg_dir, args.resolution):
+        return _uv_run(
+            [
+                *('pytest', '--tb=native', '-vv'),
+                *('-m', {'k8s': 'not machine_only', 'machine': 'not k8s_only'}[substrate]),
+                'tests/integration',
+                *(pytest_args or ['-rA']),
+            ],
+            pkg_dir=pkg_dir,
+            python=_resolve_python(args.package, args.python),
+            groups=['integration'],
+            resolution=args.resolution,
+            env={**os.environ, 'CHARMLIBS_SUBSTRATE': substrate, 'CHARMLIBS_TAG': args.tag},
+        )
 
 
 # --- Other recipes -----------------------------------------------------------------------------
@@ -501,14 +538,32 @@ def _parser(fn: FunctionType) -> argparse.ArgumentParser:
     return argparse.ArgumentParser(prog=prog, description=fn.__doc__)
 
 
-def _package_parser(fn: FunctionType) -> argparse.ArgumentParser:
-    """Return an `ArgumentParser` with the common `--python` and `package` arguments."""
+def _package_parser(fn: FunctionType, *, resolution: bool = True) -> argparse.ArgumentParser:
+    """Return an `ArgumentParser` with the common `--python`, `--resolution`, `package` args.
+
+    Pass `resolution=False` for a recipe that doesn't resolve dependencies, so that it
+    rejects `--resolution` rather than accepting and ignoring it.
+    """
     parser = _parser(fn)
     parser.add_argument(
         '--python',
         default=None,
         help="Python version to use, e.g. `3.12` (defaults to the package's minimum).",
     )
+    if resolution:
+        parser.add_argument(
+            '--resolution',
+            default=None,
+            choices=('highest', 'lowest', 'lowest-direct'),
+            help=(
+                'Dependency resolution strategy to pass to `uv run --resolution=...`. '
+                "When set, the package's uv.lock is bypassed (no `--locked`). "
+                'Useful for testing against the lowest declared or highest available dependency '
+                'versions, since a charm resolves deps at pack time from its own lockfile. '
+                '`lowest` also lowers transitive dependencies, so expect it to fail; it is a '
+                'debugging aid rather than something CI runs.'
+            ),
+        )
     parser.add_argument('package', help='Path from the repo root to the package, e.g. `pathops`.')
     return parser
 
@@ -546,18 +601,49 @@ def _requires_python_minimum(pkg_dir: pathlib.Path) -> str:
 # --- uv run ------------------------------------------------------------------------------------
 
 
+@contextlib.contextmanager
+def _resolution_sandbox(pkg_dir: pathlib.Path, resolution: str | None) -> Iterator[None]:
+    """Keep a `--resolution` run from changing the package's `uv.lock` or `.venv`.
+
+    `uv run --resolution=<mode>` re-resolves dependencies, writes the result back to the
+    package's `uv.lock`, and syncs the project environment to match. That's fine in CI (each
+    job is a fresh checkout) but disruptive locally: the lockfile shows up as modified, and the
+    `.venv` an editor is probably using is left on the alternative versions. When `resolution`
+    is set, this points `UV_PROJECT_ENVIRONMENT` at a temporary directory for the duration, and
+    restores the lock file bytes afterwards.
+    """
+    if resolution is None:
+        yield
+        return
+    lock = pkg_dir / 'uv.lock'
+    saved = lock.read_bytes() if lock.exists() else None
+    previous_env = os.environ.get('UV_PROJECT_ENVIRONMENT')
+    try:
+        with tempfile.TemporaryDirectory(prefix='charmlibs-resolution-') as tmp:
+            os.environ['UV_PROJECT_ENVIRONMENT'] = str(pathlib.Path(tmp) / 'venv')
+            yield
+    finally:
+        if previous_env is None:
+            os.environ.pop('UV_PROJECT_ENVIRONMENT', None)
+        else:
+            os.environ['UV_PROJECT_ENVIRONMENT'] = previous_env
+        if saved is not None and lock.read_bytes() != saved:
+            lock.write_bytes(saved)
+
+
 def _uv_run(
     args: Sequence[str | pathlib.Path],
     *,
     pkg_dir: pathlib.Path,
     python: str,
     groups: Sequence[str] = (),
+    resolution: str | None = None,
     env: dict[str, str] | None = None,
     check: bool = True,
     stdout: IO[str] | None = None,
 ) -> int:
     """Run `uv run ... <args>` in `pkg_dir`, returning the exit code."""
-    cmd = _uv_cmd(args, pkg_dir=pkg_dir, python=python, groups=groups)
+    cmd = _uv_cmd(args, pkg_dir=pkg_dir, python=python, groups=groups, resolution=resolution)
     return _run(cmd, cwd=pkg_dir, env=env, check=check, stdout=stdout)
 
 
@@ -585,10 +671,17 @@ def _uv_cmd(
     pkg_dir: pathlib.Path,
     python: str,
     groups: Sequence[str] = (),
+    resolution: str | None = None,
 ) -> list[str | pathlib.Path]:
-    """Build a `uv run ... <args>` command list to be executed in `pkg_dir`."""
+    """Build a `uv run ... <args>` command list to be executed in `pkg_dir`.
+
+    If `resolution` is set, `--resolution=<mode>` is passed and `--locked` is omitted so
+    uv re-resolves against the mode instead of pinning to the checked-in lockfile.
+    """
     cmd = ['uv', 'run', '--with-requirements', TEST_REQUIREMENTS, '--python', python]
-    if (pkg_dir / 'uv.lock').exists():
+    if resolution is not None:
+        cmd.append(f'--resolution={resolution}')
+    elif (pkg_dir / 'uv.lock').exists():
         cmd.append('--locked')
     available = _dependency_groups(pkg_dir)
     for group in groups:

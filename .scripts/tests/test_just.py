@@ -16,7 +16,9 @@
 
 """Unit tests for the just script."""
 
+import os
 import pathlib
+from collections.abc import Callable, Sequence
 from unittest.mock import patch
 
 import just
@@ -77,6 +79,121 @@ class TestUVCmd:
             'foo',
             'pytest',
         ]
+
+    def test_with_resolution_omits_locked(self, tmp_path: pathlib.Path):
+        (tmp_path / 'pyproject.toml').touch()
+        (tmp_path / 'uv.lock').touch()
+        result = just._uv_cmd(
+            ['pytest'], pkg_dir=tmp_path, python='3.12', groups=[], resolution='lowest-direct'
+        )
+        assert '--locked' not in result
+        assert result == [
+            'uv',
+            'run',
+            '--with-requirements',
+            self.test_reqs,
+            '--python',
+            '3.12',
+            '--resolution=lowest-direct',
+            'pytest',
+        ]
+
+    @pytest.mark.parametrize('resolution', ['highest', 'lowest', 'lowest-direct'])
+    def test_with_resolution_no_lock(self, tmp_path: pathlib.Path, resolution: str):
+        (tmp_path / 'pyproject.toml').touch()
+        result = just._uv_cmd(
+            ['pytest'], pkg_dir=tmp_path, python='3.12', groups=[], resolution=resolution
+        )
+        assert f'--resolution={resolution}' in result
+        assert '--locked' not in result
+
+
+class TestResolutionSandbox:
+    def test_restores_modified_lock(self, tmp_path: pathlib.Path):
+        lock = tmp_path / 'uv.lock'
+        lock.write_bytes(b'original')
+        with just._resolution_sandbox(tmp_path, 'lowest-direct'):
+            lock.write_bytes(b'mutated')
+        assert lock.read_bytes() == b'original'
+
+    def test_leaves_unmodified_lock_untouched(self, tmp_path: pathlib.Path):
+        lock = tmp_path / 'uv.lock'
+        lock.write_bytes(b'original')
+        with just._resolution_sandbox(tmp_path, 'lowest-direct'):
+            pass
+        assert lock.read_bytes() == b'original'
+
+    def test_no_resolution_does_nothing(
+        self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.delenv('UV_PROJECT_ENVIRONMENT', raising=False)
+        lock = tmp_path / 'uv.lock'
+        lock.write_bytes(b'original')
+        with just._resolution_sandbox(tmp_path, None):
+            assert 'UV_PROJECT_ENVIRONMENT' not in os.environ
+            lock.write_bytes(b'mutated')
+        assert lock.read_bytes() == b'mutated'
+
+    def test_no_lock_file_is_not_created(self, tmp_path: pathlib.Path):
+        with just._resolution_sandbox(tmp_path, 'lowest-direct'):
+            pass
+        assert not (tmp_path / 'uv.lock').exists()
+
+    def test_restores_on_exception(self, tmp_path: pathlib.Path):
+        lock = tmp_path / 'uv.lock'
+        lock.write_bytes(b'original')
+        with pytest.raises(RuntimeError, match='boom'):
+            with just._resolution_sandbox(tmp_path, 'lowest-direct'):
+                lock.write_bytes(b'mutated')
+                raise RuntimeError('boom')
+        assert lock.read_bytes() == b'original'
+
+    def test_uses_a_temporary_project_environment(
+        self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.delenv('UV_PROJECT_ENVIRONMENT', raising=False)
+        with just._resolution_sandbox(tmp_path, 'lowest-direct'):
+            venv = pathlib.Path(os.environ['UV_PROJECT_ENVIRONMENT'])
+            assert not venv.is_relative_to(tmp_path)
+            assert venv.parent.is_dir()
+        assert 'UV_PROJECT_ENVIRONMENT' not in os.environ
+        assert not venv.parent.exists()
+
+    def test_restores_existing_project_environment(self, tmp_path: pathlib.Path):
+        with patch.dict('os.environ', {'UV_PROJECT_ENVIRONMENT': 'mine'}):
+            with just._resolution_sandbox(tmp_path, 'lowest-direct'):
+                assert os.environ['UV_PROJECT_ENVIRONMENT'] != 'mine'
+            assert os.environ['UV_PROJECT_ENVIRONMENT'] == 'mine'
+
+    @pytest.mark.parametrize(
+        'recipe',
+        [just.check, just.lint, just.static, just.unit, just.functional, just.integration_k8s],
+    )
+    def test_recipes_use_the_sandbox(
+        self,
+        tmp_path: pathlib.Path,
+        monkeypatch: pytest.MonkeyPatch,
+        recipe: Callable[[list[str]], int],
+    ):
+        monkeypatch.delenv('UV_PROJECT_ENVIRONMENT', raising=False)
+        (tmp_path / 'pyproject.toml').touch()
+        lock = tmp_path / 'uv.lock'
+        lock.write_bytes(b'original')
+        project_envs: list[str | None] = []
+
+        def fake_run(cmd: Sequence[str], *, env: dict[str, str] | None = None, **_: object):
+            if any('--resolution=' in str(part) for part in cmd):
+                lock.write_bytes(b'mutated')
+                project_envs.append(
+                    (os.environ if env is None else env).get('UV_PROJECT_ENVIRONMENT')
+                )
+            return 0
+
+        monkeypatch.setattr(just, '_run', fake_run)
+        recipe(['--python', '3.12', '--resolution', 'lowest-direct', str(tmp_path)])
+        assert project_envs
+        assert all(project_envs)
+        assert lock.read_bytes() == b'original'
 
 
 class TestDependencyGroups:
@@ -252,6 +369,26 @@ class TestPackageParser:
         args = parser.parse_args(['foo'])
         assert args.python is None
         assert args.package == 'foo'
+        assert args.resolution is None
+
+    @pytest.mark.parametrize('resolution', ['highest', 'lowest', 'lowest-direct'])
+    def test_resolution_choice(self, resolution: str):
+        parser = just._package_parser(just.unit)
+        args = parser.parse_args(['--resolution', resolution, 'foo'])
+        assert args.resolution == resolution
+
+    def test_resolution_rejects_unknown(self, capsys: pytest.CaptureFixture[str]):
+        parser = just._package_parser(just.unit)
+        with pytest.raises(SystemExit):
+            parser.parse_args(['--resolution', 'bogus', 'foo'])
+        assert 'invalid choice' in capsys.readouterr().err
+
+    def test_without_resolution(self, capsys: pytest.CaptureFixture[str]):
+        parser = just._package_parser(just.combine_coverage, resolution=False)
+        assert parser.parse_args(['foo']).package == 'foo'
+        with pytest.raises(SystemExit):
+            parser.parse_args(['--resolution', 'lowest-direct', 'foo'])
+        assert 'unrecognized arguments' in capsys.readouterr().err
 
 
 class TestRun:
