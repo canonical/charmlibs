@@ -85,7 +85,9 @@ class LocalPath(pathlib.PosixPath):
             PermissionError: if the local user does not have permissions for the operation.
         """
         _validate_user_and_group(user=user, group=group)
-        with self._open_for_write(mode=mode, user=user, group=group, text=False) as f:
+        fd = self._open_fd_for_write(mode=mode, user=user, group=group)
+        # open() owns the descriptor from here, and closes it itself if it fails.
+        with open(fd, 'wb') as f:
             return f.write(memoryview(data))
 
     def write_text(
@@ -146,21 +148,14 @@ class LocalPath(pathlib.PosixPath):
             data = data.replace('\n', newline)
         elif newline not in ('', '\n', None):
             raise ValueError(f'illegal newline value: {newline!r}')
-        with self._open_for_write(
-            mode=mode, user=user, group=group, text=True, encoding=encoding, errors=errors
-        ) as f:
+        fd = self._open_fd_for_write(mode=mode, user=user, group=group)
+        # open() owns the descriptor from here, and closes it itself if it fails.
+        # newline='' because newlines were already handled above.
+        with open(fd, 'w', encoding=encoding, errors=errors, newline='') as f:
             return f.write(data)
 
-    def _open_for_write(
-        self,
-        *,
-        mode: int | None,
-        user: str | None,
-        group: str | None,
-        text: bool,
-        encoding: str | None = None,
-        errors: str | None = None,
-    ) -> typing.IO[typing.Any]:
+    def _open_fd_for_write(self, *, mode: int | None, user: str | None, group: str | None) -> int:
+        """Open the file for writing, with its owner and mode set, and return the descriptor."""
         # Set the permissions and ownership on the open file descriptor before any content is
         # written, so that the content is never readable with the wrong permissions or owner.
         # O_TRUNC empties an existing file before either changes, so its old content is never
@@ -179,11 +174,7 @@ class LocalPath(pathlib.PosixPath):
         except BaseException:
             os.close(fd)
             raise
-        # open() owns the descriptor from here, and closes it itself if it fails.
-        if text:
-            # newline='' because newlines were already handled by the caller.
-            return open(fd, 'w', encoding=encoding, errors=errors, newline='')
-        return open(fd, 'wb')
+        return fd
 
     def glob(  # pyright: ignore[reportIncompatibleMethodOverride]
         self, pattern: str | os.PathLike[str]
