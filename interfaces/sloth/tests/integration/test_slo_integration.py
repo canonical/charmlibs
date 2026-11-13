@@ -203,6 +203,7 @@ def test_relation_removal(juju: Juju) -> None:
     logger.info('After relation removal, services: %s', services)
 
 
+# Skipped by --no-juju-teardown, which keeps the model for debugging.
 @pytest.mark.juju_teardown
 def test_teardown(juju: Juju) -> None:
     """Clean up deployed charms."""
