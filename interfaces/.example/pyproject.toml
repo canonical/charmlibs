@@ -40,6 +40,7 @@ functional = [  # installed for `just functional interfaces/example-interface`
 ]
 integration = [  # installed for `just integration interfaces/example-interface`
     "jubilant",
+    "pytest-jubilant>=2.3.1",
 ]
 
 [project.urls]

@@ -30,6 +30,7 @@ functional = [  # installed for `just functional uptime`
 ]
 integration = [  # installed for `just integration uptime`
     "jubilant",
+    "pytest-jubilant>=2.3.1",
 ]
 
 [project.urls]
