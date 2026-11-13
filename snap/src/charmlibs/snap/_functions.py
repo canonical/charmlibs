@@ -14,7 +14,7 @@
 
 """High level helper functions that build on top of the basic snap operations."""
 
-from . import _errors, _snapd_snaps, _utils
+from . import _errors, _snapd_conf, _snapd_snaps, _utils
 
 
 def ensure_installed(
@@ -96,6 +96,71 @@ def ensure_installed(
     if not update:  # User explicitly requested no update in this case.
         return False
     return _snapd_snaps.refresh(snap, channel=channel, classic=classic)
+
+
+def ensure_vitality_hint(snap: str) -> object:
+    """Ensure the snap is in the system's ``resilience.vitality-hint`` list.
+
+    The vitality hint is an ordered list of snaps whose services the kernel's out-of-memory
+    (OOM) killer should spare, most important first. This function appends the snap to the end of
+    the list if it is not already present.
+
+    You can call this function before the snap is installed, and snapd will apply the hint when
+    the snap is installed. If the snap is already installed, snapd rewrites the snap's
+    service units straight away, and starts any services that are enabled but stopped.
+    A running service keeps its current score until it next starts, so use :func:`restart`
+    if you want the hint applied immediately.
+
+    The snap is appended to the list, because this leaves the position of every other listed
+    snap unchanged. When a snap's position changes, snapd rewrites its service units and starts
+    any of its enabled services that are stopped, so inserting earlier in the list would affect
+    every snap after it.
+
+    Being on the list matters far more than the position on it. snapd sets the
+    ``OOMScoreAdjust`` of a listed snap's services to ``-900`` plus the snap's position in the
+    list: ``-899`` for the first snap, ``-898`` for the second, and so on, up to ``-800`` for the
+    100th. Unlisted snaps' services keep the default of ``0``, like most other processes. When the
+    system runs out of memory, the kernel kills the process with the highest score: its
+    ``OOMScoreAdjust`` plus 10 points for each 1% of total memory (including swap) that it uses.
+    This means that:
+
+    - A listed snap's service is only killed ahead of an unlisted process if it uses around
+      80-90% more of total memory than that process.
+    - Each position in the list is worth only 0.1% of total memory, so between listed snaps,
+      memory use decides which is killed first.
+
+    Args:
+        snap: The name of the snap to add to the list. A snap instance name, such as
+            ``foo_bar``, may be used to target a parallel install.
+
+    Returns:
+        A truthy value if the snap was added to the list, or a falsy value if it was already
+        listed. Not guaranteed to be an actual :class:`bool`.
+
+    Raises:
+        ValueError: if the snap name is empty, blank, contains a comma, has leading or
+            trailing whitespace, or is "snapd" (whose services are always at ``-900``).
+        ChangeError: if snapd rejects the updated list: if the snap name is not a valid snap
+            name, or if the list would contain too many snaps (snapd's current limit is 100).
+        BadResponseError: if snapd returns a non-string value for the vitality hint.
+    """
+    _utils.raise_if_not_comma_list_safe(snap, label='snap name')
+    if snap == 'snapd':
+        raise ValueError('snap name cannot be "snapd"')
+    vitality_hint = 'resilience.vitality-hint'
+    try:
+        current = _snapd_conf.get_one('system', vitality_hint)
+    except _errors.OptionNotFoundError:
+        current = ''
+    if not isinstance(current, str):
+        # NOTE: This should never happen as snapd rejects malformed values for this option.
+        msg = f'Unexpected config type {type(current).__name__!r} for {vitality_hint!r} (expected a "str")'  # noqa: E501
+        raise _errors.BadResponseError(msg, response=current)
+    hints = current.split(',') if current else []  # Treat '' as an empty list.
+    if snap in hints:
+        return False
+    _snapd_conf.set('system', {vitality_hint: ','.join([*hints, snap])})
+    return True
 
 
 def _installed_info(snap: str) -> _snapd_snaps.InstalledInfo | None:
