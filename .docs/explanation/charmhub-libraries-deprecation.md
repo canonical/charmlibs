@@ -11,7 +11,7 @@ Charmhub-hosted charm libraries -- single-file Python modules fetched with `char
 
 ## Background
 
-Charms originally shared code by distributing single-file Python modules on Charmhub. Each module was associated with a specific charm. Charms fetched libraries using the `charmcraft fetch-lib` and `charmcraft fetch-libs` commands, and typically checked them into their version control. These libraries were stored under `lib/`, which was added to `PYTHONPATH` at runtime, allowing the module to be imported by charm name and API version. For example `from operator_libs_linux.v2 import snap`.
+Charms originally shared code by distributing single-file Python modules on Charmhub. Each module was associated with a specific charm. Charms fetched libraries using the `charmcraft fetch-lib` and `charmcraft fetch-libs` commands, and typically checked them into their version control. These libraries were stored under `lib/`, which was added to `PYTHONPATH` at runtime, allowing the module to be imported by charm name and API version. For example `from charms.operator_libs_linux.v2 import snap`.
 
 ## Timeline
 
@@ -55,14 +55,10 @@ Read more: {ref}`how-to-migrate`
 
 ### If you use Charmhub-hosted libraries in your charm
 
-When a Python package replacement is available, switch to it:
+When a Python package replacement is available, switch to it: remove the vendored library, add the replacement package to your charm's dependencies, and update your imports.
+For libraries migrated to the `charmlibs` monorepo, the `1.0` release is a bug-for-bug port, so no changes to your charm's logic are needed.
 
-1. Remove the library from the `charm-libs` section of your `charmcraft.yaml` and delete the vendored directory from `lib/`.
-2. Remove any manually added transitive dependencies that are no longer needed.
-3. Add the replacement package to your charm's dependencies.
-4. Update your imports to use the new package's import path.
-
-Read more: {ref}`how-to-manage-charm-libraries`
+Read more: {ref}`how-to-migrate-charm`
 
 ### If you are writing a new library
 
