@@ -101,28 +101,29 @@ class ExternalIdpProvider(BaseModel):
 
     @field_validator("tenant_id")
     def provider_must_be_microsoft(cls, v, info):
-        if v and info.data.get("provider") != "microsoft":
+        provider = info.data.get("provider")
+        if v and provider != Provider.microsoft:
             raise ValueError("Provider must be microsoft to use key: `tenant_id`")
-        elif not v and info.data.get("provider") == "microsoft":
+        elif not v and provider == Provider.microsoft:
             raise ValueError("`tenant_id` is required with provider microsoft")
         return v
 
     @field_validator("private_key", "private_key_id", "team_id")
     def provider_must_be_apple(cls, v, info):
-        if v and info.data.get("provider") != "apple":
-            raise ValueError(f"Provider must be apple to use key: `{info.data.get('name')}`")
-        elif not v and info.data.get("provider") == "apple":
-            raise ValueError(f"`{info.data.get('name')}` is required with apple provider")
+        provider = info.data.get("provider")
+        if v and provider != Provider.apple:
+            raise ValueError(f"Provider must be apple to use key: `{info.field_name}`")
+        elif not v and provider == Provider.apple:
+            raise ValueError(f"`{info.field_name}` is required with apple provider")
         return v
 
     @field_validator("issuer_url")
     def issuer_url_allowed(cls, v, info):
-        if v and info.data.get("provider") in ["generic", "auth0"]:
-            raise ValueError(
-                f"`issuer_url` not allowed with provider: {info.data.get('provider')}"
-            )
-        elif not v and info.data.get("provider") in ["generic", "auth0"]:
-            raise ValueError("`issuer_url` is required with {values['provider'] provider")
+        provider = info.data.get("provider")
+        if v and provider not in (Provider.generic, Provider.auth0):
+            raise ValueError("`issuer_url` is only allowed with the generic and auth0 providers")
+        elif not v and provider in (Provider.generic, Provider.auth0):
+            raise ValueError(f"`issuer_url` is required with provider {provider.value}")
         return v
 
 
