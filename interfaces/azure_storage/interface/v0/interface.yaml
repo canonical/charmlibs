@@ -10,8 +10,6 @@ description: |
 providers:
   - name: azure-storage-integrator
     url: https://github.com/canonical/object-storage-integrators
-    test_setup:
-      charm_root: azure_storage
 
 requirers:
   - name: spark-integration-hub-k8s
