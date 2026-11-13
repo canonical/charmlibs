@@ -153,6 +153,21 @@ def test_schema_table_enum_external_ref_and_boolean_schema():
     ]
 
 
+def test_schema_table_enum_type_comes_from_its_values():
+    schema = {
+        'properties': {
+            'level': {'enum': [1, 2]},
+            'version': {'const': 3},
+            'mixed': {'enum': ['auto', 0]},
+        },
+    }
+    assert _rows(schema) == [
+        '| `level` | integer (`1`, `2`) | no |  |',
+        '| `version` | integer (`3`) | no |  |',
+        '| `mixed` | string or integer (`auto`, `0`) | no |  |',
+    ]
+
+
 def test_schema_table_stops_on_recursion():
     schema = {
         'properties': {'node': {'$ref': '#/$defs/Node'}},

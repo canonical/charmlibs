@@ -203,7 +203,8 @@ def _type_names(schema: dict[str, typing.Any]) -> list[str]:
     if type_:
         name = str(type_)
     elif 'enum' in schema or 'const' in schema:
-        name = 'string'
+        values = schema['enum'] if 'enum' in schema else [schema['const']]
+        name = ' or '.join(dict.fromkeys(_json_type(v) for v in values))
     elif 'properties' in schema:
         name = 'object'
     else:
@@ -213,6 +214,23 @@ def _type_names(schema: dict[str, typing.Any]) -> list[str]:
     elif 'const' in schema:
         name += f' (`{schema["const"]}`)'
     return [name]
+
+
+def _json_type(value: object) -> str:
+    """The JSON schema type name of a value, as it appears in an ``enum`` or ``const``."""
+    if value is None:
+        return 'null'
+    if isinstance(value, bool):  # before int, which bool is a subclass of
+        return 'boolean'
+    if isinstance(value, int):
+        return 'integer'
+    if isinstance(value, float):
+        return 'number'
+    if isinstance(value, list):
+        return 'array'
+    if isinstance(value, dict):
+        return 'object'
+    return 'string'
 
 
 def _schema_rows(
