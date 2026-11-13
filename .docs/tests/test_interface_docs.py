@@ -168,6 +168,10 @@ def test_schema_table_enum_type_comes_from_its_values():
     ]
 
 
+def test_schema_table_with_no_fields():
+    assert interface_docs._schema_table({}) == 'This schema has no fields.'
+
+
 def test_schema_table_stops_on_recursion():
     schema = {
         'properties': {'node': {'$ref': '#/$defs/Node'}},

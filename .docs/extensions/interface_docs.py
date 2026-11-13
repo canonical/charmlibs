@@ -158,9 +158,11 @@ def _schema_table(schema: dict[str, typing.Any]) -> str:
     array items and `{...}` marking keys matched by a pattern or allowed as additional properties.
     Local `$ref`s are followed, and the alternatives of an `anyOf` or `oneOf` are merged.
     """
-    rows = ['| Field | Type | Required | Description |', '| --- | --- | --- | --- |']
     # Alternatives that share a field would otherwise list it more than once.
-    rows.extend(dict.fromkeys(_schema_rows(schema, root=schema, prefix='', seen=())))
+    fields = list(dict.fromkeys(_schema_rows(schema, root=schema, prefix='', seen=())))
+    if not fields:
+        return 'This schema has no fields.'
+    rows = ['| Field | Type | Required | Description |', '| --- | --- | --- | --- |', *fields]
     return '\n'.join(rows)
 
 
