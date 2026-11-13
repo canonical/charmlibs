@@ -54,6 +54,8 @@ def test_schema_table():
         '| `jobs` | array | yes | The jobs. |',
         '| `jobs[].job-id` | string | yes | An id \\| with a pipe. |',
         '| `jobs[].status` | string or null | no |  |',
+        '',
+        'For a nested field, Required means required within its parent.',
     ]
 
 
@@ -63,7 +65,7 @@ def test_expand_schema_tables(tmp_path: pathlib.Path):
     readme = 'Before\n<!-- schema-table: schemas/provider.json -->\nAfter\n'
     result = interface_docs._expand_schema_tables(readme, tmp_path)
     assert result.startswith('Before\n| Field |')
-    assert result.endswith('|\nAfter\n')
+    assert result.endswith('within its parent.\nAfter\n')
 
 
 def test_expand_schema_tables_without_marker(tmp_path: pathlib.Path):
@@ -71,7 +73,11 @@ def test_expand_schema_tables_without_marker(tmp_path: pathlib.Path):
 
 
 def _rows(schema: dict[str, typing.Any]) -> list[str]:
-    return interface_docs._schema_table(schema).splitlines()[2:]
+    return [
+        line
+        for line in interface_docs._schema_table(schema).splitlines()[2:]
+        if line.startswith('|')
+    ]
 
 
 def test_schema_table_follows_local_refs():
@@ -166,6 +172,19 @@ def test_schema_table_enum_type_comes_from_its_values():
         '| `version` | integer (`3`) | no |  |',
         '| `mixed` | string or integer (`auto`, `0`) | no |  |',
     ]
+
+
+def test_schema_table_notes_what_required_means_for_nested_fields():
+    nested = {'properties': {'a': {'type': 'object', 'properties': {'b': {'type': 'string'}}}}}
+    assert interface_docs._schema_table(nested).endswith(
+        'For a nested field, Required means required within its parent.'
+    )
+    flat = {
+        'properties': {'a': {'type': 'string'}},
+        'patternProperties': {'^x.y$': {'type': 'string'}},
+        'additionalProperties': {'type': 'integer'},
+    }
+    assert 'Required means' not in interface_docs._schema_table(flat)
 
 
 def test_schema_table_with_no_fields():

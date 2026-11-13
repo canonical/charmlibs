@@ -163,7 +163,24 @@ def _schema_table(schema: dict[str, typing.Any]) -> str:
     if not fields:
         return 'This schema has no fields.'
     rows = ['| Field | Type | Required | Description |', '| --- | --- | --- | --- |', *fields]
+    if _has_nested_fields(fields):
+        rows.extend(['', 'For a nested field, Required means required within its parent.'])
     return '\n'.join(rows)
+
+
+def _has_nested_fields(rows: list[str]) -> bool:
+    """Whether any row is for a field inside another, such as `a.b` or `a[].b`.
+
+    A dot alone doesn't say so, since `{...}` and pattern keys can contain one.
+    """
+    paths = [row.split('`', 2)[1] for row in rows]
+    return any(
+        path.startswith('[]')
+        or any(
+            path.startswith((f'{parent}.', f'{parent}[]')) for parent in paths if parent != path
+        )
+        for path in paths
+    )
 
 
 def _resolve(schema: dict[str, typing.Any], root: dict[str, typing.Any]) -> dict[str, typing.Any]:
