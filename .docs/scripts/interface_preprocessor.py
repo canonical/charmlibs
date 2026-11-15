@@ -588,6 +588,7 @@ def _nested_models(schema: JsonSchema, defs: dict[str, JsonSchema]) -> list[str]
 def _cell(text: str) -> str:
     """Make text safe for a single Markdown table cell."""
     text = ' '.join(text.split())
+    # A '<' starts a raw HTML tag in Markdown, so `<name>` in a description would vanish.
     return text.replace('|', '\\|').replace('<', '&lt;')
 
 

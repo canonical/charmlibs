@@ -427,6 +427,32 @@ def test_pipes_in_type_and_default_are_escaped():
     assert rows[5] == '| `sep` | one of `\\|`, `,` | no |  |'
 
 
+def test_required_note_is_given_once():
+    other = {'properties': {'name': {'type': 'string'}}, 'type': 'object'}
+    databags: dict[str, typing.Any] = dict(DATABAGS)
+    databags['requirer-app'] = {
+        '$defs': {'Other': other},
+        'properties': {'other': {'$ref': '#/$defs/Other'}},
+        'type': 'object',
+    }
+    markdown = ip.render_relation_data(databags)
+    assert markdown.count('#### `') == 2
+    assert markdown.count('Required means') == 1
+
+
+def test_markup_in_description_and_diagram_is_escaped():
+    databags: dict[str, typing.Any] = dict.fromkeys(DATABAGS)
+    databags['provider-app'] = {
+        'properties': {'host': {'type': 'string', 'description': 'Set to <name>.'}},
+        'type': 'object',
+    }
+    databags['requirer-unit'] = {'properties': {'"quoted"': {'type': 'string'}}, 'type': 'object'}
+    markdown = ip.render_relation_data(databags, link_schema=False)
+    assert '| `host` | string | no | Set to &lt;name>. |' in markdown
+    diagram = ip.render_direction_diagram(databags)
+    assert '-->|"unit: #quot;quoted#quot;"| provider' in diagram
+
+
 def test_databag_model_with_no_fields():
     databags: dict[str, typing.Any] = dict.fromkeys(DATABAGS)
     databags['provider-app'] = {'properties': {}, 'type': 'object'}
