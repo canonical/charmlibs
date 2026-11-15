@@ -456,6 +456,14 @@ def _type(schema: JsonSchema, defs: dict[str, JsonSchema]) -> str:
             return f'list, each {item}'
         return f'list of {item}s' if item.endswith(' object') else f'list of {item}'
     if type_ == 'object':
+        patterns = schema.get('patternProperties')
+        if isinstance(patterns, dict) and patterns:
+            patterns = typing.cast('dict[str, JsonSchema]', patterns)
+            mappings = [
+                f'matching `{pattern}` to {_type(values, defs)}'
+                for pattern, values in patterns.items()
+            ]
+            return 'mapping of string ' + ', or '.join(mappings)
         values = schema.get('additionalProperties')
         if isinstance(values, dict) and values:
             return f'mapping of string to {_type(typing.cast("JsonSchema", values), defs)}'

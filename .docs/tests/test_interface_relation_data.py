@@ -121,6 +121,17 @@ def test_relation_data_without_schema_link():
         ({'type': 'array'}, 'list'),
         ({'type': 'array', 'items': {'enum': ['a', 'b']}}, 'list, each one of `a`, `b`'),
         ({'type': 'object'}, 'object'),
+        (
+            {'type': 'object', 'patternProperties': {'^x-': {'type': 'integer'}}},
+            'mapping of string matching `^x-` to integer',
+        ),
+        (
+            {
+                'type': 'object',
+                'patternProperties': {'^x-': {'type': 'integer'}, '^y-': {'type': 'string'}},
+            },
+            'mapping of string matching `^x-` to integer, or matching `^y-` to string',
+        ),
         ({'type': 'number', 'exclusiveMinimum': 0}, 'number, more than 0'),
         (
             {'type': 'number', 'exclusiveMinimum': 0, 'maximum': 1},
