@@ -425,3 +425,35 @@ def test_pipes_in_type_and_default_are_escaped():
     rows = ip.render_relation_data(databags, link_schema=False).splitlines()
     assert rows[4] == '| `mode` | string, matching `^(a\\|b)$` | no (default `a\\|b`) |  |'
     assert rows[5] == '| `sep` | one of `\\|`, `,` | no |  |'
+
+
+def test_databag_model_with_no_fields():
+    databags: dict[str, typing.Any] = dict.fromkeys(DATABAGS)
+    databags['provider-app'] = {'properties': {}, 'type': 'object'}
+    markdown = ip.render_relation_data(databags, link_schema=False)
+    assert markdown.splitlines()[:3] == [
+        '### Provider application databag',
+        '',
+        'No fields are defined.',
+    ]
+    assert '|' not in markdown
+    assert ip.render_direction_diagram(databags) == ''
+
+
+def test_recursive_nested_model_is_listed_once():
+    node = {
+        'properties': {
+            'children': {'type': 'array', 'items': {'$ref': '#/$defs/Node'}},
+        },
+        'type': 'object',
+    }
+    databags: dict[str, typing.Any] = dict.fromkeys(DATABAGS)
+    databags['provider-app'] = {
+        '$defs': {'Node': node},
+        'properties': {'root': {'$ref': '#/$defs/Node'}},
+        'type': 'object',
+    }
+    markdown = ip.render_relation_data(databags, link_schema=False)
+    assert '| `root` | `Node` object | no |  |' in markdown
+    assert '| `children` | list of `Node` objects | no |  |' in markdown
+    assert markdown.count('#### `Node`') == 1
