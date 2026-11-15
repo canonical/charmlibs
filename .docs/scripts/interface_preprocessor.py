@@ -341,6 +341,11 @@ def render_direction_diagram(databags: dict[str, JsonSchema | None]) -> str:
     ])
 
 
+_NESTED_REQUIRED_NOTE = (
+    'For a nested object, Required means required whenever the object is present.'
+)
+
+
 def render_relation_data(
     databags: dict[str, JsonSchema | None], link_schema: bool = True, diagram: str = ''
 ) -> str:
@@ -355,6 +360,7 @@ def render_relation_data(
         out.extend([diagram, ''])
     empty = [title for name, title in DATABAGS.items() if databags.get(name) is None]
     rendered: set[str] = set()
+    noted_required = False
     for name, title in DATABAGS.items():
         schema = databags.get(name)
         if schema is None:
@@ -370,8 +376,13 @@ def render_relation_data(
             model = pending.pop(0)
             if model in rendered:
                 continue
+            out.extend([f'#### `{model}`', ''])
+            if not noted_required:
+                # The first nested object's table, so say what its Required column means.
+                out.extend([_NESTED_REQUIRED_NOTE, ''])
+                noted_required = True
             rendered.add(model)
-            out.extend([f'#### `{model}`', '', *_fields_table(defs[model], defs), ''])
+            out.extend([*_fields_table(defs[model], defs), ''])
             pending.extend(_nested_models(defs[model], defs))
     if empty:
         names = [t.removesuffix(' databag').lower() for t in empty]

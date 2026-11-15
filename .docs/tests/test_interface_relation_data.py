@@ -91,6 +91,8 @@ def test_relation_data_tables():
 
         #### `Endpoint`
 
+        For a nested object, Required means required whenever the object is present.
+
         | Field | Type | Required | Description |
         |---|---|---|---|
         | `url` | string (URI) | yes | Where to connect. |
@@ -391,3 +393,10 @@ def test_load_schemas_keeps_errors_for_each_readme(monkeypatch: pytest.MonkeyPat
     error = result['b/schema.py']
     assert isinstance(error, ip.SchemaError)
     assert str(error) == 'ValueError: nope'
+
+
+def test_relation_data_without_nested_objects_has_no_required_note():
+    databags = {**DATABAGS, 'requirer-unit': None}
+    databags['provider-app'] = {'properties': {'host': {'type': 'string'}}, 'type': 'object'}
+    markdown = ip.render_relation_data(databags)
+    assert 'Required means' not in markdown
