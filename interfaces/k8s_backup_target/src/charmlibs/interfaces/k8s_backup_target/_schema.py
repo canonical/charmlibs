@@ -128,3 +128,8 @@ class ProviderAppData(BaseModel):
         description="List of backup target entries.",
         title="Backup Targets",
     )
+
+
+ProviderUnitData = None
+RequirerAppData = None
+RequirerUnitData = None

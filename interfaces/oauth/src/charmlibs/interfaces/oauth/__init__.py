@@ -61,6 +61,33 @@ Then, to initialize the library:
                 OAUTH_GRANT_TYPES,
             )
             self.oauth.update_client_config(client_config)
+
+A client that needs more than one redirect URI passes a list instead of a single URI:
+
+.. code-block:: python
+
+    client_config = ClientConfig(
+        [urljoin(url, "/oauth/callback") for url in self.external_urls],
+        OAUTH_SCOPES,
+        OAUTH_GRANT_TYPES,
+    )
+
+Providers older than 1.2.0 reject a list, so only pass more than one URI when the provider
+is known to support it. ``ClientConfig.redirect_uris`` returns the URIs as a list whichever
+form was used.
+
+
+Provider
+--------
+
+Besides the ``client_created``/``client_changed`` events, a provider can read a requirer's
+published configuration at any time with ``OAuthProvider.get_client_config(relation)``. It
+returns ``None`` when the requirer has published nothing yet and raises ``DataValidationError``
+when what it published does not match the requirer schema. Use it to reconcile registered
+clients holistically rather than relying on an event having been delivered.
+
+Note that ``client_created``/``client_changed`` are not emitted when the requirer's data fails
+validation; the failure is logged and the relation is skipped rather than erroring the hook.
 """
 
 from ._oauth import (

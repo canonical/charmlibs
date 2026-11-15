@@ -1,7 +1,7 @@
 name: tracing
 version: 2
 status: published
-lib: charms.tempo_coordinator_k8s.tracing
+lib: charmlibs.interfaces.tracing
 summary: Request endpoints for pushing trace data.
 description: |
   The `tracing` interface supports push-based tracing.
@@ -11,19 +11,9 @@ description: |
 providers:
   - name: tempo-coordinator-k8s
     url: https://github.com/canonical/tempo-operators
-    test_setup:
-      charm_root: coordinator
-      pre_run: uv export --frozen --format requirements.txt --output-file requirements.txt
-      location: tests/interface/conftest.py
-      identifier: tracing_tester
 
 requirers:
   - name: pyroscope-coordinator-k8s
     url: https://github.com/canonical/pyroscope-operators
-    test_setup:
-      charm_root: coordinator
-      pre_run: uv export --frozen --format requirements.txt --output-file requirements.txt
-      location: tests/interface/conftest.py
-      identifier: tracing_tester
 
 maintainer: observability

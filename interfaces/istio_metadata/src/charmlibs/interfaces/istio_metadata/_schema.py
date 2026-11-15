@@ -34,3 +34,9 @@ class IstioMetadataAppData(BaseModel):
         description='The root namespace for the Istio installation.',
         examples=['istio-system'],
     )
+
+
+ProviderAppData = IstioMetadataAppData
+ProviderUnitData = None
+RequirerAppData = None
+RequirerUnitData = None

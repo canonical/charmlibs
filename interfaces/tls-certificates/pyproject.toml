@@ -80,10 +80,11 @@ extends = "../../pyproject.toml"
 include = ["src", "tests", "interface"]
 pythonVersion = "3.10"  # check no python > 3.10 features are used
 ignore = [
-    "tests/integration/charms/*/published/src/charmlibs",
+    "tests/integration/charms/*/library/src/charmlibs",
+    # symlink sources; the charm code is checked via the dereferenced copies in each charm's src/
+    "tests/integration/charms/common",
     # imports the Charmhub-hosted lib, which is only present in the packed charm
-    "tests/integration/charms/requirer/fetch_lib_charm.py",
-    "tests/integration/charms/requirer/fetch-lib-*",
+    "tests/integration/charms/fetch-lib-*",
 ]
 
 [tool.charmlibs.functional]

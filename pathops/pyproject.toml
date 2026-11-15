@@ -22,7 +22,9 @@ dependencies = [
 lint = [
     "typing_extensions",
 ]
-unit = []
+unit = [
+    "ops[testing]",
+]
 functional = []
 integration = [
     "jubilant",

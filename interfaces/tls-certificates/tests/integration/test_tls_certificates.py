@@ -11,6 +11,7 @@ from datetime import timedelta
 
 import jubilant
 import pytest
+from cryptography.hazmat.primitives.asymmetric import ec
 
 from certificates import Certificate
 from charmlibs.interfaces import tls_certificates
@@ -338,6 +339,43 @@ class TestIntegration:
 
         task = juju.run(f"{new_app_and_unit_requirer_app_name}/0", "get-unit-certificate")
         _assert_certificate_fields(task)
+
+
+class TestECDSAKeys:
+    """Verify a requirer using ECDSA keys gets certificates from a real provider."""
+
+    @pytest.mark.parametrize("key_size", [256, 384])
+    def test_given_ecdsa_key_when_related_to_self_signed_certificates_then_ec_certificate_received(
+        self, juju: jubilant.Juju, key_size: int
+    ):
+        requirer_app_name = f"ecdsa-p{key_size}-requirer"
+        provider_app_name = f"ecdsa-p{key_size}-self-signed"
+
+        juju.deploy(
+            REQUIRER_LOCAL,
+            app=requirer_app_name,
+            base="ubuntu@22.04",
+            config={"key_algorithm": "ecdsa", "key_size": key_size},
+        )
+        juju.deploy(
+            "self-signed-certificates",
+            app=provider_app_name,
+            channel="1/stable",
+            base="ubuntu@24.04",
+        )
+        juju.integrate(requirer_app_name, provider_app_name)
+        juju.wait(
+            lambda status: jubilant.all_active(status, requirer_app_name, provider_app_name),
+            timeout=1000,
+        )
+
+        task = juju.run(f"{requirer_app_name}/0", "get-certificate")
+        _assert_certificate_fields(task)
+        public_key = Certificate(task.results["certificate"]).certificate.public_key()
+        assert isinstance(public_key, ec.EllipticCurvePublicKey)
+        assert public_key.curve.key_size == key_size
+
+        juju.remove_application(requirer_app_name, provider_app_name)
 
 
 class TestProviderCapabilitiesUpgrade:
