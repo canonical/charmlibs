@@ -417,7 +417,9 @@ def _fields_table(schema: JsonSchema, defs: dict[str, JsonSchema]) -> list[str]:
         description = prop.get('description', '')
         if not description and '$ref' in prop:
             description = _resolve(prop, defs).get('description', '')
-        rows.append(f'| `{field}` | {_type(prop, defs)} | {req} | {_cell(description)} |')
+        type_ = _type(prop, defs).replace('|', '\\|')
+        req = req.replace('|', '\\|')
+        rows.append(f'| `{field}` | {type_} | {req} | {_cell(description)} |')
     return rows
 
 

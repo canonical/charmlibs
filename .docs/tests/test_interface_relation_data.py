@@ -400,3 +400,17 @@ def test_relation_data_without_nested_objects_has_no_required_note():
     databags['provider-app'] = {'properties': {'host': {'type': 'string'}}, 'type': 'object'}
     markdown = ip.render_relation_data(databags)
     assert 'Required means' not in markdown
+
+
+def test_pipes_in_type_and_default_are_escaped():
+    databags: dict[str, typing.Any] = dict.fromkeys(DATABAGS)
+    databags['provider-app'] = {
+        'properties': {
+            'mode': {'type': 'string', 'pattern': '^(a|b)$', 'default': 'a|b'},
+            'sep': {'enum': ['|', ',']},
+        },
+        'type': 'object',
+    }
+    rows = ip.render_relation_data(databags, link_schema=False).splitlines()
+    assert rows[4] == '| `mode` | string, matching `^(a\\|b)$` | no (default `a\\|b`) |  |'
+    assert rows[5] == '| `sep` | one of `\\|`, `,` | no |  |'
