@@ -306,3 +306,78 @@ def test_recursive_databag_model_lists_its_fields():
     # The databag is the Node model, so it isn't documented a second time.
     assert '#### `Node`' not in markdown
     assert 'app: name, child' in ip.render_direction_diagram(databags)
+
+
+class _Warnings:
+    def __init__(self):
+        self.messages: list[str] = []
+
+    def warning(self, msg: str, *args: object) -> None:
+        self.messages.append(msg % args)
+
+
+def test_schema_that_cannot_be_rendered_names_the_readme(monkeypatch: pytest.MonkeyPatch):
+    warnings = _Warnings()
+    monkeypatch.setattr(ip, 'logger', warnings)
+    readme = pathlib.Path('interfaces/foo/interface/v0/README.md')
+    # A property schema that's a list rather than an object.
+    databags: dict[str, typing.Any] = {
+        **DATABAGS,
+        'provider-app': {'properties': {'host': ['not', 'a', 'schema']}},
+    }
+    result = ip.with_generated_sections(readme, '# `foo/v0`\n', databags)
+    assert result == '# `foo/v0`\n'
+    (message,) = warnings.messages
+    assert message.startswith(f'{readme}: relation data not generated')
+    assert 'AttributeError' in message
+
+
+def test_schema_that_cannot_be_loaded_names_the_readme(monkeypatch: pytest.MonkeyPatch):
+    warnings = _Warnings()
+    monkeypatch.setattr(ip, 'logger', warnings)
+    readme = pathlib.Path('interfaces/foo/interface/v0/README.md')
+    error = ip.SchemaError('Traceback ...\nValueError: schema does not define X')
+    result = ip.with_generated_sections(readme, '# `foo/v0`\n', error)
+    assert result == '# `foo/v0`\n'
+    (message,) = warnings.messages
+    assert message.startswith(f'{readme}: relation data not generated')
+    assert 'schema does not define X' in message
+
+
+@pytest.mark.parametrize(
+    ('returncode', 'stdout', 'stderr', 'reason'),
+    [
+        (1, '', 'error: No solution found when resolving', 'No solution found'),
+        (0, 'not JSON', '', 'Expecting value'),
+    ],
+)
+def test_schema_script_failure_gives_the_reason(
+    monkeypatch: pytest.MonkeyPatch, returncode: int, stdout: str, stderr: str, reason: str
+):
+    warnings = _Warnings()
+    monkeypatch.setattr(ip, 'logger', warnings)
+
+    def run(cmd: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(cmd, returncode, stdout=stdout, stderr=stderr)
+
+    monkeypatch.setattr(ip.subprocess, 'run', run)
+    assert ip._load_schemas(_ROOT, ['interfaces/foo/interface/v0/schema.py']) == {}
+    (message,) = warnings.messages
+    assert reason in message
+
+
+def test_load_schemas_keeps_errors_for_each_readme(monkeypatch: pytest.MonkeyPatch):
+    output = {
+        'a/schema.py': {'databags': dict.fromkeys(DATABAGS)},
+        'b/schema.py': {'error': 'ValueError: nope'},
+    }
+
+    def run(cmd: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(cmd, 0, stdout=json.dumps(output), stderr='')
+
+    monkeypatch.setattr(ip.subprocess, 'run', run)
+    result = ip._load_schemas(_ROOT, list(output))
+    assert result['a/schema.py'] == dict.fromkeys(DATABAGS)
+    error = result['b/schema.py']
+    assert isinstance(error, ip.SchemaError)
+    assert str(error) == 'ValueError: nope'
