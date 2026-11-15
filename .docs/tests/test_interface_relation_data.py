@@ -276,3 +276,33 @@ def test_schema_script_handles_both_conventions(tmp_path: pathlib.Path):
     assert list(old_bags['requirer-unit']['properties']) == ['address']
     assert 'does not define ProviderAppData' in result[str(misnamed)]['error']
     assert 'RuntimeError: nope' in result[str(broken)]['error']
+
+
+def test_recursive_databag_model_lists_its_fields():
+    # Pydantic puts a self-referencing model in $defs and makes the schema a $ref to it.
+    node = {
+        'properties': {
+            'name': {'type': 'string'},
+            'child': {'anyOf': [{'$ref': '#/$defs/Node'}, {'type': 'null'}], 'default': None},
+        },
+        'required': ['name'],
+        'type': 'object',
+    }
+    databags = {
+        'provider-app': {'$defs': {'Node': node}, '$ref': '#/$defs/Node'},
+        'provider-unit': None,
+        'requirer-app': None,
+        'requirer-unit': None,
+    }
+    markdown = ip.render_relation_data(databags, link_schema=False)
+    assert markdown.splitlines()[:6] == [
+        '### Provider application databag',
+        '',
+        '| Field | Type | Required | Description |',
+        '|---|---|---|---|',
+        '| `name` | string | yes |  |',
+        '| `child` | `Node` object or null | no |  |',
+    ]
+    # The databag is the Node model, so it isn't documented a second time.
+    assert '#### `Node`' not in markdown
+    assert 'app: name, child' in ip.render_direction_diagram(databags)

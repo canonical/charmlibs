@@ -290,7 +290,7 @@ def render_direction_diagram(databags: dict[str, JsonSchema | None]) -> str:
             schema = databags.get(f'{side}-{bag}')
             if schema is None:
                 continue
-            fields = list(schema.get('properties', {}))
+            fields = list(_databag_model(schema).get('properties', {}))
             if fields:
                 rows = [', '.join(fields[i : i + 3]) for i in range(0, len(fields), 3)]
                 parts.append(f'{bag}: ' + ',<br>'.join(rows))
@@ -328,6 +328,10 @@ def render_relation_data(
         if schema is None:
             continue
         defs: dict[str, JsonSchema] = schema.get('$defs', {})
+        if '$ref' in schema:
+            # The databag model itself, so a field that refers back to it isn't a nested model.
+            rendered.add(schema['$ref'].rsplit('/', 1)[-1])
+        schema = _databag_model(schema)
         out.extend([f'### {title}', '', *_fields_table(schema, defs), ''])
         pending = _nested_models(schema, defs)
         while pending:
@@ -341,6 +345,17 @@ def render_relation_data(
         names = [t.removesuffix(' databag').lower() for t in empty]
         out.append(f'Empty databags: {", ".join(names)}.')
     return '\n'.join(out).strip()
+
+
+def _databag_model(schema: JsonSchema) -> JsonSchema:
+    """Return the object schema for a databag.
+
+    Pydantic puts a model that refers to itself in `$defs`, and the databag's schema is then
+    only a `$ref` to it.
+    """
+    if '$ref' in schema and 'properties' not in schema:
+        return {**_resolve(schema, schema.get('$defs', {})), '$defs': schema.get('$defs', {})}
+    return schema
 
 
 def _fields_table(schema: JsonSchema, defs: dict[str, JsonSchema]) -> list[str]:
