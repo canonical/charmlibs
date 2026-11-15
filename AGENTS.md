@@ -205,7 +205,7 @@ pathops/
 │   │   └── test_*.py
 │   └── integration/
 │       ├── pack.sh         # Script to pack test charms
-│       ├── conftest.py     # Juju fixtures (jubilant)
+│       ├── conftest.py     # Juju fixtures (pytest-jubilant)
 │       ├── test_*.py
 │       └── charms/         # Test charm source
 ├── pyproject.toml          # Package metadata, dependencies, tool config
