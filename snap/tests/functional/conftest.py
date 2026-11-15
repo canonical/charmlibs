@@ -62,8 +62,25 @@ def hold_auto_refresh() -> None:
 
     Nothing here depends on the image having held anything: the hold can be set whether or not
     the core snap is installed, since snapd serves the system configuration namespace either way.
+
+    The hold only stops snapd starting new auto-refreshes, so any that slipped in while the hold
+    was absent are waited out afterwards. Waiting only once the hold is in place closes the race:
+    snapd re-checks the hold under the state lock as it creates an auto-refresh change, so any
+    change created before the hold landed is already listed by the time we look, and none can
+    be created after.
     """
     _snapd_conf.set('system', {'refresh.hold': 'forever'})
+    changes = _client.get('/v2/changes', query={'select': 'in-progress'})
+    assert isinstance(changes, list)
+    changes = typing.cast('list[dict[str, Any]]', changes)
+    for change in changes:
+        if change['kind'] != 'auto-refresh':
+            continue
+        snap_logger.info('Waiting for in-progress auto-refresh [%s]', change['id'])
+        try:
+            _client._Change(change['id']).wait()
+        except snap.ChangeError:
+            pass  # Whether it succeeded doesn't matter, only that snapd is free again.
 
 
 @pytest.fixture(scope='session', autouse=True)

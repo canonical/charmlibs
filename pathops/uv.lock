@@ -17,6 +17,9 @@ integration = [
 lint = [
     { name = "typing-extensions" },
 ]
+unit = [
+    { name = "ops", extra = ["testing"] },
+]
 
 [package.metadata]
 requires-dist = [{ name = "ops", specifier = ">=2.19,<4" }]
@@ -28,7 +31,7 @@ integration = [
     { name = "pytest-jubilant", specifier = ">=2.3.1" },
 ]
 lint = [{ name = "typing-extensions" }]
-unit = []
+unit = [{ name = "ops", extras = ["testing"] }]
 
 [[package]]
 name = "colorama"
@@ -109,6 +112,25 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/49/e4/70ed4f3dc41b2d626ef38ffc7c2418b680f0c7f0ddf0a4410572903734df/ops-3.8.0.tar.gz", hash = "sha256:bdbf4bbcd0622acade9ef0b156ddefc31be59f0ef55d563081a094cf7dd6665c", size = 606170, upload-time = "2026-06-30T03:24:48.612Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/46/70/234d31bdee92d89fd7a4e0944283469a88fad5ea23e2ad449d6ce1256b53/ops-3.8.0-py3-none-any.whl", hash = "sha256:03f788091b10c5ed37a0a290e814b1a90aa0dcec6006a87875a085072df2261d", size = 215545, upload-time = "2026-06-30T03:24:43.916Z" },
+]
+
+[package.optional-dependencies]
+testing = [
+    { name = "ops-scenario" },
+]
+
+[[package]]
+name = "ops-scenario"
+version = "8.8.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "ops" },
+    { name = "pyyaml" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/64/43/0f12c71563810b5121b2f9432890c517f8f97f592cc86a1ea6c7835ef5c9/ops_scenario-8.8.0.tar.gz", hash = "sha256:3140fe256c68ac4d2d498cfe1cadb7f7e8a0a9687090bb137883ad8b7096cb96", size = 83463, upload-time = "2026-06-30T03:24:49.733Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b3/db/adf8fa05fc609d9a261c28b6b320c140eb635a95e056f5a2f9ae255c6aff/ops_scenario-8.8.0-py3-none-any.whl", hash = "sha256:088f0c5713d330b92762c4853a32a9482f4a162667d9d475edf924ce2510a3f0", size = 72696, upload-time = "2026-06-30T03:24:45.626Z" },
 ]
 
 [[package]]
