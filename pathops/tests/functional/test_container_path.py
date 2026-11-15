@@ -338,6 +338,21 @@ def test_is_symlink(container: ops.Container, session_dir: pathlib.Path, filenam
     assert container_result == pathlib_result
 
 
+GLOB_LIKE_NAMES = ('s*', 's?bling', '[s]ibling', 'sibling[', 'back\\slash', 'star*', '*')
+
+
+@pytest.mark.parametrize('name', GLOB_LIKE_NAMES)
+def test_is_symlink_name_isnt_a_pattern(
+    container: ops.Container, tmp_path: pathlib.Path, name: str
+):
+    (tmp_path / 'sibling').symlink_to(tmp_path)
+    container_path = ContainerPath(tmp_path, name, container=container)
+    assert not (tmp_path / name).is_symlink()
+    assert not container_path.is_symlink()
+    (tmp_path / name).symlink_to(tmp_path)
+    assert container_path.is_symlink()
+
+
 class TestRmDir:
     def test_ok(self, container: ops.Container, tmp_path: pathlib.Path):
         path = tmp_path / 'directory'
@@ -386,6 +401,21 @@ class TestRmDir:
         with pytest.raises(OSError) as ctx:
             container_path.rmdir()
         assert ctx.value.errno == errno.ENOTEMPTY
+
+    @pytest.mark.parametrize('name', GLOB_LIKE_NAMES)
+    def test_name_isnt_a_pattern(
+        self, container: ops.Container, tmp_path: pathlib.Path, name: str
+    ):
+        (tmp_path / 'sibling').mkdir()
+        (tmp_path / 'sibling[]').mkdir()
+        container_path = ContainerPath(tmp_path, name, container=container)
+        with pytest.raises(FileNotFoundError):
+            container_path.rmdir()
+        (tmp_path / name).mkdir()
+        container_path.rmdir()
+        assert not (tmp_path / name).exists()
+        assert (tmp_path / 'sibling').exists()
+        assert (tmp_path / 'sibling[]').exists()
 
 
 class TestUnlink:
@@ -436,6 +466,21 @@ class TestUnlink:
         container_path = ContainerPath(path, container=container)
         with pytest.raises(IsADirectoryError):
             container_path.unlink()
+
+    @pytest.mark.parametrize('name', GLOB_LIKE_NAMES)
+    def test_name_isnt_a_pattern(
+        self, container: ops.Container, tmp_path: pathlib.Path, name: str
+    ):
+        (tmp_path / 'sibling').touch()
+        (tmp_path / 'sibling[]').touch()
+        container_path = ContainerPath(tmp_path, name, container=container)
+        with pytest.raises(FileNotFoundError):
+            container_path.unlink()
+        (tmp_path / name).touch()
+        container_path.unlink()
+        assert not (tmp_path / name).exists()
+        assert (tmp_path / 'sibling').exists()
+        assert (tmp_path / 'sibling[]').exists()
 
 
 def write_text(path: pathlib.Path | ContainerPath, **kwargs: Any) -> None:
