@@ -415,7 +415,7 @@ def _type(schema: JsonSchema, defs: dict[str, JsonSchema]) -> str:
         target = _resolve(schema, defs)
         name = schema['$ref'].rsplit('/', 1)[-1]
         if 'enum' in target:
-            return _enum(target['enum'])
+            return _enum(target['enum'], target)
         if target.get('type') == 'object' and 'properties' in target:
             return f'`{name}` object'
         return _type(target, defs)
@@ -428,9 +428,9 @@ def _type(schema: JsonSchema, defs: dict[str, JsonSchema]) -> str:
     if 'allOf' in schema and len(schema['allOf']) == 1:
         return _type(schema['allOf'][0], defs)
     if 'const' in schema:
-        return _code(schema['const'])
+        return _enum([schema['const']], schema)
     if 'enum' in schema:
-        return _enum(schema['enum'])
+        return _enum(schema['enum'], schema)
     if schema.get('contentMediaType') == 'application/json':
         return f'JSON-encoded {_type(schema.get("contentSchema", {}), defs)}'
     type_ = schema.get('type')
@@ -439,7 +439,7 @@ def _type(schema: JsonSchema, defs: dict[str, JsonSchema]) -> str:
         if not items:
             return 'list'
         item = _type(items, defs)
-        if item.startswith('one of '):
+        if item.startswith('one of ') or ', one of ' in item:
             return f'list, each {item}'
         return f'list of {item}s' if item.endswith(' object') else f'list of {item}'
     if type_ == 'object':
@@ -494,10 +494,39 @@ def _characters(n: int) -> str:
     return '1 character' if n == 1 else f'{n} characters'
 
 
-def _enum(values: list[typing.Any]) -> str:
+def _enum(values: list[typing.Any], schema: JsonSchema) -> str:
+    """Describe an enum or const.
+
+    The values are shown as code, which looks the same for `1` and `"1"`, so a type other
+    than string is named, taken from the values if the schema doesn't give one.
+    """
+    type_ = schema.get('type')
+    if isinstance(type_, str):
+        type_name = type_
+    else:
+        type_name = ' or '.join(dict.fromkeys(_json_type(v) for v in values))
     if len(values) == 1:
-        return _code(values[0])
-    return 'one of ' + ', '.join(_code(v) for v in values)
+        code = _code(values[0])
+        return code if type_name in ('string', 'null') else f'{type_name} {code}'
+    text = 'one of ' + ', '.join(_code(v) for v in values)
+    return text if type_name == 'string' else f'{type_name}, {text}'
+
+
+def _json_type(value: typing.Any) -> str:
+    """Return the JSON Schema type name of a value."""
+    if value is None:
+        return 'null'
+    if isinstance(value, bool):  # Before int, since bool is a subclass of int.
+        return 'boolean'
+    if isinstance(value, int):
+        return 'integer'
+    if isinstance(value, float):
+        return 'number'
+    if isinstance(value, list):
+        return 'array'
+    if isinstance(value, dict):
+        return 'object'
+    return 'string'
 
 
 def _code(value: typing.Any) -> str:

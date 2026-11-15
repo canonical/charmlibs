@@ -114,7 +114,7 @@ def test_relation_data_without_schema_link():
     ('prop', 'expected'),
     [
         ({}, 'any'),
-        ({'const': 1}, '`1`'),
+        ({'const': 1}, 'integer `1`'),
         ({'enum': ['a']}, '`a`'),
         ({'type': 'array'}, 'list'),
         ({'type': 'array', 'items': {'enum': ['a', 'b']}}, 'list, each one of `a`, `b`'),
@@ -133,6 +133,16 @@ def test_relation_data_without_schema_link():
         ({'anyOf': [{'type': 'string'}, {'type': 'integer'}]}, 'string or integer'),
         ({'anyOf': [{'type': 'null'}]}, 'null'),
         ({'allOf': [{'type': 'boolean'}]}, 'boolean'),
+        # An enum's values are shown as code, so a type other than string is named.
+        ({'enum': ['a', 'b'], 'type': 'string'}, 'one of `a`, `b`'),
+        ({'enum': [1, 2], 'type': 'integer'}, 'integer, one of `1`, `2`'),
+        ({'enum': [1, 2]}, 'integer, one of `1`, `2`'),
+        ({'enum': ['auto', 0]}, 'string or integer, one of `auto`, `0`'),
+        ({'enum': [True, None]}, 'boolean or null, one of `true`, `null`'),
+        ({'const': 3}, 'integer `3`'),
+        ({'const': 1.5}, 'number `1.5`'),
+        ({'const': None}, '`null`'),
+        ({'type': 'array', 'items': {'enum': [1, 2]}}, 'list, each integer, one of `1`, `2`'),
     ],
 )
 def test_type(prop: dict[str, typing.Any], expected: str):
