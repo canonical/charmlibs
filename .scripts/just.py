@@ -151,7 +151,14 @@ def init(argv: list[str]) -> int:
         action='store_true',
         help='Scaffold a charmlibs.interfaces package instead of a general charmlibs package.',
     )
+    parser.add_argument(
+        '--definition-only',
+        action='store_true',
+        help='Scaffold only an interface definition, without a library (implies --interface).',
+    )
     args, cookiecutter_args = parser.parse_known_args(argv)
+    if args.definition_only:
+        args.interface = True
     c = Colors()
     if args.interface:
         print(
@@ -171,6 +178,8 @@ def init(argv: list[str]) -> int:
     cmd.append(template.name)
     if args.interface:
         cmd.append('_interface=True')
+    if args.definition_only:
+        cmd.append('_definition_only=True')
     cmd.extend(cookiecutter_args)
     _run(cmd, env={**os.environ, 'CHARMLIBS_TEMPLATE': str(template.resolve())})
     return 0
@@ -456,7 +465,12 @@ def interfaces_json(argv: list[str]) -> int:
         'tags',
         'status',
     ]
-    cmd: list[str | pathlib.Path] = ['.scripts/ls.py', 'interfaces', '--indent-json']
+    cmd: list[str | pathlib.Path] = [
+        '.scripts/ls.py',
+        'interfaces',
+        '--exclude-examples',
+        '--indent-json',
+    ]
     for output in outputs:
         cmd.extend(['--output', output])
     with (REPO_ROOT / 'interfaces' / 'index.json').open('w') as f:
