@@ -172,7 +172,10 @@ class DatabagModel(pydantic.BaseModel):
             databag[self._NEST_UNDER] = self.json(by_alias=True, exclude_defaults=False)  # type: ignore
             return databag
 
-        dct = json.loads(self.json(by_alias=True, exclude_defaults=False))  # type: ignore
+        # On pydantic v1, the v2 `model_config` class attribute is a regular field: leave it out.
+        dct = json.loads(
+            self.json(by_alias=True, exclude_defaults=False, exclude={"model_config"})  # type: ignore
+        )
         databag.update({k: json.dumps(v) for k, v in dct.items()})
 
         return databag
