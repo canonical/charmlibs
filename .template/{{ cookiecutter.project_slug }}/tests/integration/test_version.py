@@ -19,11 +19,32 @@ import jubilant
 from {{ cookiecutter.__ns }} import {{ cookiecutter.__pkg }}
 
 
+{% if cookiecutter._interface -%}
+def test_deploy(juju: jubilant.Juju, provider: str, requirer: str):
+    """The deployment takes place in the module scoped `juju` fixture."""
+    assert provider in juju.status().apps
+    assert requirer in juju.status().apps
+
+
+def test_relate(juju: jubilant.Juju, provider: str, requirer: str):
+    juju.integrate(f'{provider}:endpoint', f'{requirer}:endpoint')
+    juju.wait(jubilant.all_active)
+    relations = juju.status().apps[provider].relations['endpoint']
+    assert any(relation.related_app == requirer for relation in relations)
+{%- else -%}
 def test_deploy(juju: jubilant.Juju, charm: str):
     """The deployment takes place in the module scoped `juju` fixture."""
     assert charm in juju.status().apps
+{%- endif %}
 
 
+{% if cookiecutter._interface -%}
+def test_lib_version(juju: jubilant.Juju, provider: str, requirer: str):
+    for app in (provider, requirer):
+        result = juju.run(f'{app}/0', 'lib-version')
+        assert result.results['version'] == {{ cookiecutter.__pkg }}.__version__
+{%- else -%}
 def test_lib_version(juju: jubilant.Juju, charm: str):
     result = juju.run(f'{charm}/0', 'lib-version')
     assert result.results['version'] == {{ cookiecutter.__pkg }}.__version__
+{%- endif %}

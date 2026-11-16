@@ -1,3 +1,9 @@
+# 1.1.5 - 02 October 2026
+
+Fix:
+- Publish the etcd request for an existing relation once the `cluster_id` becomes
+  available, instead of requiring the relation to be recreated.
+
 # 1.1.4 - 24 September 2026
 
 Bump dependencies: notably `dpcharmlibs-interfaces` to get the cross-model

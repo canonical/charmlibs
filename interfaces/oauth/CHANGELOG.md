@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.0
+
+- Allow a client to register more than one redirect URI: `ClientConfig.redirect_uri` and the
+  `redirect_uri` databag field now accept a list of URIs as well as a single URI.
+  - Add `ClientConfig.redirect_uris`, which returns the URIs as a list whichever form was used.
+  - A single URI is still published as a plain string, so requirers that do not use a list keep
+    working with providers older than 1.2.0. Those providers reject a list.
+
 ## 1.1.0
 
 - Backport holistic client reconciliation fixes from `charms.hydra.v0.oauth`:

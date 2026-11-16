@@ -30,6 +30,12 @@ config:
       type: string
       description: Certificate request mode (unit, app, or app_and_unit)
       default: "unit"
+    key_algorithm:
+      type: string
+      description: Algorithm for the generated private key (rsa or ecdsa). Unset uses the library default.
+    key_size:
+      type: int
+      description: Size in bits of the generated private key. Unset uses the library default.
     common_name:
       type: string
       description: Certificate common name

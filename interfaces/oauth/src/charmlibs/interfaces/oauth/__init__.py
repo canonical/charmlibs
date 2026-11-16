@@ -62,6 +62,20 @@ Then, to initialize the library:
             )
             self.oauth.update_client_config(client_config)
 
+A client that needs more than one redirect URI passes a list instead of a single URI:
+
+.. code-block:: python
+
+    client_config = ClientConfig(
+        [urljoin(url, "/oauth/callback") for url in self.external_urls],
+        OAUTH_SCOPES,
+        OAUTH_GRANT_TYPES,
+    )
+
+Providers older than 1.2.0 reject a list, so only pass more than one URI when the provider
+is known to support it. ``ClientConfig.redirect_uris`` returns the URIs as a list whichever
+form was used.
+
 
 Provider
 --------

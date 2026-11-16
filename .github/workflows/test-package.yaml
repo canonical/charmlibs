@@ -47,7 +47,7 @@ jobs:
           persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d  # v10.0.1
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e  # v10.3.2
 
       - name: Ensure package uv.lock is up-to-date
         working-directory: ${{ inputs.package }}
@@ -137,7 +137,7 @@ jobs:
           persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d  # v10.0.1
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e  # v10.3.2
 
       - name: Run static analysis and other checks
         env:
@@ -158,7 +158,7 @@ jobs:
           persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d  # v10.0.1
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e  # v10.3.2
 
       - name: Run unit tests
         env:
@@ -228,7 +228,7 @@ jobs:
         run: go install "github.com/canonical/pebble/cmd/$PEBBLE"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d  # v10.0.1
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e  # v10.3.2
 
       - name: Run functional tests
         if: matrix.sudo == 'no-sudo'
@@ -264,7 +264,7 @@ jobs:
         run: sudo concierge prepare --verbose --juju-channel=3/stable -p machine
 
       - name: Install uv
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d  # v10.0.1
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e  # v10.3.2
 
       - name: Pack charms
         if: ${{ hashFiles(format('{0}/tests/integration/pack.sh', inputs.package)) != '' }}

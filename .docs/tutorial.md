@@ -297,7 +297,7 @@ We'll start by taking a look at the files that will make up our packed charm, un
 At the top level are directories for two test charms, with the directory name reflecting the substrate the charm is for: `k8s-charm` and `machine-charm`.
 You'll also see a `common/` directory containing shared files which are symlinked into the structure for our two test charms -- these symlinks are resolved by the packing step before `charmcraft pack` is executed.
 Taking a look inside one of the charm directories, you can see these symlinks, as well as a unique `charmcraft.yaml` file per substrate, and the usual `src/` directory.
-There's also a symlink named `library/`, pointing to `common/local-library/`, which contains symlinks to your library code and metadata -- this is how the latest changes from your library are made available to these charms.
+There's also a symlink named `library/`, pointing to `common/library/`, which contains symlinks to your library code and metadata -- this is how the latest changes from your library are made available to these charms.
 Under `src/`, you'll see a unique `charm.py` file, and a symlink to `common/common.py`.
 
 Our `uptime` function should work just as well in a K8s charm as in a machine charm, so we'll test on both substrates, meaning that we don't need to change anything so far.

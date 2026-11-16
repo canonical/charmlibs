@@ -106,7 +106,8 @@ OAUTH_REQUIRER_JSON_SCHEMA: dict[str, Any] = {
     'type': 'object',
     'properties': {
         'redirect_uri': {
-            'type': 'string',
+            'type': ['string', 'array'],
+            'items': {'type': 'string'},
             'default': None,
         },
         'audience': {'type': 'array', 'default': [], 'items': {'type': 'string'}},
@@ -241,28 +242,45 @@ def _validate_data(data: dict[str, Any], schema: dict[str, Any]) -> None:
 
 @dataclass
 class ClientConfig:
-    """Helper class containing a client's configuration."""
+    """Helper class containing a client's configuration.
 
-    redirect_uri: str | None
+    ``redirect_uri`` is either a single URI or a list of them. Use ``redirect_uris`` to read
+    it without caring which form it was given in.
+    """
+
+    redirect_uri: str | list[str] | None
     scope: str
     grant_types: list[str]
     audience: list[str] = field(default_factory=lambda: [])
     token_endpoint_auth_method: str = 'client_secret_basic'  # noqa: S105
     client_id: str | None = None
 
+    @property
+    def redirect_uris(self) -> list[str]:
+        """The redirect URIs as a list, whichever form ``redirect_uri`` was given in."""
+        if not self.redirect_uri:
+            return []
+        if isinstance(self.redirect_uri, str):
+            return [self.redirect_uri]
+        return list(self.redirect_uri)
+
     def validate(self) -> None:
         """Validate the client configuration."""
-        if 'authorization_code' in self.grant_types and not self.redirect_uri:
+        redirect_uris = self.redirect_uris
+        if 'authorization_code' in self.grant_types and not redirect_uris:
             raise ClientConfigError(
                 'redirect_uri is required when using authorization_code grant_type'
             )
 
         # Validate redirect_uri when configured
-        if self.redirect_uri is not None and not re.match(url_regex, self.redirect_uri):
-            raise ClientConfigError(f'Invalid URL {self.redirect_uri}')
+        for redirect_uri in redirect_uris:
+            if not re.match(url_regex, redirect_uri):
+                raise ClientConfigError(f'Invalid URL {redirect_uri}')
 
-        if self.redirect_uri is not None and self.redirect_uri.startswith('http://'):
-            logger.warning("Provided Redirect URL uses http scheme. Don't do this in production")
+            if redirect_uri.startswith('http://'):
+                logger.warning(
+                    "Provided Redirect URL uses http scheme. Don't do this in production"
+                )
 
         # Validate grant_types
         for grant_type in self.grant_types:
@@ -455,8 +473,15 @@ class OAuthRequirer(OAuthRelation):
         if not relation or not relation.app:
             return
 
-        data = _dump_data(client_config.to_dict(), OAUTH_REQUIRER_JSON_SCHEMA)
-        relation.data[self.model.app].update(data)
+        data = client_config.to_dict()
+        # A single URI is published as a plain string, the only form that providers older
+        # than 1.2.0 accept, so the list form is used only when there is more than one.
+        if redirect_uris := client_config.redirect_uris:
+            data['redirect_uri'] = redirect_uris[0] if len(redirect_uris) == 1 else redirect_uris
+        else:
+            data.pop('redirect_uri', None)
+
+        relation.data[self.model.app].update(_dump_data(data, OAUTH_REQUIRER_JSON_SCHEMA))
 
     def is_client_created(self, relation_id: int | None = None) -> bool | None:
         """Check if the client has been created."""
@@ -527,7 +552,7 @@ class ClientCreatedEvent(EventBase):
     def __init__(
         self,
         handle: Handle,
-        redirect_uri: str,
+        redirect_uri: str | list[str] | None,
         scope: str,
         grant_types: list[str],
         audience: list[str],
@@ -555,7 +580,7 @@ class ClientCreatedEvent(EventBase):
 
     def restore(self, snapshot: dict[str, Any]) -> None:
         """Restore event."""
-        self.redirect_uri = cast('str', snapshot['redirect_uri'])
+        self.redirect_uri = cast('str | list[str] | None', snapshot['redirect_uri'])
         self.scope = cast('str', snapshot['scope'])
         self.grant_types = cast('list[str]', snapshot['grant_types'])
         self.audience = cast('list[str]', snapshot['audience'])
@@ -579,7 +604,7 @@ class ClientChangedEvent(EventBase):
     def __init__(
         self,
         handle: Handle,
-        redirect_uri: str,
+        redirect_uri: str | list[str] | None,
         scope: str,
         grant_types: list[str],
         audience: list[str],
@@ -610,7 +635,7 @@ class ClientChangedEvent(EventBase):
 
     def restore(self, snapshot: dict[str, Any]) -> None:
         """Restore event."""
-        self.redirect_uri = cast('str', snapshot['redirect_uri'])
+        self.redirect_uri = cast('str | list[str] | None', snapshot['redirect_uri'])
         self.scope = cast('str', snapshot['scope'])
         self.grant_types = cast('list[str]', snapshot['grant_types'])
         self.audience = cast('list[str]', snapshot['audience'])
@@ -696,7 +721,7 @@ class OAuthProvider(OAuthRelation):
             logger.warning('The requirer relation data is not valid yet.')
             return
 
-        redirect_uri = cast('str | None', client_data.get('redirect_uri'))
+        redirect_uri = cast('str | list[str] | None', client_data.get('redirect_uri'))
         scope = cast('str | None', client_data.get('scope'))
         grant_types = cast('list[str] | None', client_data.get('grant_types'))
         audience = cast('list[str] | None', client_data.get('audience'))

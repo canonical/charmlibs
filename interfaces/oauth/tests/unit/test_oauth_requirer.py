@@ -243,6 +243,109 @@ def test_redirect_uri_optional_without_authorization_code_grant(
     assert 'redirect_uri' not in relation_out.local_app_data
 
 
+def test_redirect_uri_list_in_relation_bag(context: Context[OAuthRequirerCharm]) -> None:
+    relation = Relation('oauth')
+    state = create_state(leader=True, relations=[relation], containers=[])
+    redirect_uris = ['https://example.oidc.client/callback', 'https://other.oidc.client/callback']
+
+    client_config = ClientConfig(**CLIENT_CONFIG)
+    client_config.redirect_uri = redirect_uris
+
+    state_out = state
+    with context(context.on.start(), state) as mgr:
+        mgr.charm.config_to_update = client_config
+        state_out = mgr.run()
+
+    relation_out = state_out.get_relation(relation.id)
+    assert json.loads(relation_out.local_app_data['redirect_uri']) == redirect_uris
+
+
+def test_single_redirect_uri_list_published_as_string(
+    context: Context[OAuthRequirerCharm],
+) -> None:
+    """A list of one is published in the form that providers older than 1.2.0 accept."""
+    relation = Relation('oauth')
+    state = create_state(leader=True, relations=[relation], containers=[])
+
+    client_config = ClientConfig(**CLIENT_CONFIG)
+    client_config.redirect_uri = ['https://example.oidc.client/callback']
+
+    state_out = state
+    with context(context.on.start(), state) as mgr:
+        mgr.charm.config_to_update = client_config
+        state_out = mgr.run()
+
+    relation_out = state_out.get_relation(relation.id)
+    assert relation_out.local_app_data['redirect_uri'] == 'https://example.oidc.client/callback'
+
+
+def test_empty_redirect_uri_list_not_published(context: Context[OAuthRequirerCharm]) -> None:
+    relation = Relation('oauth')
+    state = create_state(leader=True, relations=[relation], containers=[])
+
+    client_config = ClientConfig(**CLIENT_CONFIG)
+    client_config.grant_types = ['client_credentials']
+    client_config.redirect_uri = []
+
+    state_out = state
+    with context(context.on.start(), state) as mgr:
+        mgr.charm.config_to_update = client_config
+        state_out = mgr.run()
+
+    relation_out = state_out.get_relation(relation.id)
+    assert 'redirect_uri' not in relation_out.local_app_data
+
+
+def test_exception_raised_when_malformed_redirect_url_in_list(
+    context: Context[OAuthRequirerCharm],
+) -> None:
+    state = create_state(leader=True, containers=[])
+
+    client_config = ClientConfig(**CLIENT_CONFIG)
+    client_config.redirect_uri = ['https://example.oidc.client/callback', 'malformed-url']
+
+    with context(context.on.start(), state) as mgr:
+        mgr.charm.config_to_update = client_config
+        with pytest.raises(Exception, match='Invalid URL malformed-url'):
+            mgr.run()
+
+
+def test_exception_raised_when_empty_redirect_uri_list_for_authorization_code(
+    context: Context[OAuthRequirerCharm],
+) -> None:
+    state = create_state(leader=True, containers=[])
+
+    client_config = ClientConfig(**CLIENT_CONFIG)
+    client_config.grant_types = ['authorization_code']
+    client_config.redirect_uri = []
+
+    with context(context.on.start(), state) as mgr:
+        mgr.charm.config_to_update = client_config
+        with pytest.raises(
+            Exception,
+            match='redirect_uri is required when using authorization_code grant_type',
+        ):
+            mgr.run()
+
+
+@pytest.mark.parametrize(
+    ('redirect_uri', 'expected'),
+    [
+        (None, []),
+        ([], []),
+        ('https://example.oidc.client/callback', ['https://example.oidc.client/callback']),
+        (
+            ['https://example.oidc.client/callback', 'https://other.oidc.client/callback'],
+            ['https://example.oidc.client/callback', 'https://other.oidc.client/callback'],
+        ),
+    ],
+)
+def test_redirect_uris(redirect_uri: str | list[str] | None, expected: list[str]) -> None:
+    client_config = ClientConfig(redirect_uri, 'openid', ['client_credentials'])
+
+    assert client_config.redirect_uris == expected
+
+
 def test_exception_raised_when_missing_redirect_uri_for_authorization_code(
     context: Context[OAuthRequirerCharm],
 ) -> None:
