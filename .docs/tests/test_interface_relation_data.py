@@ -266,6 +266,10 @@ def test_add_generated_sections_without_headings():
 
 
 def test_schema_script_handles_both_conventions(tmp_path: pathlib.Path):
+    """Run the schema script for real, as the docs build does.
+
+    This needs `uv`, and network access unless uv already has schema-requirements.txt cached.
+    """
     new_style = tmp_path / 'new.py'
     new_style.write_text(
         textwrap.dedent("""\
