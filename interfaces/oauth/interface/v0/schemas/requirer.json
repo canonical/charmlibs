@@ -12,7 +12,7 @@
                 "audience": [],
                 "scope": "openid email",
                 "grant_types": ["authorization_code"],
-                "token_endpoint_auth_method": ["client_secret_basic"]
+                "token_endpoint_auth_method": "client_secret_basic"
             },
             "related-units": {}
         }
@@ -80,7 +80,7 @@
             "related-units": {
                 "type": "object",
                 "patternProperties": {
-                    "^.*/d+$": {
+                    "^.*/\\d+$": {
                         "type": "object",
                         "additionalProperties": true
                     }
