@@ -45,9 +45,8 @@ Examples:
         },
         unit: {
             "prometheus_scrape_unit_address": "zinc-k8s-0.zinc-k8s-endpoints.cos.svc.cluster.local",
-            "prometheus_scrape_unit_name": "zinc-k8s/0"
-            "prometheus_scrape_unit_path": null
-
+            "prometheus_scrape_unit_name": "zinc-k8s/0",
+            "prometheus_scrape_unit_fqdn": "zinc-k8s-0.zinc-k8s-endpoints.cos.svc.cluster.local"
         }
 """
 
@@ -135,8 +134,14 @@ class ProviderUnitData(BaseModel):
         "This name uniquely identifies the unit as a target for Prometheus to collect metrics data."
     )
     prometheus_scrape_unit_path: str | None = Field(
+        default=None,
         description="An optional path provided by the unit for Prometheus scraping. "
-        "It is present when the provider charm is backed by an Ingress or a Proxy."
+        "It is present when the provider charm is backed by an Ingress or a Proxy.",
+    )
+    prometheus_scrape_unit_fqdn: str | None = Field(
+        default=None,
+        description="The fully qualified domain name of the unit. "
+        "It is absent when the provider charm is backed by an Ingress or a Proxy.",
     )
 
 
