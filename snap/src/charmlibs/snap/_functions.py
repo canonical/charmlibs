@@ -135,7 +135,9 @@ def ensure_quota(
     - **the empty value**: the group must not have this. ``None`` means no limit (or no
       parent, for a top-level group), so ``memory=self.config.get('memory-limit')`` removes
       the memory limit when the config option is cleared. ``()`` means no snaps, and ``{}``
-      means no services.
+      means no services. A group cannot exist without a limit, so removing the group's
+      **last** limit removes the group -- after which the call is a no-op until a limit
+      is given again.
     - **``UNCHANGED``** (the default): leave it as it is. An argument that is left out is
       never compared, never a reason to change the group, and keeps its current value
       through any other change -- as do limits snapd reports that this function has no
@@ -149,16 +151,17 @@ def ensure_quota(
     - Anything else -- removing a snap or service, removing a limit, lowering memory or
       threads, changing the parent -- **re-creates** the group: it is removed and created
       again with the target membership and limits (carrying over everything left
-      ``UNCHANGED``).
+      ``UNCHANGED``). The exception is removing the group's last limit, which removes
+      the group itself rather than re-creating it.
 
     Note that adding a snap to a group, and re-creating a group, restart the snap's
     services, and that a re-created group leaves its snaps unconstrained for a moment.
 
     This function manages one group at a time. A group that has sub-groups cannot be
     re-created: :class:`QuotaHasSubgroupsError` is raised before anything is changed, and
-    the sub-groups must be removed first. Also note that snapd requires a new group to
-    have at least one limit, so creating a group with only snaps (or nothing) in it is an
-    :class:`APIError`.
+    the sub-groups must be removed first. Also note that a new group must be given at
+    least one limit: asking for a group with only snaps (or nothing) in it is a
+    :class:`ValueError`, before any request.
 
     The intended pattern is to install every snap first (for example with
     :func:`ensure_installed`) and then call ``ensure_quota`` once, naming all of them,
@@ -187,8 +190,9 @@ def ensure_quota(
         threads: The threads limit, or None for no threads limit.
 
     Returns:
-        A truthy value if the group was created or changed, or a falsy value if it already
-        matched. Not guaranteed to be an actual :class:`bool`.
+        A truthy value if the group was created, changed, or removed, or a falsy value if
+        it already matched (or was already absent). Not guaranteed to be an actual
+        :class:`bool`.
 
     Raises:
         ValueError: if the group name is empty, blank, or is not a single path segment; if
@@ -197,10 +201,10 @@ def ensure_quota(
             that is empty, blank, or is not a single path segment; if ``memory`` or
             ``threads`` is zero or negative; if the CPU percentage is outside 1 to 100 or
             the CPU count is zero or negative; if ``cpu_set`` is empty or contains a
-            negative number; or if the target group would have no limits at all.
+            negative number; or if a group is to be created but no limit was given.
         NotInstalledError: if a snap named in ``snaps`` or ``services`` is not installed.
-        QuotaHasSubgroupsError: if the group must be re-created but has sub-groups.
-            Nothing is changed in this case.
+        QuotaHasSubgroupsError: if the group must be re-created or removed but has
+            sub-groups. Nothing is changed in this case.
         APIError: for the rules left to snapd -- for example, a group name with invalid
             characters, snaps and services mixed in one group, or a parent that does not
             exist.
@@ -253,14 +257,23 @@ def ensure_quota(
             target_constraints.pop(key, None)
         else:
             target_constraints[key] = value
-    # A group cannot exist without a limit, so a target with no constraints is never
-    # reachable: snapd refuses to create one, and re-creating to reach it would delete
-    # the group and then fail. Refuse it up front, before any write, instead. Entries
+    # A group cannot exist without a limit, so a target with no constraints means the
+    # group should not exist: removing a group's last limit removes the group. Entries
     # the library has no argument for (such as journal) still count as limits.
     if not target_constraints:
+        if info is not None:
+            # Only an explicit None can bring an existing group here, and nothing is
+            # being created, so whether the snaps are installed is not checked. A group
+            # with sub-groups still cannot be removed: QuotaHasSubgroupsError escapes.
+            _snapd_quotas.remove_quota(group)
+            return True
+        if any(value is None for value in given.values()):
+            # The group is already gone, which is what was asked: a no-op.
+            return False
+        # ... but if no limit was given at all, the caller asked for a group without
+        # saying what its limits are, which is a mistake in the call.
         raise ValueError(
-            f'a quota group must have at least one limit, but the target for {group!r} '
-            f'has none; remove the group with remove_quota instead'
+            f'a new quota group needs at least one limit, but nothing was given for {group!r}'
         )
     # 4. A group that doesn't exist is created as the target.
     if info is None:

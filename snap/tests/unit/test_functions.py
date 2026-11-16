@@ -341,34 +341,64 @@ class TestEnsureQuotaValidation:
         assert not result
 
 
-class TestEnsureQuotaNeedsALimit:
-    def test_removing_the_only_limit_raises_without_a_write(
+class TestEnsureQuotaNoLimitsLeft:
+    """A target with no constraints: a group cannot exist without a limit, so a target
+    with none means the group should not exist -- unless the group is already absent and
+    the caller simply gave no limit at all, which is a mistake in the call."""
+
+    def test_removing_the_last_limit_removes_the_group(
         self, mock_client: MockClient, mock_quotas: MockQuotas
     ):
-        # Without the check, the group is removed and then snapd refuses to create it
-        # again -- the caller gets an APIError and the group is gone.
+        # memory=self.config.get('memory-limit') with the option cleared: the snap should
+        # be unconstrained, so the group is removed. Nothing is created, so whether the
+        # snaps are installed is not checked (no GET probe).
+        mock_quotas.get_quota.return_value = make_quota(snaps=['a'], constraints={'memory': 1024})
+        result = _functions.ensure_quota('my-group', memory=None)
+        assert result
+        mock_quotas.remove_quota.assert_called_once_with('my-group')
+        mock_client.post.assert_not_called()
+        mock_client.get.assert_not_called()
+
+    def test_removing_the_last_limit_with_subgroups_raises(
+        self, mock_client: MockClient, mock_quotas: MockQuotas
+    ):
+        # A group with sub-groups still cannot be removed; the error passes through.
         mock_quotas.get_quota.return_value = make_quota(
-            snaps=['a'], constraints={'memory': 1024}
+            snaps=['a'], subgroups=['sub'], constraints={'memory': 1024}
         )
-        with pytest.raises(ValueError, match='at least one limit'):
+        mock_quotas.remove_quota.side_effect = QuotaHasSubgroupsError(
+            'cannot remove quota group with sub-groups', kind='', value='', status_code=400
+        )
+        with pytest.raises(QuotaHasSubgroupsError):
             _functions.ensure_quota('my-group', memory=None)
+        mock_client.post.assert_not_called()
+
+    def test_removing_a_limit_from_a_missing_group_is_a_no_op(
+        self, mock_client: MockClient, mock_quotas: MockQuotas
+    ):
+        # The group is already gone, which is what was asked: falsy, and no write.
+        mock_quotas.get_quota.side_effect = _quota_not_found('my-group')
+        result = _functions.ensure_quota('my-group', ['a'], memory=None)
+        assert not result
         mock_client.post.assert_not_called()
         mock_quotas.remove_quota.assert_not_called()
 
     def test_new_group_without_a_limit_raises_without_a_write(
         self, mock_client: MockClient, mock_quotas: MockQuotas
     ):
+        # Asking for a group to be created without saying what its limits are is a
+        # mistake in the call, not a request for no group: ValueError, before any write.
         mock_quotas.get_quota.side_effect = _quota_not_found('my-group')
         with pytest.raises(ValueError, match='at least one limit'):
             _functions.ensure_quota('my-group', ['a'])
         mock_client.post.assert_not_called()
         mock_quotas.remove_quota.assert_not_called()
 
-    def test_removing_the_only_library_limit_with_a_journal_quota_succeeds(
+    def test_removing_the_only_library_limit_with_a_journal_quota_recreates(
         self, mock_client: MockClient, mock_quotas: MockQuotas
     ):
-        # A call made only of removals is not always an error: the journal entry, which
-        # the library has no argument for, still counts as a limit.
+        # The journal entry, which the library has no argument for, still counts as a
+        # limit: the group still has one, so it is re-created as usual, not removed.
         mock_quotas.get_quota.return_value = make_quota(
             snaps=['a'], constraints={'memory': 1024, 'journal': {'size': 16777216}}
         )
@@ -515,9 +545,7 @@ class TestEnsureQuotaNoChange:
         mock_client.post.assert_not_called()
         mock_quotas.remove_quota.assert_not_called()
 
-    def test_empty_cpu_entry_means_not_set(
-        self, mock_client: MockClient, mock_quotas: MockQuotas
-    ):
+    def test_empty_cpu_entry_means_not_set(self, mock_client: MockClient, mock_quotas: MockQuotas):
         # The mirror case: a group with only a CPU set is reported with an empty cpu entry.
         mock_quotas.get_quota.return_value = make_quota(
             snaps=['a'], constraints={'cpu': {}, 'cpu-set': {'cpus': [0]}}

@@ -450,14 +450,19 @@ def test_ensure_quota_new_group_needs_a_limit():
         snap.get_quota(f'{_QUOTA_PREFIX}one')
 
 
-def test_ensure_quota_cannot_remove_the_only_limit():
-    # The group would have to be re-created without any limit, which snapd refuses -- so
-    # it is a ValueError before any write, and the group and its snaps are untouched.
+def test_ensure_quota_removing_the_last_limit_removes_the_group():
+    # The natural charm call with the config option cleared: the snap should be
+    # unconstrained, and a group cannot exist without a limit, so the group goes away --
+    # and the call is then a no-op until a limit is given again.
     ensure_installed_local(_QUOTA_SNAP)
-    _functions.ensure_quota(f'{_QUOTA_PREFIX}one', _QUOTA_SNAP, memory=4 * _MiB)
-    with pytest.raises(ValueError, match='at least one limit'):
-        _functions.ensure_quota(f'{_QUOTA_PREFIX}one', memory=None)
-    info = snap.get_quota(f'{_QUOTA_PREFIX}one')
+    group = f'{_QUOTA_PREFIX}one'
+    _functions.ensure_quota(group, _QUOTA_SNAP, memory=4 * _MiB)
+    assert _functions.ensure_quota(group, _QUOTA_SNAP, memory=None)
+    with pytest.raises(snap.QuotaNotFoundError):
+        snap.get_quota(group)
+    assert not _functions.ensure_quota(group, _QUOTA_SNAP, memory=None)
+    assert _functions.ensure_quota(group, _QUOTA_SNAP, memory=4 * _MiB)
+    info = snap.get_quota(group)
     assert info.snaps == [_QUOTA_SNAP]
     assert info.memory == 4 * _MiB
 
@@ -524,8 +529,8 @@ def test_ensure_quota_removes_each_limit_in_turn():
     assert info.threads == 128
     assert not _functions.ensure_quota(group, cpu_set=None)
 
-    # Removing the last remaining limit is the only one that is an error (a group needs
-    # at least one), so threads goes last, with a limit back in place first.
+    # Removing the last remaining limit would remove the group itself, so threads goes
+    # last, with a limit back in place first to keep the group around for the assertions.
     assert _functions.ensure_quota(group, memory=4 * _MiB)
     assert _functions.ensure_quota(group, threads=None)
     info = snap.get_quota(group)
