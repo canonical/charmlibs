@@ -79,7 +79,23 @@ if {{cookiecutter._interface}}:  # noqa: F821
     shutil.rmtree(pathlib.Path('tests', 'integration', 'charms', 'k8s-charm'))
     shutil.rmtree(pathlib.Path('tests', 'integration', 'charms', 'machine-charm'))
 else:  # Not an interface library.
+    shutil.rmtree('interface')
     shutil.rmtree('testing')
     # General libraries only use the k8s and machine test charms.
     shutil.rmtree(pathlib.Path('tests', 'integration', 'charms', 'provider-charm'))
     shutil.rmtree(pathlib.Path('tests', 'integration', 'charms', 'requirer-charm'))
+
+
+######################################################################
+# keep only the interface definition for a definition-only interface #
+######################################################################
+
+# False by default, set to True by `just init --definition-only`
+if {{cookiecutter._definition_only}}:  # noqa: F821
+    for path in pathlib.Path().iterdir():
+        if path.name == 'interface':
+            continue
+        if path.is_dir():
+            shutil.rmtree(path)
+        else:
+            path.unlink()
