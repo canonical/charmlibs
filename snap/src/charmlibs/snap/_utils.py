@@ -21,6 +21,7 @@ import re
 import sys
 import typing
 import urllib.parse
+from typing import NoReturn
 
 from . import _client, _errors
 
@@ -29,7 +30,9 @@ if typing.TYPE_CHECKING:
 
 
 class _SentinelMeta(type):
-    def __call__(cls, *args: object, **kwargs: object) -> typing.NoReturn:
+    def __call__(cls) -> NoReturn:
+        # Takes no arguments so that the reference docs show the class without a
+        # constructor signature, which would suggest it can be instantiated.
         raise TypeError(f'{cls.__name__} is a sentinel and cannot be instantiated')
 
     def __repr__(cls) -> str:
