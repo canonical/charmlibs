@@ -24,7 +24,7 @@ lint = [
 ]
 unit = [
     "ops[testing]",
-    "pytest",
+    "pytest>=8",
 ]
 functional = [
 ]
