@@ -28,16 +28,38 @@ if typing.TYPE_CHECKING:
     from collections.abc import Collection, Iterable
 
 
-def snap_path_segment(snap: str) -> str:
+class _SentinelMeta(type):
+    def __call__(cls, *args: object, **kwargs: object) -> typing.NoReturn:
+        raise TypeError(f'{cls.__name__} is a sentinel and cannot be instantiated')
+
+    def __repr__(cls) -> str:
+        return cls.__name__
+
+
+@typing.final
+class UNCHANGED(metaclass=_SentinelMeta):
+    """Sentinel value meaning 'leave this as it is', the default for optional arguments.
+
+    Quota group arguments (see :func:`set_quota` and :func:`ensure_quota`) default to
+    ``UNCHANGED`` so that an argument the caller doesn't mention is distinguished from the
+    empty value, which asks for the corresponding limit or membership to be absent.
+
+    ``UNCHANGED`` is a class, used only through identity: a value is unchanged when it
+    ``is UNCHANGED``. It cannot be instantiated.
+    """
+
+
+def snap_path_segment(snap: str, *, label: str = 'snap name') -> str:
     """Validate a snap name and encode it for use as a single URL path segment.
 
     Raises ValueError if the name is empty or would not be a single, canonical path segment
-    (see :func:`raise_if_not_path_segment`).
+    (see :func:`raise_if_not_path_segment`). ``label`` names the value in the error message
+    when the argument is not a snap name (a quota group name, say).
 
     Encoding is applied, so that characters such as ``?`` and ``#`` in a name are sent as
     part of the path instead of starting a query string or fragment.
     """
-    raise_if_not_path_segment(snap)
+    raise_if_not_path_segment(snap, label=label)
     return urllib.parse.quote(snap, safe='')
 
 
@@ -210,8 +232,11 @@ def as_list(values: str | Iterable[str]) -> list[str]:
 #############################################################
 
 
-def raise_if_not_path_segment(snap: str) -> None:
+def raise_if_not_path_segment(snap: str, *, label: str = 'snap name') -> None:
     """Raise ValueError if a snap name would not be a single, canonical URL path segment.
+
+    ``label`` names the value in the error message, for callers whose argument is not a
+    snap name (a quota group name, say) but is subject to the same rule.
 
     Percent-encoding alone is not enough to guarantee that:
 
@@ -230,7 +255,7 @@ def raise_if_not_path_segment(snap: str) -> None:
     """
     problem = _empty(snap) or _blank(snap) or _path_segment(snap)
     if problem:
-        raise ValueError(_message('snap name', problem, [snap]))
+        raise ValueError(_message(label, problem, [snap]))
 
 
 def raise_if_empty_or_blank(values: str | Collection[str], *, label: str) -> None:

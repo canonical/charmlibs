@@ -14,7 +14,15 @@
 
 """High level helper functions that build on top of the basic snap operations."""
 
-from . import _errors, _snapd_snaps, _utils
+from __future__ import annotations
+
+import typing
+from typing import Any
+
+from . import _errors, _snapd_quotas, _snapd_snaps, _utils
+
+if typing.TYPE_CHECKING:
+    from collections.abc import Iterable, Mapping
 
 
 def ensure_installed(
@@ -104,3 +112,277 @@ def _installed_info(snap: str) -> _snapd_snaps.InstalledInfo | None:
         return _snapd_snaps.list_one(snap)
     except _errors.NotInstalledError:
         return None
+
+
+def ensure_quota(
+    group: str,
+    snaps: str | Iterable[str] | type[_utils.UNCHANGED] = _utils.UNCHANGED,
+    *,
+    services: Mapping[str, str | Iterable[str]] | type[_utils.UNCHANGED] = _utils.UNCHANGED,
+    parent: str | type[_utils.UNCHANGED] | None = _utils.UNCHANGED,
+    memory: int | type[_utils.UNCHANGED] | None = _utils.UNCHANGED,
+    cpu: tuple[int | None, int] | type[_utils.UNCHANGED] | None = _utils.UNCHANGED,
+    cpu_set: Iterable[int] | type[_utils.UNCHANGED] | None = _utils.UNCHANGED,
+    threads: int | type[_utils.UNCHANGED] | None = _utils.UNCHANGED,
+) -> object:
+    """Ensure a quota group exists and matches what was asked, changing it if needed.
+
+    Every argument except ``group`` has three states:
+
+    - **a value**: the group must have exactly this. ``ensure_quota('my-group', ['a', 'b'])``
+      makes the group's snaps exactly ``a`` and ``b``, and ``memory=1024**2`` makes the
+      memory limit exactly 1 MiB.
+    - **the empty value**: the group must not have this. ``None`` means no limit (or no
+      parent, for a top-level group), so ``memory=self.config.get('memory-limit')`` removes
+      the memory limit when the config option is cleared. ``()`` means no snaps, and ``{}``
+      means no services.
+    - **``UNCHANGED``** (the default): leave it as it is. An argument that is left out is
+      never compared, never a reason to change the group, and keeps its current value
+      through any other change -- as do limits snapd reports that this function has no
+      argument for, such as journal quotas. On a group that does not exist yet, "left as
+      it is" means absent.
+
+    What happens when the group doesn't match:
+
+    - Adding snaps or services, adding a limit, raising the memory or threads limit, and
+      changing the CPU limit up or down all happen **in place**, in a single change.
+    - Anything else -- removing a snap or service, removing a limit, lowering memory or
+      threads, changing the parent -- **re-creates** the group: it is removed and created
+      again with the target membership and limits (carrying over everything left
+      ``UNCHANGED``).
+
+    Note that adding a snap to a group, and re-creating a group, restart the snap's
+    services, and that a re-created group leaves its snaps unconstrained for a moment.
+
+    This function manages one group at a time. A group that has sub-groups cannot be
+    re-created: :class:`QuotaHasSubgroupsError` is raised before anything is changed, and
+    the sub-groups must be removed first. Also note that snapd requires a new group to
+    have at least one limit, so creating a group with only snaps (or nothing) in it is an
+    :class:`APIError`.
+
+    The intended pattern is to install every snap first (for example with
+    :func:`ensure_installed`) and then call ``ensure_quota`` once, naming all of them,
+    which adds them in a single change::
+
+        ensure_installed('my-snap')
+        ensure_quota('my-group', ['my-snap'], memory=self.config.get('memory-limit'))
+
+    It is safe to call on every hook: when the group already matches, no request is made
+    beyond reading the group. And after a snap is removed and installed again (which
+    drops it from the group), calling ``ensure_quota`` puts it back.
+
+    Args:
+        group: The name of the quota group.
+        snaps: The snaps in the group, as a single name or an iterable of names.
+        services: The services in the group, as a mapping of snap name to service names:
+            ``{'some-snap': ['serv1', 'serv2']}``.
+        parent: The name of an existing group to nest this group under, or None for a
+            top-level group.
+        memory: The memory limit in bytes, or None for no memory limit. The library does
+            no unit parsing.
+        cpu: The CPU limit as a ``(count, percentage)`` pair -- ``(2, 50)`` is the CLI's
+            ``2x50%``, and a count of None applies the percentage to every available
+            core -- or None for no CPU limit. Percentage is 1 to 100.
+        cpu_set: The indices of the cores the group may use, or None for no CPU set limit.
+        threads: The threads limit, or None for no threads limit.
+
+    Returns:
+        A truthy value if the group was created or changed, or a falsy value if it already
+        matched. Not guaranteed to be an actual :class:`bool`.
+
+    Raises:
+        ValueError: if the group name is empty, blank, or is not a single path segment; if
+            a snap or service name is empty or blank; if ``memory`` or ``threads`` is zero
+            or negative; if the CPU percentage is outside 1 to 100 or the CPU count is zero
+            or negative; or if ``cpu_set`` is empty or contains a negative number.
+        NotInstalledError: if a snap named in ``snaps`` or ``services`` is not installed.
+        QuotaHasSubgroupsError: if the group must be re-created but has sub-groups.
+            Nothing is changed in this case.
+        APIError: for the rules left to snapd -- for example, a group name with invalid
+            characters, snaps and services mixed in one group, a parent that does not
+            exist, or a new group without a limit.
+        ChangeError: if the operation fails after starting.
+    """
+    # 1. Validate every argument that was given, before any request, converting each
+    # limit to the constraint entry snapd uses. A None entry means the limit must be absent.
+    _utils.raise_if_not_path_segment(group, label='group name')
+    snaps_list = None if snaps is _utils.UNCHANGED else _snapd_quotas._validate_snaps(snaps)
+    services_dict = (
+        None if services is _utils.UNCHANGED else _snapd_quotas._validate_services(services)
+    )
+    given: dict[str, Any] = {}
+    if memory is not _utils.UNCHANGED:
+        if memory is not None:
+            _snapd_quotas._validate_memory(memory)
+        given['memory'] = memory
+    if cpu is not _utils.UNCHANGED:
+        given['cpu'] = None if cpu is None else _snapd_quotas._validate_cpu(cpu)
+    if cpu_set is not _utils.UNCHANGED:
+        given['cpu-set'] = (
+            None if cpu_set is None else {'cpus': _snapd_quotas._validate_cpu_set(cpu_set)}
+        )
+    if threads is not _utils.UNCHANGED:
+        if threads is not None:
+            _snapd_quotas._validate_threads(threads)
+        given['threads'] = threads
+    # 2. Read the group. A group that doesn't exist is an empty group.
+    try:
+        info = _snapd_quotas.get_quota(group)
+    except _errors.QuotaNotFoundError:
+        info = None
+    current_snaps = [] if info is None else info.snaps
+    current_services: dict[str, list[str]] = {} if info is None else info.services
+    current_parent = None if info is None else info.parent
+    current_constraints: dict[str, Any] = {} if info is None else dict(info._constraints)
+    # 3. Build the target from a copy of the current group, applying what was given.
+    # Entries snapd reports that this function has no argument for (such as journal)
+    # are copied through untouched.
+    target_snaps = current_snaps if snaps_list is None else snaps_list
+    target_services = current_services if services_dict is None else services_dict
+    target_parent = current_parent if parent is _utils.UNCHANGED else parent
+    target_constraints = dict(current_constraints)
+    for key, value in given.items():
+        if value is None:
+            target_constraints.pop(key, None)
+        else:
+            target_constraints[key] = value
+    # 4. A group that doesn't exist is created as the target.
+    if info is None:
+        _create_quota(group, target_snaps, target_services, target_parent, target_constraints)
+        return True
+    # 5. A group that already matches is left alone.
+    if (
+        _same_names(current_snaps, target_snaps)
+        and _same_services(current_services, target_services)
+        and current_parent == target_parent
+        and _same_constraints(current_constraints, target_constraints)
+    ):
+        return False
+    # 6-7. A target reachable by adding to the current group is reached with one 'ensure'
+    # request carrying only what the group lacks.
+    if _can_update_quota_in_place(
+        current_snaps,
+        current_services,
+        current_parent,
+        current_constraints,
+        target_snaps,
+        target_services,
+        target_parent,
+        target_constraints,
+    ):
+        new_snaps = [s for s in target_snaps if s not in set(current_snaps)]
+        new_services = {
+            snap: [name for name in names if name not in set(current_services.get(snap, []))]
+            for snap, names in target_services.items()
+        }
+        changed = {
+            key: value
+            for key, value in target_constraints.items()
+            if not _same_constraint_entry(key, current_constraints.get(key), value)
+        }
+        named = [*new_snaps, *new_services]
+        try:
+            _snapd_quotas._post_ensure(
+                group,
+                snaps=new_snaps,
+                services=_snapd_quotas._qualified_services(new_services),
+                constraints=changed,
+            )
+        except _errors.APIError:
+            _snapd_quotas._raise_if_not_installed(named)
+            raise
+        return True
+    # 8. Anything else re-creates the group.
+    # Check the named snaps first, so that a wrong snap name cannot delete a working group.
+    _snapd_quotas._raise_if_not_installed([*target_snaps, *target_services])
+    # A group with sub-groups cannot be removed: QuotaHasSubgroupsError escapes here,
+    # before anything has changed.
+    _snapd_quotas.remove_quota(group)
+    _create_quota(group, target_snaps, target_services, target_parent, target_constraints)
+    return True
+
+
+def _create_quota(
+    group: str,
+    snaps: Iterable[str],
+    services: Mapping[str, Iterable[str]],
+    parent: str | None,
+    constraints: Mapping[str, Any],
+) -> None:
+    """Create a quota group with the full target description, in a single 'ensure' request."""
+    try:
+        _snapd_quotas._post_ensure(
+            group,
+            snaps=snaps,
+            services=_snapd_quotas._qualified_services(services),
+            parent=parent,
+            constraints=constraints,
+        )
+    except _errors.APIError:
+        _snapd_quotas._raise_if_not_installed([*snaps, *services])
+        raise
+
+
+def _same_names(current: Iterable[str], target: Iterable[str]) -> bool:
+    """Compare two collections of names, ignoring order."""
+    return set(current) == set(target)
+
+
+def _same_services(
+    current: Mapping[str, Iterable[str]], target: Mapping[str, Iterable[str]]
+) -> bool:
+    """Compare two snap-to-services mappings, ignoring order within each snap."""
+    return set(current) == set(target) and all(
+        set(current[snap]) == set(target[snap]) for snap in current
+    )
+
+
+def _same_constraints(current: Mapping[str, Any], target: Mapping[str, Any]) -> bool:
+    """Compare two raw constraint dicts as snapd reports them."""
+    return set(current) == set(target) and all(
+        _same_constraint_entry(key, current[key], target[key]) for key in current
+    )
+
+
+def _same_constraint_entry(key: str, current: Any, target: Any) -> bool:
+    """Compare a single constraint entry, comparing a CPU set's cores ignoring order."""
+    if key == 'cpu-set' and isinstance(current, dict) and isinstance(target, dict):
+        current_cpus: Any = typing.cast('dict[str, Any]', current).get('cpus') or []
+        target_cpus: Any = typing.cast('dict[str, Any]', target).get('cpus') or []
+        return set(current_cpus) == set(target_cpus)
+    return current == target
+
+
+def _can_update_quota_in_place(
+    current_snaps: Iterable[str],
+    current_services: Mapping[str, Iterable[str]],
+    current_parent: str | None,
+    current_constraints: Mapping[str, Any],
+    target_snaps: Iterable[str],
+    target_services: Mapping[str, Iterable[str]],
+    target_parent: str | None,
+    target_constraints: Mapping[str, Any],
+) -> bool:
+    """Whether the target can be reached by adding to the current group.
+
+    Mirrors the limits of snapd's 'ensure' action: the parent must be the same, every
+    snap and service must still be there, no constraint entry may be deleted, and the
+    memory and threads limits may be raised but not lowered. The CPU limit may change up
+    or down in place.
+    """
+    if current_parent != target_parent:
+        return False
+    if not set(current_snaps) <= set(target_snaps):
+        return False
+    for snap_name, names in current_services.items():
+        if not set(names) <= set(target_services.get(snap_name, [])):
+            return False
+    for key in current_constraints:
+        if key not in target_constraints:
+            return False
+    for key in ('memory', 'threads'):
+        current_value = current_constraints.get(key)
+        target_value = target_constraints.get(key)
+        if current_value is not None and target_value is not None and target_value < current_value:
+            return False
+    return True

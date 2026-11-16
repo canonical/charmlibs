@@ -32,7 +32,18 @@ if typing.TYPE_CHECKING:
 # 1. DOES_NOT_RAISE if snap-not-found is handled but not raised.
 # 2. RAISES_NOT_IN_STORE if snap-not-found becomes NotInStoreError.
 # Otherwise the call is assumed to raise NotInstalledError.
-EXCLUDE = {'alias', 'unalias', 'unhold'}
+# The quota endpoints answer a kindless 404 or 400 of their own, never snap-not-found:
+# get_quota, list_quotas, and remove_quota name a group, not a snap. ensure_quota reads
+# through get_quota, and narrows not-installed snaps itself via its check_installed probes.
+EXCLUDE = {
+    'alias',
+    'unalias',
+    'unhold',
+    'get_quota',
+    'list_quotas',
+    'remove_quota',
+    'ensure_quota',
+}
 CALLS: dict[str, Callable[[], object]] = {
     'connect': lambda: snap.connect(('lxd', 'home')),
     'disconnect': lambda: snap.disconnect(('lxd', 'home')),
@@ -47,6 +58,9 @@ CALLS: dict[str, Callable[[], object]] = {
     'remove': lambda: snap.remove('lxd'),
     'restart': lambda: snap.restart('lxd'),
     'set': lambda: snap.set('lxd', {'mykey': 'myval'}),
+    # set_quota's own request never gets snap-not-found from snapd (its failures are kindless),
+    # but the probe it does on failure narrows one to NotInstalledError.
+    'set_quota': lambda: snap.set_quota('my-group', 'lxd', memory=1024),
     'start': lambda: snap.start('lxd'),
     'stop': lambda: snap.stop('lxd'),
     'unset': lambda: snap.unset('lxd', ['mykey']),

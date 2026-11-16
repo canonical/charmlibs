@@ -10,6 +10,7 @@ import functools
 import json
 import logging
 import random
+import subprocess
 import time
 import typing
 import uuid
@@ -81,6 +82,43 @@ def hold_auto_refresh() -> None:
             _client._Change(change['id']).wait()
         except snap.ChangeError:
             pass  # Whether it succeeded doesn't matter, only that snapd is free again.
+
+
+# Quota group tests name every group they create with this prefix, so that cleanup can
+# remove exactly those groups without touching any the suite didn't make.
+QUOTA_TEST_PREFIX = 'test-quota-'
+
+
+def remove_test_quota_groups() -> None:
+    """Remove every leftover test quota group, sub-groups first (a parent can't go first)."""
+    groups: dict[str, snap.QuotaInfo] = {}
+    for _ in range(10):
+        groups = {g.name: g for g in snap.list_quotas() if g.name.startswith(QUOTA_TEST_PREFIX)}
+        if not groups:
+            return
+        parents = {g.parent for g in groups.values() if g.parent is not None}
+        for name in groups.keys() - parents:
+            snap.remove_quota(name)
+    raise AssertionError(f'could not clean up test quota groups: {sorted(groups)}')
+
+
+@pytest.fixture(autouse=True)
+def _clean_quota_groups() -> typing.Iterator[None]:  # pyright: ignore[reportUnusedFunction]
+    """Remove test quota groups before and after each test, so no failure can leak one."""
+    remove_test_quota_groups()
+    yield
+    remove_test_quota_groups()
+
+
+def reset_service_rate_limit(name: str, service: str) -> None:
+    """Clear systemd's start-rate-limit state for a snap's service.
+
+    snapd restarts a snap's services when the snap joins or leaves a quota group, and those
+    restarts accumulate against systemd's per-unit start rate limit across tests -- after
+    enough of them, systemd refuses to start the unit and snapd's change fails. Resetting
+    the counter before a test that drives restarts keeps the limit out of the assertion.
+    """
+    subprocess.run(['systemctl', 'reset-failed', f'snap.{name}.{service}'], check=False)
 
 
 @pytest.fixture(scope='session', autouse=True)
