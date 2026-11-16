@@ -304,8 +304,13 @@ class TestEnsureQuotaValidation:
         [
             {'snaps': ['']},
             {'snaps': [' ']},
+            {'snaps': ['a/b']},
             {'services': {'': ['serv1']}},
+            {'services': {'a/b': ['serv1']}},
             {'services': {'snap-a': [' ']}},
+            {'parent': ''},
+            {'parent': ' '},
+            {'parent': 'a/b'},
             {'memory': 0},
             {'memory': -1},
             {'threads': 0},
@@ -324,6 +329,60 @@ class TestEnsureQuotaValidation:
         mock_quotas.get_quota.assert_not_called()
         mock_client.get.assert_not_called()
         mock_client.post.assert_not_called()
+
+    def test_parent_error_label(self, mock_client: MockClient, mock_quotas: MockQuotas):
+        with pytest.raises(ValueError, match='parent group name must not be empty'):
+            _functions.ensure_quota('my-group', parent='')
+
+    def test_parent_none_is_not_an_error(self, mock_client: MockClient, mock_quotas: MockQuotas):
+        # None means 'must be absent' (a top-level group), not an invalid name.
+        mock_quotas.get_quota.return_value = make_quota(constraints={'memory': 1024})
+        result = _functions.ensure_quota('my-group', parent=None)
+        assert not result
+
+
+class TestEnsureQuotaNeedsALimit:
+    def test_removing_the_only_limit_raises_without_a_write(
+        self, mock_client: MockClient, mock_quotas: MockQuotas
+    ):
+        # Without the check, the group is removed and then snapd refuses to create it
+        # again -- the caller gets an APIError and the group is gone.
+        mock_quotas.get_quota.return_value = make_quota(
+            snaps=['a'], constraints={'memory': 1024}
+        )
+        with pytest.raises(ValueError, match='at least one limit'):
+            _functions.ensure_quota('my-group', memory=None)
+        mock_client.post.assert_not_called()
+        mock_quotas.remove_quota.assert_not_called()
+
+    def test_new_group_without_a_limit_raises_without_a_write(
+        self, mock_client: MockClient, mock_quotas: MockQuotas
+    ):
+        mock_quotas.get_quota.side_effect = _quota_not_found('my-group')
+        with pytest.raises(ValueError, match='at least one limit'):
+            _functions.ensure_quota('my-group', ['a'])
+        mock_client.post.assert_not_called()
+        mock_quotas.remove_quota.assert_not_called()
+
+    def test_removing_the_only_library_limit_with_a_journal_quota_succeeds(
+        self, mock_client: MockClient, mock_quotas: MockQuotas
+    ):
+        # A call made only of removals is not always an error: the journal entry, which
+        # the library has no argument for, still counts as a limit.
+        mock_quotas.get_quota.return_value = make_quota(
+            snaps=['a'], constraints={'memory': 1024, 'journal': {'size': 16777216}}
+        )
+        result = _functions.ensure_quota('my-group', memory=None)
+        assert result
+        mock_quotas.remove_quota.assert_called_once_with('my-group')
+        assert _posted_bodies(mock_client) == [
+            {
+                'action': 'ensure',
+                'group-name': 'my-group',
+                'snaps': ['a'],
+                'constraints': {'journal': {'size': 16777216}},
+            }
+        ]
 
 
 class TestEnsureQuotaCreate:
@@ -441,6 +500,32 @@ class TestEnsureQuotaNoChange:
         result = _functions.ensure_quota('my-group')
         assert not result
         mock_client.post.assert_not_called()
+
+    def test_empty_cpu_set_entry_means_not_set(
+        self, mock_client: MockClient, mock_quotas: MockQuotas
+    ):
+        # snapd reports cpu and cpu-set together whenever either is set, with the unused
+        # one an empty object. The empty entry is not a limit that is set: cpu_set=None
+        # on this group is already true, not a reason to re-create it.
+        mock_quotas.get_quota.return_value = make_quota(
+            snaps=['a'], constraints={'cpu': {'percentage': 50}, 'cpu-set': {}}
+        )
+        result = _functions.ensure_quota('my-group', ['a'], cpu=(None, 50), cpu_set=None)
+        assert not result
+        mock_client.post.assert_not_called()
+        mock_quotas.remove_quota.assert_not_called()
+
+    def test_empty_cpu_entry_means_not_set(
+        self, mock_client: MockClient, mock_quotas: MockQuotas
+    ):
+        # The mirror case: a group with only a CPU set is reported with an empty cpu entry.
+        mock_quotas.get_quota.return_value = make_quota(
+            snaps=['a'], constraints={'cpu': {}, 'cpu-set': {'cpus': [0]}}
+        )
+        result = _functions.ensure_quota('my-group', ['a'], cpu=None, cpu_set=[0])
+        assert not result
+        mock_client.post.assert_not_called()
+        mock_quotas.remove_quota.assert_not_called()
 
 
 class TestEnsureQuotaUpdateInPlace:
@@ -675,6 +760,25 @@ class TestEnsureQuotaRecreate:
                 'group-name': 'my-group',
                 'snaps': ['a'],
                 'constraints': {'memory': 1024, 'threads': 8, 'journal': {'size': 16777216}},
+            }
+        ]
+
+    def test_recreate_keeps_an_empty_journal_entry(
+        self, mock_client: MockClient, mock_quotas: MockQuotas
+    ):
+        # Unlike cpu and cpu-set, an empty journal entry is meaningful (a journal quota
+        # with no size or rate), so it is carried over like any other entry.
+        mock_quotas.get_quota.return_value = make_quota(
+            snaps=['a', 'b'], constraints={'memory': 2048, 'journal': {}}
+        )
+        result = _functions.ensure_quota('my-group', ['a'])
+        assert result
+        assert _posted_bodies(mock_client) == [
+            {
+                'action': 'ensure',
+                'group-name': 'my-group',
+                'snaps': ['a'],
+                'constraints': {'memory': 2048, 'journal': {}},
             }
         ]
 

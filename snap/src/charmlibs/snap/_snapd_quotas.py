@@ -58,23 +58,33 @@ class QuotaInfo:
         self._threads = threads
         self._memory_usage = memory_usage
         self._threads_usage = threads_usage
-        # The constraints exactly as snapd reported them, so that ensure_quota can carry over
-        # limits it was not asked about -- including kinds this library has no argument for.
+        # The constraints as snapd reported them (minus its empty cpu/cpu-set entries, see
+        # _from_dict), so that ensure_quota can carry over limits it was not asked about --
+        # including kinds this library has no argument for, such as journal quotas.
         self._constraints = dict(constraints)
 
     @classmethod
     def _from_dict(cls, info_dict: dict[str, Any]) -> Self:
-        constraints: dict[str, Any] = info_dict.get('constraints') or {}
+        constraints: dict[str, Any] = dict(info_dict.get('constraints') or {})
         current: dict[str, Any] = info_dict.get('current') or {}
         # NOTE: snapd omits zero values and empty lists from its response, so a missing or
-        # zero limit means "not set", and is reported here as None.
+        # zero limit means "not set", and is reported here as None. The exception is that it
+        # reports cpu and cpu-set together whenever either is set, with the unused one an
+        # empty object -- and an empty entry means "not set" too. Drop those two from the
+        # raw constraints, so that comparing groups (or carrying constraints over a
+        # re-create) never reads them as set. An empty journal entry, by contrast, is
+        # meaningful -- a journal quota with no size or rate -- and is kept.
+        cpu_dict: dict[str, Any] = constraints.get('cpu') or {}
+        if not cpu_dict.get('percentage'):
+            constraints.pop('cpu', None)
+        cpu_set_dict: dict[str, Any] = constraints.get('cpu-set') or {}
+        if not cpu_set_dict.get('cpus'):
+            constraints.pop('cpu-set', None)
         memory = constraints.get('memory') or None
         threads = constraints.get('threads') or None
-        cpu_dict: dict[str, Any] = constraints.get('cpu') or {}
         percentage = cpu_dict.get('percentage') or None
         # A count of zero (or absent) means the percentage applies to every available core.
         cpu = (cpu_dict.get('count') or None, percentage) if percentage is not None else None
-        cpu_set_dict: dict[str, Any] = constraints.get('cpu-set') or {}
         cpu_set = cpu_set_dict.get('cpus') or None
         raw_services: list[str] = info_dict.get('services') or []
         services: dict[str, list[str]] = {}
@@ -305,9 +315,12 @@ def set_quota(
 
     Raises:
         ValueError: if the group name is empty, blank, or is not a single path segment; if
-            a snap or service name is empty or blank; if ``memory`` or ``threads`` is zero
-            or negative; if the CPU percentage is outside 1 to 100 or the CPU count is zero
-            or negative; or if ``cpu_set`` is empty or contains a negative number.
+            a snap name (in ``snaps`` or ``services``) is empty, blank, or is not a single
+            path segment; if a service name is empty or blank; if ``parent`` is a string
+            that is empty, blank, or is not a single path segment; if ``memory`` or
+            ``threads`` is zero or negative; if the CPU percentage is outside 1 to 100 or
+            the CPU count is zero or negative; or if ``cpu_set`` is empty or contains a
+            negative number.
         TypeError: if ``parent`` or a limit is None.
         NotInstalledError: if a snap named in ``snaps`` or ``services`` is not installed.
         APIError: for the rules left to snapd -- for example, a group name with invalid
@@ -326,6 +339,10 @@ def set_quota(
     snaps_list = None if snaps is _utils.UNCHANGED else _validate_snaps(snaps)
     services_dict = None if services is _utils.UNCHANGED else _validate_services(services)
     _reject_none(parent, 'parent')
+    if parent is not _utils.UNCHANGED:
+        # snapd stores no parent when it gets an empty one, so reading the group back
+        # would never show what was sent. Reject it rather than send it nowhere.
+        _utils.raise_if_not_path_segment(parent, label='parent group name')
     _reject_none(memory, 'memory')
     _reject_none(cpu, 'cpu')
     _reject_none(cpu_set, 'cpu_set')
@@ -422,21 +439,31 @@ def _post_ensure(
 
 
 def _validate_snaps(snaps: str | Iterable[str]) -> list[str]:
-    """Normalise a one-or-many snap argument to a list, rejecting empty or blank names."""
+    """Normalise a one-or-many snap argument to a list, rejecting unusable names.
+
+    Names are validated as path segments, not just as empty or blank, because the
+    not-installed probe on a failed request builds a path from each name: a name that
+    can't be a path segment would raise ValueError from inside the exception handler and
+    mask the error snapd sent (the same trap _snapd_apps._post_action documents).
+    """
     names = _utils.as_list(snaps)
-    _utils.raise_if_empty_or_blank(names, label='snap name')
+    for name in names:
+        _utils.raise_if_not_path_segment(name)
     return names
 
 
 def _validate_services(services: Mapping[str, str | Iterable[str]]) -> dict[str, list[str]]:
-    """Normalise a services mapping's values to lists, rejecting empty or blank names.
+    """Normalise a services mapping's values to lists, rejecting unusable names.
+
+    Snap names (the keys) are validated as path segments like any other snap name (see
+    :func:`_validate_snaps`); service names get the empty-or-blank check only.
 
     A snap mapped to an empty list contributes no services, so the entry is dropped:
     ``{'some-snap': []}`` means the same as not mentioning ``some-snap`` at all.
     """
     result: dict[str, list[str]] = {}
     for snap_name, names in services.items():
-        _utils.raise_if_empty_or_blank(snap_name, label='snap name')
+        _utils.raise_if_not_path_segment(snap_name)
         names_list = _utils.as_list(names)
         _utils.raise_if_empty_or_blank(names_list, label='service name')
         if names_list:

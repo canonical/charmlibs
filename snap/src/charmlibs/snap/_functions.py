@@ -192,15 +192,18 @@ def ensure_quota(
 
     Raises:
         ValueError: if the group name is empty, blank, or is not a single path segment; if
-            a snap or service name is empty or blank; if ``memory`` or ``threads`` is zero
-            or negative; if the CPU percentage is outside 1 to 100 or the CPU count is zero
-            or negative; or if ``cpu_set`` is empty or contains a negative number.
+            a snap name (in ``snaps`` or ``services``) is empty, blank, or is not a single
+            path segment; if a service name is empty or blank; if ``parent`` is a string
+            that is empty, blank, or is not a single path segment; if ``memory`` or
+            ``threads`` is zero or negative; if the CPU percentage is outside 1 to 100 or
+            the CPU count is zero or negative; if ``cpu_set`` is empty or contains a
+            negative number; or if the target group would have no limits at all.
         NotInstalledError: if a snap named in ``snaps`` or ``services`` is not installed.
         QuotaHasSubgroupsError: if the group must be re-created but has sub-groups.
             Nothing is changed in this case.
         APIError: for the rules left to snapd -- for example, a group name with invalid
-            characters, snaps and services mixed in one group, a parent that does not
-            exist, or a new group without a limit.
+            characters, snaps and services mixed in one group, or a parent that does not
+            exist.
         ChangeError: if the operation fails after starting.
     """
     # 1. Validate every argument that was given, before any request, converting each
@@ -210,6 +213,10 @@ def ensure_quota(
     services_dict = (
         None if services is _utils.UNCHANGED else _snapd_quotas._validate_services(services)
     )
+    if parent is not _utils.UNCHANGED and parent is not None:
+        # snapd stores no parent when it gets an empty one, so the group read back would
+        # never equal what was asked for, and every call would re-create the group.
+        _utils.raise_if_not_path_segment(parent, label='parent group name')
     given: dict[str, Any] = {}
     if memory is not _utils.UNCHANGED:
         if memory is not None:
@@ -246,6 +253,15 @@ def ensure_quota(
             target_constraints.pop(key, None)
         else:
             target_constraints[key] = value
+    # A group cannot exist without a limit, so a target with no constraints is never
+    # reachable: snapd refuses to create one, and re-creating to reach it would delete
+    # the group and then fail. Refuse it up front, before any write, instead. Entries
+    # the library has no argument for (such as journal) still count as limits.
+    if not target_constraints:
+        raise ValueError(
+            f'a quota group must have at least one limit, but the target for {group!r} '
+            f'has none; remove the group with remove_quota instead'
+        )
     # 4. A group that doesn't exist is created as the target.
     if info is None:
         _create_quota(group, target_snaps, target_services, target_parent, target_constraints)

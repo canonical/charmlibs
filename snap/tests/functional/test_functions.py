@@ -12,7 +12,7 @@ paths, with the classic-confinement tests grouped together.
 import pytest
 
 from charmlibs import snap
-from charmlibs.snap import _errors, _functions
+from charmlibs.snap import _client, _errors, _functions
 from charmlibs.snap import _snapd_snaps as _snapd
 from conftest import QUOTA_TEST_PREFIX as _QUOTA_PREFIX
 from conftest import (
@@ -441,9 +441,119 @@ def test_ensure_quota_not_installed():
 
 
 def test_ensure_quota_new_group_needs_a_limit():
-    # snapd's rule, surfaced as an APIError: a group cannot be created without a limit.
+    # A group cannot be created without a limit: a ValueError, before any request, rather
+    # than snapd's APIError, so that it behaves like removing the only limit (below).
     ensure_installed_local(_QUOTA_SNAP)
-    with pytest.raises(snap.APIError, match='at least one resource limit'):
+    with pytest.raises(ValueError, match='at least one limit'):
         _functions.ensure_quota(f'{_QUOTA_PREFIX}one', _QUOTA_SNAP)
     with pytest.raises(snap.QuotaNotFoundError):
         snap.get_quota(f'{_QUOTA_PREFIX}one')
+
+
+def test_ensure_quota_cannot_remove_the_only_limit():
+    # The group would have to be re-created without any limit, which snapd refuses -- so
+    # it is a ValueError before any write, and the group and its snaps are untouched.
+    ensure_installed_local(_QUOTA_SNAP)
+    _functions.ensure_quota(f'{_QUOTA_PREFIX}one', _QUOTA_SNAP, memory=4 * _MiB)
+    with pytest.raises(ValueError, match='at least one limit'):
+        _functions.ensure_quota(f'{_QUOTA_PREFIX}one', memory=None)
+    info = snap.get_quota(f'{_QUOTA_PREFIX}one')
+    assert info.snaps == [_QUOTA_SNAP]
+    assert info.memory == 4 * _MiB
+
+
+def test_ensure_quota_cpu_without_cpu_set_is_stable():
+    # snapd reports the unset cpu-set as an empty entry; cpu_set=None must not read that
+    # as 'set' and re-create the group on every call.
+    ensure_installed_local(_QUOTA_SNAP)
+    group = f'{_QUOTA_PREFIX}one'
+    assert _functions.ensure_quota(group, _QUOTA_SNAP, cpu=(None, 50), cpu_set=None)
+    assert not _functions.ensure_quota(group, _QUOTA_SNAP, cpu=(None, 50), cpu_set=None)
+    info = snap.get_quota(group)
+    assert info.cpu == (None, 50)
+    assert info.cpu_set is None
+
+
+def test_ensure_quota_cpu_set_without_cpu_is_stable():
+    # The mirror case: a group with only a CPU set is reported with an empty cpu entry.
+    ensure_installed_local(_QUOTA_SNAP)
+    group = f'{_QUOTA_PREFIX}one'
+    assert _functions.ensure_quota(group, _QUOTA_SNAP, cpu=None, cpu_set=[0])
+    assert not _functions.ensure_quota(group, _QUOTA_SNAP, cpu=None, cpu_set=[0])
+    info = snap.get_quota(group)
+    assert info.cpu is None
+    assert info.cpu_set == [0]
+
+
+def test_ensure_quota_cpu_none_recreates_once_and_keeps_the_cpu_set():
+    # Removing the CPU limit re-creates the group (a limit can only be removed that way),
+    # leaves the CPU set in place, and is stable afterwards.
+    ensure_installed_local(_QUOTA_SNAP)
+    group = f'{_QUOTA_PREFIX}one'
+    _functions.ensure_quota(group, _QUOTA_SNAP, cpu=(1, 50), cpu_set=[0])
+    assert _functions.ensure_quota(group, _QUOTA_SNAP, cpu=None)
+    info = snap.get_quota(group)
+    assert info.cpu is None
+    assert info.cpu_set == [0]
+    assert not _functions.ensure_quota(group, _QUOTA_SNAP, cpu=None)
+
+
+def test_ensure_quota_removes_each_limit_in_turn():
+    # Each limit can be removed while the others stay, and the result is stable.
+    ensure_installed_local(_QUOTA_SNAP)
+    group = f'{_QUOTA_PREFIX}one'
+    _functions.ensure_quota(
+        group, _QUOTA_SNAP, memory=8 * _MiB, cpu=(1, 50), cpu_set=[0], threads=128
+    )
+
+    assert _functions.ensure_quota(group, memory=None)
+    info = snap.get_quota(group)
+    assert info.memory is None
+    assert (info.cpu, info.cpu_set, info.threads) == ((1, 50), [0], 128)
+    assert not _functions.ensure_quota(group, memory=None)
+
+    assert _functions.ensure_quota(group, cpu=None)
+    info = snap.get_quota(group)
+    assert info.cpu is None
+    assert (info.cpu_set, info.threads) == ([0], 128)
+    assert not _functions.ensure_quota(group, cpu=None)
+
+    assert _functions.ensure_quota(group, cpu_set=None)
+    info = snap.get_quota(group)
+    assert info.cpu_set is None
+    assert info.threads == 128
+    assert not _functions.ensure_quota(group, cpu_set=None)
+
+    # Removing the last remaining limit is the only one that is an error (a group needs
+    # at least one), so threads goes last, with a limit back in place first.
+    assert _functions.ensure_quota(group, memory=4 * _MiB)
+    assert _functions.ensure_quota(group, threads=None)
+    info = snap.get_quota(group)
+    assert info.threads is None
+    assert info.memory == 4 * _MiB
+    assert not _functions.ensure_quota(group, threads=None)
+
+
+def test_ensure_quota_recreate_preserves_a_journal_quota():
+    # The reason ensure_quota copies the raw constraints: limits the library has no
+    # argument for. A journal quota is set by posting directly, then the memory limit
+    # is lowered, forcing a re-create that must carry the journal entry over.
+    ensure_installed_local(_QUOTA_SNAP)  # no services: keeps restarts out of it
+    group = f'{_QUOTA_PREFIX}journal'
+    _client.post(
+        '/v2/quotas',
+        body={
+            'action': 'ensure',
+            'group-name': group,
+            'snaps': [_QUOTA_SNAP],
+            'constraints': {'memory': 8 * _MiB, 'journal': {'size': 16 * _MiB}},
+        },
+    )
+    before = snap.get_quota(group)
+    assert before._constraints['journal'] == {'size': 16 * _MiB}
+    assert _functions.ensure_quota(group, memory=4 * _MiB)
+    after = snap.get_quota(group)
+    assert after._constraints['journal'] == before._constraints['journal']
+    assert after.memory == 4 * _MiB
+    # And the carried-over entry is not seen as a difference on the next call.
+    assert not _functions.ensure_quota(group, memory=4 * _MiB)

@@ -38,6 +38,7 @@ _CALLS: dict[str, Callable[[str], object]] = {
     'ensure_quota (services service)': lambda v: snap.ensure_quota(
         'some-group', services={'some-snap': [v]}
     ),
+    'ensure_quota (parent)': lambda v: snap.ensure_quota('some-group', parent=v),
     'get': lambda v: snap.get(v),
     'get (key)': lambda v: snap.get('lxd', [v]),
     'get_one': lambda v: snap.get_one(v, 'mykey'),
@@ -60,6 +61,7 @@ _CALLS: dict[str, Callable[[str], object]] = {
     'set_quota (services service)': lambda v: snap.set_quota(
         'some-group', services={'some-snap': [v]}
     ),
+    'set_quota (parent)': lambda v: snap.set_quota('some-group', parent=v),
     'start': lambda v: snap.start(v),
     'start (service)': lambda v: snap.start('lxd', v),
     'stop': lambda v: snap.stop(v),
