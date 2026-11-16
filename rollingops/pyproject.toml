@@ -29,7 +29,7 @@ lint = [  # installed for `just lint rollingops` (unit, functional, and integrat
     # "typing_extensions",
 ]
 unit = [  # installed for `just unit rollingops`
-    "ops[testing]",
+    "ops[testing]>=3.1.0",
 ]
 functional = [  # installed for `just functional rollingops`
 ]
