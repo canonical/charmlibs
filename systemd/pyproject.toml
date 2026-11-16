@@ -19,7 +19,7 @@ dependencies = []
 [dependency-groups]
 lint = []
 unit = [
-    "ops[testing]",
+    "ops[testing]>=2.17",
 ]
 functional = []
 integration = []
