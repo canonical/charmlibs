@@ -1,3 +1,8 @@
+# 1.1.6 - 16 November 2026
+
+Fix:
+- Require `tenacity>=6.1.0`. Older releases either lack `before_sleep_log` or use `asyncio.coroutine`, which Python 3.11 removed.
+
 # 1.1.5 - 02 October 2026
 
 Fix:
