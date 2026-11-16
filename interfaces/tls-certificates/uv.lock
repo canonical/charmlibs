@@ -135,8 +135,8 @@ integration = [
 ]
 lint = [{ name = "typing-extensions" }]
 unit = [
-    { name = "ops", extras = ["testing"] },
-    { name = "pkilint" },
+    { name = "ops", extras = ["testing"], specifier = ">=3.4.0" },
+    { name = "pkilint", specifier = ">=0.13.0" },
 ]
 
 [[package]]

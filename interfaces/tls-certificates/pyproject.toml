@@ -25,8 +25,8 @@ lint = [  # installed for `just lint interfaces/tls_certificates` (unit, functio
     "typing_extensions",
 ]
 unit = [  # installed for `just unit interfaces/tls_certificates`
-    "ops[testing]",
-    "pkilint",
+    "ops[testing]>=3.4.0",
+    "pkilint>=0.13.0",
 ]
 functional = [  # installed for `just functional interfaces/tls_certificates`
 ]
