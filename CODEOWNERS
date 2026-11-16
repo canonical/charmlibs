@@ -274,8 +274,7 @@
 /interfaces/service_mesh @canonical/service-mesh
 
 # /interfaces/smtp/
-/interfaces/smtp/interface/ @canonical/platform-engineering
-/interfaces/smtp/ruff.toml @canonical/platform-engineering
+/interfaces/smtp/ @canonical/platform-engineering-emea 
 
 # /interfaces/spark_service_account/
 /interfaces/spark_service_account/interface/ @canonical/processing
