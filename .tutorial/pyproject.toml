@@ -24,7 +24,7 @@ lint = [  # installed for `just lint uptime` (unit, functional, and integration 
     # "typing_extensions",
 ]
 unit = [  # installed for `just unit uptime`
-    "ops[testing]",
+    "ops[testing]>=2.17",
 ]
 functional = [  # installed for `just functional uptime`
 ]
