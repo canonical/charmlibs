@@ -16,7 +16,7 @@ classifiers = [
 dynamic = ["version"]
 dependencies = [
     "ops>=3,<4",
-    "crossplane",
+    "crossplane>=0.5.4",
 ]
 
 [dependency-groups]
