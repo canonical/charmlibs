@@ -21,7 +21,7 @@ lint = [  # installed for `just lint snap` (unit, functional, and integration ar
     "typing_extensions",
 ]
 unit = [
-    "pytest",
+    "pytest>=8",
 ]
 functional = [
     "pytest",

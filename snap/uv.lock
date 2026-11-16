@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.10"
 
 [[package]]
@@ -23,7 +23,7 @@ unit = [
 functional = [{ name = "pytest" }]
 integration = []
 lint = [{ name = "typing-extensions" }]
-unit = [{ name = "pytest" }]
+unit = [{ name = "pytest", specifier = ">=8" }]
 
 [[package]]
 name = "colorama"
