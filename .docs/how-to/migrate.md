@@ -78,7 +78,7 @@ It may be that the interface definitions are already hosted in the repo under `i
 In this case:
 - Temporarily move the `<interface name>` directory.
 - Re-run `just init --interface`.
-- Then add the `interface` subdirectory to your newly generated project.
+- Then replace the generated `interface` subdirectory in your newly generated project with the existing one.
 
 You'll also want to check for any config files under the old `<interface name>` directory (for example, a `ruff.toml` file), and incorporate any applicable settings into your project's `pyproject.toml`.
 
