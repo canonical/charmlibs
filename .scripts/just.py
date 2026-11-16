@@ -27,6 +27,9 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import datetime
+import difflib
+import json
 import os
 import pathlib
 import re
@@ -49,6 +52,8 @@ if typing.TYPE_CHECKING:
 # `.scripts/just.py` -> repo root is two parents up.
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 TEST_REQUIREMENTS = REPO_ROOT / 'test-requirements.txt'
+# Each package's dependencies and `unit` group at the `lowest-direct` resolution.
+LOWEST_DIRECT_FILE = 'uv-lowest-direct.txt'
 # The default Python version to use, and the minimum we'll run with.
 DEFAULT_PYTHON = '3.10'
 
@@ -303,10 +308,19 @@ def unit(argv: list[str]) -> int:
     args, pytest_args = _package_parser(unit).parse_known_args(argv)
     python = _resolve_python(args.package, args.python)
     pkg_dir = REPO_ROOT / args.package
+    # Install the committed lowest-direct pins if there are any, rather than re-resolving.
+    pinned = args.resolution == 'lowest-direct' and (pkg_dir / LOWEST_DIRECT_FILE).exists()
     cmds = _coverage_cmds(
-        pkg_dir, 'unit', python, pytest_args or ['-rA'], resolution=args.resolution
+        pkg_dir,
+        'unit',
+        python,
+        pytest_args or ['-rA'],
+        resolution=None if pinned else args.resolution,
+        no_sync=pinned,
     )
     with _resolution_sandbox(pkg_dir, args.resolution):
+        if pinned:
+            _sync_lowest_direct(pkg_dir, python)
         for cmd in cmds:
             _run(cmd, cwd=pkg_dir, env=_coverage_env())
     return 0
@@ -354,6 +368,7 @@ def _coverage_cmds(
     pytest_args: list[str],
     *,
     resolution: str | None = None,
+    no_sync: bool = False,
 ):
     """Return cmds for `coverage run -m pytest` and `coverage report` for package and suite."""
     data_file_arg = f'--data-file=.report/coverage-{suite}-{python}.db'
@@ -361,10 +376,16 @@ def _coverage_cmds(
         *('coverage', 'run', data_file_arg, '--source=src', '-m'),
         *('pytest', '--tb=native', '-vv', f'tests/{suite}', *pytest_args),
     ]
-    run_cmd = _uv_cmd(run, pkg_dir=pkg_dir, python=python, groups=[suite], resolution=resolution)
-    report = ['coverage', 'report', data_file_arg]
-    report_cmd = _uv_cmd(
-        report, pkg_dir=pkg_dir, python=python, groups=[suite], resolution=resolution
+    run_cmd, report_cmd = (
+        _uv_cmd(
+            args,
+            pkg_dir=pkg_dir,
+            python=python,
+            groups=[suite],
+            resolution=resolution,
+            no_sync=no_sync,
+        )
+        for args in (run, ['coverage', 'report', data_file_arg])
     )
     return run_cmd, report_cmd
 
@@ -502,6 +523,159 @@ def interfaces_json(argv: list[str]) -> int:
 
 
 @_register
+def lowest_direct(argv: list[str]) -> int:
+    """Generate packages' `uv-lowest-direct.txt` files, or check that they're up to date.
+
+    The file pins a package's dependencies and `unit` group as uv resolves them with
+    `--resolution lowest-direct`: direct dependencies at the lowest versions the package allows,
+    and everything else at the newest release as of the `exclude-newer` time recorded in the
+    file. `just unit --resolution lowest-direct <package>` installs from it. Regenerate it after
+    changing the package's dependencies. Examples and packages without unit tests don't have one.
+    """
+    parser = _parser(lowest_direct)
+    parser.add_argument(
+        'packages',
+        nargs='*',
+        help='Paths from the repo root to the packages (defaults to all packages).',
+    )
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
+        '--check',
+        action='store_true',
+        help='Fail if a file is missing or out of date, instead of writing it.',
+    )
+    mode.add_argument(
+        '--upgrade',
+        action='store_true',
+        help='Resolve as of now, instead of the `exclude-newer` time in the existing file.',
+    )
+    args = parser.parse_args(argv)
+    packages = args.packages or _lowest_direct_packages()
+    failures = 0
+    for package in packages:
+        pkg_dir = REPO_ROOT / package
+        if _is_example(package) or not (pkg_dir / 'tests' / 'unit').is_dir():
+            print(f'{package}: skipped (example, or no unit tests)', file=sys.stderr)
+            continue
+        if args.check:
+            failures += _check_lowest_direct(package)
+        else:
+            failures += _write_lowest_direct(package, upgrade=args.upgrade)
+    return 1 if failures else 0
+
+
+def _lowest_direct_packages() -> list[str]:
+    """Return the packages that should have a `uv-lowest-direct.txt` file."""
+    cmd = ['.scripts/ls.py', 'packages', '--exclude-examples', '--exclude-placeholders']
+    output = subprocess.check_output(cmd, cwd=REPO_ROOT, text=True)
+    packages: list[str] = json.loads(output)
+    return [p for p in packages if (REPO_ROOT / p / 'tests' / 'unit').is_dir()]
+
+
+def _is_example(package: str) -> bool:
+    """Return whether `package` is one of the examples, which don't commit lock files."""
+    parts = pathlib.PurePath(package).parts
+    return parts[:1] in (('.example',), ('.tutorial',)) or parts[:2] == ('interfaces', '.example')
+
+
+def _write_lowest_direct(package: str, *, upgrade: bool) -> int:
+    """Write `package`'s lowest-direct file, returning the number of failures (0 or 1)."""
+    path = REPO_ROOT / package / LOWEST_DIRECT_FILE
+    existing = None if upgrade else _read_exclude_newer(path)
+    # Keep the existing timestamp when it still resolves, so that the file only changes when
+    # the package's dependencies do. A new dependency may need a release from after it.
+    content = _export_lowest_direct(package, existing) if existing else None
+    if content is None:
+        content = _export_lowest_direct(package, _now())
+    if content is None:
+        print(f'{package}: the lowest-direct resolution failed', file=sys.stderr)
+        return 1
+    path.write_text(content)
+    print(f'{package}: wrote {LOWEST_DIRECT_FILE}', file=sys.stderr)
+    return 0
+
+
+def _check_lowest_direct(package: str) -> int:
+    """Check `package`'s lowest-direct file, returning the number of failures (0 or 1)."""
+    path = REPO_ROOT / package / LOWEST_DIRECT_FILE
+    fix = f'Run `just lowest-direct {package}` and commit the result.'
+    if not path.exists():
+        if _export_lowest_direct(package, _now(), quiet=True) is None:
+            # Nothing can be committed until the package's lower bounds resolve. The
+            # unit-resolution job runs the tests with a fresh resolution and shows why it fails.
+            print(f'{package}: no {LOWEST_DIRECT_FILE}, and the lowest-direct resolution fails')
+            return 0
+        print(f'{package}: {LOWEST_DIRECT_FILE} is missing. {fix}')
+        return 1
+    exclude_newer = _read_exclude_newer(path)
+    if exclude_newer is None:
+        print(f'{package}: {LOWEST_DIRECT_FILE} has no `exclude-newer` line. {fix}')
+        return 1
+    expected = _export_lowest_direct(package, exclude_newer)
+    if expected is None:
+        print(f'{package}: the lowest-direct resolution failed. {fix}')
+        return 1
+    actual = path.read_text()
+    if actual != expected:
+        diff = difflib.unified_diff(
+            actual.splitlines(keepends=True),
+            expected.splitlines(keepends=True),
+            fromfile=f'{package}/{LOWEST_DIRECT_FILE}',
+            tofile='expected',
+        )
+        print(f'{package}: {LOWEST_DIRECT_FILE} is out of date. {fix}')
+        print(''.join(diff))
+        return 1
+    print(f'{package}: {LOWEST_DIRECT_FILE} is up to date')
+    return 0
+
+
+def _export_lowest_direct(package: str, exclude_newer: str, *, quiet: bool = False) -> str | None:
+    """Return the contents of `package`'s lowest-direct file, or None if resolution fails.
+
+    This is `uv export` from a `lowest-direct` lock rather than `uv pip compile`, because the
+    lock resolves all of the package's dependency groups together (as `uv run` does), and
+    handles path sources and groups that refer to the package's own extras.
+    """
+    pkg_dir = REPO_ROOT / package
+    cmd = [
+        *('uv', 'export', '--quiet', '--resolution=lowest-direct'),
+        f'--exclude-newer={exclude_newer}',
+        *('--format=requirements.txt', '--no-hashes', '--no-header', '--no-default-groups'),
+    ]
+    if 'unit' in _dependency_groups(pkg_dir):
+        cmd.extend(['--group', 'unit'])
+    env = {k: v for k, v in os.environ.items() if k != 'VIRTUAL_ENV'}
+    with _resolution_sandbox(pkg_dir, 'lowest-direct'):
+        env['UV_PROJECT_ENVIRONMENT'] = os.environ['UV_PROJECT_ENVIRONMENT']
+        result = subprocess.run(cmd, cwd=pkg_dir, env=env, capture_output=True, text=True)
+    if result.returncode != 0:
+        if not quiet:
+            print(result.stderr, file=sys.stderr)
+        return None
+    header = (
+        f'# Generated by `just lowest-direct {package}`: do not edit by hand.\n'
+        "# The package's dependencies and `unit` group at uv's lowest-direct resolution,\n"
+        f'# installed by `just unit --resolution lowest-direct {package}`.\n'
+        f'# exclude-newer: {exclude_newer}\n'
+    )
+    return header + result.stdout
+
+
+def _read_exclude_newer(path: pathlib.Path) -> str | None:
+    """Return the `exclude-newer` time recorded in a lowest-direct file, if there is one."""
+    if not path.exists():
+        return None
+    match = re.search(r'^# exclude-newer: (\S+)$', path.read_text(), flags=re.MULTILINE)
+    return match.group(1) if match else None
+
+
+def _now() -> str:
+    """Return the current UTC time in the RFC 3339 form `--exclude-newer` takes."""
+    return datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+
+
+@_register
 def _scripts_unit(argv: list[str]) -> int:
     """Run the unit tests for the repository tooling in `.scripts/`."""
     _parser(_scripts_unit).parse_args(argv)
@@ -560,6 +734,8 @@ def _package_parser(fn: FunctionType, *, resolution: bool = True) -> argparse.Ar
                 "When set, the package's uv.lock is bypassed (no `--locked`). "
                 'Useful for testing against the lowest declared or highest available dependency '
                 'versions, since a charm resolves deps at pack time from its own lockfile. '
+                "For `unit`, `lowest-direct` installs the package's committed "
+                f'{LOWEST_DIRECT_FILE} if it has one (see `just lowest-direct`). '
                 '`lowest` also lowers transitive dependencies, so expect it to fail; it is a '
                 'debugging aid rather than something CI runs.'
             ),
@@ -610,7 +786,7 @@ def _resolution_sandbox(pkg_dir: pathlib.Path, resolution: str | None) -> Iterat
     job is a fresh checkout) but disruptive locally: the lockfile shows up as modified, and the
     `.venv` an editor is probably using is left on the alternative versions. When `resolution`
     is set, this points `UV_PROJECT_ENVIRONMENT` at a temporary directory for the duration, and
-    restores the lock file bytes afterwards.
+    restores the lock file bytes afterwards (or removes the lock file, if there wasn't one).
     """
     if resolution is None:
         yield
@@ -627,8 +803,18 @@ def _resolution_sandbox(pkg_dir: pathlib.Path, resolution: str | None) -> Iterat
             os.environ.pop('UV_PROJECT_ENVIRONMENT', None)
         else:
             os.environ['UV_PROJECT_ENVIRONMENT'] = previous_env
-        if saved is not None and lock.read_bytes() != saved:
+        if saved is None:
+            lock.unlink(missing_ok=True)  # e.g. examples, which don't commit a uv.lock
+        elif lock.read_bytes() != saved:
             lock.write_bytes(saved)
+
+
+def _sync_lowest_direct(pkg_dir: pathlib.Path, python: str) -> None:
+    """Install the package's lowest-direct pins into the (temporary) project environment."""
+    venv = os.environ['UV_PROJECT_ENVIRONMENT']
+    _run(['uv', 'venv', '--quiet', '--python', python, venv], cwd=pkg_dir)
+    python_path = pathlib.Path(venv) / 'bin' / 'python'
+    _run(['uv', 'pip', 'sync', '--python', python_path, LOWEST_DIRECT_FILE], cwd=pkg_dir)
 
 
 def _uv_run(
@@ -672,14 +858,21 @@ def _uv_cmd(
     python: str,
     groups: Sequence[str] = (),
     resolution: str | None = None,
+    no_sync: bool = False,
 ) -> list[str | pathlib.Path]:
     """Build a `uv run ... <args>` command list to be executed in `pkg_dir`.
 
     If `resolution` is set, `--resolution=<mode>` is passed and `--locked` is omitted so
     uv re-resolves against the mode instead of pinning to the checked-in lockfile.
+    If `no_sync` is set, `--no-sync` is passed instead, to run in a project environment
+    that has already been populated (see `_sync_lowest_direct`).
     """
+    if no_sync and resolution is not None:
+        raise ValueError('`no_sync` and `resolution` are mutually exclusive')
     cmd = ['uv', 'run', '--with-requirements', TEST_REQUIREMENTS, '--python', python]
-    if resolution is not None:
+    if no_sync:
+        cmd.append('--no-sync')
+    elif resolution is not None:
         cmd.append(f'--resolution={resolution}')
     elif (pkg_dir / 'uv.lock').exists():
         cmd.append('--locked')
