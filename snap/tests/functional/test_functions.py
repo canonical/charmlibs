@@ -418,6 +418,26 @@ def test_ensure_quota_services():
     assert not result
 
 
+def test_ensure_quota_recreate_restores_the_group_when_the_create_fails():
+    # Dropping snap 1 and lowering the limit forces a re-create of A; the create then
+    # fails because snap 2 is already in group B ('snap already in quota group').
+    ensure_installed_local(_QUOTA_SNAP)
+    ensure_installed_local(_QUOTA_SERVICE_SNAP)
+    group_a = f'{_QUOTA_PREFIX}a'
+    group_b = f'{_QUOTA_PREFIX}b'
+    _functions.ensure_quota(group_a, _QUOTA_SNAP, memory=8 * _MiB)
+    _functions.ensure_quota(group_b, _QUOTA_SERVICE_SNAP, memory=8 * _MiB)
+    with pytest.raises(snap.APIError, match='already in quota group'):
+        _functions.ensure_quota(group_a, [_QUOTA_SERVICE_SNAP], memory=4 * _MiB)
+    # The previous group A was put back: snap 1 and the 8 MiB limit are as they were.
+    info = snap.get_quota(group_a)
+    assert info.snaps == [_QUOTA_SNAP]
+    assert info.memory == 8 * _MiB
+    info_b = snap.get_quota(group_b)
+    assert info_b.snaps == [_QUOTA_SERVICE_SNAP]
+    assert info_b.memory == 8 * _MiB
+
+
 def test_ensure_quota_with_subgroups_cannot_recreate():
     ensure_installed_local(_QUOTA_SNAP)
     _functions.ensure_quota(f'{_QUOTA_PREFIX}parent', _QUOTA_SNAP, memory=8 * _MiB)

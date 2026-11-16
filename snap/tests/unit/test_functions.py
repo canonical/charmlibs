@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock
@@ -18,6 +19,7 @@ from charmlibs.snap._errors import (
     QuotaNotFoundError,
     _NotFoundError,
 )
+from charmlibs.snap._errors import ConnectionError as SnapConnectionError
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -856,3 +858,153 @@ class TestEnsureQuotaRecreate:
         with pytest.raises(QuotaHasSubgroupsError):
             _functions.ensure_quota('my-group', memory=1024)
         mock_client.post.assert_not_called()
+
+
+# The request bodies for TestEnsureQuotaRecreateRollback: the failed create of the
+# target, and the restore of the group as read. journal is UNCHANGED in the call, so it
+# is carried over to the target as well.
+_CREATE_BODY: dict[str, Any] = {
+    'action': 'ensure',
+    'group-name': 'my-group',
+    'parent': 'parent-group',
+    'snaps': ['a'],
+    'constraints': {'memory': 1024, 'journal': {'size': 16777216}},
+}
+_RESTORE_BODY: dict[str, Any] = {
+    'action': 'ensure',
+    'group-name': 'my-group',
+    'parent': 'parent-group',
+    'snaps': ['a'],
+    'constraints': {'memory': 2048, 'journal': {'size': 16777216}},
+}
+
+
+class TestEnsureQuotaRecreateRollback:
+    """When a re-create's create fails, the previous group is put back where possible.
+
+    The current group used throughout has a parent and a journal entry (which the
+    library has no argument for), so the restore request must carry all of it: snaps,
+    parent, and the raw constraints. Lowering the memory limit forces the re-create.
+    """
+
+    def _current(self) -> _snapd_quotas.QuotaInfo:
+        return make_quota(
+            parent='parent-group',
+            snaps=['a'],
+            constraints={'memory': 2048, 'journal': {'size': 16777216}},
+        )
+
+    def test_create_fails_and_restore_succeeds(
+        self, mock_client: MockClient, mock_quotas: MockQuotas
+    ):
+        mock_quotas.get_quota.return_value = self._current()
+        original = APIError('cannot create quota group', kind='', value='', status_code=400)
+        mock_client.post.side_effect = [original, {}]  # create fails; restore succeeds
+        with pytest.raises(APIError) as ctx:
+            _functions.ensure_quota('my-group', memory=1024)
+        # The caller sees the original error, unchained: the restore succeeded.
+        assert ctx.value is original
+        assert ctx.value.__context__ is None
+        mock_quotas.remove_quota.assert_called_once_with('my-group')
+        assert _posted_bodies(mock_client) == [_CREATE_BODY, _RESTORE_BODY]
+
+    def test_restore_carries_services(self, mock_client: MockClient, mock_quotas: MockQuotas):
+        # A current group with services rather than snaps (a snap can't have both in one
+        # group): the restore flattens them back to snapd's qualified form.
+        mock_quotas.get_quota.return_value = make_quota(
+            parent='parent-group',
+            services={'a': ['s1', 's2']},
+            constraints={'memory': 2048},
+        )
+        mock_client.post.side_effect = [APIError('', kind='', value='', status_code=400), {}]
+        with pytest.raises(APIError):
+            _functions.ensure_quota('my-group', memory=1024)
+        restore = mock_client.post.call_args_list[1].kwargs['body']
+        assert restore == {
+            'action': 'ensure',
+            'group-name': 'my-group',
+            'parent': 'parent-group',
+            'services': ['a.s1', 'a.s2'],
+            'constraints': {'memory': 2048},
+        }
+
+    def test_restore_fails_with_api_error(self, mock_client: MockClient, mock_quotas: MockQuotas):
+        mock_quotas.get_quota.return_value = self._current()
+        original = APIError('create failed', kind='', value='', status_code=400)
+        restore_error = APIError('restore failed', kind='', value='', status_code=400)
+        mock_client.post.side_effect = [original, restore_error]
+        with pytest.raises(APIError) as ctx:
+            _functions.ensure_quota('my-group', memory=1024)
+        # The caller still sees the original error, with the restore failure attached as
+        # context: it did not cause the original error, so no `from`.
+        assert ctx.value is original
+        assert ctx.value.__context__ is restore_error
+
+    def test_restore_fails_with_connection_error(
+        self, mock_client: MockClient, mock_quotas: MockQuotas
+    ):
+        mock_quotas.get_quota.return_value = self._current()
+        original = APIError('create failed', kind='', value='', status_code=400)
+        restore_error = SnapConnectionError('snapd went away')
+        mock_client.post.side_effect = [original, restore_error]
+        with pytest.raises(APIError) as ctx:
+            _functions.ensure_quota('my-group', memory=1024)
+        assert ctx.value is original
+        assert ctx.value.__context__ is restore_error
+
+    def test_create_connection_error_is_not_restored(
+        self, mock_client: MockClient, mock_quotas: MockQuotas
+    ):
+        # The request may still be running in snapd, and a second one could collide with
+        # it: a non-APIError from the create means no restore is attempted.
+        mock_quotas.get_quota.return_value = self._current()
+        original = SnapConnectionError('snapd went away')
+        mock_client.post.side_effect = original
+        with pytest.raises(SnapConnectionError) as ctx:
+            _functions.ensure_quota('my-group', memory=1024)
+        assert ctx.value is original
+        mock_client.post.assert_called_once()
+
+    def test_create_not_installed_still_restores(
+        self, mock_client: MockClient, mock_quotas: MockQuotas
+    ):
+        # The pre-create probe passes but the create itself fails, and the conversion in
+        # _create_quota turns it into NotInstalledError (an APIError): restore is attempted.
+        mock_quotas.get_quota.return_value = self._current()
+        mock_client.get.side_effect = [{}, _not_installed('a')]
+        mock_client.post.side_effect = [
+            APIError('cannot use snap "a" in group', kind='', value='', status_code=400),
+            {},
+        ]
+        with pytest.raises(NotInstalledError):
+            _functions.ensure_quota('my-group', memory=1024)
+        assert len(mock_client.post.call_args_list) == 2
+
+    def test_logs_warning_when_restored(
+        self, mock_client: MockClient, mock_quotas: MockQuotas, caplog: pytest.LogCaptureFixture
+    ):
+        mock_quotas.get_quota.return_value = self._current()
+        mock_client.post.side_effect = [APIError('', kind='', value='', status_code=400), {}]
+        with caplog.at_level(logging.WARNING, logger='charmlibs.snap._functions'):
+            with pytest.raises(APIError):
+                _functions.ensure_quota('my-group', memory=1024)
+        record = caplog.records[0]
+        assert record.levelno == logging.WARNING
+        assert "'my-group'" in record.message
+        assert 'restored' in record.message
+
+    def test_logs_error_when_not_restored(
+        self, mock_client: MockClient, mock_quotas: MockQuotas, caplog: pytest.LogCaptureFixture
+    ):
+        mock_quotas.get_quota.return_value = self._current()
+        mock_client.post.side_effect = [
+            APIError('create failed', kind='', value='', status_code=400),
+            APIError('restore failed', kind='', value='', status_code=400),
+        ]
+        with caplog.at_level(logging.WARNING, logger='charmlibs.snap._functions'):
+            with pytest.raises(APIError):
+                _functions.ensure_quota('my-group', memory=1024)
+        record = caplog.records[0]
+        assert record.levelno == logging.ERROR
+        assert "'my-group'" in record.message
+        assert 'no longer exists' in record.message

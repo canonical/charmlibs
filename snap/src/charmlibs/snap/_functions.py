@@ -16,10 +16,13 @@
 
 from __future__ import annotations
 
+import logging
 import typing
 from typing import Any
 
 from . import _errors, _snapd_quotas, _snapd_snaps, _utils
+
+logger = logging.getLogger(__name__)
 
 if typing.TYPE_CHECKING:
     from collections.abc import Iterable, Mapping
@@ -156,6 +159,12 @@ def ensure_quota(
 
     Note that adding a snap to a group, and re-creating a group, restart the snap's
     services, and that a re-created group leaves its snaps unconstrained for a moment.
+
+    If creating the new group fails, the previous group is put back where possible, and
+    the error is raised. Note that in that case the snap's services have been restarted
+    all the same, and will be again on each further attempt while the cause remains. If
+    snapd becomes unreachable between the removal and the creation, the group is left
+    removed.
 
     This function manages one group at a time. A group that has sub-groups cannot be
     re-created: :class:`QuotaHasSubgroupsError` is raised before anything is changed, and
@@ -327,7 +336,33 @@ def ensure_quota(
     # A group with sub-groups cannot be removed: QuotaHasSubgroupsError escapes here,
     # before anything has changed.
     _snapd_quotas.remove_quota(group)
-    _create_quota(group, target_snaps, target_services, target_parent, target_constraints)
+    try:
+        _create_quota(group, target_snaps, target_services, target_parent, target_constraints)
+    except _errors.APIError as create_error:
+        # snapd refused the target (a snap that is already in another group, limits that
+        # don't fit inside the parent, ...), and the group is gone: put it back the way
+        # it was. Only the description read in step 2 still has the parts the caller
+        # left UNCHANGED -- its snaps, services, parent and raw constraints.
+        try:
+            _snapd_quotas._post_ensure(
+                group,
+                snaps=current_snaps,
+                services=_snapd_quotas._qualified_services(current_services),
+                parent=current_parent,
+                constraints=current_constraints,
+            )
+        except _errors.Error:
+            logger.error(
+                'Re-creating quota group %r failed, and restoring the previous group '
+                'failed too: the group no longer exists',
+                group,
+            )
+            # The caller still gets the original error, raised from inside this except
+            # block so that Python attaches the restore failure as __context__. No
+            # 'from': the restore failure did not cause the original error.
+            raise create_error  # noqa: B904 (deliberately unchained: this is the original error)
+        logger.warning('Re-creating quota group %r failed; the previous group was restored', group)
+        raise
     return True
 
 
