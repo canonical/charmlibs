@@ -41,6 +41,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import pathlib
+import re
 import sys
 import traceback
 import typing
@@ -71,7 +72,10 @@ def _describe(path: pathlib.Path) -> dict[str, typing.Any]:
 
 
 def _load(path: pathlib.Path) -> types.ModuleType:
-    name = f'_interface_schema_{abs(hash(str(path.resolve())))}'
+    # For example, '_interface_schema_smtp_interface_v0_schema', which is what an error
+    # shows for a model's class. The last four parts are unique across interfaces/*/interface/v*/.
+    slug = re.sub(r'\W', '_', '_'.join(path.resolve().with_suffix('').parts[-4:]))
+    name = f'_interface_schema_{slug}'
     spec = importlib.util.spec_from_file_location(name, path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
