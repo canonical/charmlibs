@@ -15,7 +15,7 @@ classifiers = [
 ]
 dynamic = ["version"]
 dependencies = [
-    "ops",
+    "ops>=2.23.0",
     "pydantic>=2.0",
     "pyyaml",
     "cosl>=0.0.10",
