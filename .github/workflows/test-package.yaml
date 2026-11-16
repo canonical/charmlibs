@@ -173,6 +173,8 @@ jobs:
   # lowest-direct runs on the minimum Python and highest on the maximum: on an
   # older Python, a dependency that has dropped support for it resolves to an
   # older release, which would hide the new release highest is there to catch.
+  # lowest-direct installs the package's committed uv-lowest-direct.txt (see
+  # `just lowest-direct`) when it has one; highest always resolves afresh.
   # continue-on-error until existing lower bounds are known-good.
   unit-resolution:
     needs: init
