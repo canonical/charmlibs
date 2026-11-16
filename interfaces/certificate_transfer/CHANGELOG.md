@@ -1,3 +1,8 @@
+# 1.1.1 - 16 November 2026
+
+- Require `ops>=2.17.0` and `pydantic>=1.10.0`. Previously neither dependency had a lower bound.
+- Don't write a `model_config` key to the relation databag when using pydantic v1.
+
 # 1.1.0 - 7 October 2026
 
 - Make certificate reads repeatable and publish a v0 provider's certificate snapshot in the application databag.
