@@ -16,8 +16,8 @@ classifiers = [
 dynamic = ["version"]
 dependencies = [
     "cryptography>=43.0.0",
-    "ops",
-    "pydantic",
+    "ops>=2.19.0",
+    "pydantic>=1.10.0",
 ]
 
 [dependency-groups]
