@@ -455,7 +455,7 @@ def _type(schema: JsonSchema, defs: dict[str, JsonSchema]) -> str:
         item = _type(items, defs)
         if item.startswith('one of ') or ', one of ' in item:
             return f'list, each {item}'
-        return f'list of {item}s' if item.endswith(' object') else f'list of {item}'
+        return f'list of {_plural(item)}'
     if type_ == 'object':
         patterns = schema.get('patternProperties')
         if isinstance(patterns, dict) and patterns:
@@ -472,6 +472,18 @@ def _type(schema: JsonSchema, defs: dict[str, JsonSchema]) -> str:
     if isinstance(type_, str):
         return _with_constraints(type_, schema)
     return 'any'
+
+
+_SINGULAR_TYPE = re.compile(r'(string|integer|number|boolean|object|list|mapping)(?=$| \(|,| of )')
+
+
+def _plural(item: str) -> str:
+    """Pluralise a list's item type, leaving anything that doesn't start with a plain type."""
+    if ' or ' in item:
+        return item
+    if item.endswith(' object'):
+        return f'{item}s'
+    return _SINGULAR_TYPE.sub(r'\1s', item, count=1) if _SINGULAR_TYPE.match(item) else item
 
 
 # Pydantic's JSON Schema format names that don't read well as they are.

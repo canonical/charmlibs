@@ -119,6 +119,26 @@ def test_relation_data_without_schema_link():
         ({'const': 1}, 'integer `1`'),
         ({'enum': ['a']}, '`a`'),
         ({'type': 'array'}, 'list'),
+        ({'type': 'array', 'items': {'type': 'string'}}, 'list of strings'),
+        (
+            {'type': 'array', 'items': {'type': 'string', 'format': 'uri'}},
+            'list of strings (URI)',
+        ),
+        (
+            {'type': 'array', 'items': {'type': 'array', 'items': {'type': 'integer'}}},
+            'list of lists of integers',
+        ),
+        (
+            {
+                'type': 'array',
+                'items': {'type': 'object', 'additionalProperties': {'type': 'string'}},
+            },
+            'list of mappings of string to string',
+        ),
+        (
+            {'type': 'array', 'items': {'anyOf': [{'type': 'string'}, {'type': 'null'}]}},
+            'list of string or null',
+        ),
         ({'type': 'array', 'items': {'enum': ['a', 'b']}}, 'list, each one of `a`, `b`'),
         ({'type': 'object'}, 'object'),
         (
