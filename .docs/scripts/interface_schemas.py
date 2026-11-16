@@ -30,7 +30,9 @@ Two schema conventions are supported:
 * Module-level ``ProviderAppData``, ``ProviderUnitData``, ``RequirerAppData`` and
   ``RequirerUnitData`` names, each a Pydantic model or ``None``. All four must be defined.
 * ``ProviderSchema`` and ``RequirerSchema`` classes with ``app`` and ``unit`` fields, as
-  defined with ``interface_tester.schema_base.DataBagSchema``.
+  defined with ``interface_tester.schema_base.DataBagSchema``. A missing class is
+  reported as two empty databags rather than an error, unlike a missing name in the first
+  convention. This is deliberate, because the legacy convention is being phased out.
 
 This script imports pydantic, so it is run in its own environment rather than imported by
 the interface preprocessor.
