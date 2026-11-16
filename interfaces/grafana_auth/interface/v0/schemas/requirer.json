@@ -24,9 +24,14 @@
             "required": [
                 "urls"
             ],
-            "urls": {
-                "$id": "#/properties/application-data/urls",
-                "type": "list"
+            "properties": {
+                "urls": {
+                    "$id": "#/properties/application-data/properties/urls",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
             }
         }
     },
