@@ -37,7 +37,7 @@ integration = []
 lint = []
 unit = [
     { name = "ops", extras = ["testing"] },
-    { name = "pytest" },
+    { name = "pytest", specifier = ">=8" },
 ]
 
 [[package]]
