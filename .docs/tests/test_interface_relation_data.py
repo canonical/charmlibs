@@ -222,6 +222,19 @@ def test_add_generated_sections_direction_ends_at_title():
     assert lines.index('```mermaid') < lines.index('# Another title')
 
 
+def test_add_generated_sections_relation_data_before_direction():
+    readme = (
+        '# `foo/v0`\n\n## Relation data\n\nHand-written.\n\n'
+        '## Direction\n\nThe provider writes.\n\n## Behavior\n\nStuff.\n'
+    )
+    lines = ip.add_generated_sections(readme, DATABAGS).splitlines()
+    direction = lines.index('## Direction')
+    tables = lines.index('### Provider application databag')
+    assert lines.index('## Relation data') < tables < lines.index('Hand-written.') < direction
+    diagram = lines.index('```mermaid')
+    assert direction < diagram < lines.index('## Behavior')
+
+
 def test_add_generated_sections_without_headings():
     result = ip.add_generated_sections('# `foo/v0`\n\nSome text.\n', DATABAGS)
     lines = result.splitlines()

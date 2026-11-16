@@ -268,16 +268,17 @@ def add_generated_sections(readme: str, databags: Databags) -> str:
         link_schema='schema.py' not in readme,
         diagram=diagram if direction is None else '',
     )
-    relation_data_index = headings.get('relation data')
-    if relation_data_index is None:
-        lines.extend(['', '## Relation data', '', relation_data])
-    else:
-        lines[relation_data_index + 1 : relation_data_index + 1] = ['', relation_data]
     if direction is not None and diagram:
         end = _section_end(lines, direction)
         while end > direction + 1 and not lines[end - 1].strip():
             end -= 1
-        lines[end:end] = ['', diagram]
+        lines[end:end] = ['', *diagram.splitlines()]
+    # Look the heading up again: the diagram may have moved it.
+    relation_data_index = _level_2_headings(lines).get('relation data')
+    if relation_data_index is None:
+        lines.extend(['', '## Relation data', '', relation_data])
+    else:
+        lines[relation_data_index + 1 : relation_data_index + 1] = ['', relation_data]
     return '\n'.join(lines) + '\n'
 
 
