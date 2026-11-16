@@ -13,12 +13,6 @@ The provider replies with, for each requested interface, an endpoint at which th
 
 The directionality of the relation flows from the observer, Tempo(-compliant) backend, to the observed: the application producing the traces.
 
-```mermaid
-graph LR
-    Requirer["Observed app (requirer)"]  --> RequestedProtocols --> Provider["Receiver (provider)"]
-    Provider["Receiver (provider)"]  --> TracingBackends --> Requirer["Observed app (requirer)"]
-```
-
 ## Behavior
 ### Requirer
 

@@ -12,12 +12,6 @@ The requirer is expected to supply configuration required to set up an Identity 
 
 The provider will read the information from the application databag, transform them into access rules and forward relevant configuration to Traefik or other API Gateway. It will not write to the application databag.
 
-```mermaid
-flowchart
-    Requirer -- protected_urls, allowed_endpoints, headers --> Provider
-    Provider ----> Requirer
-```
-
 ## Behavior
 
 Both the requirer and the provider need to adhere to a certain set of criteria to be considered compatible with the interface:

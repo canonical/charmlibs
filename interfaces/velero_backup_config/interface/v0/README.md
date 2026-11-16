@@ -10,11 +10,6 @@ This interface is used by charms like **Velero Kubeflow client** (e.g. `veler
 
 This is a unidirectional interface where the requirer (client) sends data and the provider (Velero Operator) only receives data. There is no data sent back from the provider side.
 
-```mermaid
-flowchart TD
-    Requirer -- endpoint, app_name, spec --> Provider
-```
-
 ## Behavior
 
 - **Requirer (Client Charm)**: Provides the backup specification via its application relation data. Typically, a client charm will set this data as soon as the relation is formed.

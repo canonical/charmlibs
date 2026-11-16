@@ -13,11 +13,6 @@ The directionality of the relation flows from the observer, Tempo(-compliant) ba
 
 We call the data structure that is exchanged via this interface the 'TracingBackend'.
 
-```mermaid
-graph LR
-    Provider["Ingester (provider)"]  --> TracingBackend["TracingBackend"] --> Requirer["Observed app (requirer)"]
-```
-
 ## Behavior
 ### Requirer
 

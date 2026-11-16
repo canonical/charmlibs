@@ -10,12 +10,6 @@ In most cases, this will be accomplished using the [ingress library](https://git
 The `ingress` interface implements a provider/requirer pattern.
 The requirer is a charm that wishes to receive ingress, and the provider is a charm able to provide it.
 
-```mermaid
-flowchart TD
-    Requirer -- IngressData --> Provider
-    Provider -- Ingress --> Requirer
-```
-
 ## Behavior
 
 The requirer and the provider need to adhere to a certain set of criteria to be considered compatible with the interface.

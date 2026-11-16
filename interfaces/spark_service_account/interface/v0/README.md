@@ -6,12 +6,6 @@ This relation interface describes the expected behavior of any charm that interf
 
 ## Direction
 
-```mermaid
-flowchart TD
-    Requirer -- service-account, requested-secrets, skip-creation --> Provider
-    Provider -- service-account, secret-extra --> Requirer
-```
-
 The `spark-service-account` relation consists of two parts.
 The Provider takes care of creating and managing the Spark service account, while the Requirer can use it to run Spark jobs.
 

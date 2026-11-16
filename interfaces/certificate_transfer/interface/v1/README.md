@@ -8,12 +8,6 @@ Some charms require knowledge of public TLS certificates for trusted communicati
 
 ## Direction
 
-```mermaid
-flowchart TD
-    Requirer -- version --> Provider
-    Provider -- certificates, version --> Requirer
-```
-
 As with all Juju relations, the `certificate_transfer` interface consists of two parties: a Provider and a Requirer.
 
 ## Behavior

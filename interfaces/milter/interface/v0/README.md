@@ -13,11 +13,6 @@ In most cases, this will be accomplished by manually parsing the relation data, 
 The `milter` interface implements a provider/requirer pattern.
 The requirer is a charm that requires Milter details to connect to a Milter server, and the provider is a charm serving as Milter.
 
-```mermaid
-flowchart TD
-    Provider -- port --> Requirer
-```
-
 ## Behavior
 
 The requirer and the provider must adhere to a certain set of criteria to be considered compatible with the interface.

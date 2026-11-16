@@ -10,11 +10,6 @@ In a typical 5G network, the provider of this interface would be a gNodeB. The r
 
 ## Direction
 
-```mermaid
-flowchart TD
-    Provider -- gNodeB Name, TAC --> Requirer
-```
-
 As with all Juju relations, the `fiveg_gnb_identity` interface consists of two parties: a Provider and a Requirer.
 
 ## Behavior

@@ -13,12 +13,6 @@ This interface is implemented in the [`data_interfaces`](https://charmhub.io/dat
 
 ## Direction
 
-```mermaid
-flowchart LR
-    Requirer -- plugin-url, requested-secrets --> Provider
-    Provider -- "endpoints, secret-user [,secret-tls]"--> Requirer
-```
-
 ## Behavior
 
 Both the Requirer and the Provider need to adhere to the following criteria, to be considered compatible with the interface.

@@ -14,12 +14,6 @@ be able to provide or consume the LDAP authentication configuration data.
 
 ## Direction
 
-```mermaid
-flowchart TD
-    Requirer -- user, \ngroup --> Provider
-    Provider -- urls, \nldaps_urls, \nbase_dn, \nbind_dn, \nbind_password_secret, \nauth_method, \nstarttls --> Requirer
-```
-
 ## Behavior
 
 Both the `provider` and the `requirer` need to adhere to a certain set of

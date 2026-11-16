@@ -8,11 +8,6 @@ The `istio_metadata` interface lets an **Istio control plane charm** share infor
 
 This is a unidirectional interface where the provider sends data and the requirer only receives data. There is no data sent back from the requirer side.
 
-```mermaid
-flowchart TD
-    Provider -- root_namespace --> Requirer
-```
-
 ## Behavior
 
 - **Provider (Istio control plane charm)**: Publishes the metadata to the application data bag, typically on `leader_elected` and on this relation's `relation_joined` events. Only the leader unit may write the application data bag.
