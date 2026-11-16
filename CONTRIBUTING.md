@@ -42,6 +42,8 @@ Use `just add <package> <dep>` to add a dependency to a library, rather than cal
 just add pathops 'pydantic>=2'
 ```
 
+Each package with unit tests also commits a `uv-lowest-direct.txt`, which pins its dependencies at the lowest versions its `pyproject.toml` allows. CI runs the unit tests against it, as well as against the newest versions, because a charm can resolve any version in the range. After changing a package's dependencies, regenerate the file with `just lowest-direct <package>` and commit it. CI checks that it's up to date. If the unit tests fail with the lowest versions (`just unit --resolution lowest-direct <package>`), raise the lower bound in `pyproject.toml`.
+
 ## Functional and integration tests
 
 `functional` and `integration` tests are also executed in CI, and can be run locally too. They're excluded from `just check` as they may require additional setup:
