@@ -264,7 +264,6 @@ autodoc_default_options = {
         '__dataclass_fields__,'
         '__dataclass_params__,'
         '__delattr__,'
-        '__final__,'
         '__firstlineno__,'
         '__hash__,'
         '__init__,'
