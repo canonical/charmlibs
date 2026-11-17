@@ -105,7 +105,16 @@ class TestLoadOnDoctreeRead:
         package_docs._load_on_doctree_read(app, _doctree('placeholder'))
         assert dependencies == [str(pathlib.Path('.save', f'{docname}.pickle'))]
 
-    @pytest.mark.parametrize('docname', ['index', 'reference/index', 'how-to/charmlibs/snap/x'])
+    @pytest.mark.parametrize(
+        'docname',
+        [
+            'index',
+            'reference/index',
+            'reference/charmlibs',
+            'reference/charmlibs-interfaces',
+            'how-to/charmlibs/snap/x',
+        ],
+    )
     def test_other_pages_get_no_dependency(self, docname: str):
         # A missing dependency makes Sphinx re-read a page on every build, so only the
         # package placeholder pages may be given one.

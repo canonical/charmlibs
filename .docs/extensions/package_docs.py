@@ -57,8 +57,8 @@ def setup(app: sphinx.application.Sphinx) -> dict[str, str | bool]:
     return {
         'version': '1.0.0',
         # Sphinx discards its cached environment when this changes. Bump it when what this
-        # extension records in the environment changes, as when the package pages gained a
-        # dependency on their pickles: pages read before then would otherwise stay stale.
+        # extension records in the environment changes, so that pages read before the change
+        # aren't left stale.
         'env_version': 1,
         'parallel_read_safe': False,
         'parallel_write_safe': False,
