@@ -58,6 +58,9 @@ interfaces-json *args:
 lowest-direct *args:
     @.scripts/just.py lowest-direct "$@"
 
+check-codeowners *args:
+    @.scripts/just.py check-codeowners "$@"
+
 _scripts-unit *args:
     @.scripts/just.py scripts-unit "$@"
 
