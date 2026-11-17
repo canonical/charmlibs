@@ -37,6 +37,7 @@ import typing
 if typing.TYPE_CHECKING:
     import docutils.nodes
     import sphinx.application
+    import sphinx.util.typing
 
 
 # Every page under this docname prefix is a placeholder for one package's reference docs.
@@ -48,7 +49,7 @@ AUTOMODULE_TEMPLATE = """
 """.rstrip()
 
 
-def setup(app: sphinx.application.Sphinx) -> dict[str, str | bool]:
+def setup(app: sphinx.application.Sphinx) -> sphinx.util.typing.ExtensionMetadata:
     """Entrypoint for Sphinx extensions, connects generation code to Sphinx event."""
     app.connect('source-read', _append_automodule_on_source_read)
     app.connect('doctree-read', _load_on_doctree_read)
