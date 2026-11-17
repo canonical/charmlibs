@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# ruff: noqa: D103 (function docstrings)
-
 """Unit tests for the interface_docs Sphinx fallback extension."""
 
 from __future__ import annotations
