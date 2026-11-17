@@ -2,7 +2,7 @@
 name = "charmlibs-rollingops"
 description = "The charmlibs.rollingops package."
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.10"
 authors = [
     {name="The Data Platform team at Canonical"},
 ]
@@ -18,7 +18,7 @@ dependencies = [
     "ops>=2.23.1,<4",
     "charmlibs-interfaces-tls-certificates>=1.8.1",
     "charmlibs-pathops>=1.2.1",
-    "dpcharmlibs-interfaces==1.0.0",
+    "dpcharmlibs-interfaces>=1.1.0",
     "tenacity",
     "pydantic>=2.12.5",
     "shortuuid>=1.0.13",
@@ -35,6 +35,7 @@ functional = [  # installed for `just functional rollingops`
 ]
 integration = [  # installed for `just integration rollingops`
     "jubilant",
+    "pytest-jubilant>=2",
     "tenacity",
     "charmlibs-apt",
 ]
@@ -69,7 +70,7 @@ src = ["src", "tests/unit", "tests/integration"]  # correctly sort local imports
 extends = "../pyproject.toml"
 include = ["src", "tests"]
 exclude = ["tests/integration/.tmp/**"]
-pythonVersion = "3.12"  # check no python > 3.12 features are used
+pythonVersion = "3.10"
 
 [tool.charmlibs.functional]
 ubuntu = []  # ubuntu versions to run functional tests with, e.g. "24.04" (defaults to just "latest")

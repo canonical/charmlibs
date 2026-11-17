@@ -40,6 +40,7 @@ compatible with the interface.
 - Is expected to provide an error in `request_errors` for each CSR that could not be processed
 - Is expected to ensure mutual exclusivity: a CSR appears in **either** `certificates` or `request_errors`, never both
 - Is expected to overwrite the existing certificates and/or remove the pre-existing certificates from the relation data.
+- May optionally advertise its certificate issuing capabilities in `capabilities` (best-effort). This field is additive and optional; legacy providers and requirers that ignore it are unaffected.
 
 ## Relation Data
 
@@ -145,3 +146,28 @@ Standard error codes:
 | **2XX** | **server_error**       | **Server-related errors**                                      |
 | 201     | `server_not_available` | The provider backend is not reachable (e.g., Vault is sealed)  |
 | **9XX** | **other**              | **Other errors not covered by the above categories**           |
+
+#### Capabilities
+
+A provider **may** optionally advertise a best-effort description of what its backing
+certificate issuing capabilities via the `capabilities` field in its application data. This
+field is additive and optional.
+
+Every attribute is independently optional. An omitted attribute means "unspecified /
+unknown" and **must not** be treated as an assumed default by the requirer. The `capabilities` should not be assumed by requirers and can be fully absent.
+
+```json
+{
+  "supports_ip_sans": false,
+  "supports_wildcard_dns": true,
+  "supports_subdomain": false,
+  "supports_ca_certificates": false,
+  "allowed_domains": ["mydomain.com"],
+  "provider_type": "acme"
+}
+```
+
+**Backward Compatibility**:
+The `capabilities` field is optional and additive. Capability-aware requirers interoperate
+with legacy providers (no `capabilities` advertised), and legacy requirers interoperate
+with capability-advertising providers, with no behavioral change to existing flows.

@@ -14,7 +14,7 @@ from .conftest import deploy
 pytestmark = pytest.mark.k8s_only
 
 
-@pytest.mark.setup
+@pytest.mark.juju_setup
 def test_deployment(juju: jubilant.Juju, charm: str):
     deploy(juju, charm)
     assert charm in juju.status().apps

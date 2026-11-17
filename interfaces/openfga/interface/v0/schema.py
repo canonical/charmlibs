@@ -28,30 +28,34 @@ from pydantic import BaseModel, Field, IPvAnyAddress
 
 
 class OpenFGAProviderData(BaseModel):
+    """Provider data schema for OpenFGA v0."""
+
     address: IPvAnyAddress = Field(
-        description="The address of the OpenFGA service.",
-        title="OpenFGA address",
-        examples=["10.10.4.1"],
+        description='The address of the OpenFGA service.',
+        title='OpenFGA address',
+        examples=['10.10.4.1'],
     )
     port: int = Field(
-        description="Port on which the OpenFGA service is listening (HTTP).",
-        title="OpenFGA port",
+        description='Port on which the OpenFGA service is listening (HTTP).',
+        title='OpenFGA port',
         examples=[8080],
     )
     scheme: str = Field(
-        description="Scheme to be used to connect to the OpenFGA service.",
-        title="OpenFGA scheme",
-        examples=["http", "https"],
+        description='Scheme to be used to connect to the OpenFGA service.',
+        title='OpenFGA scheme',
+        examples=['http', 'https'],
     )
     token_secret_id: str = Field(
-        description="Secret ID of the preshared token to be used to connect to the OpenFGA service.",
-        title="Secret ID of the OpenFGA token",
+        description=(
+            'Secret ID of the preshared token to be used to connect to the OpenFGA service.'
+        ),
+        title='Secret ID of the OpenFGA token',
     )
 
     store_id: str = Field(
-        description="ID of the authentication stored that was created.",
-        title="OpenFGA store ID",
-        examples=["01GK13VYZK62Q1T0X55Q2BHYD6"],
+        description='ID of the authentication stored that was created.',
+        title='OpenFGA store ID',
+        examples=['01GK13VYZK62Q1T0X55Q2BHYD6'],
     )
 
 
@@ -62,10 +66,12 @@ class ProviderSchema(DataBagSchema):
 
 
 class OpenFGARequirerData(BaseModel):
+    """Requirer data schema for OpenFGA v0."""
+
     store_name: str = Field(
-        description="The name of the authentication store.",
-        title="Authorization store name",
-        examples=["auth_store"],
+        description='The name of the authentication store.',
+        title='Authorization store name',
+        examples=['auth_store'],
     )
 
 

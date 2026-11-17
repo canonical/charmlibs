@@ -14,10 +14,10 @@
 
 """Rolling ops common functions."""
 
+import datetime as dt
 import logging
 import subprocess
 from collections.abc import Callable
-from datetime import UTC, datetime
 from logging.handlers import RotatingFileHandler
 from typing import TypeVar
 
@@ -40,25 +40,25 @@ ETCD_FAILED_HOOK_NAME = 'rollingops_etcd_failed'
     wait=wait_fixed(10),
     reraise=True,
 )
-def with_pebble_retry[T](func: Callable[[], T]) -> T:
+def with_pebble_retry(func: Callable[[], T]) -> T:
     return func()
 
 
-def now_timestamp() -> datetime:
+def now_timestamp() -> dt.datetime:
     """UTC timestamp."""
-    return datetime.now(UTC)
+    return dt.datetime.now(dt.timezone.utc)
 
 
-def parse_timestamp(timestamp: str) -> datetime | None:
+def parse_timestamp(timestamp: str) -> dt.datetime | None:
     """Parse epoch timestamp string. Return None on errors."""
     try:
-        return datetime.fromtimestamp(float(timestamp), tz=UTC)
+        return dt.datetime.fromtimestamp(float(timestamp), tz=dt.timezone.utc)
     except Exception:
         return None
 
 
-def datetime_to_str(dt: datetime) -> str:
-    return str(dt.timestamp())
+def datetime_to_str(value: dt.datetime) -> str:
+    return str(value.timestamp())
 
 
 def setup_logging(

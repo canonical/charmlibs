@@ -116,6 +116,11 @@ class PathProtocol(typing.Protocol):
         ...
 
     # NOTE: Not supported -- (Python 3.12) ``case_sensitive`` keyword argument
+    # NOTE: Not supported -- (Python 3.12) path-like ``path_pattern``
+    # ContainerPath.match accepts str | os.PathLike[str], but the protocol stays narrow.
+    # Widening it here would oblige us to shim LocalPath.match too, and we can't write that
+    # override without also handling the case_sensitive keyword, which pathlib.Path.match
+    # doesn't have before 3.12.
     def match(self, path_pattern: str) -> bool:
         """Return whether this path matches the given pattern.
 
@@ -129,6 +134,13 @@ class PathProtocol(typing.Protocol):
         """Return a new instance of the same type, with the path name replaced.
 
         The name is the last component of the path, including any suffixes.
+        """
+        ...
+
+    def with_stem(self, stem: str) -> Self:
+        """Return a new instance of the same type, with the path stem replaced.
+
+        The stem is the path name minus its last suffix.
         """
         ...
 
@@ -594,14 +606,12 @@ class PathProtocol(typing.Protocol):
 # ContainerPath to ease compatibility with pathlib.Path on 3.12+ if we someday
 # support relative paths
 
-# def is_relative_to(self, other: _StrPath) -> Self: ...  # 3.9+
-# not part of protocol but can be provided on ContainerPath implementation
-# to ease compatibility with pathlib.Path on 3.9+
-
-# def with_stem(self, stem: str) -> Self: ...  # 3.9+
-# not part of protocol but can be provided on ContainerPath implementation
-# to ease compatibility with pathlib.Path on 3.9+
-# could be added to the protocol if we're happy for LocalPath to double as backports
+# def is_relative_to(self, other: _StrPath, /) -> bool: ...  # 3.9+
+# provided on ContainerPath to ease compatibility with pathlib.Path on 3.9+,
+# but deliberately not part of the protocol: pathlib's signature is `*other` until
+# 3.12, so the protocol would have to declare `other` as positional-only for LocalPath
+# to satisfy it, and the 3.12 `walk_up` keyword can't be offered until the minimum
+# supported Python is 3.12
 
 # def with_segments(self, *pathsegments: _StrPath) -> Self: ...
 # required for 3.12+ subclassing machinery

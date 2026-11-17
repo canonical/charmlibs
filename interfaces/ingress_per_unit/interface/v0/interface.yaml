@@ -12,4 +12,4 @@ requirers:
   - name: loki-k8s
     url: https://github.com/canonical/loki-k8s-operator
 
-maintainer: observability
+maintainer: platform-engineering

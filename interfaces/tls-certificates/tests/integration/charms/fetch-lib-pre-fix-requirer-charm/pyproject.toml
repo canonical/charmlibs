@@ -1,0 +1,11 @@
+[project]
+name = "requirer-charm"
+version = "0.0.0"
+description = "Test requirer charm using the Charmhub v4 lib from before the app-owned private key fix, for upgrade integration tests"
+requires-python = ">=3.10"
+dependencies = [
+    "ops",
+    # PYDEPS of charms.tls_certificates_interface.v4.tls_certificates
+    "cryptography",
+    "pydantic",
+]

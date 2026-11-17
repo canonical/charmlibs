@@ -1,0 +1,8 @@
+name: test-alias-snap
+version: "1.0"
+summary: Snap with a plain command, to claim an alias in charmlibs.snap functional tests
+confinement: strict
+base: core24
+apps:
+  hello:
+    command: bin/hello

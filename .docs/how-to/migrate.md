@@ -103,6 +103,18 @@ As you work through this guide we'll suggest good moments to commit, but treat t
 
 To start with, commit the output of `just init` now, before making any other changes.
 
+```{admonition} Working with agents
+:class: tip
+
+Agents can greatly benefit from a dry-run in order to produce a cleanly reviewable series of commits.
+Consider prompting your agent to:
+
+1. Review the migration guide and the library to migrate, then write an initial multi-step migration plan.
+2. Work through the plan, noting any deviations from the plan.
+3. After finishing, rework the plan & deviations into a clean commit-by-commit plan that aligns with the migration guide. Capture the precise scope of each commit.
+4. Do the migration according to the commit-by-commit plan, with real commits.
+```
+
 ## Migrate your library's code
 
 This is the easy bit, since Charmhub-hosted libs are only a single module.
@@ -280,12 +292,12 @@ Integration tests involve packing your library into a charm and deploying it on 
 Read more: {ref}`tutorial-add-integration-tests`, {ref}`charmlibs-integration-tests`
 
 If you take a look at your `<library path>/tests/integration` directory, you'll see a `pack.sh` script.
-Currently it packs a simple `k8s` or `machine` charm, depending on the `CHARMLIBS_SUBSTRATE` variable that is set in CI.
+Currently it packs either `k8s-charm` or `machine-charm`, depending on the `CHARMLIBS_SUBSTRATE` variable that is set in CI.
 In CI, the script is executed by `just pack-k8s` or `just pack-machine`.
 The integration tests provided by the template use `jubilant` to deploy and test the packed charm.
 They're executed by `just integration-k8s` or `just integration-machine`.
 
-The simple `k8s` and `machine` charms are defined in the `<library path>/tests/integration/charms` directory.
+The `k8s-charm` and `machine-charm` charms are defined in the `<library path>/tests/integration/charms` directory.
 You're more than welcome to fit your existing integration tests into this structure.
 However, the use of the `pack.sh` script is completely optional -- you're free to remove it entirely, in which case that step is skipped in CI.
 This is especially useful if your integration tests used `pytest-operator` to pack and deploy charms from the tests themselves.
@@ -351,7 +363,7 @@ Edit the imported pages to follow the conventions described in {ref}`how-to-add-
 The {ref}`interface library listing <interface-libs-listing>` and {ref}`general library listing <general-libs-listing>` are generated from `.docs/reference/libs.yaml`.
 
 There should already be an entry for the old Charmhub-hosted library.
-If there isn't, add one with a `deprecated` status and a description noting it has been superseded by the new `charmlibs` package.
+If there isn't, add one with a `legacy` status and a description noting it has been superseded by the new `charmlibs` package.
 
 Add a new entry for the `charmlibs` package with the new package name, source URL, status, description, and any relevant tags.
 See `.docs/reference/tags.yaml` for the full list of available tags and their assignment criteria.

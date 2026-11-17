@@ -10,15 +10,16 @@
 /.gitignore @canonical/charmlibs-maintainers
 /.scripts/ @canonical/charmlibs-maintainers
 /.template/ @canonical/charmlibs-maintainers
+/.vscode/ @canonical/charmlibs-maintainers
 /.workshop/ @canonical/charmlibs-maintainers
 /AGENTS.md @canonical/charmlibs-maintainers
 /CODE_OF_CONDUCT.md @canonical/charmlibs-maintainers
 /CONTRIBUTING.md @canonical/charmlibs-maintainers
 /docs.just @canonical/charmlibs-maintainers
-/interface-test-requirements.txt @canonical/charmlibs-maintainers
 /justfile @canonical/charmlibs-maintainers
 /LICENSE @canonical/charmlibs-maintainers
 /pyproject.toml @canonical/charmlibs-maintainers
+/schema-requirements.txt @canonical/charmlibs-maintainers
 /SECURITY.md @canonical/charmlibs-maintainers
 /test-requirements.txt @canonical/charmlibs-maintainers
 /uv.lock @canonical/charmlibs-maintainers
@@ -55,8 +56,7 @@
 # charmlibs.interfaces packages (alphabetical)
 
 # /interfaces/auth_proxy/
-/interfaces/auth_proxy/interface/ @canonical/identity
-/interfaces/auth_proxy/ruff.toml @canonical/identity
+/interfaces/auth_proxy/ @canonical/identity
 
 # /interfaces/azure_service_principal/
 /interfaces/azure_service_principal/interface/ @canonical/data
@@ -97,9 +97,6 @@
 /interfaces/filesystem_info/interface/ @canonical/hpc-team
 /interfaces/filesystem_info/ruff.toml @canonical/hpc-team
 
-# telco interfaces (fiveg_*, ip_router, sdcore_*)
-# The telco team was disbanded, so these are permanently owned by charmlibs-maintainers.
-
 # /interfaces/fiveg_core_gnb/
 /interfaces/fiveg_core_gnb/interface/ @canonical/charmlibs-maintainers
 /interfaces/fiveg_core_gnb/ruff.toml @canonical/charmlibs-maintainers
@@ -133,11 +130,22 @@
 /interfaces/fiveg_rfsim/ruff.toml @canonical/charmlibs-maintainers
 
 # /interfaces/forward_auth/
-/interfaces/forward_auth/interface/ @canonical/identity
-/interfaces/forward_auth/ruff.toml @canonical/identity
+/interfaces/forward_auth/ @canonical/identity
 
 # /interfaces/gateway_metadata/
 /interfaces/gateway_metadata/ @canonical/service-mesh
+
+# /interfaces/ingress/
+/interfaces/ingress/interface/ @canonical/platform-engineering
+/interfaces/ingress/ruff.toml @canonical/platform-engineering
+
+# /interfaces/ingress_per_unit/
+/interfaces/ingress_per_unit/interface/ @canonical/platform-engineering
+/interfaces/ingress_per_unit/ruff.toml @canonical/platform-engineering
+
+# /interfaces/ip_router/
+/interfaces/ip_router/interface/ @canonical/charmlibs-maintainers
+/interfaces/ip_router/ruff.toml @canonical/charmlibs-maintainers
 
 # /interfaces/istio_ingress_route/
 /interfaces/istio_ingress_route/ @canonical/service-mesh
@@ -163,10 +171,6 @@
 # /interfaces/hydra_endpoints/
 /interfaces/hydra_endpoints/interface/ @canonical/identity
 /interfaces/hydra_endpoints/ruff.toml @canonical/identity
-
-# /interfaces/ip_router/ (telco, owned by charmlibs-maintainers -- see note above)
-/interfaces/ip_router/interface/ @canonical/charmlibs-maintainers
-/interfaces/ip_router/ruff.toml @canonical/charmlibs-maintainers
 
 # /interfaces/jwt/
 /interfaces/jwt/interface/ @canonical/data
@@ -197,8 +201,7 @@
 /interfaces/kubeflow_dashboard_links/ruff.toml @canonical/mlops
 
 # /interfaces/ldap/
-/interfaces/ldap/interface/ @canonical/identity
-/interfaces/ldap/ruff.toml @canonical/identity
+/interfaces/ldap/ @canonical/identity
 
 # /interfaces/litmus_auth/
 /interfaces/litmus_auth/interface/ @canonical/tracing-and-profiling
@@ -229,16 +232,14 @@
 /interfaces/nginx-route/ruff.toml @canonical/platform-engineering
 
 # /interfaces/oauth/
-/interfaces/oauth/interface/ @canonical/identity
-/interfaces/oauth/ruff.toml @canonical/identity
+/interfaces/oauth/ @canonical/identity
 
 # /interfaces/opencti_connector/
 /interfaces/opencti_connector/interface/ @canonical/platform-engineering
 /interfaces/opencti_connector/ruff.toml @canonical/platform-engineering
 
 # /interfaces/openfga/
-/interfaces/openfga/interface/ @canonical/identity
-/interfaces/openfga/ruff.toml @canonical/identity
+/interfaces/openfga/ @canonical/identity
 
 # /interfaces/opensearch_client/
 /interfaces/opensearch_client/interface/ @canonical/data-nosql
@@ -275,11 +276,11 @@
 /interfaces/saml/interface/ @canonical/platform-engineering
 /interfaces/saml/ruff.toml @canonical/platform-engineering
 
-# /interfaces/sdcore_config/ (telco, owned by charmlibs-maintainers -- see note above)
+# /interfaces/sdcore_config/
 /interfaces/sdcore_config/interface/ @canonical/charmlibs-maintainers
 /interfaces/sdcore_config/ruff.toml @canonical/charmlibs-maintainers
 
-# /interfaces/sdcore_management/ (telco, owned by charmlibs-maintainers -- see note above)
+# /interfaces/sdcore_management/
 /interfaces/sdcore_management/interface/ @canonical/charmlibs-maintainers
 /interfaces/sdcore_management/ruff.toml @canonical/charmlibs-maintainers
 
@@ -290,8 +291,11 @@
 /interfaces/service_mesh/ @canonical/service-mesh
 
 # /interfaces/smtp/
-/interfaces/smtp/interface/ @canonical/platform-engineering
-/interfaces/smtp/ruff.toml @canonical/platform-engineering
+/interfaces/smtp/ @canonical/platform-engineering-emea 
+
+# /interfaces/spark_service_account/
+/interfaces/spark_service_account/interface/ @canonical/processing
+/interfaces/spark_service_account/ruff.toml @canonical/processing
 
 # /interfaces/tempo_cluster/
 /interfaces/tempo_cluster/interface/ @canonical/tracing-and-profiling
@@ -301,8 +305,7 @@
 /interfaces/tls-certificates/ @canonical/tls
 
 # /interfaces/tracing/
-/interfaces/tracing/interface/ @canonical/tracing-and-profiling
-/interfaces/tracing/ruff.toml @canonical/tracing-and-profiling
+/interfaces/tracing/ @canonical/tracing-and-profiling
 
 # /interfaces/vault-autounseal/
 /interfaces/vault-autounseal/interface/ @canonical/tls
@@ -326,3 +329,7 @@
 # /interfaces/wazuh_api_client/
 /interfaces/wazuh_api_client/interface/ @canonical/platform-engineering
 /interfaces/wazuh_api_client/ruff.toml @canonical/platform-engineering
+
+# /interfaces/zookeeper/
+/interfaces/zookeeper/interface/ @canonical/data-bigdata
+/interfaces/zookeeper/ruff.toml @canonical/data-bigdata

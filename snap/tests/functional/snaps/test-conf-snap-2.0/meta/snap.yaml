@@ -1,0 +1,4 @@
+name: test-conf-snap
+version: "2.0"
+summary: Classic-confined revision, for confinement tests
+confinement: classic

@@ -1,11 +1,7 @@
 """This file defines the schemas for the provider and requirer sides of the `tls-certificates` interface.
 
-It exposes two interfaces.schema_base.DataBagSchema subclasses called:
-- ProviderSchema
-- RequirerSchema
-
 Examples:
-    ProviderSchema:
+    Provider:
         unit: <empty>
         app: {
             "certificates": [
@@ -31,9 +27,17 @@ Examples:
                         "endpoint": "https://acme-staging-v02.api.letsencrypt.org/directory"
                     }
                 }
-            ]
+            ],
+            "capabilities": {
+                "supports_ip_sans": false,
+                "supports_wildcard_dns": true,
+                "supports_subdomain": false,
+                "supports_ca_certificates": false,
+                "allowed_domains": ["mydomain.com"],
+                "provider_type": "acme"
+            }
         }
-    RequirerSchema:
+    Requirer:
         unit: {
             "certificate_signing_requests": [
                 {
@@ -45,8 +49,7 @@ Examples:
         app:  <empty>
 """
 
-from interface_tester.schema_base import DataBagSchema
-from pydantic import BaseModel, Field, Json
+from pydantic import BaseModel, Field
 
 
 class Certificate(BaseModel):
@@ -102,12 +105,45 @@ class RequestError(BaseModel):
     error: ProviderError = Field(description="Error details.")
 
 
-class ProviderApplicationData(BaseModel):
+class Capabilities(BaseModel):
+    """Provider capabilities model.
+
+    Best-effort description of what the provider's certificate server supports. Every
+    attribute is independently optional; an omitted attribute means "unspecified /
+    unknown" and must not be treated as an assumed default.
+    """
+
+    supports_ip_sans: bool | None = Field(
+        default=None, description="Whether IP addresses are accepted in SANs."
+    )
+    supports_wildcard_dns: bool | None = Field(
+        default=None, description="Whether wildcard DNS entries are accepted."
+    )
+    supports_subdomain: bool | None = Field(
+        default=None, description="Whether subdomain certificates can be issued."
+    )
+    supports_ca_certificates: bool | None = Field(
+        default=None, description="Whether CA certificates can be issued."
+    )
+    allowed_domains: list[str] | None = Field(
+        default=None, description="Optional list of allowed DNS domains."
+    )
+    provider_type: str | None = Field(
+        default=None, description="Optional provider-type hint (e.g. 'acme', 'vault')."
+    )
+
+
+class ProviderAppData(BaseModel):
     """Provider application data model."""
 
-    certificates: Json[list[Certificate]] = Field(description="List of certificates.")
-    request_errors: Json[list[RequestError]] | None = Field(
+    certificates: list[Certificate] | None = Field(
+        default=None, description="List of certificates."
+    )
+    request_errors: list[RequestError] | None = Field(
         default=None, description="List of request errors."
+    )
+    capabilities: Capabilities | None = Field(
+        default=None, description="Best-effort provider capabilities."
     )
 
 
@@ -117,19 +153,11 @@ class RequirerData(BaseModel):
     The same model is used for the unit and application data.
     """
 
-    certificate_signing_requests: Json[list[CertificateSigningRequest]] = Field(
+    certificate_signing_requests: list[CertificateSigningRequest] = Field(
         description="List of certificate signing requests."
     )
 
 
-class ProviderSchema(DataBagSchema):
-    """Provider schema for TLS Certificates."""
-
-    app: ProviderApplicationData  # pyright: ignore[reportGeneralTypeIssues,reportIncompatibleVariableOverride]
-
-
-class RequirerSchema(DataBagSchema):
-    """Requirer schema for TLS Certificates."""
-
-    app: RequirerData  # pyright: ignore[reportGeneralTypeIssues,reportIncompatibleVariableOverride]
-    unit: RequirerData  # pyright: ignore[reportGeneralTypeIssues,reportIncompatibleVariableOverride]
+ProviderUnitData = None
+RequirerAppData = RequirerData
+RequirerUnitData = RequirerData

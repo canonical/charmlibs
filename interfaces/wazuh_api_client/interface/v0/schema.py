@@ -2,11 +2,8 @@
 # See LICENSE file for licensing details.
 """This file defines the schema for the provider side of the wazuh-api-client interface.
 
-It exposes one interfaces.schema_base.DataBagSchema subclass called:
-- ProviderSchema
-
 Examples:
-    ProviderSchema:
+    Provider:
         unit: <empty>
         app: {"wazuh-api-client":
                  {
@@ -16,11 +13,10 @@ Examples:
              }
 """
 
-from interface_tester.schema_base import DataBagSchema
 from pydantic import AnyHttpUrl, BaseModel, Field
 
 
-class WazuhApiclientProviderData(BaseModel):
+class ProviderAppData(BaseModel):
     endpoint: AnyHttpUrl = Field(
         description="Endpoint used to connect to the API.",
         title="Endpoint",
@@ -34,11 +30,6 @@ class WazuhApiclientProviderData(BaseModel):
     )
 
 
-class ProviderSchema(DataBagSchema):
-    """Provider schema for Wazuh API client."""
-
-    app: WazuhApiclientProviderData
-
-
-class RequirerSchema(DataBagSchema):
-    """Requirer schema for Wazuh API client."""
+ProviderUnitData = None
+RequirerAppData = None
+RequirerUnitData = None

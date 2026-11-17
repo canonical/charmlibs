@@ -25,13 +25,3 @@ updates:
       test-deps:
         patterns:
           - "*"
-  # Daily security updates to individual Python packages
-  - package-ecosystem: "pip"
-    directories:
-      - "/"
-      - "/[a-z]*"
-    schedule:
-      interval: "daily"
-    open-pull-requests-limit: 0  # Security updates only
-    labels:
-      - "dependencies"

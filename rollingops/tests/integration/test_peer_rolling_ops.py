@@ -15,7 +15,6 @@
 """Integration tests using real Juju and pre-packed charm(s)."""
 
 import logging
-import time
 
 import jubilant
 
@@ -24,6 +23,7 @@ from tests.integration.utils import (
     get_unit_events,
     parse_ts,
     remove_transition_file,
+    wait_for_events,
 )
 
 logger = logging.getLogger(__name__)
@@ -215,11 +215,13 @@ def test_retry_release_alternates_execution(juju: jubilant.Juju, app_name: str):
     juju.run(unit_a, 'failed-restart', {'delay': 10, 'max-retry': 2}, wait=TIMEOUT)
     juju.run(unit_b, 'failed-restart', {'delay': 1, 'max-retry': 2}, wait=TIMEOUT)
 
-    time.sleep(90)  # wait for operation execution. TODO: in charm use lock state to clear status.
-
+    # Each unit executes 3 times (attempt 0 plus 2 retries), recording a start
+    # and a retry_release event each time. Wait for those events rather than for
+    # a fixed duration, which cannot account for lock hand-off latency.
+    # TODO: in charm use lock state to clear status.
     all_events: list[dict[str, str]] = []
-    all_events.extend(get_unit_events(juju, unit_a))
-    all_events.extend(get_unit_events(juju, unit_b))
+    all_events.extend(wait_for_events(juju, unit_a, count=2 * 3, timeout=TIMEOUT))
+    all_events.extend(wait_for_events(juju, unit_b, count=2 * 3, timeout=TIMEOUT))
     all_events.sort(key=parse_ts)
 
     logger.info(all_events)
