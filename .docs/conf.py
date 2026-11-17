@@ -186,6 +186,12 @@ extensions = [
     *local_extensions,
 ]
 
+# sphinx-last-updated-by-git: don't look for Git timestamps in the .save directory, where the
+# package_docs extension stores per-package doctree pickles. The pickles are untracked, so
+# there's no timestamp to get from them, and missing ones would otherwise each emit a warning
+# (which fails the -W build) until a full `just docs` run has built every package.
+git_exclude_patterns = ['.save/**']
+
 # Custom MyST syntax extensions; see
 # https://myst-parser.readthedocs.io/en/latest/syntax/optional.html
 # NOTE: By default, the following MyST extensions are enabled:
