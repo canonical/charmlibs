@@ -1,4 +1,4 @@
-# 1.4.2 - 10 November 2026
+# 1.4.2 - 17 November 2026
 
 `ContainerPath` now matches `pathlib.Path` for paths where a parent exists but can't be traversed as a directory, because it's a non-directory (for example `/some/file.txt/child`) or a symlink to one:
 - `exists`, `is_dir`, `is_file`, `is_fifo` and `is_socket` now return `False` instead of raising `NotADirectoryError`.
