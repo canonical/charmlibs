@@ -92,7 +92,7 @@ class DnsProviderData(BaseModel):
     uuid: UUID = Field(
         name="UUID",
         description="UUID for this domain as specified by the requirer.",
-        examples="550e8400-e29b-41d4-a716-446655440000",
+        examples=["550e8400-e29b-41d4-a716-446655440000"],
     )
     status: Status = Field(
         name="Status",
@@ -152,7 +152,7 @@ class RequirerEntries(BaseModel):
     uuid: UUID = Field(
         name="UUID",
         description="UUID for this entry.",
-        examples="550e8400-e29b-41d4-a716-446655440000",
+        examples=["550e8400-e29b-41d4-a716-446655440000"],
     )
 
 
