@@ -22,11 +22,10 @@ import json
 import typing
 
 import interface_preprocessor as ip
+import pytest
 
 if typing.TYPE_CHECKING:
     import pathlib
-
-    import pytest
 
 # --- _main ---
 
@@ -78,6 +77,36 @@ def test_main_removes_placeholder(tmp_path: pathlib.Path, monkeypatch: pytest.Mo
     ip._main()
 
     assert not (ref_dir / 'placeholder.md').exists()
+
+
+def test_main_fails_early_on_missing_readme(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+):
+    """A version directory without a README.md fails before anything is written."""
+    docs_dir = tmp_path / 'docs_site'
+    ref_dir = docs_dir / 'reference' / 'interfaces'
+    ref_dir.mkdir(parents=True)
+    (ref_dir / 'placeholder.md').write_text('# Temporary TOC placeholder')
+    good = tmp_path / 'interfaces' / 'bar' / 'interface' / 'v0'
+    good.mkdir(parents=True)
+    (good / 'README.md').write_text('# Bar v0\n')
+    for version in ('v0', 'v1'):
+        (tmp_path / 'interfaces' / 'foo' / 'interface' / version).mkdir(parents=True)
+    monkeypatch.setattr(ip, '_DOCS_DIR', docs_dir)
+    monkeypatch.setattr(ip, '_REPO_ROOT', tmp_path)
+    interfaces = ['interfaces/bar', 'interfaces/foo']
+    monkeypatch.setattr(ip.subprocess, 'check_output', _fake_ls(interfaces))
+
+    with pytest.raises(SystemExit) as exc_info:
+        ip._main()
+
+    message = str(exc_info.value.code)
+    assert 'README.md' in message
+    assert 'interfaces/foo/interface/v0/README.md' in message
+    assert 'interfaces/foo/interface/v1/README.md' in message
+    assert 'interfaces/bar' not in message
+    # Nothing was written, and the placeholder is left for the fallback extension.
+    assert sorted(p.name for p in ref_dir.iterdir()) == ['placeholder.md']
 
 
 # --- _generate_interface_docs ---

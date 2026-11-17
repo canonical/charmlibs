@@ -42,6 +42,7 @@ import json
 import pathlib
 import re
 import subprocess
+import sys
 
 _DOCS_DIR = pathlib.Path(__file__).parent.parent.resolve()
 _REPO_ROOT = _DOCS_DIR.parent
@@ -63,9 +64,6 @@ _INDEX_TEMPLATE = """
 
 def _main() -> None:
     """Write an index stub and rewritten version READMEs for every interface."""
-    ref_dir = _DOCS_DIR / 'reference' / 'interfaces'
-    ref_dir.mkdir(parents=True, exist_ok=True)
-    (ref_dir / 'placeholder.md').unlink(missing_ok=True)
     cmd = [
         _REPO_ROOT / '.scripts' / 'ls.py',
         'interfaces',
@@ -73,8 +71,28 @@ def _main() -> None:
         '--exclude-placeholders',
     ]
     interfaces: list[str] = json.loads(subprocess.check_output(cmd, text=True))
-    for path_str in interfaces:
-        _generate_interface_docs(interface_dir=_REPO_ROOT / path_str, ref_dir=ref_dir)
+    interface_dirs = [_REPO_ROOT / path_str for path_str in interfaces]
+    if missing := _missing_readmes(interface_dirs):
+        paths = '\n'.join(f'  {p.relative_to(_REPO_ROOT)}' for p in missing)
+        sys.exit(
+            'Every interface version directory needs a README.md, '
+            f'which is used as its reference page. Missing:\n{paths}'
+        )
+    ref_dir = _DOCS_DIR / 'reference' / 'interfaces'
+    ref_dir.mkdir(parents=True, exist_ok=True)
+    (ref_dir / 'placeholder.md').unlink(missing_ok=True)
+    for interface_dir in interface_dirs:
+        _generate_interface_docs(interface_dir=interface_dir, ref_dir=ref_dir)
+
+
+def _missing_readmes(interface_dirs: list[pathlib.Path]) -> list[pathlib.Path]:
+    """Return the README.md path of every interface version directory that lacks one."""
+    return [
+        v / 'README.md'
+        for interface_dir in interface_dirs
+        for v in sorted((interface_dir / 'interface').glob('v[0-9]*'))
+        if not (v / 'README.md').is_file()
+    ]
 
 
 def _generate_interface_docs(interface_dir: pathlib.Path, ref_dir: pathlib.Path) -> None:
