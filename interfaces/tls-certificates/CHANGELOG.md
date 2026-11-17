@@ -1,3 +1,8 @@
+# 1.13.1 - 6 November 2026
+
+Allow providers to read certificate requests from legacy requirers that omit the `ca` attribute.
+The missing attribute defaults to `false`.
+
 # 1.13.0 - 30 October 2026
 
 Add `get_request_status(attributes)`, returning

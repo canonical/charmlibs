@@ -42,6 +42,7 @@ functional = [  # installed for `just functional {{ cookiecutter.__path_prefix }
 ]
 integration = [  # installed for `just integration {{ cookiecutter.__path_prefix }}{{ cookiecutter.project_slug }}`
     "jubilant",
+    "pytest-jubilant>=2.3.1",
 ]
 
 [project.urls]
