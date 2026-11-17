@@ -27,6 +27,8 @@ Also manage:
 - Config with :func:`get`, :func:`get_one`, :func:`set`, and :func:`unset`.
 - Connections between snaps with :func:`connect` and :func:`disconnect`.
 - Application aliases with :func:`alias` and :func:`unalias`.
+- Quota groups with :func:`ensure_quota`, :func:`set_quota`, :func:`remove_quota`,
+  :func:`get_quota`, and :func:`list_quotas`.
 
 Exceptions
 ----------
@@ -74,12 +76,15 @@ from ._errors import (
     NotInstalledError,
     NotInStoreError,
     OptionNotFoundError,
+    QuotaHasSubgroupsError,
+    QuotaNotFoundError,
     RevisionNotAvailableError,
     SocketNotFoundError,
     TimeoutError,  # noqa: A004 (shadowing a Python builtin)
 )
 from ._functions import (
     ensure_installed,
+    ensure_quota,
 )
 from ._snapd_aliases import (
     alias,
@@ -104,6 +109,13 @@ from ._snapd_logs import (
     LogEntry,
     logs,
 )
+from ._snapd_quotas import (
+    QuotaInfo,
+    get_quota,
+    list_quotas,
+    remove_quota,
+    set_quota,
+)
 from ._snapd_snaps import (
     InstalledInfo,
     hold,
@@ -113,9 +125,13 @@ from ._snapd_snaps import (
     remove,
     unhold,
 )
+from ._utils import (
+    UNCHANGED,
+)
 from ._version import __version__ as __version__
 
 __all__ = [
+    'UNCHANGED',
     'APIError',
     'AppNotFoundError',
     'BadResponseError',
@@ -129,6 +145,9 @@ __all__ = [
     'NotInStoreError',
     'NotInstalledError',
     'OptionNotFoundError',
+    'QuotaHasSubgroupsError',
+    'QuotaInfo',
+    'QuotaNotFoundError',
     'RevisionNotAvailableError',
     'SocketNotFoundError',
     'TimeoutError',
@@ -136,16 +155,21 @@ __all__ = [
     'connect',
     'disconnect',
     'ensure_installed',
+    'ensure_quota',
     'get',
     'get_one',
+    'get_quota',
     'hold',
     'install',
     'list_one',
+    'list_quotas',
     'logs',
     'refresh',
     'remove',
+    'remove_quota',
     'restart',
     'set',
+    'set_quota',
     'start',
     'stop',
     'unalias',

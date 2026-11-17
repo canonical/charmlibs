@@ -30,20 +30,38 @@ _CALLS: dict[str, Callable[[str], object]] = {
     'alias (app)': lambda v: snap.alias('lxd', v, 'testlxc'),
     'alias (alias)': lambda v: snap.alias('lxd', 'lxc', v),
     'ensure_installed': lambda v: snap.ensure_installed(v),
+    'ensure_quota': lambda v: snap.ensure_quota(v),
+    'ensure_quota (snaps)': lambda v: snap.ensure_quota('some-group', [v]),
+    'ensure_quota (services snap)': lambda v: snap.ensure_quota(
+        'some-group', services={v: ['serv1']}
+    ),
+    'ensure_quota (services service)': lambda v: snap.ensure_quota(
+        'some-group', services={'some-snap': [v]}
+    ),
+    'ensure_quota (parent)': lambda v: snap.ensure_quota('some-group', parent=v),
     'get': lambda v: snap.get(v),
     'get (key)': lambda v: snap.get('lxd', [v]),
     'get_one': lambda v: snap.get_one(v, 'mykey'),
     'get_one (key)': lambda v: snap.get_one('lxd', v),
+    'get_quota': lambda v: snap.get_quota(v),
     'hold': lambda v: snap.hold(v),
     'list_one': lambda v: snap.list_one(v),
     'install': lambda v: snap.install(v),
     'logs': lambda v: snap.logs(v),
     'refresh': lambda v: snap.refresh(v),
     'remove': lambda v: snap.remove(v),
+    'remove_quota': lambda v: snap.remove_quota(v),
     'restart': lambda v: snap.restart(v),
     'restart (service)': lambda v: snap.restart('lxd', v),
     'set': lambda v: snap.set(v, {'mykey': 'myval'}),
     'set (key)': lambda v: snap.set('lxd', {v: 'myval'}),
+    'set_quota': lambda v: snap.set_quota(v),
+    'set_quota (snaps)': lambda v: snap.set_quota('some-group', [v]),
+    'set_quota (services snap)': lambda v: snap.set_quota('some-group', services={v: ['serv1']}),
+    'set_quota (services service)': lambda v: snap.set_quota(
+        'some-group', services={'some-snap': [v]}
+    ),
+    'set_quota (parent)': lambda v: snap.set_quota('some-group', parent=v),
     'start': lambda v: snap.start(v),
     'start (service)': lambda v: snap.start('lxd', v),
     'stop': lambda v: snap.stop(v),
@@ -74,6 +92,10 @@ _BLANK_ONLY_CALLS: dict[str, Callable[[str], object]] = {
 _BLANK = ' '
 
 
+# Public functions that take no name-like argument at all, so there is nothing to check.
+_NO_NAME_ARGUMENTS = {'list_quotas'}
+
+
 def _function_names(calls: dict[str, Callable[[str], object]]) -> set[str]:
     return {name.split(' (')[0] for name in calls}
 
@@ -84,7 +106,7 @@ def test_every_public_function_is_accounted_for():
     public = {name for name in snap.__all__ if inspect.isfunction(getattr(snap, name))}
     covered = _function_names(_CALLS)
     blank_only = _function_names(_BLANK_ONLY_CALLS)
-    assert public == covered | blank_only
+    assert public == covered | blank_only | _NO_NAME_ARGUMENTS
     assert not covered & blank_only
 
 

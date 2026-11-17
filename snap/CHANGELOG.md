@@ -1,3 +1,7 @@
+# Unreleased
+
+Add support for snapd [quota groups](https://snapcraft.io/docs/quota-groups), which limit the memory, CPU, CPU set, and thread usage of a group of snaps. The thin wrappers `set_quota`, `remove_quota`, `get_quota`, and `list_quotas` mirror the `snap set-quota`, `snap remove-quota`, `snap quota`, and `snap quotas` commands, with `QuotaInfo` carrying a group's membership and limits. The `ensure_quota` helper makes one group match a declarative description -- creating it, adding to it in place, or re-creating it as needed -- and is safe to call on every hook. Anything a caller leaves out defaults to the new `UNCHANGED` sentinel, meaning it is left as it is. The new errors `QuotaNotFoundError` and `QuotaHasSubgroupsError` classify the cases a charm may want to handle.
+
 # 2.0.0 - 31 August 2026
 
 A ground-up rewrite of `charmlibs.snap`. The 1.x library was a straight migration of `operator_libs_linux.v2.snap`; 2.0 is a new, deliberately smaller API. It talks to snapd exclusively over the REST API (it no longer shells out to the `snap` CLI), has no caching layer, and has no runtime dependencies (the `opentelemetry-api` dependency and its tracing are gone). Function names, argument semantics, and error behaviour follow the `snap` CLI, so what you know from the command line carries over.

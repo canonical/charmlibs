@@ -1,0 +1,74 @@
+{
+    "type": "sync",
+    "status-code": 200,
+    "status": "OK",
+    "result": [
+        {
+            "group-name": "fixture-journal",
+            "snaps": [
+                "test-other-service-snap"
+            ],
+            "constraints": {
+                "journal": {
+                    "size": 16000000
+                }
+            },
+            "current": {}
+        },
+        {
+            "group-name": "fixture-parent",
+            "subgroups": [
+                "fixture-sub"
+            ],
+            "snaps": [
+                "core24"
+            ],
+            "constraints": {
+                "memory": 64000000
+            },
+            "current": {}
+        },
+        {
+            "group-name": "fixture-sub",
+            "parent": "fixture-parent",
+            "constraints": {
+                "cpu": {
+                    "count": 2,
+                    "percentage": 50
+                },
+                "cpu-set": {},
+                "threads": 32
+            },
+            "current": {}
+        },
+        {
+            "group-name": "fixture-svc",
+            "subgroups": [
+                "fixture-svc-sub"
+            ],
+            "snaps": [
+                "test-service-snap"
+            ],
+            "constraints": {
+                "memory": 64000000
+            },
+            "current": {
+                "memory": 647168
+            }
+        },
+        {
+            "group-name": "fixture-svc-sub",
+            "parent": "fixture-svc",
+            "services": [
+                "test-service-snap.daemon"
+            ],
+            "constraints": {
+                "cpu": {
+                    "percentage": 50
+                },
+                "cpu-set": {}
+            },
+            "current": {}
+        }
+    ]
+}

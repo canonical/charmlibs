@@ -218,5 +218,17 @@ class OptionNotFoundError(APIError):
     """Raised via the API when the specified snap config option is not found."""
 
 
+class QuotaNotFoundError(APIError):
+    """Raised when a quota group does not exist."""
+
+
+class QuotaHasSubgroupsError(APIError):
+    """Raised when a quota group cannot be removed because it has sub-groups.
+
+    Nothing was changed when this error is raised. A charm that manages a parent group and
+    its sub-groups should catch this error to know it must remove the sub-groups first.
+    """
+
+
 class ChangeError(APIError):
     """Raised when a snap change results in an error or has an unexpected status."""

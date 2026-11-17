@@ -652,6 +652,10 @@ def test_all_errors_mapped():
         # kind: snapd has no kind that means "the store doesn't have it" as opposed to "it isn't
         # installed". See _NotFoundError and test_absent_snap_kinds below.
         'NotInStoreError',
+        # Built with APIError._from from snapd's kindless quota errors, classified by the
+        # function that made the request (a 404 on the group lookup, or a sub-groups list).
+        'QuotaNotFoundError',
+        'QuotaHasSubgroupsError',
     }
     expected = {
         name
