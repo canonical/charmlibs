@@ -27,15 +27,13 @@ rewritten to absolute GitHub URLs.
 
 Run from ``just docs``; see ``docs.just`` for the invocation.
 
-This is a standalone preprocessor script rather than a Sphinx extension,
-following the same pattern as ``diataxis_preprocessor.py``. Unlike the
-package reference docs, interface docs don't use autodoc, so nothing here
-needs to run inside a Sphinx build. Generating the pages once up front —
-instead of in a ``builder-inited`` hook on every Sphinx pass — keeps the
-per-package intermediate passes cheaper and the extension machinery simpler.
-The companion ``interface_docs`` extension is now only a fallback: it writes
-a placeholder page when this script hasn't run, so the glob toctree in
-``reference/interfaces.md`` still matches at least one document.
+This is a standalone preprocessor script and nothing here needs to be run
+inside a Sphinx build. Generating the pages once up front — instead of in a
+``builder-inited`` hook on every Sphinx pass — keeps the per-package
+intermediate passes cheap and the extension machinery simple. The companion
+``interface_docs`` extension is a fallback: it writes a placeholder page when
+this script hasn't run, so the glob toctree in ``reference/interfaces.md``
+still matches at least one document.
 """
 
 from __future__ import annotations
