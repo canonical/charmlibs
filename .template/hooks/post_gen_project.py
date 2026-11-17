@@ -91,6 +91,7 @@ else:  # Not an interface library.
 ######################################################################
 
 # False by default, set to True by `just init --definition-only`
+# Keep this last: restoring the symlinks above fails on paths removed here.
 if {{cookiecutter._definition_only}}:  # noqa: F821
     for path in pathlib.Path().iterdir():
         if path.name == 'interface':
