@@ -56,7 +56,13 @@ just add pathops 'pydantic>=2'
 
   Extra pytest flags are passed through, e.g. `workshop exec noble -- sudo just functional snap -x -k test_install`. Workshop configs are in `.workshop/`.
 
+  A workshop that has been launched or started keeps running until it's stopped, and is restarted automatically when your machine boots. Each worktree gets its own workshops, so they add up quickly. Run `workshop stop <name>` (e.g. `workshop stop noble`) when you're done testing, and `workshop list --global` to find any you've left running.
+
+  Before deleting a worktree, run `workshop remove <name>` in it for each of its workshops (there's no need to stop them first). If the directory is deleted first, the workshops keep running and Workshop can no longer manage them; they show up as `missing-project` in `workshop list --global`. To clean one up, recreate the directory (`mkdir <path>`) and run `workshop remove -p <path> <name>`.
+
 - Integration tests involve packing real test charms and deploying them on a Juju cloud. Pack first with `just pack-k8s <package>` or `just pack-machine <package>`, then run `just integration-k8s <package>` or `just integration-machine <package>`.
+
+  Integration tests use [pytest-jubilant](https://github.com/canonical/pytest-jubilant), so add `pytest-jubilant` to the package's `integration` dependency group. Its `juju` fixture creates a temporary model for each test module and tears it down afterwards. To deploy your test charms, override `juju` in `tests/integration/conftest.py` and request the original `juju` fixture as an argument, as the template does. Don't create models with `jubilant.temp_model` directly, because pytest-jubilant can only collect logs from the models it creates. Pass `--juju-dump-logs` to save the `juju debug-log` for each model to `.logs/`, and `--no-juju-teardown` to keep the models after the tests finish (this also skips any test marked `juju_teardown`).
 
 Read more: [the different types of tests](https://canonical.com/juju/docs/charmlibs/explanation/charmlibs-tests/).
 

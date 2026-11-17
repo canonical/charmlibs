@@ -52,7 +52,7 @@ def test_refresh_to_a_classic_revision_needs_the_flag():
     install_local(_STRICT, dangerous=True)
     with pytest.raises(_errors.NeedsClassicError) as ctx:
         install_local(_CLASSIC, dangerous=True, classic=False)
-    assert ctx.value.kind == 'snap-needs-classic'
+    assert ctx.value._kind == 'snap-needs-classic'
     assert snap.list_one(_SNAP).classic is False  # Unchanged by the failed refresh.
 
 

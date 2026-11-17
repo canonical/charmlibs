@@ -76,8 +76,8 @@ def test_raises_not_installed_error(name: str, mock_client: MockClient):
     assert type(e) is not _NotFoundError, 'Must narrow to a subtype.'
     assert type(e) is NotInstalledError
     assert e.message == error.message
-    assert e.value == error.value
-    assert e.kind == error.kind
+    assert e._value == error._value
+    assert e._kind == error._kind
     assert e._status_code == error._status_code
     assert e._status == error._status
 
@@ -91,8 +91,8 @@ def test_raises_not_in_store_error(name: str, mock_client: MockClient):
     assert type(e) is not _NotFoundError, 'Must narrow to a subtype.'
     assert type(e) is NotInStoreError
     assert e.message == error.message
-    assert e.value == error.value
-    assert e.kind == error.kind
+    assert e._value == error._value
+    assert e._kind == error._kind
     assert e._status_code == error._status_code
     assert e._status == error._status
 
@@ -123,7 +123,7 @@ def test_refresh_also_raises_not_in_store_error(
     assert type(e) is not _NotFoundError, 'Must narrow to a subtype.'
     assert type(e) is NotInStoreError
     assert e.message == error.message
-    assert e.value == error.value
-    assert e.kind == error.kind
+    assert e._value == error._value
+    assert e._kind == error._kind
     assert e._status_code == error._status_code
     assert e._status == error._status

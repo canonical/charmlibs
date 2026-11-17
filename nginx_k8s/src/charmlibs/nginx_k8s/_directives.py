@@ -143,25 +143,21 @@ def resolver(
 def tracing(tracing_config: typing.Optional['NginxTracingConfig']) -> list[dict[str, typing.Any]]:
     if not tracing_config:
         return []
-    return (
-        [
-            {'directive': 'otel_trace', 'args': ['on']},
-            # propagate the trace context headers
-            {'directive': 'otel_trace_context', 'args': ['propagate']},
-            {
-                'directive': 'otel_exporter',
-                'args': [],
-                'block': [{'directive': 'endpoint', 'args': [tracing_config.endpoint]}],
-            },
-            {'directive': 'otel_service_name', 'args': [tracing_config.service_name]},
-            *([
-                {'directive': 'otel_resource_attr', 'args': [attr_key, attr_val]}
-                for attr_key, attr_val in tracing_config.resource_attributes.items()
-            ]),
-        ]
-        if tracing_config
-        else []
-    )
+    return [
+        {'directive': 'otel_trace', 'args': ['on']},
+        # propagate the trace context headers
+        {'directive': 'otel_trace_context', 'args': ['propagate']},
+        {
+            'directive': 'otel_exporter',
+            'args': [],
+            'block': [{'directive': 'endpoint', 'args': [tracing_config.endpoint]}],
+        },
+        {'directive': 'otel_service_name', 'args': [tracing_config.service_name]},
+        *([
+            {'directive': 'otel_resource_attr', 'args': [attr_key, attr_val]}
+            for attr_key, attr_val in tracing_config.resource_attributes.items()
+        ]),
+    ]
 
 
 def servers(

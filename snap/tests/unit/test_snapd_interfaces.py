@@ -103,7 +103,7 @@ class TestConnect:
             _snapd_interfaces.connect(('installed-plug', 'p'), ('absent-slot', 's'))
         # The plug snap is probed before the slot snap (matching snapd's blame order).
         assert mock_client.get.call_args_list[0].args[0] == '/v2/snaps/installed-plug'
-        assert ctx.value.value == 'absent-slot'
+        assert ctx.value._value == 'absent-slot'
 
     def test_connect_not_found_is_snapd_probe_error_and_does_not_chain(
         self, mock_client: MockClient
@@ -116,8 +116,8 @@ class TestConnect:
         with pytest.raises(_NotFoundError) as ctx:
             _snapd_interfaces.connect(('absent', 'home'))
         assert ctx.value.message == 'snap not installed'
-        assert ctx.value.kind == 'snap-not-found'
-        assert ctx.value.value == 'absent'
+        assert ctx.value._kind == 'snap-not-found'
+        assert ctx.value._value == 'absent'
         assert str(ctx.value) == 'snap not installed (absent)'
         assert ctx.value.__cause__ is None
         assert ctx.value.__suppress_context__
@@ -219,7 +219,7 @@ class TestDisconnect:
         with pytest.raises(_NotFoundError) as ctx:
             _snapd_interfaces.disconnect(('absent', 'p'))
         assert ctx.value.message == 'snap not installed'
-        assert ctx.value.value == 'absent'
+        assert ctx.value._value == 'absent'
         assert str(ctx.value) == 'snap not installed (absent)'
         assert ctx.value.__cause__ is None
         assert ctx.value.__suppress_context__

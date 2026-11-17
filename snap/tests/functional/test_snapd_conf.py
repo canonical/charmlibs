@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -152,7 +153,7 @@ def test_get_option_not_found_raises():
     ensure_installed_store(_SNAP, channel='latest/edge')
     with pytest.raises(_errors.OptionNotFoundError) as ctx:
         _snapd_conf.get(_SNAP, ['key-that-should-not-exist'])
-    assert ctx.value.kind == 'option-not-found'
+    assert ctx.value._kind == 'option-not-found'
     assert ctx.value.message
 
 
@@ -160,7 +161,7 @@ def test_get_option_not_found_value_contains_snap_and_key():
     ensure_installed_store(_SNAP, channel='latest/edge')
     with pytest.raises(_errors.OptionNotFoundError) as ctx:
         _snapd_conf.get(_SNAP, ['key-that-should-not-exist'])
-    value = str(ctx.value.value)
+    value = str(ctx.value._value)
     assert 'SnapName' in value
     assert 'Key' in value
     assert _SNAP in value
@@ -172,13 +173,13 @@ def test_get_not_installed_snap_raises_not_found():
     # get() probes /v2/snaps/{snap} and raises _NotFoundError, consistent with set and unset.
     with pytest.raises(_errors.NotInstalledError) as ctx:
         _snapd_conf.get(_ABSENT_SNAP, ['any-key'])
-    assert ctx.value.kind == 'snap-not-found'
+    assert ctx.value._kind == 'snap-not-found'
     # get() raises snapd's own /v2/snaps/{snap} probe error unchanged: a terse message with the
     # snap name in value, which str() surfaces as 'snap not installed (<snap>)'. This reads
     # differently from set/unset (whose PUT error names the snap in the message) -- we pass each
     # endpoint's wording through rather than hand-building an error to normalise them.
     assert ctx.value.message == 'snap not installed'
-    assert str(ctx.value.value) == _ABSENT_SNAP
+    assert str(ctx.value._value) == _ABSENT_SNAP
     assert str(ctx.value) == f'snap not installed ({_ABSENT_SNAP})'
 
 
@@ -197,7 +198,7 @@ def test_get_all_not_installed_snap_raises_not_found():
     # /v2/snaps/{snap} and raises _NotFoundError instead of returning {}.
     with pytest.raises(_errors.NotInstalledError) as ctx:
         _snapd_conf.get(_ABSENT_SNAP)
-    assert ctx.value.kind == 'snap-not-found'
+    assert ctx.value._kind == 'snap-not-found'
     assert ctx.value.message == 'snap not installed'
     assert str(ctx.value) == f'snap not installed ({_ABSENT_SNAP})'
     # No error was being handled when this was raised, so there's nothing to chain.
@@ -259,13 +260,13 @@ def test_get_one_missing_key_raises_option_not_found():
     ensure_installed_store(_SNAP, channel='latest/edge')
     with pytest.raises(_errors.OptionNotFoundError) as ctx:
         _snapd_conf.get_one(_SNAP, 'key-that-should-not-exist')
-    assert ctx.value.kind == 'option-not-found'
+    assert ctx.value._kind == 'option-not-found'
 
 
 def test_get_one_not_installed_snap_raises_not_found():
     with pytest.raises(_errors.NotInstalledError) as ctx:
         _snapd_conf.get_one(_ABSENT_SNAP, 'any-key')
-    assert ctx.value.kind == 'snap-not-found'
+    assert ctx.value._kind == 'snap-not-found'
     assert ctx.value.message == 'snap not installed'
 
 
@@ -340,7 +341,7 @@ def test_get_empty_keys_returns_empty_dict():
 def test_get_empty_keys_not_installed_snap_raises_not_found():
     with pytest.raises(_errors.NotInstalledError) as ctx:
         _snapd_conf.get(_ABSENT_SNAP, [])
-    assert ctx.value.kind == 'snap-not-found'
+    assert ctx.value._kind == 'snap-not-found'
     assert ctx.value.message == 'snap not installed'
     assert str(ctx.value) == f'snap not installed ({_ABSENT_SNAP})'
 
@@ -455,7 +456,7 @@ def test_unset_empty_keys_is_noop():
 def test_set_not_installed_snap_raises_snap_not_found(config: dict[str, Any]):
     with pytest.raises(_errors.NotInstalledError) as ctx:
         _snapd_conf.set(_ABSENT_SNAP, config)
-    assert ctx.value.kind == 'snap-not-found'
+    assert ctx.value._kind == 'snap-not-found'
     # set/unset surface snapd's PUT error directly, which names the snap in the message. get()
     # differs -- it raises the terse /v2/snaps probe error (name in value) -- because snapd words
     # its two endpoints differently and we pass each through rather than normalising them.
@@ -465,7 +466,7 @@ def test_set_not_installed_snap_raises_snap_not_found(config: dict[str, Any]):
 def test_unset_not_installed_snap_raises_snap_not_found():
     with pytest.raises(_errors.NotInstalledError) as ctx:
         _snapd_conf.unset(_ABSENT_SNAP, ['test-key'])
-    assert ctx.value.kind == 'snap-not-found'
+    assert ctx.value._kind == 'snap-not-found'
     assert ctx.value.message == f'snap "{_ABSENT_SNAP}" is not installed'
 
 
@@ -512,14 +513,20 @@ def test_set_and_unset_reject_empty_and_blank_keys(func: Any, key: str):
         func(_SNAP, {key: 'value'} if func is _snapd_conf.set else [key])
 
 
+def _invalid_option_name(quoted: str) -> str:
+    """Regex for snapd's invalid option name error, naming the key as quoted by snapd."""
+    # snapd 2.78 changed 'invalid option name: "x"' to 'invalid option name "x": <reason>'.
+    return rf'invalid option name:? {re.escape(quoted)}'
+
+
 @pytest.mark.parametrize(
     ('key', 'expected'),
     [
-        ('', 'internal error: key cannot be an empty string'),
-        (' ', 'invalid option name: " "'),
-        ('\t', 'invalid option name: "\\t"'),
-        (' padded ', 'invalid option name: " padded "'),
-        ('a,b', 'invalid option name: "a,b"'),
+        ('', re.escape('internal error: key cannot be an empty string')),
+        (' ', _invalid_option_name('" "')),
+        ('\t', _invalid_option_name('"\\t"')),
+        (' padded ', _invalid_option_name('" padded "')),
+        ('a,b', _invalid_option_name('"a,b"')),
     ],
 )
 def test_raw_put_unusable_key_fails_the_change(key: str, expected: str):
@@ -529,7 +536,7 @@ def test_raw_put_unusable_key_fails_the_change(key: str, expected: str):
     ensure_installed_store(_SNAP, channel='latest/edge')
     with pytest.raises(_errors.ChangeError) as ctx:
         _client.put(f'/v2/snaps/{_SNAP}/conf', body={key: 'value'})
-    assert expected in ctx.value.message
+    assert re.search(expected, ctx.value.message)
 
 
 # A key with an empty dotted segment is neither empty nor blank, so it isn't guarded client-side
@@ -544,8 +551,8 @@ def test_get_key_with_an_empty_dotted_segment_raises(key: str):
     ensure_installed_store(_SNAP, channel='latest/edge')
     with pytest.raises(_errors.APIError) as ctx:
         _snapd_conf.get(_SNAP, [key])
-    assert not ctx.value.kind
-    assert ctx.value.message == 'invalid option name: ""'
+    assert not ctx.value._kind
+    assert re.match(_invalid_option_name('""'), ctx.value.message)
 
 
 @pytest.mark.parametrize('key', ['a.', '.a', 'a..b', '.'])
@@ -554,7 +561,7 @@ def test_set_key_with_an_empty_dotted_segment_fails_the_change(key: str):
     ensure_installed_store(_SNAP, channel='latest/edge')
     with pytest.raises(_errors.ChangeError) as ctx:
         _snapd_conf.set(_SNAP, {key: 'value'})
-    assert 'invalid option name: ""' in ctx.value.message
+    assert re.search(_invalid_option_name('""'), ctx.value.message)
 
 
 def test_raw_put_unusable_key_rolls_back_the_valid_keys():
@@ -574,7 +581,7 @@ def test_get_mixed_keys_raises_option_not_found():
     _snapd_conf.set(_SNAP, {_KEY: 'exists'})
     with pytest.raises(_errors.OptionNotFoundError) as ctx:
         _snapd_conf.get(_SNAP, [_KEY, 'key-that-does-not-exist-xyz'])
-    assert ctx.value.kind == 'option-not-found'
+    assert ctx.value._kind == 'option-not-found'
     _cleanup()
 
 

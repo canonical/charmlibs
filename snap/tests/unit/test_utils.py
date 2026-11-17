@@ -298,7 +298,7 @@ class TestCheckInstalled:
         )
         error = _utils.check_installed(snap)
         assert type(error) is NotInstalledError
-        assert error.value == snap
+        assert error._value == snap
         mock_client.get.assert_called_once_with(f'/v2/snaps/{snap}')
 
     def test_installed_snap_is_probed(self, mock_client: MockClient):
@@ -315,8 +315,8 @@ class TestCheckInstalled:
         assert type(error) is NotInstalledError
         # Every field is carried across, so the caller raises snapd's own message and value.
         assert error.message == 'snap not installed'
-        assert error.value == 'hello-world'
-        assert error.kind == 'snap-not-found'
+        assert error._value == 'hello-world'
+        assert error._kind == 'snap-not-found'
 
     def test_narrowed_error_has_no_traceback(self, mock_client: MockClient):
         # The caller raises this error itself, so it must not carry the probe's frames.

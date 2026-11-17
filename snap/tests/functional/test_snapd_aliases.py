@@ -143,12 +143,12 @@ def test_unalias_removes_alias():
 
 
 def test_unalias_nonexistent_alias_raises():
-    # Unaliasing an alias that doesn't exist raises a base Error (no kind).
+    # Unaliasing an alias that doesn't exist raises a base APIError (no kind).
     ensure_installed_store(_SNAP)
     _cleanup_alias()
-    with pytest.raises(_errors.Error) as ctx:
+    with pytest.raises(_errors.APIError) as ctx:
         _snapd_aliases.unalias(_ALIAS)
-    assert not ctx.value.kind
+    assert not ctx.value._kind
     assert 'cannot find' in ctx.value.message or _ALIAS in ctx.value.message
 
 
@@ -182,7 +182,7 @@ def test_alias_not_installed_snap_raises():
     with pytest.raises(_errors.NotInstalledError) as ctx:
         _snapd_aliases.alias(_ABSENT_SNAP, 'hello', 'test-not-installed-alias')
     assert type(ctx.value) is _errors.NotInstalledError
-    assert ctx.value.kind == 'snap-not-installed'
+    assert ctx.value._kind == 'snap-not-installed'
 
 
 # ---------------------------------------------------------------------------
@@ -214,8 +214,8 @@ def test_raw_alias_empty_or_blank_snap_is_not_installed(snap_name: str):
             '/v2/aliases',
             body={'action': 'alias', 'snap': snap_name, 'app': _APP, 'alias': _ALIAS},
         )
-    assert ctx.value.kind == 'snap-not-installed'
-    assert ctx.value.value == snap_name
+    assert ctx.value._kind == 'snap-not-installed'
+    assert ctx.value._value == snap_name
 
 
 @pytest.mark.parametrize('app', ['', ' '])
@@ -263,5 +263,5 @@ def test_unalias_after_snap_removed_raises():
     ensure_removed(_SNAP)
     with pytest.raises(_errors.APIError) as ctx:
         _snapd_aliases.unalias(_ALIAS)
-    assert not ctx.value.kind
+    assert not ctx.value._kind
     assert 'cannot find' in ctx.value.message

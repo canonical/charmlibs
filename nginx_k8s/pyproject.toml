@@ -29,7 +29,7 @@ unit = [
 functional = []
 integration = [
     "jubilant",
-    "pytest-jubilant"
+    "pytest-jubilant>=2"
 ]
 
 [project.urls]

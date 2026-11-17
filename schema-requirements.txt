@@ -1,0 +1,5 @@
+# Dependencies needed to import the interface schemas in `interfaces/*/interface/v*/schema.py`.
+# `pytest-interface-tester` is only required while schemas still subclass
+# `interface_tester.schema_base.DataBagSchema`.
+pydantic~=2.0
+pytest-interface-tester~=3.4

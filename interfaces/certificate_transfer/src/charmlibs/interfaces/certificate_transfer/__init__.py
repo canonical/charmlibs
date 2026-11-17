@@ -72,6 +72,10 @@ Requirer charm
 =================
 The requirer charm is the charm requiring certificates from another charm that provides them.
 
+The ``certificate_set_updated`` event is emitted when the set of certificates in a relation
+changes. Relation-changed events that leave the set of certificates unchanged (including
+changes only to their order) do not emit it again.
+
 Example::
 
     import logging
