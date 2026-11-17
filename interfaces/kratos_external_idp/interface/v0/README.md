@@ -24,15 +24,13 @@ The Provider MUST adhere to the criteria, to be considered compatible with the i
 ### Provider
 - MUST provide one or more provider configurations in the relation data bag.
 - MUST provide the `client_id` field for each item.
-- MUST provide the `provider` field for each item with the provider's type. `provider` must be one of: `generic`, `google`, `facebook`, `microsoft`, `github`, `apple`, `gitlab`, `auth0`, `slack`, `spotify`, `discord`, `twitch`, `netid`, `yandex`, `yander`, `vk`, `dingtalk`.
+- MUST provide the `provider` field for each item with the provider's type. `provider` must be one of: `generic`, `google`, `facebook`, `microsoft`, `github`, `apple`, `gitlab`, `auth0`, `slack`, `spotify`, `discord`, `twitch`, `netid`, `yandex`, `vk`, `dingtalk`.
 - MUST provide the `secret_backend` field for each item, with information about backend used to store the sensitive information (`client_secrets`, `apple_private_keys`). The `secret_backend` field MUST have one of the following values: `relation`, `secret`, `vault`.
 - If `provider` is any of `generic` or `auth0` then the Provider MUST provide the `client_secret` and `issuer_url` fields under the corresponding key.
-- If `provider` is any of `google`, `facebook`, `github`, `gitlab`, `slack`, `spotify`, `discord`, `twitch`, `netid`, `yandex`, `yander`, `vk` or `dingtalk` then the Provider MUST provide the `client_secret` field under the corresponding key.
+- If `provider` is any of `google`, `facebook`, `github`, `gitlab`, `slack`, `spotify`, `discord`, `twitch`, `netid`, `yandex`, `vk` or `dingtalk` then the Provider MUST provide the `client_secret` field under the corresponding key.
 - If `provider` is `microsoft` then the Provider MUST provide the `client_secret` and `tenant_id` fields under the corresponding key.
 - If `provider` is `apple` then the Provider MUST provide the `team_id`, `private_key_id` and `private_key` fields under the corresponding key. A `client_secret` is not required.
 - MAY provide `scope`, `provider_id`, `label`, and `jsonnet_mapper` strings for each item. Fields that do not apply to the chosen provider can be omitted; they do not need explicit null values.
-
-The v0 reference library uses the legacy spelling `yander`. The schema accepts this spelling as well as its existing `yandex` value; accepting both does not translate between them or change the library's supported configuration values. The identifier for VK is `vk`, not `vkontakte`.
 
 ### Requirer
 - MUST provide an array of `redirect_uri`s and `provider_id`s for each provider in the Provider's databag.

@@ -51,7 +51,6 @@ class Provider(Enum):
     twitch = "twitch"
     netid = "netid"
     yandex = "yandex"
-    yander = "yander"
     vk = "vk"
     dingtalk = "dingtalk"
 
