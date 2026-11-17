@@ -39,7 +39,7 @@ from pathlib import Path as _Path  # for __version__
 from ops.pebble import ConnectionError as PebbleConnectionError
 
 from ._container_path import ContainerPath, RelativePathError
-from ._functions import ensure_contents
+from ._functions import ensure_contents, rmtree
 from ._local_path import LocalPath
 from ._types import PathProtocol
 
@@ -50,6 +50,7 @@ __all__ = (
     'PebbleConnectionError',
     'RelativePathError',
     'ensure_contents',
+    'rmtree',
 )
 
 __version__ = (_Path(__file__).parent / '_version.txt').read_text().strip()

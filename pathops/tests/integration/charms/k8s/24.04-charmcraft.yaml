@@ -46,3 +46,8 @@ actions:
       already-exists:
         type: boolean
         default: false
+  rmtree:
+    params:
+      scenario:
+        type: string
+        description: One of 'success', 'not-found', 'not-a-directory'

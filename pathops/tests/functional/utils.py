@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import os
 import pathlib
 import socket
 import string
@@ -36,6 +37,8 @@ BROKEN_SYMLINK_NAME = 'symlink_broken'
 EMPTY_DIR_NAME = 'empty_dir'
 EMPTY_DIR_SYMLINK_NAME = 'symlink_dir'
 EMPTY_FILE_NAME = 'empty_file.bin'
+FIFO_NAME = 'named_pipe.fifo'
+FIFO_SYMLINK_NAME = 'symlink.fifo'
 FILE_SYMLINK_NAME = 'symlink.bin'
 MISSING_FILE_NAME = 'does_not_exist'
 NESTED_DIR_NAME = 'nested_dir'
@@ -91,6 +94,8 @@ def _populate_interesting_dir(main_dir: pathlib.Path) -> Callable[[], None]:
         sock.bind(str(directory / SOCKET_NAME))
         sockets.append(sock)
         (directory / SOCKET_SYMLINK_NAME).symlink_to(directory / SOCKET_NAME)
+        os.mkfifo(directory / FIFO_NAME)
+        (directory / FIFO_SYMLINK_NAME).symlink_to(directory / FIFO_NAME)
         # TODO: make block device?
     assert not (main_dir / MISSING_FILE_NAME).exists()
     assert not (nested_dir / MISSING_FILE_NAME).exists()
