@@ -19,7 +19,7 @@ To find out which package supersedes a Charmhub-hosted library, check the librar
 ```
 
 This guide assumes that you're migrating to the bug-for-bug `1.0` port described above.
-If you aren't -- for example, `charmlibs-snap` 2.0 has a new, backwards incompatible API -- refer to the library's documentation and changelog for the code changes you'll need to make.
+If you aren't -- for example, `charmlibs-snap` 2.0 has a new, backwards incompatible API -- refer to the library's documentation and changelog for the additional code changes you'll need to make.
 
 ## Remove the Charmhub-hosted library
 
@@ -95,7 +95,7 @@ For example, `from charms.tls_certificates_interface.v4 import tls_certificates`
 ````
 `````
 
-Because version `1.0` of the package is a bug-for-bug port of the Charmhub-hosted library, no other code changes are needed -- the names you import and their behaviour are unchanged.
+As long as the version `1.0` of the package you're migrating to is a bug-for-bug port of the Charmhub-hosted library, no other code changes are needed -- the names you import and their behaviour are unchanged.
 
 ## Verify the migration
 
