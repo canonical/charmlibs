@@ -37,12 +37,16 @@ def raise_file_exists(msg: str, from_: BaseException | None = None) -> NoReturn:
     raise e from from_
 
 
-def raise_if_matches_file_exists(error: pebble.Error, msg: str) -> None:
-    if (
+def matches_file_exists(error: pebble.Error) -> bool:
+    return (
         isinstance(error, pebble.PathError)
         and error.kind == 'generic-file-error'
         and 'file exists' in error.message
-    ):
+    )
+
+
+def raise_if_matches_file_exists(error: pebble.Error, msg: str) -> None:
+    if matches_file_exists(error):
         raise_file_exists(msg, from_=error)
 
 

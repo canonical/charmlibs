@@ -794,11 +794,14 @@ class ContainerPath:
         except pebble.PathError as e:
             _errors.raise_if_matches_lookup(e, msg=e.message)
             msg = repr(self)
-            if _errors.matches_not_a_directory(e):
+            if _errors.matches_not_a_directory(e) or (
+                make_parents and _errors.matches_file_exists(e)
+            ):
                 # The target exists as a non-directory, or a parent can't be traversed, which
-                # Pebble reports the same way. Looking up the parent tells these apart. The lookup
-                # itself raises NotADirectoryError, or OSError (ELOOP), if a parent further up is
-                # the cause.
+                # Pebble reports the same way: "not a directory", or, when making parents, "file
+                # exists" from older Pebble versions such as 1.1.1. Looking up the parent tells
+                # these apart. The lookup itself raises NotADirectoryError, or OSError (ELOOP), if
+                # a parent further up is the cause.
                 try:
                     parent_info = _fileinfo.from_container_path(self.parent)
                 except FileNotFoundError:
