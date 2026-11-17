@@ -29,14 +29,14 @@ if typing.TYPE_CHECKING:
     import sphinx.application
 
 
-def _app(confdir: pathlib.Path) -> sphinx.application.Sphinx:
+def _fake_app(confdir: pathlib.Path) -> sphinx.application.Sphinx:
     """A minimal stand-in for the Sphinx app: ``_fallback`` only reads ``confdir``."""
     return typing.cast('sphinx.application.Sphinx', types.SimpleNamespace(confdir=str(confdir)))
 
 
 def test_fallback_writes_placeholder_when_dir_missing(tmp_path: pathlib.Path):
     """The reference/interfaces directory and placeholder are created if missing."""
-    interface_docs._fallback(_app(tmp_path))
+    interface_docs._fallback(_fake_app(tmp_path))
 
     placeholder = tmp_path / 'reference' / 'interfaces' / 'placeholder.md'
     assert placeholder.exists()
@@ -49,7 +49,7 @@ def test_fallback_keeps_existing_placeholder(tmp_path: pathlib.Path):
     ref_dir.mkdir(parents=True)
     (ref_dir / 'placeholder.md').write_text('existing')
 
-    interface_docs._fallback(_app(tmp_path))
+    interface_docs._fallback(_fake_app(tmp_path))
 
     assert (ref_dir / 'placeholder.md').read_text() == 'existing'
 
@@ -60,7 +60,7 @@ def test_fallback_skips_placeholder_when_content_exists(tmp_path: pathlib.Path):
     ref_dir.mkdir(parents=True)
     (ref_dir / 'foo.md').write_text('generated')
 
-    interface_docs._fallback(_app(tmp_path))
+    interface_docs._fallback(_fake_app(tmp_path))
 
     assert not (ref_dir / 'placeholder.md').exists()
 
@@ -72,7 +72,7 @@ def test_fallback_removes_stale_placeholder(tmp_path: pathlib.Path):
     (ref_dir / 'foo.md').write_text('generated')
     (ref_dir / 'placeholder.md').write_text('stale')
 
-    interface_docs._fallback(_app(tmp_path))
+    interface_docs._fallback(_fake_app(tmp_path))
 
     assert not (ref_dir / 'placeholder.md').exists()
     assert (ref_dir / 'foo.md').read_text() == 'generated'
