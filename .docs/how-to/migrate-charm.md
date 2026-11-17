@@ -69,9 +69,11 @@ from charms.<charm name>.v<API version> import <module name>
 from charms.<charm name>.v<API version>.<module name> import ...
 ```
 
-with imports of the new package.
+with imports of the new package:
 
-For a general library:
+`````{tab-set}
+````{tab-item} General libraries
+:sync: general
 
 ```python
 from charmlibs import <module name>
@@ -79,8 +81,10 @@ from charmlibs.<module name> import ...
 ```
 
 For example, `from charms.operator_libs_linux.v2 import snap` becomes `from charmlibs import snap`.
+````
 
-For an interface library:
+````{tab-item} Interface libraries
+:sync: interface
 
 ```python
 from charmlibs.interfaces import <module name>
@@ -88,6 +92,8 @@ from charmlibs.interfaces.<module name> import ...
 ```
 
 For example, `from charms.tls_certificates_interface.v4 import tls_certificates` becomes `from charmlibs.interfaces import tls_certificates`.
+````
+`````
 
 Because version `1.0` of the package is a bug-for-bug port of the Charmhub-hosted library, no other code changes are needed -- the names you import and their behaviour are unchanged.
 
