@@ -95,9 +95,15 @@ def _generate_interface_docs(interface_dir: pathlib.Path, ref_dir: pathlib.Path)
 
 def _rewrite_links(content: str, base_url: str) -> str:
     """Rewrite relative markdown links to absolute GitHub URLs under ``base_url``."""
+    relative_link = (
+        r'\[(.+?)\]'  # [link text] -- capture group 1, non-greedy for multiple links on a line
+        r'\('  # (
+        r'(?!https?://)'  # not an absolute URL
+        r'([^)]+)'  # relative target -- capture group 2
+        r'\)'  # )
+    )
     return re.sub(
-        # match all non-http(s) markdown links and prepend base_url to matching links
-        r'\[(.+)\]\((?!https?://)([^)]+)\)',
+        relative_link,
         lambda m: f'[{m.group(1)}]({base_url}/{m.group(2)})',
         content,
     )

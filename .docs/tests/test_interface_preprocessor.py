@@ -160,6 +160,24 @@ def test_rewrite_links_preserves_http():
     assert ip._rewrite_links(content, 'https://example.com/base') == content
 
 
+def test_rewrite_links_multiple_relative_on_one_line():
+    content = 'See [the schema](schema.py) and [the README](README.md).'
+    result = ip._rewrite_links(content, 'https://example.com/base')
+    assert result == (
+        'See [the schema](https://example.com/base/schema.py)'
+        ' and [the README](https://example.com/base/README.md).'
+    )
+
+
+def test_rewrite_links_mixed_on_one_line():
+    content = 'See [docs](https://example.com/page), [schema](schema.py), [other](http://x/).'
+    result = ip._rewrite_links(content, 'https://example.com/base')
+    assert result == (
+        'See [docs](https://example.com/page),'
+        ' [schema](https://example.com/base/schema.py), [other](http://x/).'
+    )
+
+
 # --- _write_if_needed ---
 
 
