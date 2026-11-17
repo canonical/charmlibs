@@ -135,11 +135,11 @@ class TestCheck:
 
     def test_directory_entry_without_trailing_slash_is_reported(self):
         problems = self._check(_entries('/apt'), 'apt/src/x.py')  # missing trailing slash
-        assert 'CODEOWNERS entry must have a trailing slash iff it is a dir: /apt' in problems
+        assert 'CODEOWNERS entry for a directory must have a trailing slash: /apt' in problems
 
     def test_file_entry_with_trailing_slash_is_reported(self):
         problems = self._check(_entries('/README.md/'), 'README.md')  # stray trailing slash
-        msg = 'CODEOWNERS entry must have a trailing slash iff it is a dir: /README.md/'
+        msg = 'CODEOWNERS entry for a file must not have a trailing slash: /README.md/'
         assert msg in problems
 
     def test_unanchored_entry_is_reported(self):

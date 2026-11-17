@@ -82,8 +82,8 @@ def get_tracked_files(root: pathlib.Path | str) -> list[pathlib.Path]:
 def map_children(files: list[pathlib.Path]) -> dict[pathlib.Path, list[pathlib.Path]]:
     """Map each tracked directory to its sorted immediate children (files and subdirectories).
 
-    The repository root is keyed as `pathlib.Path()` (i.e. `.`). A path is a directory iff it
-    appears as a key; the tracked files are the paths that never appear as keys.
+    The repository root is keyed as `pathlib.Path()` (that is, `.`). A path is a directory if
+    and only if it appears as a key; the tracked files are the paths that never appear as keys.
     """
     children: dict[pathlib.Path, set[pathlib.Path]] = {}
     for path in files:
@@ -98,8 +98,8 @@ def check(
     """Return a list of problems found between the CODEOWNERS `entries` and the tracked tree.
 
     Everything is checked against the tracked tree (`children`) rather than the filesystem, so
-    untracked and ignored paths are irrelevant. A path is a tracked directory iff it's a key in
-    `children`; `all_paths` is every tracked file and directory.
+    untracked and ignored paths are irrelevant. A path is a tracked directory if and only if
+    it's a key in `children`; `all_paths` is every tracked file and directory.
     """
     problems: list[str] = []
     # Check that each top-level path and immediate child of interfaces/ is owned.
@@ -117,9 +117,13 @@ def check(
     for target, pattern in entries.items():
         if target not in all_paths:
             problems.append(f'CODEOWNERS entry points at a missing path: {pattern}')
-        elif (target in children) != pattern.endswith('/'):
+        elif target in children and not pattern.endswith('/'):
             problems.append(
-                f'CODEOWNERS entry must have a trailing slash iff it is a dir: {pattern}'
+                f'CODEOWNERS entry for a directory must have a trailing slash: {pattern}'
+            )
+        elif target not in children and pattern.endswith('/'):
+            problems.append(
+                f'CODEOWNERS entry for a file must not have a trailing slash: {pattern}'
             )
         if not pattern.startswith('/'):
             problems.append(f'CODEOWNERS entry must be anchored with a leading /: {pattern}')
