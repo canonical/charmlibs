@@ -39,6 +39,9 @@ if typing.TYPE_CHECKING:
     import sphinx.application
 
 
+# Every page under this docname prefix is a placeholder for one package's reference docs.
+PACKAGE_DOCS_PREFIX = 'reference/charmlibs/'
+
 AUTOMODULE_TEMPLATE = """
 
 .. automodule:: {package}
@@ -51,7 +54,15 @@ def setup(app: sphinx.application.Sphinx) -> dict[str, str | bool]:
     app.connect('doctree-read', _load_on_doctree_read)
     app.connect('doctree-resolved', _save_on_doctree_resolved)
     app.add_config_value('package', default=None, rebuild='')
-    return {'version': '1.0.0', 'parallel_read_safe': False, 'parallel_write_safe': False}
+    return {
+        'version': '1.0.0',
+        # Sphinx discards its cached environment when this changes. Bump it when what this
+        # extension records in the environment changes, as when the package pages gained a
+        # dependency on their pickles: pages read before then would otherwise stay stale.
+        'env_version': 1,
+        'parallel_read_safe': False,
+        'parallel_write_safe': False,
+    }
 
 
 def _append_automodule_on_source_read(
@@ -81,7 +92,15 @@ def _load_on_doctree_read(app: sphinx.application.Sphinx, doctree: docutils.node
     """Load pickle file named after docname if it exists, and replace doctree contents in-place."""
     if app.config.package is not None:  # only load when not building docs for a specific package
         return
-    if not (source := pathlib.Path('.save', f'{app.env.docname}.pickle')).exists():
+    source = pathlib.Path('.save', f'{app.env.docname}.pickle')
+    if app.env.docname.startswith(PACKAGE_DOCS_PREFIX):
+        # The page's content comes from the pickle, not from the placeholder rst file, which
+        # never changes. Without this, an incremental build never re-reads the page, and keeps
+        # serving the reference docs from the first time the package was built. A pickle that
+        # doesn't exist yet is noted too: Sphinx re-reads a page whose dependency is missing,
+        # so the page picks up its package's docs once they have been built.
+        app.env.note_dependency(str(source))
+    if not source.exists():
         return
     saved, objects, modules, toc, toc_num_entries = pickle.loads(source.read_bytes())  # noqa: S301
     # restore saved doctree
