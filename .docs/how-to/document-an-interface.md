@@ -12,7 +12,7 @@ The specification is the source of truth for what it means for a charm to provid
 It is published on the docs site under {ref}`Interface specifications <reference-interfaces>`.
 
 ```{tip}
-This guide is for the **interface specification** -- the low-level contract defined in `interfaces/<name>/interface/`.
+This guide is for the **interface specification**: the low-level contract defined in `interfaces/<name>/interface/`.
 For library documentation targeting charm authors, like tutorials, how-to guides, and explanations, follow {ref}`how-to-add-library-docs` instead.
 ```
 
@@ -34,9 +34,9 @@ interfaces/<interface-name>/
 
 ## Write the specification README
 
-The `README.md` file is the heart of the specification. It is rendered verbatim on the docs site (under {ref}`reference-interfaces`).
+The `README.md` file is the heart of the specification. It is rendered word for word on the docs site (under {ref}`reference-interfaces`).
 
-Relative links to files in the repository are rewritten to GitHub URLs by the docs build. Absolute URLs are preserved as-is, and should be used for links to PyPI and Charmhub. Intersphinx links are not currently supported, so link to other documentation should use absolute URLs as well.
+Relative links to files in the repository are rewritten to GitHub URLs by the docs build. Absolute URLs are preserved as-is, and should be used for links to PyPI and Charmhub. Intersphinx links are not currently supported, so links to other documentation should use absolute URLs as well.
 
 Start the README with a top-level heading of the form `# <interface-name>`, and a short paragraph explaining what the interface is for and which library charm authors should use to implement it, linking to the recommended `charmlibs.interfaces.<name>` package on PyPI.
 
@@ -61,7 +61,7 @@ List the expectations for each side of the relation, under `### Requirer` and `#
 
 ### Relation data
 
-Document the contents of the application and unit databags for each side at a high level. This should be the final section in the document. In future, the JSON or Python schemas defined in the `interface/` directory will rendered below the high-level description in the docs. Populate the examples fields in your Python schemas to have them rendered here.
+Document the contents of the application and unit databags for each side at a high level. This should be the final section in the document. In future, the JSON or Python schemas defined in the `interface/` directory will be rendered below the high-level description in the docs. Populate the examples fields in your Python schemas to have them rendered here.
 
 ## Write the interface metadata
 
@@ -93,8 +93,8 @@ Use these fields:
 | `version` | The major version of this interface, recorded for historical purposes for existing interfaces. New interfaces should use version 1. |
 | `status` | One of `draft`, `published`, or `retired`. Use `draft` for work in progress, `published` for a released interface, and `retired` for interfaces that are no longer recommended for use. |
 | `lib` | The import path of the recommended `charmlibs.interfaces.<interface name>` library, when one exists. Otherwise the identifier for the legacy Charmhub-hosted library, without its version specifier: `charms.<charm>.<lib name>`. |
-| `summary` | A one-line description without special markup, shown in the interfaces table on Charmhub. |
-| `description` | A longer description, interpreted as markdown, and shown on the interface page on Charmhub. |
+| `summary` | A one-line description without any formatting, shown in the interfaces table on Charmhub. |
+| `description` | A longer description, interpreted as Markdown, and shown on the interface page on Charmhub. |
 | `providers` | A list of charms that provide the interface, each with `name` (the charm's name in `charmcraft.yaml`) and `url` (the Git repository where the charm is defined). May be empty. |
 | `requirers` | A list of charms that require the interface, in the same format. May be empty. |
 | `maintainer` | The team responsible for the interface (for example `tls`, `observability`). This should typically match the `CODEOWNERS` entry for this interface. |
@@ -102,7 +102,7 @@ Use these fields:
 ## Write the schema
 
 The `schema.py` file defines the relation data format using [Pydantic](https://docs.pydantic.dev/) models or Python stdlib `dataclasses`.
-You must provide four such classes, for the matrix of provider/requirer and app/unit relation data.
+You must provide four such classes, for the matrix of provider/requirer and app/unit relation data, or set the name to `None` for a databag that the interface doesn't use.
 These must have exactly the names `ProviderAppData`, `ProviderUnitData`, `RequirerAppData` and `RequirerUnitData`.
 
 Follow the design rules from {ref}`design-relation-interfaces` when designing the schema:
