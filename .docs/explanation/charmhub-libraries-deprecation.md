@@ -55,10 +55,7 @@ Read more: {ref}`how-to-migrate`
 
 ### If you use Charmhub-hosted libraries in your charm
 
-When a Python package replacement is available, switch to it: remove the vendored library, add the replacement package to your charm's dependencies, and update your imports.
-For libraries migrated to the `charmlibs` monorepo, the `1.0` release is a bug-for-bug port, so no changes to your charm's logic are needed.
-
-Read more: {ref}`how-to-migrate-charm`
+When a Python package replacement is available, switch to it following the steps in {ref}`how-to-migrate-charm`.
 
 ### If you are writing a new library
 

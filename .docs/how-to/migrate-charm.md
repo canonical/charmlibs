@@ -15,8 +15,11 @@ This guide covers migrating your charm from a Charmhub-hosted library to the equ
 If you maintain a Charmhub-hosted library and want to migrate the library itself, see {ref}`how-to-migrate` instead.
 
 ```{tip}
-To find out which package supersedes a Charmhub-hosted library, check the library's documentation, or look it up in the {ref}`general <general-libs-listing>` and {ref}`interface <interface-libs-listing>` library listings, where legacy Charmhub-hosted libraries name their replacements.
+To find out which package supersedes a Charmhub-hosted library, check the library's documentation. Or find the library in the {ref}`general <general-libs-listing>` or {ref}`interface <interface-libs-listing>` library listing, where the description tells you which package to use instead.
 ```
+
+This guide assumes that you're migrating to the bug-for-bug `1.0` port described above.
+If you aren't -- for example, `charmlibs-snap` 2.0 has a new, backwards incompatible API -- refer to the library's documentation and changelog for the code changes you'll need to make.
 
 ## Remove the Charmhub-hosted library
 
@@ -66,34 +69,28 @@ from charms.<charm name>.v<API version> import <module name>
 from charms.<charm name>.v<API version>.<module name> import ...
 ```
 
-with imports of the new package:
+with imports of the new package.
 
-`````{tab-set}
-````{tab-item} General libraries
-:sync: general
+For a general library:
 
 ```python
 from charmlibs import <module name>
 from charmlibs.<module name> import ...
 ```
-````
 
-````{tab-item} Interface libraries
-:sync: interface
+For example, `from charms.operator_libs_linux.v2 import snap` becomes `from charmlibs import snap`.
+
+For an interface library:
 
 ```python
 from charmlibs.interfaces import <module name>
 from charmlibs.interfaces.<module name> import ...
 ```
-````
-`````
 
-For example, `from charms.operator_libs_linux.v2 import snap` becomes `from charmlibs import snap`, and `from charms.tls_certificates_interface.v4 import tls_certificates` becomes `from charmlibs.interfaces import tls_certificates`.
+For example, `from charms.tls_certificates_interface.v4 import tls_certificates` becomes `from charmlibs.interfaces import tls_certificates`.
 
 Because version `1.0` of the package is a bug-for-bug port of the Charmhub-hosted library, no other code changes are needed -- the names you import and their behaviour are unchanged.
 
 ## Verify the migration
 
 Run your charm's unit tests, then pack your charm with `charmcraft pack` and deploy it or run your integration tests, to confirm that everything works exactly as before.
-
-If the package you're migrating to is *not* a bug-for-bug port of the Charmhub-hosted library you were using -- for example, `charmlibs-snap` 2.0 has a new, backwards incompatible API -- refer to the library's documentation and changelog for the code changes you'll need to make.
