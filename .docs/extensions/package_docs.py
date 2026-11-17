@@ -124,7 +124,7 @@ def _save_on_doctree_resolved(
     package = app.config.package
     # only save when building docs for a specific package
     # only save package reference docs
-    if package is None or docname != f'reference/charmlibs/{_normalize(package)}':
+    if package is None or docname != f'{PACKAGE_DOCS_PREFIX}{_normalize(package)}':
         return
     objects = app.env.domains['py'].data['objects']
     modules = app.env.domains['py'].data['modules']
