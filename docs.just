@@ -129,13 +129,13 @@ _packages *packages: _package_docs _inventories
 help:
     @just --list docs --unsorted
 
-[doc('Watch, build, and serve the docs -- does not rebuild package reference docs automatically.')]
-run: _packages
+[doc('Watch, build, and serve the docs -- does not rebuild package or interface reference docs automatically.')]
+run: _interface_docs _packages
     uvx --with-requirements=_dev/requirements.txt --from=sphinx \
         sphinx-autobuild --watch .. --ignore '**/generated/*' -b dirhtml -D llms_txt_enabled=0 . '{{build_dir}}/html'
 
 [doc('Check links.')]
-linkcheck *sphinx_args: _packages
+linkcheck *sphinx_args: _interface_docs _packages
     uvx --with-requirements=_dev/requirements.txt --from=sphinx \
         sphinx-build -b linkcheck . '{{build_dir}}' {{sphinx_args}}
 
