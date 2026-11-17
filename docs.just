@@ -99,7 +99,7 @@ _packages *packages: _package_docs _inventories
             '-D', 'language=en',
             '-D', f'package={package}',
             # llms.txt is only generated in the final combined pass (the `html` recipe).
-            # Leaving it enabled here triggers a nested base-mode build that the
+            # Enabling it here would trigger a nested base-mode build that the
             # intermediate package passes don't need.
             '-D', 'llms_txt_enabled=0',
             '-D', 'suppress_warnings=ref.ref,ref.doc,myst.xref_missing',
