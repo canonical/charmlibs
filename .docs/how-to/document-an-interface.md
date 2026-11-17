@@ -1,7 +1,7 @@
 ---
 myst:
   html_meta:
-    description: Document an interface in the charmlibs monorepo, including the specification README, metadata, schema, and interface tester tests.
+    description: Document a charm relation interface, including the README, metadata, and relation data schema.
 ---
 
 (how-to-document-an-interface)=
@@ -22,10 +22,10 @@ The low-level interface specification has its own directory under the top-level 
 
 ```text
 interfaces/<interface-name>/
-├── interface/
+├── interface/v<version>/
 │   ├── README.md       # The specification (rendered in the docs site).
 │   ├── interface.yaml  # Machine-readable metadata.
-│   └── schema.py       # Pydantic schemas for the relation data.
+│   └── schema.py       # Python schemas for the relation data.
 ├── src/charmlibs/interfaces/<interface_name>/
 │   └── ...             # The library implementation.
 ├── testing/            # The library's testing package.
@@ -61,7 +61,7 @@ List the expectations for each side of the relation, under `### Requirer` and `#
 
 ### Relation data
 
-Document the contents of the application and unit databags for each side at a high level. This should be the final section in the document. The JSON or Pydantic schemas defined in the `interface/` directory will rendered below the high-level description in the docs. Populate the examples fields in your Pydantic schemas to have them rendered here.
+Document the contents of the application and unit databags for each side at a high level. This should be the final section in the document. In future, the JSON or Python schemas defined in the `interface/` directory will rendered below the high-level description in the docs. Populate the examples fields in your Python schemas to have them rendered here.
 
 ## Write the interface metadata
 
@@ -102,9 +102,8 @@ Use these fields:
 ## Write the schema
 
 The `schema.py` file defines the relation data format using [Pydantic](https://docs.pydantic.dev/) models or Python stdlib `dataclasses`.
-You may provide up to four such classes, for the matrix of provider/requirer and app/unit relation data.
+You must provide four such classes, for the matrix of provider/requirer and app/unit relation data.
 These must have exactly the names `ProviderAppData`, `ProviderUnitData`, `RequirerAppData` and `RequirerUnitData`.
-Not defining a model is equivalent to defining an empty model, so be careful of typos.
 
 Follow the design rules from {ref}`design-relation-interfaces` when designing the schema:
 no mandatory top-level fields, no field reuse, stable collection ordering, and so on.
@@ -112,13 +111,13 @@ The schema is the machine-checkable counterpart to the prose in the README.
 
 ```{note}
 Older interface versions may use JSON Schema files under a `schemas/` directory instead of a `schema.py` file.
-New interface versions should use a `schema.py` file with Pydantic models.
+New interface versions should use a `schema.py` file with Python models.
 ```
 
 ## Keep the specification in sync
 
 The specification is a long-lived contract.
-When you change the relation data format, update the README, the schema, and the interface tester tests together in the same PR, being sure to follow {ref}`design-relation-interfaces`:
+When you change the relation data format, update the README, the schema, and the implementation in the same PR, being sure to follow {ref}`design-relation-interfaces`:
 
-- **Adding a field** is a minor change; bump at least the library's minor version.
-- **Removing a field** or changing a field's type is a breaking change and requires a major library version bump. Note that charms on the other end of a given relation may use an older library version, so the library must be tolerant of this: older versions should handle unknown fields appropriately, while newer versions must be able to gracefully handle new fields being ignored.
+- **Adding a field** is a minor change; bump at least the library's minor version. Charms on the other end of a given relation may use an older library version, so the library must be tolerant of this: older versions must handle unknown fields appropriately (typically by ignoring them), while newer versions must be able to gracefully handle new fields being ignored.
+- **Removing a field** or changing a field's type is a breaking change, and must be avoided. A new major version of a library may drop fields from the charm-facing API, and may stop sending optional fields (and all fields should be optional). However it must always tolerate reading them, and should avoid ignoring fields that the remote reasonably expects to be respected.
