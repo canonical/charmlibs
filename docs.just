@@ -1,6 +1,8 @@
 set working-directory := '.docs'
 
 build_dir := env('READTHEDOCS_OUTPUT', '_build')
+# read by conf.py to use the intersphinx inventories downloaded by the `_inventories` recipe
+export CHARMLIBS_DOCS_INVENTORY_DIR := build_dir / '_inventories'
 
 # this is the first recipe in the file, so it will run if just is called without a recipe
 [doc("""
@@ -9,7 +11,7 @@ Build the docs, (re)generating reference docs for all packages, or just those sp
 `just docs` is an alias for `just docs html`. To specify packages, you must use the full recipe, e.g.
 `just docs html interfaces/foo`.
 """)]
-html *packages: _diataxis_docs (_packages packages)
+html *packages: _diataxis_docs _interface_docs (_packages packages)
     uvx --with-requirements=_dev/requirements.txt --from=sphinx \
         sphinx-build -b dirhtml -T -W --keep-going -d _dev/.doctrees -D language=en . '{{build_dir}}/html'
 
@@ -17,9 +19,42 @@ html *packages: _diataxis_docs (_packages packages)
 _diataxis_docs:
     ./scripts/diataxis_preprocessor.py
 
+[doc('Generate interface reference docs in the Sphinx source tree.')]
+_interface_docs:
+    ./scripts/interface_preprocessor.py
+
 [doc('Write the placeholder rst files that the per-package reference docs builds fill in.')]
 _package_docs:
     ./scripts/package_docs_preprocessor.py
+
+[doc("""
+Download the intersphinx inventories once, for conf.py to read from CHARMLIBS_DOCS_INVENTORY_DIR.
+
+Otherwise every parallel package build fetches them at the same time, which gets connections reset.
+Fails if any inventory can't be downloaded, rather than letting each package build fail separately.
+""")]
+_inventories:
+    #!/usr/bin/env -S uv run --script --no-project
+    import os, pathlib, runpy, sys, time, urllib.request
+    inventory_dir = pathlib.Path(os.environ['CHARMLIBS_DOCS_INVENTORY_DIR'])
+    inventory_dir.mkdir(parents=True, exist_ok=True)
+    conf = runpy.run_path('conf.py', init_globals={'tags': set()})
+    attempts = 3
+    failed = []
+    for name, (url, _) in conf['intersphinx_mapping'].items():
+        for attempt in range(1, attempts + 1):
+            try:
+                with urllib.request.urlopen(f'{url}/objects.inv', timeout=30) as response:
+                    (inventory_dir / f'{name}.inv').write_bytes(response.read())
+                break
+            except OSError as e:
+                print(f'Failed to download {name} inventory (attempt {attempt}/{attempts}): {e}', file=sys.stderr)
+                if attempt < attempts:
+                    time.sleep(2**attempt)
+        else:
+            failed.append(name)
+    if failed:
+        sys.exit(f'Failed to download intersphinx inventories: {", ".join(failed)}')
 
 [doc("""
 Run html builder once per package, with its deps installed, setting the package argument and suppressing reference warnings.
@@ -34,7 +69,7 @@ recipe, injecting their own automodule in-memory during source-read (see
 builds don't race on the source tree. Each build's captured stdout/stderr is printed atomically
 after it finishes.
 """)]
-_packages *packages: _package_docs
+_packages *packages: _package_docs _inventories
     #!/usr/bin/env -S uv run --script --no-project
     import concurrent.futures, json, os, pathlib, subprocess, sys
     ROOT = pathlib.Path('{{justfile_directory()}}')
@@ -64,8 +99,8 @@ _packages *packages: _package_docs
             '-D', 'language=en',
             '-D', f'package={package}',
             # llms.txt is only generated in the final combined pass (the `html` recipe).
-            # Leaving it enabled here triggers a nested base-mode build that regenerates the
-            # interface reference docs, deleting the placeholder this package pass depends on.
+            # Enabling it here would trigger a nested base-mode build that the
+            # intermediate package passes don't need.
             '-D', 'llms_txt_enabled=0',
             '-D', 'suppress_warnings=ref.ref,ref.doc,myst.xref_missing',
             '.', str(outdir),
@@ -94,13 +129,13 @@ _packages *packages: _package_docs
 help:
     @just --list docs --unsorted
 
-[doc('Watch, build, and serve the docs -- does not rebuild package reference docs automatically.')]
-run: _packages
+[doc('Watch, build, and serve the docs -- does not rebuild package or interface reference docs automatically.')]
+run: _interface_docs _packages
     uvx --with-requirements=_dev/requirements.txt --from=sphinx \
         sphinx-autobuild --watch .. --ignore '**/generated/*' -b dirhtml -D llms_txt_enabled=0 . '{{build_dir}}/html'
 
 [doc('Check links.')]
-linkcheck *sphinx_args: _packages
+linkcheck *sphinx_args: _interface_docs _packages
     uvx --with-requirements=_dev/requirements.txt --from=sphinx \
         sphinx-build -b linkcheck . '{{build_dir}}' {{sphinx_args}}
 

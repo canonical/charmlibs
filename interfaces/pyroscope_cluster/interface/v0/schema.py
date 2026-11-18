@@ -1,14 +1,8 @@
-"""This file defines the schemas for the provider and requirer sides of this relation interface.
-
-It must expose two interfaces.schema_base.DataBagSchema subclasses called:
-- ProviderSchema
-- RequirerSchema
-"""
+"""This file defines the schemas for the provider and requirer sides of this relation interface."""
 
 from enum import Enum
 
-from interface_tester.schema_base import DataBagSchema
-from pydantic import BaseModel, Field, Json
+from pydantic import BaseModel, Field
 from typing_extensions import TypedDict
 
 
@@ -18,43 +12,39 @@ class RemoteWriteEndpoint(TypedDict):
     url: str
 
 
-class PyroscopeClusterProviderAppData(BaseModel):
-    """PyroscopeClusterProviderAppData."""
-
-    worker_config: Json[str] = Field(
+class ProviderAppData(BaseModel):
+    worker_config: str = Field(
         description="The pyroscope configuration that the requirer should run with."
         "Yaml-encoded. Must conform to the schema that the presently deployed "
         "workload version supports; for example see: "
         "https://grafana.com/docs/pyroscope/latest/configuration/#configure-pyroscope."
     )
-    loki_endpoints: Json[dict[str, str]] | None = Field(
+    loki_endpoints: dict[str, str] | None = Field(
         default=None,
         description="List of loki-push-api endpoints to which the worker node can push any logs it generates.",
     )
-    charm_tracing_receivers: Json[dict[str, str]] | None = Field(
+    charm_tracing_receivers: dict[str, str] | None = Field(
         default=None,
         description="Endpoints to which the the worker can push charm traces to.",
     )
-    workload_tracing_receivers: Json[dict[str, str]] | None = Field(
+    workload_tracing_receivers: dict[str, str] | None = Field(
         default=None,
         description="Endpoints to which the the worker can push workload traces to.",
     )
-    remote_write_endpoints: Json[list[RemoteWriteEndpoint]] | None = Field(
+    remote_write_endpoints: list[RemoteWriteEndpoint] | None = Field(
         default=None,
         description="Endpoints to which the workload (and the worker charm) can push metrics to.",
     )
-    worker_ports: Json[list[int]] | None = Field(
+    worker_ports: list[int] | None = Field(
         default=None,
         description="Ports that the worker should open. "
         "If not provided, the worker will open all the legacy ones.",
     )
-    ca_cert: Json[str] | None = Field(
-        default=None, description="CA certificate for tls encryption."
-    )
-    server_cert: Json[str] | None = Field(
+    ca_cert: str | None = Field(default=None, description="CA certificate for tls encryption.")
+    server_cert: str | None = Field(
         default=None, description="Server certificate for tls encryption."
     )
-    privkey_secret_id: Json[str] | None = Field(
+    privkey_secret_id: str | None = Field(
         default=None,
         description="Private key used by the coordinator, for tls encryption.",
     )
@@ -72,11 +62,9 @@ class _Topology(BaseModel):
     unit: str | None
 
 
-class PyroscopeClusterRequirerUnitData(BaseModel):
-    """PyroscopeClusterRequirerUnitData."""
-
-    juju_topology: Json[_Topology]
-    address: Json[str]
+class RequirerUnitData(BaseModel):
+    juju_topology: _Topology
+    address: str
 
 
 class PyroscopeRole(str, Enum):
@@ -100,20 +88,8 @@ class PyroscopeRole(str, Enum):
     store_gateway = "store-gateway"
 
 
-class PyroscopeClusterRequirerAppData(BaseModel):
-    """PyroscopeClusterRequirerAppData."""
-
-    role: Json[PyroscopeRole]
+class RequirerAppData(BaseModel):
+    role: PyroscopeRole
 
 
-class ProviderSchema(DataBagSchema):
-    """The schema for the provider side of this interface."""
-
-    app: PyroscopeClusterProviderAppData
-
-
-class RequirerSchema(DataBagSchema):
-    """The schema for the requirer side of this interface."""
-
-    app: PyroscopeClusterRequirerAppData
-    unit: PyroscopeClusterRequirerUnitData
+ProviderUnitData = None

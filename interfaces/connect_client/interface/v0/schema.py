@@ -1,17 +1,32 @@
-"""This file defines the schemas for the provider and requirer sides  of `connect_client` charm relation interface.
+"""This file defines the schemas for the provider and requirer sides  of `connect_client` charm relation interface."""
 
-It exposes two interfaces.schema_base.DataBagSchema subclasses called:
-- ProviderSchema
-- RequirerSchema
-"""
+import json
+from typing import Any
 
-from interface_tester.schema_base import DataBagSchema
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
 
 PLUGIN_URL_NOT_REQUIRED = "NOT-REQUIRED"
 
 
-class ConnectProviderData(BaseModel):
+class _BareStringDatabag(BaseModel):
+    """Base class for databag models that don't strictly JSON encode all entries."""
+
+    @staticmethod
+    def __juju_decoder__(value: str) -> str:
+        """Pass Juju's string through unmodified to be decoded by individual field validators."""
+        return value
+
+    @staticmethod
+    def __juju_encoder__(value: str | None) -> str:
+        """Convert `None` to "", erasing the value; Ops will error on a non-string."""
+        return "" if value is None else value
+
+
+class ProviderAppData(_BareStringDatabag):
+    """The provider's application databag."""
+
+    model_config = ConfigDict(strict=True, populate_by_name=True)
+
     endpoints: str = Field(
         description="A comma-separated list of Kafka Connect REST endpoint(s), including the protocol (either `http` or `https`)",
         examples=["http://10.1.1.100:8083,http://10.1.1.101:8083,http://10.1.1.102:8083"],
@@ -32,7 +47,11 @@ class ConnectProviderData(BaseModel):
     )
 
 
-class ConnectRequirerData(BaseModel):
+class RequirerAppData(_BareStringDatabag):
+    """The requirer's application databag."""
+
+    model_config = ConfigDict(strict=True, populate_by_name=True)
+
     plugin_url: str = Field(
         description=f'URL at which the plugins required by this client are served as a single Tarball. If not required, the requirer should place the sentinel value "{PLUGIN_URL_NOT_REQUIRED}"',
         alias="plugin-url",
@@ -41,19 +60,24 @@ class ConnectRequirerData(BaseModel):
     )
     requested_secrets: list[str] = Field(
         alias="requested-secrets",
-        description="Any provider field which should be transfered as Juju Secret",
+        description="Any provider field which should be transfered as Juju Secret. A JSON array on the wire.",
         examples=[["username", "password", "tls-ca"]],
         title="Requested secrets",
     )
 
+    @field_validator("requested_secrets", mode="before")
+    @classmethod
+    def _load_json(cls, value: Any) -> Any:
+        if not isinstance(value, str):
+            return value  # __init__ argument was already deserialized.
+        return json.loads(value)
 
-class ProviderSchema(DataBagSchema):
-    """The schema for the provider side of the `connect_client` interface."""
+    @field_serializer("requested_secrets")
+    def _dump_json(self, value: object) -> str | None:
+        if value is None:
+            return None
+        return json.dumps(value)
 
-    app: ConnectProviderData
 
-
-class RequirerSchema(DataBagSchema):
-    """The schema for the requirer side of the `connect_client` interface."""
-
-    app: ConnectRequirerData
+ProviderUnitData = None
+RequirerUnitData = None

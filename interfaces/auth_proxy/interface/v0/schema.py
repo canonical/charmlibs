@@ -1,10 +1,7 @@
 """This file defines the schemas for the provider and requirer sides of the auth_proxy interface.
-It exposes two interfaces.schema_base.DataBagSchema subclasses called:
-- ProviderSchema
-- RequirerSchema
 
 Examples:
-    RequirerSchema:
+    Requirer:
         unit: <empty>
         app: {
           "providers": [
@@ -14,16 +11,15 @@ Examples:
           ]
         }
 
-    ProviderSchema:
+    Provider:
         unit: <empty>
         app: <empty>
 """
 
-from interface_tester.schema_base import DataBagSchema
 from pydantic import AnyHttpUrl, BaseModel, Field
 
 
-class AuthProxyRequirer(BaseModel):
+class RequirerAppData(BaseModel):
     protected_urls: list[AnyHttpUrl] = Field(
         description="List of urls to be protected by Identity and Access Proxy."
     )
@@ -35,11 +31,6 @@ class AuthProxyRequirer(BaseModel):
     )
 
 
-class ProviderSchema(DataBagSchema):
-    """Provider schema for auth_proxy."""
-
-
-class RequirerSchema(DataBagSchema):
-    """Requirer schema for auth_proxy."""
-
-    app: AuthProxyRequirer
+ProviderAppData = None
+ProviderUnitData = None
+RequirerUnitData = None

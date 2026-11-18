@@ -186,6 +186,12 @@ extensions = [
     *local_extensions,
 ]
 
+# sphinx-last-updated-by-git: don't look for Git timestamps in the .save directory, where the
+# package_docs extension stores per-package doctree pickles. The pickles are untracked, so
+# there's no timestamp to get from them, and missing ones would otherwise each emit a warning
+# (which fails the -W build) until a full `just docs` run has built every package.
+git_exclude_patterns = ['.save/**']
+
 # Custom MyST syntax extensions; see
 # https://myst-parser.readthedocs.io/en/latest/syntax/optional.html
 # NOTE: By default, the following MyST extensions are enabled:
@@ -198,6 +204,12 @@ intersphinx_mapping = {
     'juju': ('https://documentation.ubuntu.com/juju/3.6', None),
     'charmcraft': ('https://documentation.ubuntu.com/charmcraft/latest', None),
 }
+# The docs recipes download each inventory once up front (the `_inventories` recipe in docs.just),
+# as the parallel per-package builds fetching them simultaneously get connections reset.
+if _inventory_dir := os.environ.get('CHARMLIBS_DOCS_INVENTORY_DIR'):
+    for _name, (_url, _) in intersphinx_mapping.items():
+        _inventory = pathlib.Path(__file__).parent / _inventory_dir / f'{_name}.inv'
+        intersphinx_mapping[_name] = (_url, str(_inventory))
 
 maximum_signature_line_length = 80
 add_function_parentheses = False  # don't automatically add parentheses after func and method refs
@@ -258,6 +270,7 @@ autodoc_default_options = {
         '__dataclass_fields__,'
         '__dataclass_params__,'
         '__delattr__,'
+        '__final__,'
         '__firstlineno__,'
         '__hash__,'
         '__init__,'

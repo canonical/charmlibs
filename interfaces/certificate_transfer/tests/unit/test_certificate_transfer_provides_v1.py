@@ -12,6 +12,10 @@ from charmlibs.interfaces.certificate_transfer import (
     CertificateTransferProvides,
 )
 
+# Enough certificates that an unsorted (set iteration) order is overwhelmingly unlikely
+# to coincide with sorted order by chance.
+UNSORTED_CERTIFICATES = [f"certificate{i:02d}" for i in range(20, 0, -1)]
+
 
 class DummyCertificateTransferProviderCharm(CharmBase):
     def __init__(self, *args: Any):
@@ -764,3 +768,84 @@ the databags except using the public methods in the provider library and use ver
             "certificate1",
             "certificate2",
         }
+
+    def test_given_v1_requirer_when_add_certificates_then_app_databag_is_sorted(self):
+        existing = UNSORTED_CERTIFICATES[:10]
+        added = UNSORTED_CERTIFICATES[10:]
+        relation = scenario.Relation(
+            endpoint="certificate_transfer",
+            interface="certificate_transfer",
+            remote_app_data={"version": "1"},
+            local_app_data={"certificates": json.dumps(existing)},
+        )
+        state_in = scenario.State(leader=True, relations=[relation])
+
+        state_out = self.ctx.run(
+            self.ctx.on.action("add-certificates", params={"certificates": ", ".join(added)}),
+            state_in,
+        )
+
+        app_data = state_out.get_relation(relation.id).local_app_data
+        assert app_data["certificates"] == json.dumps(sorted(UNSORTED_CERTIFICATES))
+
+    def test_given_v1_requirer_when_remove_certificate_then_app_databag_is_sorted(self):
+        relation = scenario.Relation(
+            endpoint="certificate_transfer",
+            interface="certificate_transfer",
+            remote_app_data={"version": "1"},
+            local_app_data={"certificates": json.dumps(UNSORTED_CERTIFICATES)},
+        )
+        state_in = scenario.State(leader=True, relations=[relation])
+
+        state_out = self.ctx.run(
+            self.ctx.on.action("remove-certificate", params={"certificate": "certificate05"}),
+            state_in,
+        )
+
+        expected = sorted(c for c in UNSORTED_CERTIFICATES if c != "certificate05")
+        app_data = state_out.get_relation(relation.id).local_app_data
+        assert app_data["certificates"] == json.dumps(expected)
+
+    def test_given_v0_requirer_when_add_certificates_then_databags_are_sorted(self):
+        relation = scenario.Relation(
+            endpoint="certificate_transfer",
+            interface="certificate_transfer",
+            remote_app_data={"version": "0"},
+        )
+        state_in = scenario.State(leader=True, relations=[relation])
+
+        state_out = self.ctx.run(
+            self.ctx.on.action(
+                "add-certificates",
+                params={"certificates": ", ".join(UNSORTED_CERTIFICATES)},
+            ),
+            state_in,
+        )
+
+        expected = sorted(UNSORTED_CERTIFICATES)
+        relation_out = state_out.get_relation(relation.id)
+        assert relation_out.local_app_data["certificates"] == json.dumps(expected)
+        assert relation_out.local_unit_data["chain"] == json.dumps(expected)
+        assert relation_out.local_unit_data["ca"] == json.dumps(expected[0])
+        assert relation_out.local_unit_data["certificate"] == json.dumps(expected[0])
+
+    def test_given_same_certificates_in_different_order_when_add_then_databag_unchanged(self):
+        expected = json.dumps(sorted(UNSORTED_CERTIFICATES))
+        relation = scenario.Relation(
+            endpoint="certificate_transfer",
+            interface="certificate_transfer",
+            remote_app_data={"version": "1"},
+            local_app_data={"certificates": expected, "version": "1"},
+        )
+        state_in = scenario.State(leader=True, relations=[relation])
+
+        state_out = self.ctx.run(
+            self.ctx.on.action(
+                "add-certificates",
+                params={"certificates": ", ".join(UNSORTED_CERTIFICATES)},
+            ),
+            state_in,
+        )
+
+        app_data = state_out.get_relation(relation.id).local_app_data
+        assert app_data == {"certificates": expected, "version": "1"}
