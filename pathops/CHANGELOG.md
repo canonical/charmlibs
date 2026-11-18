@@ -1,3 +1,7 @@
+# 1.4.1 - 10 November 2026
+
+`ContainerPath.is_symlink`, `rmdir` and `unlink` now treat the path's name literally, rather than as a glob pattern. Previously, names containing `*`, `?`, `[` or `\` could match the wrong entry, or none, and a name matching several entries raised an `AssertionError`.
+
 # 1.4.0 - 9 November 2026
 
 `ContainerPath` now provides `is_relative_to` and `with_stem`, matching `pathlib.Path` on Python 3.9+.
