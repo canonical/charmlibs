@@ -126,7 +126,7 @@ class ExternalIdpProvider(BaseModel):
         return v
 
 
-class ProviderAppAData(BaseModel):
+class ProviderAppData(BaseModel):
     providers: list[ExternalIdpProvider]
 
 

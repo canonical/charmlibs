@@ -18,7 +18,7 @@ jobs:
           persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e  # v10.3.2
 
       # We could store per-package coverage from the regular CI runs and merge
       # them here, but this is cheap to do fresh and keeps the TICS run
@@ -61,7 +61,7 @@ jobs:
           pip install flake8 pylint -r requirements.txt --break-system-packages
 
       - name: TICS GitHub Action
-        uses: tiobe/tics-github-action@06afa6781ba53ab58efbe766d41d84febad1f683  # v4.0.0
+        uses: tiobe/tics-github-action@48afe561ae55edd1e1ec484505dba636e90ba0a6  # v4.1.0
         with:
           mode: qserver
           viewerUrl: https://canonical.tiobe.com/tiobeweb/TICS/api/cfg?name=default

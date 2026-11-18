@@ -29,6 +29,35 @@ The library renews certificates without any code in the requirer charm:
 
 The requiring charm only ever has to handle `certificate_available`; the rest is managed by the library.
 
+### Inferring certificate status in a reconciler
+
+**Removing a certificate from relation data during renewal does not invalidate it.**
+Two read-only APIs distinguish issuance from the condition of an installed certificate:
+
+- `get_request_status(attributes)` returns `AVAILABLE` when the current CSR has a valid
+  certificate and matching key, `PENDING` when awaiting issuance, or `UNAVAILABLE` otherwise.
+- `get_certificate_status(certificate)` returns `VALID`, `EXPIRED`, `WITHDRAWN`, or
+  `NOT_YET_VALID` for a certificate supplied by the caller.
+
+During renewal, request status is `PENDING`, but the installed certificate may remain `VALID`.
+Do not remove it merely because the assigned-certificate getter returns nothing:
+
+```python
+from charmlibs.interfaces.tls_certificates import CertificateStatus
+
+installed = self._read_workload_certificate()  # Certificate or None
+if (
+    installed is not None
+    and self.certificates.get_certificate_status(installed) != CertificateStatus.VALID
+):
+    self._remove_cert_files()
+```
+
+The workload methods are charm-specific. Read request status after syncing; application requests
+are visible only to the leader. Validity checks cover dates and currently advertised withdrawal,
+not trust chains or CRL/OCSP. Withdrawal history is not retained. Renewal, secret handling,
+and existing getters are unchanged; TLS teardown remains the charm's responsibility.
+
 ## Private key handling
 
 The library never transmits the requirer's private key over the relation. Only CSRs and the resulting certificates cross the relation; the private key stays inside the requiring charm's data.

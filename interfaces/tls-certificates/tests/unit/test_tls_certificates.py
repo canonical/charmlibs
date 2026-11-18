@@ -31,8 +31,25 @@ from charmlibs.interfaces.tls_certificates import (
     generate_private_key,
 )
 from charmlibs.interfaces.tls_certificates._tls_certificates import (
+    _CertificateSigningRequest,
     _ProviderApplicationData,
+    _RequirerData,
 )
+
+
+@pytest.mark.parametrize("ca", [False, True])
+def test_requirer_data_dump_preserves_ca(ca: bool):
+    data = _RequirerData(
+        certificate_signing_requests=[
+            _CertificateSigningRequest(certificate_signing_request="csr", ca=ca)
+        ]
+    )
+
+    databag = data.dump()
+
+    assert json.loads(databag["certificate_signing_requests"]) == [
+        {"certificate_signing_request": "csr", "ca": ca}
+    ]
 
 
 def validate_induced_data_from_pfx_is_equal_to_initial_data(

@@ -34,9 +34,10 @@ if typing.TYPE_CHECKING:
 # Otherwise the call is assumed to raise NotInstalledError.
 EXCLUDE = {
     'alias',  # Only operates on installed snaps.
+    'ensure_vitality_hint',  # Only touches system config.
+    'system_info',  # Names no snap.
     'unalias',  # Only operates on installed snaps.
     'unhold',  # Only operates on installed snaps.
-    'ensure_vitality_hint',  # Only touches system config.
 }
 CALLS: dict[str, Callable[[], object]] = {
     'connect': lambda: snap.connect(('lxd', 'home')),

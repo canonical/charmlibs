@@ -7,11 +7,22 @@
 
 # infra
 /.github/ @canonical/charmlibs-maintainers
+/.gitignore @canonical/charmlibs-maintainers
+/.scripts/ @canonical/charmlibs-maintainers
+/.template/ @canonical/charmlibs-maintainers
+/.vscode/ @canonical/charmlibs-maintainers
+/.workshop/ @canonical/charmlibs-maintainers
+/AGENTS.md @canonical/charmlibs-maintainers
+/CODE_OF_CONDUCT.md @canonical/charmlibs-maintainers
+/CONTRIBUTING.md @canonical/charmlibs-maintainers
 /docs.just @canonical/charmlibs-maintainers
 /justfile @canonical/charmlibs-maintainers
 /LICENSE @canonical/charmlibs-maintainers
 /pyproject.toml @canonical/charmlibs-maintainers
+/schema-requirements.txt @canonical/charmlibs-maintainers
 /SECURITY.md @canonical/charmlibs-maintainers
+/test-requirements.txt @canonical/charmlibs-maintainers
+/uv.lock @canonical/charmlibs-maintainers
 
 # docs
 /.docs/ @canonical/charmlibs-maintainers
@@ -21,6 +32,11 @@
 # namespace reservation
 /.package/ @canonical/charmlibs-maintainers
 /interfaces/.package/ @canonical/charmlibs-maintainers
+
+# generated examples (kept in sync with the template by CI)
+/.example/ @canonical/charmlibs-maintainers
+/.tutorial/ @canonical/charmlibs-maintainers
+/interfaces/.example/ @canonical/charmlibs-maintainers
 
 # interfaces/index.json doesn't require CODEOWNERS review as its contents are validated in CI
 /interfaces/index.json
@@ -40,7 +56,7 @@
 # charmlibs.interfaces packages (alphabetical)
 
 # /interfaces/auth_proxy/
-/interfaces/auth_proxy @canonical/identity
+/interfaces/auth_proxy/ @canonical/identity
 
 # /interfaces/azure_service_principal/
 /interfaces/azure_service_principal/interface/ @canonical/data
@@ -114,10 +130,10 @@
 /interfaces/fiveg_rfsim/ruff.toml @canonical/charmlibs-maintainers
 
 # /interfaces/forward_auth/
-/interfaces/forward_auth @canonical/identity
+/interfaces/forward_auth/ @canonical/identity
 
 # /interfaces/gateway_metadata/
-/interfaces/gateway_metadata @canonical/service-mesh
+/interfaces/gateway_metadata/ @canonical/service-mesh
 
 # /interfaces/ingress/
 /interfaces/ingress/interface/ @canonical/platform-engineering
@@ -126,15 +142,16 @@
 # /interfaces/ingress_per_unit/
 /interfaces/ingress_per_unit/interface/ @canonical/platform-engineering
 /interfaces/ingress_per_unit/ruff.toml @canonical/platform-engineering
+
 # /interfaces/ip_router/
 /interfaces/ip_router/interface/ @canonical/charmlibs-maintainers
 /interfaces/ip_router/ruff.toml @canonical/charmlibs-maintainers
 
 # /interfaces/istio_ingress_route/
-/interfaces/istio_ingress_route @canonical/service-mesh
+/interfaces/istio_ingress_route/ @canonical/service-mesh
 
 # /interfaces/istio_metadata/
-/interfaces/istio_metadata @canonical/service-mesh
+/interfaces/istio_metadata/ @canonical/service-mesh
 
 # /interfaces/istio_request_auth/
 /interfaces/istio_request_auth/ @canonical/service-mesh
@@ -271,11 +288,14 @@
 /interfaces/sloth/ @canonical/tracing-and-profiling
 
 # /interfaces/service_mesh/
-/interfaces/service_mesh @canonical/service-mesh
+/interfaces/service_mesh/ @canonical/service-mesh
 
 # /interfaces/smtp/
-/interfaces/smtp/interface/ @canonical/platform-engineering
-/interfaces/smtp/ruff.toml @canonical/platform-engineering
+/interfaces/smtp/ @canonical/platform-engineering-emea 
+
+# /interfaces/spark_service_account/
+/interfaces/spark_service_account/interface/ @canonical/processing
+/interfaces/spark_service_account/ruff.toml @canonical/processing
 
 # /interfaces/tempo_cluster/
 /interfaces/tempo_cluster/interface/ @canonical/tracing-and-profiling
@@ -285,8 +305,7 @@
 /interfaces/tls-certificates/ @canonical/tls
 
 # /interfaces/tracing/
-/interfaces/tracing/interface/ @canonical/tracing-and-profiling
-/interfaces/tracing/ruff.toml @canonical/tracing-and-profiling
+/interfaces/tracing/ @canonical/tracing-and-profiling
 
 # /interfaces/vault-autounseal/
 /interfaces/vault-autounseal/interface/ @canonical/tls
@@ -310,3 +329,7 @@
 # /interfaces/wazuh_api_client/
 /interfaces/wazuh_api_client/interface/ @canonical/platform-engineering
 /interfaces/wazuh_api_client/ruff.toml @canonical/platform-engineering
+
+# /interfaces/zookeeper/
+/interfaces/zookeeper/interface/ @canonical/data-bigdata
+/interfaces/zookeeper/ruff.toml @canonical/data-bigdata
