@@ -90,8 +90,8 @@ Use these fields:
 | Field | Description |
 |-------|-------------|
 | `name` | The interface name, exactly as it appears in `charmcraft.yaml`. |
-| `version` | The major version of this interface, recorded for historical purposes for existing interfaces. New interfaces should use version 1. |
-| `status` | One of `draft`, `published`, or `retired`. Use `draft` for work in progress, `published` for a released interface, and `retired` for interfaces that are no longer recommended for use. |
+| `version` | The major version of this interface, recorded for historical purposes for existing interfaces. New interfaces should use version 0 and avoid creating additional versions. |
+| `status` | Use `published` for a new interface. Some older interface definitions use `draft` and should instead use `published` if a charm has been published that uses the interface. Mark an interface as `retired` only if no supported charms use it. |
 | `lib` | The import path of the recommended `charmlibs.interfaces.<interface name>` library, when one exists. Otherwise the identifier for the legacy Charmhub-hosted library, without its version specifier: `charms.<charm>.<lib name>`. |
 | `summary` | A one-line description without any formatting, shown in the interfaces table on Charmhub. |
 | `description` | A longer description, interpreted as Markdown, and shown on the interface page on Charmhub. |
