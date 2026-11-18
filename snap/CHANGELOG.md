@@ -1,3 +1,7 @@
+# 2.2.0 - 18 November 2026
+
+Add `ensure_vitality_hint`, a helper to ensure the specified snap is listed in snapd's [resilience.vitality-hint](https://snapcraft.io/docs/reference/administration/system-options/#system-resilience-vitality-hint), which configures the Linux kernel's out-of-memory killer to reduce the likelihood of the snap's services being killed when memory pressure is high.
+
 # 2.1.0 - 17 November 2026
 
 Add `system_info()`, which returns a `SystemInfo` object with information about the system as reported by snapd (`GET /v2/system-info`). It currently exposes a single field, `architecture`: the architecture snapd and the snap store use to pick snap revisions, in Debian/snap naming (for example `amd64`, `arm64`, `ppc64el`, `s390x`), suitable for keying per-architecture data such as pinned snap revisions.
