@@ -1,6 +1,6 @@
 name: {{ cookiecutter.project_slug }}
 version: 0
-status: draft
+status: published
 {%- if cookiecutter._definition_only %}
 # lib: charms.<charm>.<module>  # the library for this interface, if there is one
 {%- else %}

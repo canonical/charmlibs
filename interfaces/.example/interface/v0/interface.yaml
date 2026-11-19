@@ -1,6 +1,6 @@
 name: example-interface
 version: 0
-status: draft
+status: published
 lib: charmlibs.interfaces.example_interface
 summary: One line saying what the interface is for.
 description: |
