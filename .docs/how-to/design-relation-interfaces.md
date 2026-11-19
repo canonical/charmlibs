@@ -1,7 +1,7 @@
 ---
 myst:
   html_meta:
-    description: Follow the design rules for relation interfaces between charms, so that interfaces can evolve without causing breaking changes or downtime. 
+    description: Follow the design rules for relation interfaces between charms, so that interfaces can evolve without causing breaking changes or downtime.
 ---
 
 (design-relation-interfaces)=
@@ -28,6 +28,8 @@ When the interface evolves, some version of the library has to support both the 
 ### Charm-facing API
 
 The relation data format is a long-lived contract, while the charm-facing library API is easier to change. Design the charm-facing API and relation data format separately from the start.
+
+Read more: {ref}`design-interface-library-apis`
 
 ### Unit tests
 
@@ -102,9 +104,9 @@ def test_invalid_field_types(bad_value: Any):
 Top-level fields must not be mandatory. Any and all top-level fields may be absent in the relation data, and it must still parse cleanly.
 
 This implies that the empty relation data must have a valid representation in the interface model.
-In practice, use a single model for both reading and writing.
-That means the writer will use the model's default values when writing the relation data.
-Readers must therefore handle both representations: a field may be absent, or it may be present with the default value.
+Describe each databag with a single schema that's valid for both reading and writing.
+A writer may omit a field, or write the field's default value, so the two must mean the same thing.
+Readers must therefore treat an absent field as having its default value.
 
 For new interfaces, prefer representing an absent field as `None`.
 This keeps the model straightforward and makes the missing-value convention easy to read in both code and tests.
