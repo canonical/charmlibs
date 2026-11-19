@@ -16,7 +16,9 @@
 
 """Unit tests for the just script."""
 
+import os
 import pathlib
+from collections.abc import Callable, Sequence
 from unittest.mock import patch
 
 import just
@@ -77,6 +79,306 @@ class TestUVCmd:
             'foo',
             'pytest',
         ]
+
+    def test_with_resolution_omits_locked(self, tmp_path: pathlib.Path):
+        (tmp_path / 'pyproject.toml').touch()
+        (tmp_path / 'uv.lock').touch()
+        result = just._uv_cmd(
+            ['pytest'], pkg_dir=tmp_path, python='3.12', groups=[], resolution='lowest-direct'
+        )
+        assert '--locked' not in result
+        assert result == [
+            'uv',
+            'run',
+            '--with-requirements',
+            self.test_reqs,
+            '--python',
+            '3.12',
+            '--resolution=lowest-direct',
+            'pytest',
+        ]
+
+    @pytest.mark.parametrize('resolution', ['highest', 'lowest', 'lowest-direct'])
+    def test_with_resolution_no_lock(self, tmp_path: pathlib.Path, resolution: str):
+        (tmp_path / 'pyproject.toml').touch()
+        result = just._uv_cmd(
+            ['pytest'], pkg_dir=tmp_path, python='3.12', groups=[], resolution=resolution
+        )
+        assert f'--resolution={resolution}' in result
+        assert '--locked' not in result
+
+    def test_no_sync(self, tmp_path: pathlib.Path):
+        (tmp_path / 'pyproject.toml').touch()
+        (tmp_path / 'uv.lock').touch()
+        result = just._uv_cmd(['pytest'], pkg_dir=tmp_path, python='3.12', no_sync=True)
+        assert '--no-sync' in result
+        assert '--locked' not in result
+        assert not any(str(part).startswith('--resolution') for part in result)
+
+    def test_no_sync_and_resolution_are_exclusive(self, tmp_path: pathlib.Path):
+        (tmp_path / 'pyproject.toml').touch()
+        with pytest.raises(ValueError):
+            just._uv_cmd(
+                [], pkg_dir=tmp_path, python='3.12', resolution='lowest-direct', no_sync=True
+            )
+
+
+class TestResolutionSandbox:
+    def test_restores_modified_lock(self, tmp_path: pathlib.Path):
+        lock = tmp_path / 'uv.lock'
+        lock.write_bytes(b'original')
+        with just._resolution_sandbox(tmp_path, 'lowest-direct'):
+            lock.write_bytes(b'mutated')
+        assert lock.read_bytes() == b'original'
+
+    def test_leaves_unmodified_lock_untouched(self, tmp_path: pathlib.Path):
+        lock = tmp_path / 'uv.lock'
+        lock.write_bytes(b'original')
+        with just._resolution_sandbox(tmp_path, 'lowest-direct'):
+            pass
+        assert lock.read_bytes() == b'original'
+
+    def test_no_resolution_does_nothing(
+        self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.delenv('UV_PROJECT_ENVIRONMENT', raising=False)
+        lock = tmp_path / 'uv.lock'
+        lock.write_bytes(b'original')
+        with just._resolution_sandbox(tmp_path, None):
+            assert 'UV_PROJECT_ENVIRONMENT' not in os.environ
+            lock.write_bytes(b'mutated')
+        assert lock.read_bytes() == b'mutated'
+
+    def test_no_lock_file_is_not_created(self, tmp_path: pathlib.Path):
+        with just._resolution_sandbox(tmp_path, 'lowest-direct'):
+            pass
+        assert not (tmp_path / 'uv.lock').exists()
+
+    def test_removes_a_lock_file_it_created(self, tmp_path: pathlib.Path):
+        with just._resolution_sandbox(tmp_path, 'lowest-direct'):
+            (tmp_path / 'uv.lock').write_bytes(b'created')
+        assert not (tmp_path / 'uv.lock').exists()
+
+    def test_restores_on_exception(self, tmp_path: pathlib.Path):
+        lock = tmp_path / 'uv.lock'
+        lock.write_bytes(b'original')
+        with pytest.raises(RuntimeError, match='boom'):
+            with just._resolution_sandbox(tmp_path, 'lowest-direct'):
+                lock.write_bytes(b'mutated')
+                raise RuntimeError('boom')
+        assert lock.read_bytes() == b'original'
+
+    def test_uses_a_temporary_project_environment(
+        self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.delenv('UV_PROJECT_ENVIRONMENT', raising=False)
+        with just._resolution_sandbox(tmp_path, 'lowest-direct'):
+            venv = pathlib.Path(os.environ['UV_PROJECT_ENVIRONMENT'])
+            assert not venv.is_relative_to(tmp_path)
+            assert venv.parent.is_dir()
+        assert 'UV_PROJECT_ENVIRONMENT' not in os.environ
+        assert not venv.parent.exists()
+
+    def test_restores_existing_project_environment(self, tmp_path: pathlib.Path):
+        with patch.dict('os.environ', {'UV_PROJECT_ENVIRONMENT': 'mine'}):
+            with just._resolution_sandbox(tmp_path, 'lowest-direct'):
+                assert os.environ['UV_PROJECT_ENVIRONMENT'] != 'mine'
+            assert os.environ['UV_PROJECT_ENVIRONMENT'] == 'mine'
+
+    @pytest.mark.parametrize(
+        'recipe',
+        [just.check, just.lint, just.static, just.unit, just.functional, just.integration_k8s],
+    )
+    def test_recipes_use_the_sandbox(
+        self,
+        tmp_path: pathlib.Path,
+        monkeypatch: pytest.MonkeyPatch,
+        recipe: Callable[[list[str]], int],
+    ):
+        monkeypatch.delenv('UV_PROJECT_ENVIRONMENT', raising=False)
+        (tmp_path / 'pyproject.toml').touch()
+        lock = tmp_path / 'uv.lock'
+        lock.write_bytes(b'original')
+        project_envs: list[str | None] = []
+
+        def fake_run(cmd: Sequence[str], *, env: dict[str, str] | None = None, **_: object):
+            if any('--resolution=' in str(part) for part in cmd):
+                lock.write_bytes(b'mutated')
+                project_envs.append(
+                    (os.environ if env is None else env).get('UV_PROJECT_ENVIRONMENT')
+                )
+            return 0
+
+        monkeypatch.setattr(just, '_run', fake_run)
+        recipe(['--python', '3.12', '--resolution', 'lowest-direct', str(tmp_path)])
+        assert project_envs
+        assert all(project_envs)
+        assert lock.read_bytes() == b'original'
+
+
+class TestUnitLowestDirectFile:
+    def _run_unit(
+        self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch, resolution: str
+    ) -> list[list[str]]:
+        monkeypatch.delenv('UV_PROJECT_ENVIRONMENT', raising=False)
+        (tmp_path / 'pyproject.toml').write_text('[dependency-groups]\nunit = []')
+        (tmp_path / just.LOWEST_DIRECT_FILE).write_text('-e .\n')
+        cmds: list[list[str]] = []
+
+        def fake_run(cmd: Sequence[str | pathlib.Path], **_: object):
+            cmds.append([str(part) for part in cmd])
+            return 0
+
+        monkeypatch.setattr(just, '_run', fake_run)
+        just.unit(['--python', '3.12', '--resolution', resolution, str(tmp_path)])
+        return cmds
+
+    def test_lowest_direct_installs_the_file(
+        self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        cmds = self._run_unit(tmp_path, monkeypatch, 'lowest-direct')
+        assert cmds[0][:3] == ['uv', 'venv', '--quiet']
+        assert cmds[1][:3] == ['uv', 'pip', 'sync']
+        assert cmds[1][-1] == just.LOWEST_DIRECT_FILE
+        for cmd in cmds[2:]:
+            assert '--no-sync' in cmd
+            assert not any(part.startswith('--resolution') for part in cmd)
+
+    def test_highest_ignores_the_file(
+        self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        cmds = self._run_unit(tmp_path, monkeypatch, 'highest')
+        assert all(cmd[:2] == ['uv', 'run'] for cmd in cmds)
+        assert all('--resolution=highest' in cmd for cmd in cmds)
+
+
+class TestIsExample:
+    @pytest.mark.parametrize(
+        ('package', 'expected'),
+        [
+            ('.example', True),
+            ('.tutorial', True),
+            ('interfaces/.example', True),
+            ('interfaces/.example/testing', True),
+            ('pathops', False),
+            ('interfaces/tls-certificates', False),
+            ('interfaces/tls-certificates/testing', False),
+        ],
+    )
+    def test_ok(self, package: str, expected: bool):
+        assert just._is_example(package) is expected
+
+
+class TestReadExcludeNewer:
+    def test_ok(self, tmp_path: pathlib.Path):
+        path = tmp_path / just.LOWEST_DIRECT_FILE
+        path.write_text('# Generated\n# exclude-newer: 2026-01-02T03:04:05Z\nops==2.0\n')
+        assert just._read_exclude_newer(path) == '2026-01-02T03:04:05Z'
+
+    def test_missing_line(self, tmp_path: pathlib.Path):
+        path = tmp_path / just.LOWEST_DIRECT_FILE
+        path.write_text('ops==2.0\n')
+        assert just._read_exclude_newer(path) is None
+
+    def test_missing_file(self, tmp_path: pathlib.Path):
+        assert just._read_exclude_newer(tmp_path / just.LOWEST_DIRECT_FILE) is None
+
+
+class TestLowestDirect:
+    old = '2026-01-01T00:00:00Z'
+    now = '2026-06-01T00:00:00Z'
+
+    @pytest.fixture
+    def pkg(self, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> pathlib.Path:
+        monkeypatch.setattr(just, 'REPO_ROOT', tmp_path)
+        monkeypatch.setattr(just, '_now', lambda: self.now)
+        pkg_dir = tmp_path / 'pkg'
+        (pkg_dir / 'tests' / 'unit').mkdir(parents=True)
+        return pkg_dir
+
+    def _fake_export(
+        self, monkeypatch: pytest.MonkeyPatch, resolvable: Callable[[str], bool] = lambda _: True
+    ) -> list[str]:
+        calls: list[str] = []
+
+        def fake(package: str, exclude_newer: str, *, quiet: bool = False) -> str | None:
+            calls.append(exclude_newer)
+            return f'# exclude-newer: {exclude_newer}\n' if resolvable(exclude_newer) else None
+
+        monkeypatch.setattr(just, '_export_lowest_direct', fake)
+        return calls
+
+    def test_writes_a_new_file(self, pkg: pathlib.Path, monkeypatch: pytest.MonkeyPatch):
+        self._fake_export(monkeypatch)
+        assert just.lowest_direct(['pkg']) == 0
+        assert just._read_exclude_newer(pkg / just.LOWEST_DIRECT_FILE) == self.now
+
+    def test_keeps_the_existing_time(self, pkg: pathlib.Path, monkeypatch: pytest.MonkeyPatch):
+        (pkg / just.LOWEST_DIRECT_FILE).write_text(f'# exclude-newer: {self.old}\n')
+        calls = self._fake_export(monkeypatch)
+        assert just.lowest_direct(['pkg']) == 0
+        assert calls == [self.old]
+        assert just._read_exclude_newer(pkg / just.LOWEST_DIRECT_FILE) == self.old
+
+    def test_moves_on_if_the_existing_time_fails(
+        self, pkg: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        (pkg / just.LOWEST_DIRECT_FILE).write_text(f'# exclude-newer: {self.old}\n')
+        calls = self._fake_export(monkeypatch, resolvable=lambda t: t == self.now)
+        assert just.lowest_direct(['pkg']) == 0
+        assert calls == [self.old, self.now]
+        assert just._read_exclude_newer(pkg / just.LOWEST_DIRECT_FILE) == self.now
+
+    def test_upgrade(self, pkg: pathlib.Path, monkeypatch: pytest.MonkeyPatch):
+        (pkg / just.LOWEST_DIRECT_FILE).write_text(f'# exclude-newer: {self.old}\n')
+        calls = self._fake_export(monkeypatch)
+        assert just.lowest_direct(['--upgrade', 'pkg']) == 0
+        assert calls == [self.now]
+
+    def test_write_fails_if_unresolvable(self, pkg: pathlib.Path, monkeypatch: pytest.MonkeyPatch):
+        self._fake_export(monkeypatch, resolvable=lambda _: False)
+        assert just.lowest_direct(['pkg']) == 1
+        assert not (pkg / just.LOWEST_DIRECT_FILE).exists()
+
+    def test_check_up_to_date(self, pkg: pathlib.Path, monkeypatch: pytest.MonkeyPatch):
+        (pkg / just.LOWEST_DIRECT_FILE).write_text(f'# exclude-newer: {self.old}\n')
+        calls = self._fake_export(monkeypatch)
+        assert just.lowest_direct(['--check', 'pkg']) == 0
+        assert calls == [self.old]
+
+    def test_check_stale(self, pkg: pathlib.Path, monkeypatch: pytest.MonkeyPatch):
+        (pkg / just.LOWEST_DIRECT_FILE).write_text(f'# exclude-newer: {self.old}\nops==1\n')
+        self._fake_export(monkeypatch)
+        assert just.lowest_direct(['--check', 'pkg']) == 1
+        assert 'ops==1' in (pkg / just.LOWEST_DIRECT_FILE).read_text()  # not rewritten
+
+    def test_check_missing(self, pkg: pathlib.Path, monkeypatch: pytest.MonkeyPatch):
+        self._fake_export(monkeypatch)
+        assert just.lowest_direct(['--check', 'pkg']) == 1
+        assert not (pkg / just.LOWEST_DIRECT_FILE).exists()
+
+    def test_check_missing_and_unresolvable(
+        self, pkg: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        self._fake_export(monkeypatch, resolvable=lambda _: False)
+        assert just.lowest_direct(['--check', 'pkg']) == 0
+
+    def test_check_no_time(self, pkg: pathlib.Path, monkeypatch: pytest.MonkeyPatch):
+        (pkg / just.LOWEST_DIRECT_FILE).write_text('ops==1\n')
+        self._fake_export(monkeypatch)
+        assert just.lowest_direct(['--check', 'pkg']) == 1
+
+    @pytest.mark.parametrize('package', ['.example', 'no-unit-tests'])
+    def test_skips(self, pkg: pathlib.Path, monkeypatch: pytest.MonkeyPatch, package: str):
+        (pkg.parent / package).mkdir()
+        calls = self._fake_export(monkeypatch)
+        assert just.lowest_direct(['--check', package]) == 0
+        assert just.lowest_direct([package]) == 0
+        assert calls == []
+
+    def test_check_and_upgrade_are_exclusive(self, pkg: pathlib.Path):
+        with pytest.raises(SystemExit):
+            just.lowest_direct(['--check', '--upgrade', 'pkg'])
 
 
 class TestDependencyGroups:
@@ -252,6 +554,26 @@ class TestPackageParser:
         args = parser.parse_args(['foo'])
         assert args.python is None
         assert args.package == 'foo'
+        assert args.resolution is None
+
+    @pytest.mark.parametrize('resolution', ['highest', 'lowest', 'lowest-direct'])
+    def test_resolution_choice(self, resolution: str):
+        parser = just._package_parser(just.unit)
+        args = parser.parse_args(['--resolution', resolution, 'foo'])
+        assert args.resolution == resolution
+
+    def test_resolution_rejects_unknown(self, capsys: pytest.CaptureFixture[str]):
+        parser = just._package_parser(just.unit)
+        with pytest.raises(SystemExit):
+            parser.parse_args(['--resolution', 'bogus', 'foo'])
+        assert 'invalid choice' in capsys.readouterr().err
+
+    def test_without_resolution(self, capsys: pytest.CaptureFixture[str]):
+        parser = just._package_parser(just.combine_coverage, resolution=False)
+        assert parser.parse_args(['foo']).package == 'foo'
+        with pytest.raises(SystemExit):
+            parser.parse_args(['--resolution', 'lowest-direct', 'foo'])
+        assert 'unrecognized arguments' in capsys.readouterr().err
 
 
 class TestRun:

@@ -107,6 +107,7 @@ The `<package>` argument is the path from the repo root, e.g. `pathops` or `inte
 | `just docs html [packages]` | Build docs (including reference docs for all packages by default, or named ones -- run `just docs html -` to exclude all package reference docs (faster when working on docs only) |
 | `just docs` | Alias for `just docs html` |
 | `just add <package> <dep>` | Add a dependency to a library |
+| `just lowest-direct [packages]` | Regenerate `uv-lowest-direct.txt` (dependencies at their lower bounds) after changing dependencies; `--check` to verify |
 | `just init` | Scaffold a new general library |
 | `just init --interface` | Scaffold a new interface library |
 
@@ -124,6 +125,8 @@ just unit pathops -x -k test_copy   # stop on first failure, filter by name
 just add pathops 'pydantic>=2'
 just add interfaces/tls-certificates --requirements my-requirements.txt
 ```
+
+After changing a package's dependencies, run `just lowest-direct <package>` and commit the updated `uv-lowest-direct.txt`. CI fails if it's stale, and runs the unit tests against it (`just unit --resolution lowest-direct <package>`), so lower bounds must be ones the tests pass with.
 
 ## Test types
 
