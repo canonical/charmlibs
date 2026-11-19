@@ -45,8 +45,9 @@ def _fallback(app: sphinx.application.Sphinx) -> None:
         if not path.exists():
             path.write_text('')
     # Change logs live under reference/ rather than in their own top-level
-    # section, so the include file goes there too.
-    changelog_include = docs_dir / 'reference' / '_lib-changelog.md'
-    if not changelog_include.exists():
-        changelog_include.parent.mkdir(parents=True, exist_ok=True)
-        changelog_include.write_text('')
+    # section, with one include file per namespace.
+    for namespace in 'charmlibs', 'interfaces':
+        path = docs_dir / 'reference' / 'changelogs' / f'_lib-changelog-{namespace}.md'
+        if not path.exists():
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text('')

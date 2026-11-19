@@ -1,9 +1,11 @@
 (reference-changelogs)=
 # Change logs
 
-Every library in the [charmlibs monorepo](https://github.com/canonical/charmlibs) keeps its own change log next to its source in the repository. This page collects those change logs so that they are discoverable from the docs site without having to browse the repository.
+Every charmlibs package keeps a change log with an entry for each of its releases.
 
-Each library is versioned independently; follow the link for the library you're using to see its release history.
+```{toctree}
+:maxdepth: 2
 
-```{include} _lib-changelog.md
+changelogs/charmlibs
+changelogs/charmlibs-interfaces
 ```

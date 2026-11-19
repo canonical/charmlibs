@@ -36,11 +36,16 @@ def _app(confdir: pathlib.Path) -> sphinx.application.Sphinx:
     return typing.cast('sphinx.application.Sphinx', types.SimpleNamespace(confdir=str(confdir)))
 
 
+def _changelog_includes(confdir: pathlib.Path) -> list[pathlib.Path]:
+    changelogs = confdir / 'reference' / 'changelogs'
+    return [changelogs / f'_lib-changelog-{ns}.md' for ns in ('charmlibs', 'interfaces')]
+
+
 def test_fallback_writes_empty_include_when_missing(tmp_path: pathlib.Path):
     """Fallback writes empty include files when preprocessor hasn't run."""
     for category in CATEGORIES:
         (tmp_path / category).mkdir()
-    (tmp_path / 'reference').mkdir()
+    (tmp_path / 'reference' / 'changelogs').mkdir(parents=True)
 
     fallback._fallback(_app(tmp_path))
 
@@ -48,9 +53,9 @@ def test_fallback_writes_empty_include_when_missing(tmp_path: pathlib.Path):
         path = tmp_path / category / f'_lib-{category}.md'
         assert path.exists()
         assert path.read_text() == ''
-    changelog = tmp_path / 'reference' / '_lib-changelog.md'
-    assert changelog.exists()
-    assert changelog.read_text() == ''
+    for path in _changelog_includes(tmp_path):
+        assert path.exists()
+        assert path.read_text() == ''
 
 
 def test_fallback_skips_when_include_exists(tmp_path: pathlib.Path):
@@ -58,15 +63,17 @@ def test_fallback_skips_when_include_exists(tmp_path: pathlib.Path):
     for category in CATEGORIES:
         (tmp_path / category).mkdir()
         (tmp_path / category / f'_lib-{category}.md').write_text('existing')
-    (tmp_path / 'reference').mkdir()
-    (tmp_path / 'reference' / '_lib-changelog.md').write_text('existing-changelog')
+    (tmp_path / 'reference' / 'changelogs').mkdir(parents=True)
+    for path in _changelog_includes(tmp_path):
+        path.write_text('existing-changelog')
 
     fallback._fallback(_app(tmp_path))
 
     for category in CATEGORIES:
         path = tmp_path / category / f'_lib-{category}.md'
         assert path.read_text() == 'existing'
-    assert (tmp_path / 'reference' / '_lib-changelog.md').read_text() == 'existing-changelog'
+    for path in _changelog_includes(tmp_path):
+        assert path.read_text() == 'existing-changelog'
 
 
 def test_fallback_creates_reference_dir(tmp_path: pathlib.Path):
@@ -77,4 +84,5 @@ def test_fallback_creates_reference_dir(tmp_path: pathlib.Path):
 
     fallback._fallback(_app(tmp_path))
 
-    assert (tmp_path / 'reference' / '_lib-changelog.md').exists()
+    for path in _changelog_includes(tmp_path):
+        assert path.exists()
