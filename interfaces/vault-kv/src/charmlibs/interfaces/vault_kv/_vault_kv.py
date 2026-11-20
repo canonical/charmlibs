@@ -474,7 +474,7 @@ class VaultKvRequires(ops.Object):
         node by the underlying substrate without a change from Juju.
 
         Args:
-            relation: The relation object or the relation id.
+            relation: The relation object.
             egress_subnet: The egress subnets requesting the credentials for.
             nonce: The nonce that identifies the unit.
         """
