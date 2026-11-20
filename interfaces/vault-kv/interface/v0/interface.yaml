@@ -1,7 +1,7 @@
 name: vault-kv
 version: 0
 status: draft
-lib: charms.vault_k8s.vault_kv
+lib: charmlibs.interfaces.vault_kv
 summary: Securely share Vault credentials to interact with the Vault Key-Value (KV) backend.
 description: |
   The `vault-kv` interface allows the charms to securely request and receive the credentials needed to interact with the Key-Value (KV) backend of Vault.
