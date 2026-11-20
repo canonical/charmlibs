@@ -57,8 +57,6 @@ class VaultKvProviderCharm(CharmBase):
         pass
 
     def _on_set_kv_data_action(self, event: ActionEvent):
-        if not self.model.unit.is_leader():
-            return
         url = event.params.get("url", "")
         mount = event.params.get("mount", "")
         ca_certificate = event.params.get("ca-certificate", "")

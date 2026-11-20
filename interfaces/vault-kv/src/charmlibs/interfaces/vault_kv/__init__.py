@@ -67,7 +67,7 @@ is requiring a secret value store.
 
         def _on_connected(self, event: vault_kv.VaultKvConnectedEvent):
             relation = self.model.get_relation(event.relation_name, event.relation_id)
-            egress_subnets = [str(subnet) for subnet in self.model.get_binding(relation).network.egress_subnets][0].subnet]
+            egress_subnets = [str(subnet) for subnet in self.model.get_binding(relation).network.egress_subnets]
             egress_subnets.append(str(self.model.get_binding(relation).network.interfaces[0].subnet))
             self.interface.request_credentials(relation, egress_subnets, self.get_nonce())
 
@@ -108,9 +108,9 @@ is requiring a secret value store.
             # Update status might not be the best place
             binding = self.model.get_binding("vault-kv")
             if binding is not None:
-                egress_subnets = [str(subnet) for subnet in self.model.get_binding(relation).network.egress_subnets][0].subnet]
-                egress_subnets.append(str(self.model.get_binding(relation).network.interfaces[0].subnet))
                 relation = self.model.get_relation(relation_name="vault-kv")
+                egress_subnets = [str(subnet) for subnet in self.model.get_binding(relation).network.egress_subnets]
+                egress_subnets.append(str(self.model.get_binding(relation).network.interfaces[0].subnet))
                 self.interface.request_credentials(relation, egress_subnets, self.get_nonce())
 
         def get_nonce(self):
