@@ -312,8 +312,7 @@
 /interfaces/vault-autounseal/ruff.toml @canonical/tls
 
 # /interfaces/vault-kv/
-/interfaces/vault-kv/interface/ @canonical/tls
-/interfaces/vault-kv/ruff.toml @canonical/tls
+/interfaces/vault-kv/ @canonical/tls
 
 # /interfaces/valkey_client/
 /interfaces/valkey_client/interface/ @canonical/data-nosql
