@@ -1,0 +1,23 @@
+name: requirer
+type: charm
+summary: A small vault-kv requirer charm for use in integration tests.
+description: Requests credentials over vault-kv and exposes what it receives.
+
+base: ubuntu@24.04
+platforms:
+  amd64:
+
+requires:
+  vault-kv:
+    interface: vault-kv
+    limit: 1
+
+actions:
+  get-credentials:
+    description: Return the vault-kv data and credentials received by this unit.
+
+parts:
+  charm:
+    source: .
+    plugin: uv
+    build-snaps: [astral-uv]
