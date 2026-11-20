@@ -16,21 +16,23 @@
 
 import json
 import logging
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, MutableMapping
 from dataclasses import dataclass
-from typing import Any, Dict, List, MutableMapping
+from typing import Any
 
 import ops
-from interface_tester.schema_base import DataBagSchema  # type: ignore[import-untyped]
+from interface_tester.schema_base import DataBagSchema
 from pydantic import BaseModel, Field, Json, ValidationError
 
 
-class LogAdapter(logging.LoggerAdapter):
+class LogAdapter(logging.LoggerAdapter):  # pyright: ignore[reportMissingTypeArgument]
     """Adapter for the logger to prepend a prefix to all log lines."""
 
     prefix = "vault_kv"
 
-    def process(self, msg: str, kwargs: MutableMapping) -> tuple[str, MutableMapping]:
+    def process(
+        self, msg: str, kwargs: MutableMapping[str, Any]
+    ) -> tuple[str, MutableMapping[str, Any]]:
         """Decides the format for the prepended text."""
         return f"[{self.prefix}] {msg}", kwargs
 
@@ -74,7 +76,9 @@ class UnitVaultKvRequirerSchema(BaseModel):
         description="Egress subnets to use separated by commas, in CIDR notation."
     )
     nonce: str = Field(
-        description="Uniquely identifying value for this unit. `secrets.token_hex(16)` is recommended."
+        description=(
+            "Uniquely identifying value for this unit. `secrets.token_hex(16)` is recommended."
+        )
     )
 
 
@@ -99,11 +103,11 @@ class KVRequest:
     app_name: str
     unit_name: str
     mount_suffix: str
-    egress_subnets: List[str]
+    egress_subnets: list[str]
     nonce: str
 
 
-def get_egress_subnets_list_from_relation_data(relation_databag: Mapping[str, str]) -> List[str]:
+def get_egress_subnets_list_from_relation_data(relation_databag: Mapping[str, str]) -> list[str]:
     """Return the egress_subnet as a list.
 
     This function converts the string with values separated by commas to a list.
@@ -130,7 +134,8 @@ def is_requirer_data_valid(app_data: Mapping[str, str], unit_data: Mapping[str, 
 def is_provider_data_valid(data: Mapping[str, str]) -> bool:
     """Return whether the provider data is valid."""
     try:
-        ProviderSchema(app=VaultKvProviderSchema(**data))  # type: ignore https://github.com/pydantic/pydantic/issues/8616
+        # https://github.com/pydantic/pydantic/issues/8616
+        ProviderSchema(app=VaultKvProviderSchema(**data))  # type: ignore
         return True
     except ValidationError as e:
         logger.debug("Invalid data: %s", e)
@@ -150,13 +155,13 @@ class VaultKvClientDetachedEvent(ops.EventBase):
         super().__init__(handle)
         self.unit_name = unit_name
 
-    def snapshot(self) -> Dict[str, Any]:
+    def snapshot(self) -> dict[str, Any]:
         """Return snapshot data that should be persisted."""
         return {
             "unit_name": self.unit_name,
         }
 
-    def restore(self, snapshot: Dict[str, Any]) -> None:
+    def restore(self, snapshot: dict[str, Any]) -> None:
         """Restore the event from a snapshot."""
         super().restore(snapshot)
         self.unit_name = snapshot["unit_name"]
@@ -172,7 +177,7 @@ class NewVaultKvClientAttachedEvent(ops.RelationEvent):
         app_name: str,
         unit_name: str,
         mount_suffix: str,
-        egress_subnets: List[str],
+        egress_subnets: list[str],
         nonce: str,
     ):
         super().__init__(handle, relation)
@@ -184,7 +189,7 @@ class NewVaultKvClientAttachedEvent(ops.RelationEvent):
         self.egress_subnets = egress_subnets
         self.nonce = nonce
 
-    def snapshot(self) -> dict:
+    def snapshot(self) -> dict[str, Any]:
         """Return snapshot data that should be persisted."""
         return {
             "relation_id": self.relation_id,
@@ -196,7 +201,7 @@ class NewVaultKvClientAttachedEvent(ops.RelationEvent):
             "nonce": self.nonce,
         }
 
-    def restore(self, snapshot: Dict[str, Any]):
+    def restore(self, snapshot: dict[str, Any]):
         """Restore the value state from a given snapshot."""
         super().restore(snapshot)
         self.relation_id = snapshot["relation_id"]
@@ -217,7 +222,7 @@ class VaultKvProviderEvents(ops.ObjectEvents):
 class VaultKvProvides(ops.Object):
     """Class to be instantiated by the providing side of the relation."""
 
-    on = VaultKvProviderEvents()  # type: ignore
+    on = VaultKvProviderEvents()
 
     def __init__(
         self,
@@ -242,7 +247,7 @@ class VaultKvProvides(ops.Object):
         This handler will emit a new_vault_kv_client_attached event for each requiring unit
         with valid relation data.
         """
-        if event.app is None:
+        if event.app is None:  # pyright: ignore[reportUnnecessaryComparison]
             logger.debug("No remote application yet")
             return
         app_data = event.relation.data[event.app]
@@ -281,13 +286,13 @@ class VaultKvProvides(ops.Object):
 
         relation.data[self.charm.app]["credentials"] = json.dumps(credentials, sort_keys=True)
 
-    def get_credentials(self, relation: ops.Relation) -> dict:
+    def get_credentials(self, relation: ops.Relation) -> dict[str, str]:
         """Get the unit credentials from the app relation data and load it as a dict."""
         return json.loads(relation.data[self.charm.app].get("credentials", "{}"))
 
-    def get_kv_requests(self, relation_id: int | None = None) -> List[KVRequest]:
+    def get_kv_requests(self, relation_id: int | None = None) -> list[KVRequest]:
         """Get all KV requests for the relation."""
-        kv_requests: List[KVRequest] = []
+        kv_requests: list[KVRequest] = []
         relations = (
             [
                 relation
@@ -351,7 +356,7 @@ class VaultKvBaseEvent(ops.RelationEvent):
         self.relation_id = relation_id
         self.relation_name = relation_name
 
-    def snapshot(self) -> dict:
+    def snapshot(self) -> dict[str, Any]:
         """Return snapshot data that should be persisted."""
         return dict(
             super().snapshot(),
@@ -359,7 +364,7 @@ class VaultKvBaseEvent(ops.RelationEvent):
             relation_name=self.relation_name,
         )
 
-    def restore(self, snapshot: Dict[str, Any]):
+    def restore(self, snapshot: dict[str, Any]):
         """Restore the value state from a given snapshot."""
         super().restore(snapshot)
         self.relation_id = snapshot["relation_id"]
@@ -389,7 +394,7 @@ class VaultKvRequireEvents(ops.ObjectEvents):
 class VaultKvRequires(ops.Object):
     """Class to be instantiated by the requiring side of the relation."""
 
-    on = VaultKvRequireEvents()  # type: ignore
+    on = VaultKvRequireEvents()
 
     def __init__(
         self,
@@ -439,7 +444,7 @@ class VaultKvRequires(ops.Object):
 
     def _on_vault_kv_relation_changed(self, event: ops.RelationChangedEvent):
         """Handle relation changed."""
-        if event.app is None:
+        if event.app is None:  # pyright: ignore[reportUnnecessaryComparison]
             logger.debug("No remote application yet")
             return
 
@@ -458,7 +463,7 @@ class VaultKvRequires(ops.Object):
         self.on.gone_away.emit()
 
     def request_credentials(
-        self, relation: ops.Relation, egress_subnet: List[str] | str, nonce: str
+        self, relation: ops.Relation, egress_subnet: list[str] | str, nonce: str
     ) -> None:
         """Request credentials from the vault-kv relation.
 
@@ -496,6 +501,6 @@ class VaultKvRequires(ops.Object):
         Unit credentials are stored in the relation data as a Juju secret id.
         """
         nonce = relation.data[self.charm.unit].get("nonce")
-        if nonce is None or relation.app is None:
+        if nonce is None or relation.app is None:  # pyright: ignore[reportUnnecessaryComparison]
             return None
         return json.loads(relation.data[relation.app].get("credentials", "{}")).get(nonce)

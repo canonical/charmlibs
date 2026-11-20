@@ -71,8 +71,11 @@ quote-style = "preserve"
     "D",  # docs
     "E501",  # line too long
 ]
+"src/charmlibs/interfaces/vault_kv/__init__.py" = [  # docstring migrated from the Charmhub-hosted library
+    "E501",  # line too long
+]
 "tests/**/*" = [
-    # "E501",  # line too long
+    "E501",  # line too long
 ]
 
 [tool.pyright]

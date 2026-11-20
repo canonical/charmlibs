@@ -18,6 +18,8 @@ from typing import Any
 
 import ops.testing as testing
 import pytest
+from ops.charm import ActionEvent, CharmBase
+
 from charmlibs.interfaces.vault_kv import (
     NewVaultKvClientAttachedEvent,
     VaultKvClientDetachedEvent,
@@ -28,7 +30,6 @@ from charmlibs.interfaces.vault_kv import (
     VaultKvRequires,
     get_egress_subnets_list_from_relation_data,
 )
-from ops.charm import ActionEvent, CharmBase
 
 VAULT_KV_RELATION_NAME = "vault-kv"
 
@@ -80,23 +81,19 @@ class VaultKvProviderCharm(CharmBase):
 
     def _on_get_kv_requests_action(self, event: ActionEvent):
         kv_requests = self.interface.get_kv_requests()
-        event.set_results(
-            {
-                "kv-requests": json.dumps(
-                    [
-                        {
-                            "relation_id": kv_request.relation.id,
-                            "app_name": kv_request.app_name,
-                            "unit_name": kv_request.unit_name,
-                            "mount_suffix": kv_request.mount_suffix,
-                            "egress_subnets": kv_request.egress_subnets,
-                            "nonce": kv_request.nonce,
-                        }
-                        for kv_request in kv_requests
-                    ]
-                )
-            }
-        )
+        event.set_results({
+            "kv-requests": json.dumps([
+                {
+                    "relation_id": kv_request.relation.id,
+                    "app_name": kv_request.app_name,
+                    "unit_name": kv_request.unit_name,
+                    "mount_suffix": kv_request.mount_suffix,
+                    "egress_subnets": kv_request.egress_subnets,
+                    "nonce": kv_request.nonce,
+                }
+                for kv_request in kv_requests
+            ])
+        })
 
 
 class VaultKvRequirerCharm(CharmBase):
@@ -371,7 +368,7 @@ class TestVaultKvRequires:
             },
         )
 
-    def test_given_unit_leader_when_unit_joined_then_connected_event_fired_and_all_relation_data_is_updated(  # noqa: E501
+    def test_given_unit_leader_when_unit_joined_then_connected_event_fired_and_all_relation_data_is_updated(
         self,
     ):
         vault_kv_relation = testing.Relation(
@@ -415,7 +412,7 @@ class TestVaultKvRequires:
             "mount_suffix": "dummy"
         }
 
-    def test_given_unit_joined_is_not_leader_when_relation_joined_then_connected_is_fired_and_mount_suffix_is_not_updated(  # noqa: E501
+    def test_given_unit_joined_is_not_leader_when_relation_joined_then_connected_is_fired_and_mount_suffix_is_not_updated(
         self,
     ):
         vault_kv_relation = testing.Relation(
@@ -503,13 +500,15 @@ class TestVaultKvRequires:
 
         assert len(self.ctx.emitted_events) == 1
 
-    def test_given_egress_subnets_in_relation_databag_when_get_egress_subnets_list_from_relation_data_then_list_is_returned(  # noqa: E501
+    def test_given_egress_subnets_in_relation_databag_when_get_egress_subnets_list_from_relation_data_then_list_is_returned(
         self,
     ):
         relation_datbage_dict = {
             "nonce": "abcd",
             "egress_subnet": "10.0.0.1/32, 10.0.1.1/32,10.0.2.1/32",
         }
-        assert sorted(get_egress_subnets_list_from_relation_data(relation_datbage_dict)) == sorted(
-            ["10.0.0.1/32", "10.0.1.1/32", "10.0.2.1/32"]
-        )
+        assert sorted(get_egress_subnets_list_from_relation_data(relation_datbage_dict)) == sorted([
+            "10.0.0.1/32",
+            "10.0.1.1/32",
+            "10.0.2.1/32",
+        ])
