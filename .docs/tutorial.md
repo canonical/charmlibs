@@ -70,7 +70,7 @@ Get started by running `just init`, and provide the requested information intera
 ````{tip}
 If you're working on an interface library, run `just init --interface` instead.
 This will create the library directory under the `interfaces/` directory and set it up to use the `charmlibs.interfaces` namespace, along with an interface definition in `interface/v0/`.
-To add only an interface definition, without a library, run `just init --definition-only`.
+See {ref}`how-to-document-an-interface` for how to fill in the definition.
 ````
 
 This creates a new directory for your library, named accordingly.
