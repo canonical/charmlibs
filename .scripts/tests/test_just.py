@@ -284,6 +284,37 @@ class TestUVRun:
             assert 'fake-cmd' in uv_run_cmd
 
 
+class TestFormat:
+    def test_default_runs_check_fix(self):
+        with patch('just._run', return_value=0) as mock_run:
+            assert just.format([]) == 0
+            commands = [call.args[0] for call in mock_run.call_args_list]
+            assert ['uv', 'run', '--only-group=fast-lint', 'ruff', 'format', '.'] in commands
+            assert [
+                'uv',
+                'run',
+                '--only-group=fast-lint',
+                'ruff',
+                'check',
+                '--fix',
+                '.',
+            ] in commands
+
+    def test_format_only_skips_check(self):
+        with patch('just._run', return_value=0) as mock_run:
+            assert just.format(['--format-only']) == 0
+            commands = [call.args[0] for call in mock_run.call_args_list]
+            assert ['uv', 'run', '--only-group=fast-lint', 'ruff', 'format', '.'] in commands
+            assert not any('check' in cmd for cmd in commands)
+
+    def test_format_only_and_unsafe_fixes_are_exclusive(self):
+        with patch('just._run', return_value=0) as mock_run:
+            with pytest.raises(SystemExit) as exc_info:
+                just.format(['--format-only', '--unsafe-fixes'])
+            assert exc_info.value.code == 2
+            mock_run.assert_not_called()
+
+
 class TestCoverageEnv:
     def test_ok(self):
         env = just._coverage_env()
