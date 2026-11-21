@@ -6,12 +6,6 @@ This relation interface describes the expected behavior of any charm claiming to
 
 ## Direction
 
-```mermaid
-flowchart TD
-    Requirer -- database, \nrequested-secrets --> Provider
-    Provider -- database, \nendpoints, \nsecret-user --> Requirer
-```
-
 ## Behavior
 
 Both the Requirer and the Provider need to adhere to criteria to be considered compatible with the interface.

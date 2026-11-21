@@ -8,12 +8,6 @@ In most cases, implementation of the interface is handled via the [data_interfac
 
 ## Direction
 
-```mermaid
-flowchart TD
-    Requirer -- requested-secrets --> Provider
-    Provider -- subscription-id, tenant-id, client-id, client-secret, --> Requirer
-```
-
 ## Behavior
 
 To be considered compatible with the interface, the requirer and the provider need to adhere to the following criteria:

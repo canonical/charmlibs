@@ -9,13 +9,6 @@ In most cases, this will be accomplished using the [data_interfaces library](htt
 ## Direction
 
 If this interface implements a provider/requirer pattern, describe the directionality of the relation and its meaning.
-It would be good to have a mermaid chart to explain further:
-
-```mermaid
-flowchart TD
-    Requirer -- prefix, secret-mtls, requested-secrets, provided-secrets --> Provider
-    Provider -- endpoints, version, secret-tls, secret-user--> Requirer
-```
 
 As with all Juju relations, the `etcd-client` interface consists of two parties: a Provider (etcd charm), and a Requirer (application charm). The Requirer will be expected to provide the range of keys accessed and its certificate. The Provider will provide the endpoints the client can use to access the database, the username of the user created, the CA that issues the server certificate, and the etcd version of the cluster.
 

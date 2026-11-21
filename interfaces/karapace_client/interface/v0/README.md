@@ -13,12 +13,6 @@ The `karapace_client` interface implements a provider/requirer pattern:
 - **Provider**: A Karapace charm that can provide schema registry services
 - **Requirer**: A charm that requires access to Karapace services for schema management
 
-```mermaid
-flowchart LR
-    Requirer -- subject, extra-user-roles --> Provider
-    Provider -- subject, endpoints, username, password --> Requirer
-```
-
 ## Behavior
 
 Both the Requirer and the Provider need to adhere to the criteria, to be considered compatible with the interface.

@@ -8,12 +8,6 @@ In most cases, this will be accomplished using the [prometheus_scrape library](h
 
 ## Direction
 
-```mermaid
-flowchart TD
-    Provider -- "Scrape Job(s), Alert Rules, Metadata" --> Requirer
-    Requirer -- Scrapes --> Provider
-```
-
 As all Juju relations, the `prometheus_scrape` interface consists of a provider and a requirer. One of these, in this case the `Provider`, will be expected to stand up one or more scrape compatible metrics endpoint where the `Requirer` will be able to scrape the `Provider`s metrics.
 
 ## Behavior

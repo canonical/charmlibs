@@ -8,11 +8,6 @@ This relation interface describes the expected behavior of any charm claiming to
 
 ## Direction
 
-```mermaid
-flowchart TD
-    Provider -- ip_address, hostname, port --> Requirer
-```
-
 As with all Juju relations, the `fiveg_n2` interface consists of two parties: a Provider and a Requirer.
 
 ## Behavior

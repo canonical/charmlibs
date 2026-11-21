@@ -8,11 +8,6 @@ The `cloudflared_route` interface is designed to facilitate information exchange
 
 The `cloudflared_route` interface follows a provider/requirer pattern. The requirer is a charm that runs the cloudflared tunnel, and the provider is the charm that supplies configurations for the cloudflared tunnel.
 
-```mermaid
-flowchart TD
-  Provider -- tunnel_token_secret_id,nameserver --> Requirer
-```
-
 ## Behavior
 
 The following are the criteria that a Provider and Requirer need to adhere to in order to be compatible with this interface.

@@ -6,11 +6,6 @@ This relation interface describes the expected behaviour of any charm interfacin
 
 ## Direction
 
-```mermaid
-flowchart TD
-    Provider -- index, \nendpoints, \nsecret-user --> Requirer
-```
-
 As with all Juju relations, the `wazuh-api-client` interface consists of two parties: a Provider (Wazuh server charm), and a Requirer (application charm). The Provider will provide API credentials, which can be used to access the Wazuh REST API itself.
 
 ## Behavior

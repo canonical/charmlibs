@@ -9,12 +9,6 @@ In most cases, this will be accomplished using the [data_interfaces library](htt
 
 ## Direction
 
-```mermaid
-flowchart TD
-    Requirer -- database, \nextra-user-roles, \nrequested-secrets --> Provider
-    Provider -- database, \nendpoints, \nsecret-user --> Requirer
-```
-
 As with all Juju relations, the `database` interface consists of two parties: a Provider (database charm), and a Requirer (application charm). The Requirer will be expected to provide a database name, and the Provider will provide new unique credentials (along with other optional fields), which can be used to access the actual database cluster.
 
 ## Behavior

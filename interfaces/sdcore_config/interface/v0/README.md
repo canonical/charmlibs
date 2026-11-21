@@ -12,11 +12,6 @@ In SD-Core network, the provider of this interface would be the Webui operator a
 
 ## Direction
 
-```mermaid
-flowchart TD
-    Provider -- url --> Requirer
-```
-
 As with all Juju relations, the `sdcore_config` interface consists of two parties: a Provider and a Requirer.
 
 ## Behavior

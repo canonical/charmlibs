@@ -12,11 +12,6 @@ In a typical 5G network, the N4 interface is used between UPF and SMF.
 
 ## Direction
 
-```mermaid
-flowchart TD
-    Provider -- Hostname, Port --> Requirer
-```
-
 As with all Juju relations, the `fiveg_n4` interface consists of two parties: a Provider 
 and a Requirer.
 

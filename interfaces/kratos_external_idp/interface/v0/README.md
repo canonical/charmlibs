@@ -11,12 +11,6 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 ## Direction
 
-```mermaid
-flowchart
-    Requirer -- provider_id, redirect_uri --> Provider
-    Provider -- client_id, provider, secret_backend, client_secret, tenant_id, private_key, private_key_id, team_id --> Requirer
-```
-
 ## Behavior
 
 The Provider MUST adhere to the criteria, to be considered compatible with the interface.

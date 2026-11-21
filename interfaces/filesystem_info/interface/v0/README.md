@@ -10,12 +10,6 @@ to a client charm that wants to mount the filesystem.
 The `filesystem_info` interface implements a provider/requirer pattern. The Requirer is a charm that wishes to
 mount a shared filesystem, and the Provider is the charm exporting the mount information to do that.
 
-```mermaid
-flowchart TD
-  Requirer --> Provider
-  Provider -- endpoint --> Requirer
-```
-
 ## Behavior
 
 The exported endpoint from the Provider needs to adhere to a sublanguage of the URI grammar, which is specified

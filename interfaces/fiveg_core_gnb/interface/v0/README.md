@@ -10,12 +10,6 @@ In a typical 5G network, the provider of this interface would be a CU or a gNode
 
 ## Direction
 
-```mermaid
-flowchart TD
-    Provider -- MCC, MNC, TAC, SST, SD --> Requirer
-    Requirer -- CU/gNodeB Identifier --> Provider
-```
-
 As with all Juju relations, the `fiveg_core_gnb` interface consists of two parties: a Provider and a Requirer.
 
 ## Behavior
