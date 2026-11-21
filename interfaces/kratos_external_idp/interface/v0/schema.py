@@ -6,12 +6,15 @@ Examples:
     Provider:
         unit: <empty>
         app: {
-          "providers":[
-            "client_id": "client_id"
-            "client_secret": "cl1ent-s3cRet"
-            "secret_backend": "relation"
-            "tenant_id": "4242424242424242"
-            "provider": "microsoft"
+                    "providers": [
+                        {
+                            "client_id": "client_id",
+                            "client_secret": "cl1ent-s3cRet",
+                            "secret_backend": "relation",
+                            "scope": "profile email address phone",
+                            "tenant_id": "4242424242424242",
+                            "provider": "microsoft"
+                        }
           ]
         }
 
@@ -19,8 +22,10 @@ Examples:
         unit: <empty>
         app: {
           "providers": [
-            "redirect_uri": "https://example.kratos.com/self-service/methods/oidc/callback/microsoft"
-            "provider_id": "microsoft"
+                        {
+                            "redirect_uri": "https://example.kratos.com/self-service/methods/oidc/callback/microsoft",
+                            "provider_id": "microsoft"
+                        }
           ]
         }
 """
@@ -28,11 +33,7 @@ Examples:
 import textwrap
 from enum import Enum
 
-from pydantic import AnyHttpUrl, BaseModel, Field, field_validator
-
-
-class Url(BaseModel):
-    url: AnyHttpUrl
+from pydantic import AnyHttpUrl, BaseModel, Field, model_validator
 
 
 class Provider(Enum):
@@ -62,12 +63,14 @@ class SecretBackend(Enum):
 
 class ExternalIdpProvider(BaseModel):
     client_id: str
-    client_secret: str
-    secret_backend: SecretBackend = "relation"
+    client_secret: str | None = None
+    secret_backend: SecretBackend
     provider: Provider
-    scope: str | None
-    provider_id: str | None
+    scope: str | None = None
+    provider_id: str | None = None
+    label: str | None = None
     jsonnet_mapper: str | None = Field(
+        default=None,
         description=(
             "A jsonnet file that will be used to map the external claims to Kratos' claims. "
             "For more info see https://www.ory.sh/docs/kratos/reference/jsonnet."
@@ -93,50 +96,106 @@ class ExternalIdpProvider(BaseModel):
             )
         ],
     )
-    tenant_id: str | None
-    private_key: str | None
-    private_key_id: str | None
-    team_id: str | None
-    issuer_url: str | None
+    tenant_id: str | None = None
+    private_key: str | None = None
+    private_key_id: str | None = None
+    team_id: str | None = None
+    issuer_url: str | None = None
 
-    @field_validator("tenant_id")
-    def provider_must_be_microsoft(cls, v, info):
-        if v and info.data.get("provider") != "microsoft":
-            raise ValueError("Provider must be microsoft to use key: `tenant_id`")
-        elif not v and info.data.get("provider") == "microsoft":
-            raise ValueError("`tenant_id` is required with provider microsoft")
-        return v
+    @model_validator(mode="after")
+    def validate_provider_fields(self) -> "ExternalIdpProvider":
+        if self.provider != Provider.apple and not self.client_secret:
+            raise ValueError(f"`client_secret` is required with provider {self.provider.value}")
 
-    @field_validator("private_key", "private_key_id", "team_id")
-    def provider_must_be_apple(cls, v, info):
-        if v and info.data.get("provider") != "apple":
-            raise ValueError(f"Provider must be apple to use key: `{info.data.get('name')}`")
-        elif not v and info.data.get("provider") == "apple":
-            raise ValueError(f"`{info.data.get('name')}` is required with apple provider")
-        return v
-
-    @field_validator("issuer_url")
-    def issuer_url_allowed(cls, v, info):
-        if v and info.data.get("provider") in ["generic", "auth0"]:
-            raise ValueError(
-                f"`issuer_url` not allowed with provider: {info.data.get('provider')}"
-            )
-        elif not v and info.data.get("provider") in ["generic", "auth0"]:
-            raise ValueError("`issuer_url` is required with {values['provider'] provider")
-        return v
+        for fields, providers in (
+            (("tenant_id",), (Provider.microsoft,)),
+            (("private_key", "private_key_id", "team_id"), (Provider.apple,)),
+            (("issuer_url",), (Provider.generic, Provider.auth0)),
+        ):
+            for field in fields:
+                value = getattr(self, field)
+                if value and self.provider not in providers:
+                    raise ValueError(f"`{field}` not allowed with provider: {self.provider.value}")
+                if not value and self.provider in providers:
+                    raise ValueError(f"`{field}` is required with provider {self.provider.value}")
+        return self
 
 
 class ProviderAppData(BaseModel):
-    providers: list[ExternalIdpProvider]
+    providers: list[ExternalIdpProvider] = Field(
+        examples=[
+            [
+                {
+                    "client_id": "client_id",
+                    "client_secret": "cl1ent-s3cRet",
+                    "secret_backend": "relation",
+                    "provider": "microsoft",
+                    "scope": "profile email address phone",
+                    "provider_id": "microsoft",
+                    "label": "Microsoft",
+                    "tenant_id": "4242424242424242",
+                }
+            ],
+            [
+                {
+                    "client_id": "client_id",
+                    "secret_backend": "relation",
+                    "provider": "apple",
+                    "scope": "profile email address phone",
+                    "team_id": "team_id",
+                    "private_key_id": "private_key_id",
+                    "private_key": "private_key",
+                }
+            ],
+            [
+                {
+                    "client_id": "client_id",
+                    "client_secret": "cl1ent-s3cRet",
+                    "secret_backend": "relation",
+                    "provider": "generic",
+                    "scope": "profile email address phone",
+                    "issuer_url": "https://idp.example.com",
+                }
+            ],
+            [
+                {
+                    "client_id": "client_id",
+                    "client_secret": "cl1ent-s3cRet",
+                    "secret_backend": "relation",
+                    "provider": "auth0",
+                    "scope": "profile email address phone",
+                    "issuer_url": "https://example.auth0.com",
+                }
+            ],
+            [
+                {
+                    "client_id": "client_id",
+                    "client_secret": "cl1ent-s3cRet",
+                    "secret_backend": "relation",
+                    "provider": "google",
+                    "scope": "profile email address phone",
+                }
+            ],
+        ],
+    )
 
 
 class ExternalIdpRequirer(BaseModel):
-    redirect_uri: Url
+    redirect_uri: AnyHttpUrl
     provider_id: str
 
 
 class RequirerAppData(BaseModel):
-    providers: list[ExternalIdpRequirer]
+    providers: list[ExternalIdpRequirer] = Field(
+        examples=[
+            [
+                {
+                    "redirect_uri": "https://example.kratos.com/self-service/methods/oidc/callback/microsoft",
+                    "provider_id": "microsoft",
+                }
+            ]
+        ],
+    )
 
 
 ProviderUnitData = None
