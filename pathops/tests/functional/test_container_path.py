@@ -19,6 +19,7 @@ from __future__ import annotations
 import errno
 import getpass
 import grp
+import itertools
 import pathlib
 import pwd
 import sys
@@ -27,7 +28,7 @@ import typing
 import pytest
 
 import utils
-from charmlibs.pathops import ContainerPath, LocalPath
+from charmlibs.pathops import ContainerPath, LocalPath, _constants
 
 if typing.TYPE_CHECKING:
     from collections.abc import Callable
@@ -43,6 +44,8 @@ if typing.TYPE_CHECKING:
         (utils.BROKEN_SYMLINK_NAME, FileNotFoundError),
         (utils.MISSING_FILE_NAME, FileNotFoundError),
         (utils.SOCKET_NAME, OSError),  # ContainerPath will raise FileNotFoundError
+        *((name, NotADirectoryError) for name in utils.NON_DIRECTORY_PARENT_NAMES),
+        *((name, OSError) for name in utils.SYMLINK_LOOP_PARENT_NAMES),
     ),
 )
 @pytest.mark.parametrize('method', ('read_bytes', 'read_text'))
@@ -120,6 +123,13 @@ def test_read_bytes(container: ops.Container, session_dir: pathlib.Path, filenam
     pathlib_result = path.read_bytes()
     container_result = ContainerPath(path, container=container).read_bytes()
     assert container_result == pathlib_result
+
+
+@pytest.mark.parametrize('filename', utils.NON_DIRECTORY_PARENT_NAMES)
+def test_glob_file_parent(container: ops.Container, session_dir: pathlib.Path, filename: str):
+    path = session_dir / filename
+    assert list(path.glob('*')) == []
+    assert list(ContainerPath(path, container=container).glob('*')) == []
 
 
 class TestIterDir:
@@ -402,6 +412,27 @@ class TestRmDir:
             container_path.rmdir()
         assert ctx.value.errno == errno.ENOTEMPTY
 
+    @pytest.mark.parametrize('filename', utils.SYMLINK_LOOP_PARENT_NAMES)
+    def test_symlink_loop_parent(
+        self, container: ops.Container, session_dir: pathlib.Path, filename: str
+    ):
+        path = session_dir / filename
+        with pytest.raises(OSError) as ctx:
+            path.rmdir()
+        assert ctx.value.errno == errno.ELOOP
+        with pytest.raises(OSError) as ctx:
+            ContainerPath(path, container=container).rmdir()
+        assert ctx.value.errno == errno.ELOOP
+
+    @pytest.mark.parametrize('filename', utils.NON_DIRECTORY_PARENT_NAMES)
+    def test_file_parent(self, container: ops.Container, session_dir: pathlib.Path, filename: str):
+        path = session_dir / filename
+        with pytest.raises(NotADirectoryError):
+            path.rmdir()
+        container_path = ContainerPath(path, container=container)
+        with pytest.raises(NotADirectoryError):
+            container_path.rmdir()
+
     @pytest.mark.parametrize('name', GLOB_LIKE_NAMES)
     def test_name_isnt_a_pattern(
         self, container: ops.Container, tmp_path: pathlib.Path, name: str
@@ -466,6 +497,49 @@ class TestUnlink:
         container_path = ContainerPath(path, container=container)
         with pytest.raises(IsADirectoryError):
             container_path.unlink()
+
+    @pytest.mark.parametrize('missing_ok', (False, True))
+    @pytest.mark.parametrize('filename', utils.SYMLINK_LOOP_PARENT_NAMES)
+    def test_symlink_loop_parent(
+        self,
+        container: ops.Container,
+        session_dir: pathlib.Path,
+        filename: str,
+        missing_ok: bool,
+    ):
+        path = session_dir / filename
+        with pytest.raises(OSError) as ctx:
+            path.unlink(missing_ok=missing_ok)
+        assert ctx.value.errno == errno.ELOOP
+        with pytest.raises(OSError) as ctx:
+            ContainerPath(path, container=container).unlink(missing_ok=missing_ok)
+        assert ctx.value.errno == errno.ELOOP
+
+    @pytest.mark.parametrize('missing_ok', (False, True))
+    @pytest.mark.parametrize('filename', utils.NON_DIRECTORY_PARENT_NAMES)
+    def test_file_parent(
+        self,
+        container: ops.Container,
+        session_dir: pathlib.Path,
+        filename: str,
+        missing_ok: bool,
+    ):
+        path = session_dir / filename
+        with pytest.raises(NotADirectoryError):
+            path.unlink(missing_ok=missing_ok)
+        container_path = ContainerPath(path, container=container)
+        with pytest.raises(NotADirectoryError):
+            container_path.unlink(missing_ok=missing_ok)
+
+    def test_child_with_same_name_as_directory_parent(
+        self, container: ops.Container, tmp_path: pathlib.Path
+    ):
+        path = tmp_path / 'name' / 'name'
+        path.parent.mkdir()
+        path.touch()
+        ContainerPath(path, container=container).unlink()
+        assert not path.exists()
+        assert path.parent.exists()
 
     @pytest.mark.parametrize('name', GLOB_LIKE_NAMES)
     def test_name_isnt_a_pattern(
@@ -642,6 +716,80 @@ class TestMkDir:
             path.mkdir(exist_ok=exist_ok)
         with pytest.raises(FileNotFoundError):
             container_path.mkdir(exist_ok=exist_ok)
+
+    @pytest.mark.parametrize('exist_ok', (False, True))
+    @pytest.mark.parametrize('filename', utils.SYMLINK_LOOP_PARENT_NAMES)
+    def test_symlink_loop_parent(
+        self,
+        container: ops.Container,
+        session_dir: pathlib.Path,
+        filename: str,
+        exist_ok: bool,
+    ):
+        path = session_dir / filename
+        with pytest.raises(OSError) as ctx:
+            path.mkdir(exist_ok=exist_ok)
+        assert ctx.value.errno == errno.ELOOP
+        with pytest.raises(OSError) as ctx:
+            ContainerPath(path, container=container).mkdir(exist_ok=exist_ok)
+        assert ctx.value.errno == errno.ELOOP
+
+    @pytest.mark.parametrize('exist_ok', (False, True))
+    @pytest.mark.parametrize('filename', utils.SYMLINK_LOOP_PARENT_NAMES)
+    def test_symlink_loop_parent_with_parents(
+        self,
+        container: ops.Container,
+        session_dir: pathlib.Path,
+        filename: str,
+        exist_ok: bool,
+    ):
+        path = session_dir / filename
+        with pytest.raises(OSError) as ctx:
+            path.mkdir(parents=True, exist_ok=exist_ok)
+        assert ctx.value.errno == errno.ELOOP
+        with pytest.raises(OSError) as ctx:
+            ContainerPath(path, container=container).mkdir(parents=True, exist_ok=exist_ok)
+        assert ctx.value.errno == errno.ELOOP
+
+    @pytest.mark.parametrize('exist_ok', (False, True))
+    @pytest.mark.parametrize('mode', (_constants.DEFAULT_MKDIR_MODE, 0o700))
+    @pytest.mark.parametrize(
+        'filename',
+        (f'{utils.BROKEN_SYMLINK_NAME}/child', f'{utils.BROKEN_SYMLINK_NAME}/child/child'),
+    )
+    def test_broken_symlink_parent_with_parents(
+        self,
+        container: ops.Container,
+        session_dir: pathlib.Path,
+        filename: str,
+        mode: int,
+        exist_ok: bool,
+    ):
+        path = session_dir / filename
+        with pytest.raises(FileExistsError):
+            path.mkdir(mode=mode, parents=True, exist_ok=exist_ok)
+        with pytest.raises(FileExistsError):
+            ContainerPath(path, container=container).mkdir(
+                mode=mode, parents=True, exist_ok=exist_ok
+            )
+        assert not (session_dir / utils.MISSING_FILE_NAME).exists()  # the target isn't created
+
+    @pytest.mark.parametrize(('parents', 'exist_ok'), itertools.product((False, True), repeat=2))
+    @pytest.mark.parametrize('filename', utils.NON_DIRECTORY_PARENT_NAMES)
+    def test_file_parent(
+        self,
+        container: ops.Container,
+        session_dir: pathlib.Path,
+        filename: str,
+        parents: bool,
+        exist_ok: bool,
+    ):
+        path = session_dir / filename
+        container_path = ContainerPath(path, container=container)
+        with pytest.raises(NotADirectoryError):
+            path.mkdir(parents=parents, exist_ok=exist_ok)
+        with pytest.raises(NotADirectoryError):
+            container_path.mkdir(parents=parents, exist_ok=exist_ok)
 
     @pytest.mark.parametrize('exist_ok', (False, True))
     def test_not_a_directory_error(

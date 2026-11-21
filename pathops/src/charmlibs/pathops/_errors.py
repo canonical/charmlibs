@@ -37,12 +37,16 @@ def raise_file_exists(msg: str, from_: BaseException | None = None) -> NoReturn:
     raise e from from_
 
 
-def raise_if_matches_file_exists(error: pebble.Error, msg: str) -> None:
-    if (
+def matches_file_exists(error: pebble.Error) -> bool:
+    return (
         isinstance(error, pebble.PathError)
         and error.kind == 'generic-file-error'
         and 'file exists' in error.message
-    ):
+    )
+
+
+def raise_if_matches_file_exists(error: pebble.Error, msg: str) -> None:
+    if matches_file_exists(error):
         raise_file_exists(msg, from_=error)
 
 
@@ -113,8 +117,7 @@ def raise_if_matches_permission(error: pebble.Error, msg: str) -> None:
 
 def raise_if_matches_too_many_levels_of_symlinks(error: pebble.Error, msg: str) -> None:
     if (
-        isinstance(error, pebble.APIError)
-        and error.code == 400
-        and 'too many levels of symbolic links' in error.message
-    ):
+        (isinstance(error, pebble.APIError) and error.code == 400)
+        or (isinstance(error, pebble.PathError) and error.kind == 'generic-file-error')
+    ) and 'too many levels of symbolic links' in error.message:
         raise OSError(errno.ELOOP, os.strerror(errno.ELOOP), msg) from error
