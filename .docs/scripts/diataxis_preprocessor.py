@@ -18,13 +18,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Copy per-library diataxis docs into the Sphinx source tree.
+"""Copy per-library diataxis docs and changelogs into the Sphinx source tree.
 
 Walks every package returned by ``.scripts/ls.py``, looks for a ``docs/``
 directory, and copies tutorial, how-to, and explanation pages into the
-corresponding Sphinx source directories. Generates ``_lib-*.md`` include
-files containing toctree entries that the index pages pull in via
-``{include}``.
+corresponding Sphinx source directories. Also copies each package's
+``CHANGELOG.md`` into ``reference/charmlibs/{pkg}/`` so the change logs
+are discoverable from the docs site rather than only from the repo tree.
+Generates ``_lib-*.md`` include files containing toctree entries that
+the index pages pull in via ``{include}``.
 
 Run from ``just docs``; see ``docs.just`` for the invocation.
 
@@ -82,14 +84,30 @@ def _main() -> None:
             sources = [_REPO_ROOT / lib_path / f for f in doc_files]
             entries = _copy_category(sources, lib_path, category, sphinx_map)
             all_entries.setdefault(category, []).extend(entries)
+    # Collect changelog entries, one category per namespace, alongside the
+    # diataxis categories.
+    for category, entries in _copy_changelogs(packages, sphinx_map).items():
+        all_entries.setdefault(category, []).extend(entries)
     # Write include files with toctree entries for each category.
     for category, entries in all_entries.items():
         if not entries:
             continue
-        path = _DOCS_DIR / category / f'_lib-{category}.md'
+        path = _include_path_for(category)
         content = _TOCTREE_HEADER + '\n'.join(sorted(entries)) + '\n' + _TOCTREE_FOOTER
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content)
+
+
+def _include_path_for(category: str) -> pathlib.Path:
+    """Return where the ``_lib-{category}.md`` include file lives.
+
+    Changelog includes (one per namespace) live under ``reference/changelogs/``
+    next to the namespace pages that pull them in. Diataxis categories keep
+    their own top-level directory.
+    """
+    if category.startswith('changelog-'):
+        return _DOCS_DIR / 'reference' / 'changelogs' / f'_lib-{category}.md'
+    return _DOCS_DIR / category / f'_lib-{category}.md'
 
 
 def _copy_category(
@@ -111,6 +129,61 @@ def _copy_category(
         content = _rewrite_links(content, source, sphinx_map)
         (out_dir / source.name).write_text(content)
         entries.append(f'{lib_path.name}: {title} <charmlibs/{lib_path}/{source.stem}>')
+    return entries
+
+
+def _copy_changelogs(
+    packages: list[dict[str, Any]], sphinx_map: dict[pathlib.PurePath, str]
+) -> dict[str, list[str]]:
+    """Copy each package's ``CHANGELOG.md`` into the reference tree.
+
+    Each package's change log ends up at
+    ``reference/charmlibs/{pkg}/changelog.md``, with a synthetic
+    ``# {pkg}: Changelog`` H1 prepended so the page has a single,
+    library-scoped top-level heading. The existing per-version H1s
+    (``# 1.2.3 - 4 May 2026``) are demoted to H2 so they appear as
+    subsections. Relative links (e.g. to package sources) are rewritten
+    with :func:`_rewrite_links` so they resolve on the published site.
+    Packages without a ``CHANGELOG.md`` are skipped.
+
+    Returns toctree entries keyed by namespace category:
+    ``changelog-charmlibs`` for general libraries and
+    ``changelog-interfaces`` for interface libraries. Entries use absolute
+    docnames, because the namespace pages that include them live in
+    ``reference/changelogs/`` rather than next to the change logs.
+    """
+    entries: dict[str, list[str]] = {}
+    for pkg in packages:
+        lib_path = pathlib.PurePath(pkg['path'])
+        source = _REPO_ROOT / lib_path / 'CHANGELOG.md'
+        if not source.is_file():
+            continue
+        raw = source.read_text()
+        # Three conventions are in use. Most packages go straight to a
+        # per-version H1 (`# 1.2.3 - 4 May 2026`), the interfaces packages open
+        # with a prose `# Changelog` and use H2 for versions, and nginx_k8s
+        # opens with `# Unreleased`. Drop a leading `# Changelog` rather than
+        # demoting it, so the page doesn't end up with a redundant `Changelog`
+        # section directly under its own title -- but match that heading by
+        # name: "an H1 that doesn't start with a digit" also deletes
+        # `# Unreleased`, orphaning its entries under the page title, and would
+        # delete a released `# v1.2.3` too.
+        body = re.sub(r'\A\s*#\s+Changelog\s*\n+', '', raw, flags=re.IGNORECASE)
+        # Demote any remaining H1s (per-version headings) to H2 so the injected
+        # library heading is the sole H1 for the page.
+        demoted = re.sub(r'^# ', '## ', body, flags=re.MULTILINE)
+        content = f'# {lib_path.name}: Changelog\n\n{demoted}'
+        content = _rewrite_links(content, source, sphinx_map)
+        out_dir = _DOCS_DIR / 'reference' / 'charmlibs' / lib_path
+        out_dir.mkdir(parents=True, exist_ok=True)
+        (out_dir / 'changelog.md').write_text(content)
+        namespace = 'interfaces' if lib_path.parts[0] == 'interfaces' else 'charmlibs'
+        # Label with the import name (as the API reference does), not the
+        # directory name, so `tls-certificates` reads as `tls_certificates`.
+        label = lib_path.name.replace('-', '_')
+        entries.setdefault(f'changelog-{namespace}', []).append(
+            f'{label} </reference/charmlibs/{lib_path}/changelog>'
+        )
     return entries
 
 
@@ -173,6 +246,11 @@ def _build_sphinx_map(packages: list[dict[str, Any]]) -> dict[pathlib.PurePath, 
                 m[readme.relative_to(_REPO_ROOT)] = (
                     f'/reference/interfaces/{lib_path.name}/{readme.parent.name}'
                 )
+        # Per-package change log — rewrite links from anywhere in the tree
+        # to the docs-site copy.
+        changelog = _REPO_ROOT / lib_path / 'CHANGELOG.md'
+        if changelog.is_file():
+            m[changelog.relative_to(_REPO_ROOT)] = f'/reference/charmlibs/{lib_path}/changelog'
 
     return m
 
