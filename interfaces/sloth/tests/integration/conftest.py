@@ -5,9 +5,6 @@
 
 import logging
 import pathlib
-import sys
-import time
-import typing
 from collections.abc import Iterator
 
 import jubilant
@@ -17,20 +14,13 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.fixture(scope='module')
-def juju(request: pytest.FixtureRequest) -> Iterator[jubilant.Juju]:
-    """Pytest fixture that wraps :meth:`jubilant.with_model`.
+def juju(juju: jubilant.Juju) -> Iterator[jubilant.Juju]:
+    """Set the logging config on pytest-jubilant's temporary model.
 
-    This adds command line parameter ``--keep-models`` (see help for details).
+    Sloth's test charms are deployed by the ``juju_setup`` tests, not here.
     """
-    keep_models = typing.cast('bool', request.config.getoption('--keep-models'))
-    with jubilant.temp_model(keep=keep_models) as juju:
-        juju.model_config({'logging-config': '<root>=INFO;unit=DEBUG'})
-        yield juju
-        if request.session.testsfailed:
-            logger.info('Collecting Juju logs ...')
-            time.sleep(0.5)  # Wait for Juju to process logs.
-            log = juju.debug_log(limit=1000)
-            print(log, end='', file=sys.stderr)
+    juju.model_config({'logging-config': '<root>=INFO;unit=DEBUG'})
+    yield juju
 
 
 @pytest.fixture(scope='module')
