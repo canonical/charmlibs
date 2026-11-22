@@ -5,10 +5,7 @@ This guide will walk you through migrating an existing Charmhub-hosted library t
 
 ```{tip}
 This guide is for library authors.
-If you're a library user trying to figure out how to switch to the `charmlibs` version of a library, all you need to do is:
-1. Delete your vendored copy of the Charmhub-hosted library, remove any references to it in your `charmcraft.yaml`, and remove any transitive dependencies you added.
-2. Add the library to your charm as a regular Python dependency (with the appropriate version constraints).
-3. Update any imports to refer to the new library -- the library's reference docs should explain this.
+If you're a charm author looking to switch your charm from a Charmhub-hosted library to its `charmlibs` replacement, see {ref}`how-to-migrate-charm` instead.
 ```
 
 ## Get started
