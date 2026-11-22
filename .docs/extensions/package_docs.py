@@ -37,7 +37,11 @@ import typing
 if typing.TYPE_CHECKING:
     import docutils.nodes
     import sphinx.application
+    import sphinx.util.typing
 
+
+# Every page under this docname prefix is a placeholder for one package's reference docs.
+PACKAGE_DOCS_PREFIX = 'reference/charmlibs/'
 
 AUTOMODULE_TEMPLATE = """
 
@@ -45,13 +49,21 @@ AUTOMODULE_TEMPLATE = """
 """.rstrip()
 
 
-def setup(app: sphinx.application.Sphinx) -> dict[str, str | bool]:
+def setup(app: sphinx.application.Sphinx) -> sphinx.util.typing.ExtensionMetadata:
     """Entrypoint for Sphinx extensions, connects generation code to Sphinx event."""
     app.connect('source-read', _append_automodule_on_source_read)
     app.connect('doctree-read', _load_on_doctree_read)
     app.connect('doctree-resolved', _save_on_doctree_resolved)
     app.add_config_value('package', default=None, rebuild='')
-    return {'version': '1.0.0', 'parallel_read_safe': False, 'parallel_write_safe': False}
+    return {
+        'version': '1.0.0',
+        # Sphinx discards its cached environment when this changes. Bump it when what this
+        # extension records in the environment changes, so that pages read before the change
+        # aren't left stale.
+        'env_version': 1,
+        'parallel_read_safe': False,
+        'parallel_write_safe': False,
+    }
 
 
 def _append_automodule_on_source_read(
@@ -81,7 +93,15 @@ def _load_on_doctree_read(app: sphinx.application.Sphinx, doctree: docutils.node
     """Load pickle file named after docname if it exists, and replace doctree contents in-place."""
     if app.config.package is not None:  # only load when not building docs for a specific package
         return
-    if not (source := pathlib.Path('.save', f'{app.env.docname}.pickle')).exists():
+    source = pathlib.Path('.save', f'{app.env.docname}.pickle')
+    if app.env.docname.startswith(PACKAGE_DOCS_PREFIX):
+        # The page's content comes from the pickle, not from the placeholder rst file, which
+        # never changes. Without this, an incremental build never re-reads the page, and keeps
+        # serving the reference docs from the first time the package was built. A pickle that
+        # doesn't exist yet is noted too: Sphinx re-reads a page whose dependency is missing,
+        # so the page picks up its package's docs once they have been built.
+        app.env.note_dependency(str(source))
+    if not source.exists():
         return
     saved, objects, modules, toc, toc_num_entries = pickle.loads(source.read_bytes())  # noqa: S301
     # restore saved doctree
@@ -104,7 +124,7 @@ def _save_on_doctree_resolved(
     package = app.config.package
     # only save when building docs for a specific package
     # only save package reference docs
-    if package is None or docname != f'reference/charmlibs/{_normalize(package)}':
+    if package is None or docname != f'{PACKAGE_DOCS_PREFIX}{_normalize(package)}':
         return
     objects = app.env.domains['py'].data['objects']
     modules = app.env.domains['py'].data['modules']
