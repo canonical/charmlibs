@@ -30,6 +30,7 @@ _CALLS: dict[str, Callable[[str], object]] = {
     'alias (app)': lambda v: snap.alias('lxd', v, 'testlxc'),
     'alias (alias)': lambda v: snap.alias('lxd', 'lxc', v),
     'ensure_installed': lambda v: snap.ensure_installed(v),
+    'ensure_vitality_hint': lambda v: snap.ensure_vitality_hint(v),
     'get': lambda v: snap.get(v),
     'get (key)': lambda v: snap.get('lxd', [v]),
     'get_one': lambda v: snap.get_one(v, 'mykey'),
@@ -69,6 +70,9 @@ _BLANK_ONLY_CALLS: dict[str, Callable[[str], object]] = {
     'disconnect (slot name)': lambda v: snap.disconnect(slot=('other', v)),
 }
 
+# Functions with no name-like arguments at all are outside both contracts.
+_NO_ARGUMENTS = {'system_info'}
+
 # A blank value is only ever a typo for something. The full set of characters Python and snapd
 # agree are whitespace is covered in test_utils.py; one is enough to pin each call site.
 _BLANK = ' '
@@ -80,12 +84,14 @@ def _function_names(calls: dict[str, Callable[[str], object]]) -> set[str]:
 
 def test_every_public_function_is_accounted_for():
     # A new public function must honour the empty contract (and be listed in _CALLS), or be
-    # deliberately exempted into _BLANK_ONLY_CALLS. Neither table may name a function twice.
+    # deliberately exempted into _BLANK_ONLY_CALLS, or take no name-like arguments at all and
+    # be listed in _NO_ARGUMENTS. No table may name a function twice.
     public = {name for name in snap.__all__ if inspect.isfunction(getattr(snap, name))}
     covered = _function_names(_CALLS)
     blank_only = _function_names(_BLANK_ONLY_CALLS)
-    assert public == covered | blank_only
+    assert public == covered | blank_only | _NO_ARGUMENTS
     assert not covered & blank_only
+    assert not (covered | blank_only) & _NO_ARGUMENTS
 
 
 def _assert_no_request(mock_client: MockClient) -> None:
