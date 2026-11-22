@@ -1,3 +1,7 @@
+# 1.13.2 - 16 November 2026
+
+Require `ops>=2.19.0`, the first release with `Model.juju_version`, and `pydantic>=1.10.0`, the oldest release the pydantic v1 code path works with. Previously neither dependency had a lower bound.
+
 # 1.13.1 - 6 November 2026
 
 Allow providers to read certificate requests from legacy requirers that omit the `ca` attribute.

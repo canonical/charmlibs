@@ -15,8 +15,8 @@ classifiers = [
 ]
 dynamic = ["version"]
 dependencies = [
-    "ops",
-    "pydantic",
+    "ops>=2.17.0",
+    "pydantic>=1.10.0",
 ]
 
 [dependency-groups]
@@ -24,7 +24,7 @@ lint = [  # installed for `just lint interfaces/certificate_transfer` (unit, fun
 ]
 unit = [  # installed for `just unit interfaces/certificate_transfer`
     "ops[testing]",
-    "pytest"
+    "pytest>=8"
 ]
 functional = [  # installed for `just functional interfaces/certificate_transfer`
 ]
