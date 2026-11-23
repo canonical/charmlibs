@@ -170,9 +170,9 @@ def _write_if_needed(path: pathlib.Path, content: str) -> None:
         path.write_text(content)
 
 
-#########################################
+##########################################
 # relation data generated from schema.py #
-#########################################
+##########################################
 
 _DATABAGS = {
     'provider-app': 'Provider application databag',
