@@ -9,7 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Updated project URLs.
-- Require `ops>=2.23.0`, the first release with `Relation.save` and `Relation.load`.
+- Require `ops>=2.23.0,<4`. 2.23.0 is the first release with `Relation.save` and `Relation.load`.
+- Require `pydantic>=2.12.0`, the first release with wheels for every Python version this library supports (up to 3.14).
 
 ## [0.1.0]
 
