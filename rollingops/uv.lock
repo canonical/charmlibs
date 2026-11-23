@@ -175,7 +175,7 @@ integration = [
     { name = "tenacity" },
 ]
 lint = []
-unit = [{ name = "ops", extras = ["testing"], specifier = ">=3.1.0" }]
+unit = [{ name = "ops", extras = ["testing"] }]
 
 [[package]]
 name = "colorama"
