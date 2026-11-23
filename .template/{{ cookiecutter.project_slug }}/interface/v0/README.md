@@ -1,6 +1,11 @@
-# `{{ cookiecutter.project_slug }}/v0`
+# {{ cookiecutter.project_slug }}
 
 One or two sentences saying what the interface is for, and which side holds what.
+{%- if cookiecutter._definition_only %}
+Then name the library that charms should use to implement the interface, linked on PyPI or Charmhub.
+{%- else %}
+Charms should use [`{{ cookiecutter.__import_pkg }}`](https://pypi.org/project/{{ cookiecutter.__dist_pkg }}/) to implement it.
+{%- endif %}
 
 ## Direction
 

@@ -1,6 +1,7 @@
-# `example-interface/v0`
+# example-interface
 
 One or two sentences saying what the interface is for, and which side holds what.
+Charms should use [`charmlibs.interfaces.example_interface`](https://pypi.org/project/charmlibs-interfaces-example-interface/) to implement it.
 
 ## Direction
 

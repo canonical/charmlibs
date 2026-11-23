@@ -46,8 +46,7 @@ The `README.md` file is the heart of the specification. It is rendered word for 
 
 Relative links to files in the repository are rewritten to GitHub URLs by the docs build. Absolute URLs are preserved as-is, and should be used for links to PyPI and Charmhub. Intersphinx links are not currently supported, so links to other documentation should use absolute URLs as well.
 
-Start the README with a top-level heading of the form `` # `<interface-name>/v<version>` ``. For example, `` # `tls-certificates/v1` ``. Follow it with one or two plain sentences saying what the interface is for and which side holds what.
-Don't link the library from the README: the recommended library is the `lib` field in `interface.yaml`.
+Start the README with a top-level heading of the form `# <interface-name>`, and a short paragraph explaining what the interface is for and which library charm authors should use to implement it, linking to the recommended `charmlibs.interfaces.<name>` package on PyPI.
 
 Then add the following sections.
 

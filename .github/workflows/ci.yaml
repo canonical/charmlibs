@@ -194,8 +194,8 @@ jobs:
           uvx --from rust-just just init --definition-only --no-input project_slug=example-interface
           # only the definition is generated
           test "$(ls -A example-interface)" = interface
-          # and it's the interface library example's definition, apart from the lib line
-          diff -r -I '^\(# \)\?lib: ' .example/interface example-interface/interface
+          # and it's the interface library example's definition, apart from the library lines
+          diff -r -I '^\(# \)\?lib: ' -I 'implement \(it\|the interface\)' .example/interface example-interface/interface
 
   changelog-updated:
     needs: [init]
