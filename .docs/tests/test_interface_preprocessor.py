@@ -123,11 +123,11 @@ def test_main_fails_after_writing_pages_if_there_were_warnings(
     monkeypatch.setattr(ip, '_DOCS_DIR', docs_dir)
     monkeypatch.setattr(ip, '_REPO_ROOT', tmp_path)
     monkeypatch.setattr(ip.subprocess, 'check_output', _fake_ls(['interfaces/foo']))
-    monkeypatch.setattr(ip, 'logger', ip._Logger())
+    monkeypatch.setattr(ip, '_logger', ip._Logger())
 
     def load_schemas(root: pathlib.Path, schema_paths: list[str]) -> dict[str, typing.Any]:
         assert schema_paths == ['interfaces/foo/interface/v0/schema.py']
-        ip.logger.warning('Could not load the interface schemas: %s', 'no uv')
+        ip._logger.warning('Could not load the interface schemas: %s', 'no uv')
         return {}
 
     monkeypatch.setattr(ip, '_load_schemas', load_schemas)

@@ -74,7 +74,7 @@ DATABAGS: dict[str, dict[str, typing.Any] | None] = {
 
 
 def test_relation_data_tables():
-    markdown = ip.render_relation_data(DATABAGS)
+    markdown = ip._render_relation_data(DATABAGS)
     assert markdown == textwrap.dedent("""\
         Generated from the [Pydantic schema](schema.py).
 
@@ -108,7 +108,7 @@ def test_relation_data_tables():
 
 
 def test_relation_data_without_schema_link():
-    markdown = ip.render_relation_data(DATABAGS, link_schema=False)
+    markdown = ip._render_relation_data(DATABAGS, link_schema=False)
     assert 'schema.py' not in markdown
 
 
@@ -183,7 +183,7 @@ def test_type(prop: dict[str, typing.Any], expected: str):
 
 
 def test_direction_diagram():
-    diagram = ip.render_direction_diagram(DATABAGS)
+    diagram = ip._render_direction_diagram(DATABAGS)
     assert diagram == textwrap.dedent("""\
         ```mermaid
         flowchart LR
@@ -195,7 +195,7 @@ def test_direction_diagram():
 
 
 def test_direction_diagram_all_empty():
-    assert ip.render_direction_diagram(dict.fromkeys(DATABAGS)) == ''
+    assert ip._render_direction_diagram(dict.fromkeys(DATABAGS)) == ''
 
 
 README = """\
@@ -222,7 +222,7 @@ The provider writes.
 
 
 def test_add_generated_sections():
-    result = ip.add_generated_sections(README, DATABAGS)
+    result = ip._add_generated_sections(README, DATABAGS)
     lines = result.splitlines()
     # The diagram goes at the end of the Direction section, after the existing fence.
     diagram_start = lines.index('flowchart LR') - 1
@@ -238,7 +238,7 @@ def test_add_generated_sections():
 
 def test_add_generated_sections_direction_ends_at_title():
     readme = '# `foo/v0`\n\n## Direction\n\nThe provider writes.\n\n# Another title\n'
-    lines = ip.add_generated_sections(readme, DATABAGS).splitlines()
+    lines = ip._add_generated_sections(readme, DATABAGS).splitlines()
     assert lines.index('```mermaid') < lines.index('# Another title')
 
 
@@ -247,7 +247,7 @@ def test_add_generated_sections_relation_data_before_direction():
         '# `foo/v0`\n\n## Relation data\n\nHand-written.\n\n'
         '## Direction\n\nThe provider writes.\n\n## Behavior\n\nStuff.\n'
     )
-    lines = ip.add_generated_sections(readme, DATABAGS).splitlines()
+    lines = ip._add_generated_sections(readme, DATABAGS).splitlines()
     direction = lines.index('## Direction')
     tables = lines.index('### Provider application databag')
     assert lines.index('## Relation data') < tables < lines.index('Hand-written.') < direction
@@ -256,7 +256,7 @@ def test_add_generated_sections_relation_data_before_direction():
 
 
 def test_add_generated_sections_without_headings():
-    result = ip.add_generated_sections('# `foo/v0`\n\nSome text.\n', DATABAGS)
+    result = ip._add_generated_sections('# `foo/v0`\n\nSome text.\n', DATABAGS)
     lines = result.splitlines()
     heading = lines.index('## Relation data')
     assert lines[heading + 2] == 'Generated from the [Pydantic schema](schema.py).'
@@ -354,7 +354,7 @@ def test_recursive_databag_model_lists_its_fields():
         'requirer-app': None,
         'requirer-unit': None,
     }
-    markdown = ip.render_relation_data(databags, link_schema=False)
+    markdown = ip._render_relation_data(databags, link_schema=False)
     assert markdown.splitlines()[:6] == [
         '### Provider application databag',
         '',
@@ -365,7 +365,7 @@ def test_recursive_databag_model_lists_its_fields():
     ]
     # The databag is the Node model, so it isn't documented a second time.
     assert '#### `Node`' not in markdown
-    assert 'app: name, child' in ip.render_direction_diagram(databags)
+    assert 'app: name, child' in ip._render_direction_diagram(databags)
 
 
 class _Warnings:
@@ -378,14 +378,14 @@ class _Warnings:
 
 def test_schema_that_cannot_be_rendered_names_the_readme(monkeypatch: pytest.MonkeyPatch):
     warnings = _Warnings()
-    monkeypatch.setattr(ip, 'logger', warnings)
+    monkeypatch.setattr(ip, '_logger', warnings)
     readme = pathlib.Path('interfaces/foo/interface/v0/README.md')
     # A property schema that's a list rather than an object.
     databags: dict[str, typing.Any] = {
         **DATABAGS,
         'provider-app': {'properties': {'host': ['not', 'a', 'schema']}},
     }
-    result = ip.with_generated_sections(readme, '# `foo/v0`\n', databags)
+    result = ip._with_generated_sections(readme, '# `foo/v0`\n', databags)
     assert result == '# `foo/v0`\n'
     (message,) = warnings.messages
     assert message.startswith(f'{readme}: relation data not generated')
@@ -394,10 +394,10 @@ def test_schema_that_cannot_be_rendered_names_the_readme(monkeypatch: pytest.Mon
 
 def test_schema_that_cannot_be_loaded_names_the_readme(monkeypatch: pytest.MonkeyPatch):
     warnings = _Warnings()
-    monkeypatch.setattr(ip, 'logger', warnings)
+    monkeypatch.setattr(ip, '_logger', warnings)
     readme = pathlib.Path('interfaces/foo/interface/v0/README.md')
-    error = ip.SchemaError('Traceback ...\nValueError: schema does not define X')
-    result = ip.with_generated_sections(readme, '# `foo/v0`\n', error)
+    error = ip._SchemaError('Traceback ...\nValueError: schema does not define X')
+    result = ip._with_generated_sections(readme, '# `foo/v0`\n', error)
     assert result == '# `foo/v0`\n'
     (message,) = warnings.messages
     assert message.startswith(f'{readme}: relation data not generated')
@@ -415,7 +415,7 @@ def test_schema_script_failure_gives_the_reason(
     monkeypatch: pytest.MonkeyPatch, returncode: int, stdout: str, stderr: str, reason: str
 ):
     warnings = _Warnings()
-    monkeypatch.setattr(ip, 'logger', warnings)
+    monkeypatch.setattr(ip, '_logger', warnings)
 
     def run(cmd: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
         return subprocess.CompletedProcess(cmd, returncode, stdout=stdout, stderr=stderr)
@@ -439,14 +439,14 @@ def test_load_schemas_keeps_errors_for_each_readme(monkeypatch: pytest.MonkeyPat
     result = ip._load_schemas(_ROOT, list(output))
     assert result['a/schema.py'] == dict.fromkeys(DATABAGS)
     error = result['b/schema.py']
-    assert isinstance(error, ip.SchemaError)
+    assert isinstance(error, ip._SchemaError)
     assert str(error) == 'ValueError: nope'
 
 
 def test_relation_data_without_nested_objects_has_no_required_note():
     databags = {**DATABAGS, 'requirer-unit': None}
     databags['provider-app'] = {'properties': {'host': {'type': 'string'}}, 'type': 'object'}
-    markdown = ip.render_relation_data(databags)
+    markdown = ip._render_relation_data(databags)
     assert 'Required means' not in markdown
 
 
@@ -459,7 +459,7 @@ def test_pipes_in_type_and_default_are_escaped():
         },
         'type': 'object',
     }
-    rows = ip.render_relation_data(databags, link_schema=False).splitlines()
+    rows = ip._render_relation_data(databags, link_schema=False).splitlines()
     assert rows[4] == '| `mode` | string, matching `^(a\\|b)$` | no (default `a\\|b`) |  |'
     assert rows[5] == '| `sep` | one of `\\|`, `,` | no |  |'
 
@@ -472,7 +472,7 @@ def test_required_note_is_given_once():
         'properties': {'other': {'$ref': '#/$defs/Other'}},
         'type': 'object',
     }
-    markdown = ip.render_relation_data(databags)
+    markdown = ip._render_relation_data(databags)
     assert markdown.count('#### `') == 2
     assert markdown.count('Required means') == 1
 
@@ -484,23 +484,35 @@ def test_markup_in_description_and_diagram_is_escaped():
         'type': 'object',
     }
     databags['requirer-unit'] = {'properties': {'"quoted"': {'type': 'string'}}, 'type': 'object'}
-    markdown = ip.render_relation_data(databags, link_schema=False)
+    markdown = ip._render_relation_data(databags, link_schema=False)
     assert '| `host` | string | no | Set to &lt;name>. |' in markdown
-    diagram = ip.render_direction_diagram(databags)
+    diagram = ip._render_direction_diagram(databags)
     assert '-->|"unit: #quot;quoted#quot;"| provider' in diagram
+
+
+def test_multi_line_description_stays_in_one_table_row():
+    databags: dict[str, typing.Any] = dict.fromkeys(DATABAGS)
+    databags['provider-app'] = {
+        'properties': {
+            'host': {'type': 'string', 'description': 'The host.\n\n    Without the port.'},
+        },
+        'type': 'object',
+    }
+    markdown = ip._render_relation_data(databags, link_schema=False)
+    assert '| `host` | string | no | The host. Without the port. |' in markdown
 
 
 def test_databag_model_with_no_fields():
     databags: dict[str, typing.Any] = dict.fromkeys(DATABAGS)
     databags['provider-app'] = {'properties': {}, 'type': 'object'}
-    markdown = ip.render_relation_data(databags, link_schema=False)
+    markdown = ip._render_relation_data(databags, link_schema=False)
     assert markdown.splitlines()[:3] == [
         '### Provider application databag',
         '',
         'No fields are defined.',
     ]
     assert '|' not in markdown
-    assert ip.render_direction_diagram(databags) == ''
+    assert ip._render_direction_diagram(databags) == ''
 
 
 def test_recursive_nested_model_is_listed_once():
@@ -516,7 +528,7 @@ def test_recursive_nested_model_is_listed_once():
         'properties': {'root': {'$ref': '#/$defs/Node'}},
         'type': 'object',
     }
-    markdown = ip.render_relation_data(databags, link_schema=False)
+    markdown = ip._render_relation_data(databags, link_schema=False)
     assert '| `root` | `Node` object | no |  |' in markdown
     assert '| `children` | list of `Node` objects | no |  |' in markdown
     assert markdown.count('#### `Node`') == 1

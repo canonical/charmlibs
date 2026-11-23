@@ -63,7 +63,7 @@ class _Logger:
         print(f'WARNING: {msg % args}', file=sys.stderr)
 
 
-logger = _Logger()
+_logger = _Logger()
 
 _INDEX_TEMPLATE = """
 ({label})=
@@ -106,8 +106,8 @@ def _main() -> None:
     schemas = _load_schemas(root=_REPO_ROOT, schema_paths=schema_paths)
     for interface_dir in interface_dirs:
         _generate_interface_docs(interface_dir=interface_dir, ref_dir=ref_dir, schemas=schemas)
-    if logger.count:
-        sys.exit(f'{logger.count} warning(s) while generating the interface reference docs.')
+    if _logger.count:
+        sys.exit(f'{_logger.count} warning(s) while generating the interface reference docs.')
 
 
 def _missing_readmes(interface_dirs: list[pathlib.Path]) -> list[pathlib.Path]:
@@ -123,7 +123,7 @@ def _missing_readmes(interface_dirs: list[pathlib.Path]) -> list[pathlib.Path]:
 def _generate_interface_docs(
     interface_dir: pathlib.Path,
     ref_dir: pathlib.Path,
-    schemas: dict[str, Databags | SchemaError] | None = None,
+    schemas: dict[str, _Databags | _SchemaError] | None = None,
 ) -> None:
     """Write the index stub and rewritten version READMEs for one interface."""
     interface_name = interface_dir.name
@@ -137,7 +137,7 @@ def _generate_interface_docs(
         if schemas:
             schema = schemas.get(str((v / 'schema.py').relative_to(_REPO_ROOT)))
             readme_path = (v / 'README.md').relative_to(_REPO_ROOT)
-            readme_raw = with_generated_sections(readme_path, readme_raw, schema)
+            readme_raw = _with_generated_sections(readme_path, readme_raw, schema)
         base_url = f'{_REPO_MAIN_URL}/interfaces/{interface_name}/interface/{v.name}'
         readme = _rewrite_links(readme_raw, base_url)
         content = f'({label}-{v.name})=\n' + readme
@@ -174,7 +174,7 @@ def _write_if_needed(path: pathlib.Path, content: str) -> None:
 # relation data generated from schema.py #
 #########################################
 
-DATABAGS = {
+_DATABAGS = {
     'provider-app': 'Provider application databag',
     'provider-unit': 'Provider unit databag',
     'requirer-app': 'Requirer application databag',
@@ -183,24 +183,24 @@ DATABAGS = {
 _SCHEMA_SCRIPT = pathlib.Path(__file__).parent / 'interface_schemas.py'
 
 # A JSON Schema, as produced by Pydantic's model_json_schema().
-JsonSchema = dict[str, typing.Any]
+_JsonSchema = dict[str, typing.Any]
 
 
-class SchemaError(Exception):
+class _SchemaError(Exception):
     """A schema.py couldn't be loaded; the message is the reason."""
 
 
-Databags = dict[str, JsonSchema | None]
+_Databags = dict[str, _JsonSchema | None]
 
 
 def _load_schemas(
     root: pathlib.Path, schema_paths: list[str]
-) -> dict[str, Databags | SchemaError]:
+) -> dict[str, _Databags | _SchemaError]:
     """Return the databag JSON Schemas for each schema.py, keyed by path relative to root.
 
     The schemas are imported in a separate environment with the dependencies from
     schema-requirements.txt, so that pydantic isn't needed in the docs environment.
-    A schema that can't be loaded maps to a SchemaError with the reason. If the schemas
+    A schema that can't be loaded maps to a _SchemaError with the reason. If the schemas
     can't be loaded at all, the result is empty, with a warning.
     """
     if not schema_paths:
@@ -218,21 +218,21 @@ def _load_schemas(
         process = subprocess.run(cmd, capture_output=True, text=True, cwd=root, check=False)
         if process.returncode != 0:
             reason = process.stderr.strip() or f'exit code {process.returncode}'
-            raise SchemaError(f'{_SCHEMA_SCRIPT.name} failed:\n{reason}')
+            raise _SchemaError(f'{_SCHEMA_SCRIPT.name} failed:\n{reason}')
         output = json.loads(process.stdout)
-    except (OSError, ValueError, SchemaError) as e:
-        logger.warning(
+    except (OSError, ValueError, _SchemaError) as e:
+        _logger.warning(
             'Could not load the interface schemas, so no relation data is generated: %s', e
         )
         return {}
     return {
-        path: SchemaError(schema['error']) if 'error' in schema else schema['databags']
+        path: _SchemaError(schema['error']) if 'error' in schema else schema['databags']
         for path, schema in output.items()
     }
 
 
-def with_generated_sections(
-    readme_path: pathlib.Path, readme: str, databags: Databags | SchemaError | None
+def _with_generated_sections(
+    readme_path: pathlib.Path, readme: str, databags: _Databags | _SchemaError | None
 ) -> str:
     """Return the README with the generated sections added, if there is a schema.
 
@@ -241,29 +241,29 @@ def with_generated_sections(
     """
     if databags is None:
         return readme
-    if isinstance(databags, SchemaError):
+    if isinstance(databags, _SchemaError):
         reason = f'could not load schema.py:\n{databags}'
     else:
         try:
-            return add_generated_sections(readme, databags)
+            return _add_generated_sections(readme, databags)
         except Exception as e:  # Any malformed schema.
             reason = f'could not render schema.py: {type(e).__name__}: {e}'
-    logger.warning('%s: relation data not generated, because it %s', readme_path, reason)
+    _logger.warning('%s: relation data not generated, because it %s', readme_path, reason)
     return readme
 
 
-def add_generated_sections(readme: str, databags: Databags) -> str:
+def _add_generated_sections(readme: str, databags: _Databags) -> str:
     """Add the relation data tables and the direction diagram generated from the schema.
 
     The tables go directly under the 'Relation data' heading, or in a new section at the end
     if there isn't one. The diagram goes at the end of the 'Direction' section, or at the
     start of the generated relation data if there isn't one.
     """
-    diagram = render_direction_diagram(databags)
+    diagram = _render_direction_diagram(databags)
     lines = readme.splitlines()
     headings = _level_2_headings(lines)
     direction = headings.get('direction')
-    relation_data = render_relation_data(
+    relation_data = _render_relation_data(
         databags,
         link_schema='schema.py' not in readme,
         diagram=diagram if direction is None else '',
@@ -314,7 +314,7 @@ def _lines_outside_fences(lines: list[str]) -> typing.Iterator[tuple[int, str]]:
             yield i, line
 
 
-def render_direction_diagram(databags: dict[str, JsonSchema | None]) -> str:
+def _render_direction_diagram(databags: dict[str, _JsonSchema | None]) -> str:
     """Return a mermaid diagram of which side writes which fields, or '' if nothing is written."""
     edges: list[str] = []
     for side, other in (('provider', 'requirer'), ('requirer', 'provider')):
@@ -347,8 +347,8 @@ _NESTED_REQUIRED_NOTE = (
 )
 
 
-def render_relation_data(
-    databags: dict[str, JsonSchema | None], link_schema: bool = True, diagram: str = ''
+def _render_relation_data(
+    databags: dict[str, _JsonSchema | None], link_schema: bool = True, diagram: str = ''
 ) -> str:
     """Return Markdown with a table per non-empty databag, and one per nested object.
 
@@ -359,14 +359,14 @@ def render_relation_data(
         out.extend(['Generated from the [Pydantic schema](schema.py).', ''])
     if diagram:
         out.extend([diagram, ''])
-    empty = [title for name, title in DATABAGS.items() if databags.get(name) is None]
+    empty = [title for name, title in _DATABAGS.items() if databags.get(name) is None]
     rendered: set[str] = set()
     noted_required = False
-    for name, title in DATABAGS.items():
+    for name, title in _DATABAGS.items():
         schema = databags.get(name)
         if schema is None:
             continue
-        defs: dict[str, JsonSchema] = schema.get('$defs', {})
+        defs: dict[str, _JsonSchema] = schema.get('$defs', {})
         if '$ref' in schema:
             # The databag model itself, so a field that refers back to it isn't a nested model.
             rendered.add(schema['$ref'].rsplit('/', 1)[-1])
@@ -391,7 +391,7 @@ def render_relation_data(
     return '\n'.join(out).strip()
 
 
-def _databag_model(schema: JsonSchema) -> JsonSchema:
+def _databag_model(schema: _JsonSchema) -> _JsonSchema:
     """Return the object schema for a databag.
 
     Pydantic puts a model that refers to itself in `$defs`, and the databag's schema is then
@@ -402,8 +402,8 @@ def _databag_model(schema: JsonSchema) -> JsonSchema:
     return schema
 
 
-def _fields_table(schema: JsonSchema, defs: dict[str, JsonSchema]) -> list[str]:
-    properties: dict[str, JsonSchema] = schema.get('properties', {})
+def _fields_table(schema: _JsonSchema, defs: dict[str, _JsonSchema]) -> list[str]:
+    properties: dict[str, _JsonSchema] = schema.get('properties', {})
     if not properties:
         return ['No fields are defined.']
     required = set(schema.get('required', []))
@@ -424,7 +424,7 @@ def _fields_table(schema: JsonSchema, defs: dict[str, JsonSchema]) -> list[str]:
     return rows
 
 
-def _type(schema: JsonSchema, defs: dict[str, JsonSchema]) -> str:
+def _type(schema: _JsonSchema, defs: dict[str, _JsonSchema]) -> str:
     if '$ref' in schema:
         target = _resolve(schema, defs)
         name = schema['$ref'].rsplit('/', 1)[-1]
@@ -434,7 +434,7 @@ def _type(schema: JsonSchema, defs: dict[str, JsonSchema]) -> str:
             return f'`{name}` object'
         return _type(target, defs)
     if 'anyOf' in schema or 'oneOf' in schema:
-        options: list[JsonSchema] = schema.get('anyOf', schema.get('oneOf', []))
+        options: list[_JsonSchema] = schema.get('anyOf', schema.get('oneOf', []))
         nullable = any(o.get('type') == 'null' for o in options)
         types = [_type(o, defs) for o in options if o.get('type') != 'null']
         text = ' or '.join(dict.fromkeys(types)) or 'null'
@@ -459,7 +459,7 @@ def _type(schema: JsonSchema, defs: dict[str, JsonSchema]) -> str:
     if type_ == 'object':
         patterns = schema.get('patternProperties')
         if isinstance(patterns, dict) and patterns:
-            patterns = typing.cast('dict[str, JsonSchema]', patterns)
+            patterns = typing.cast('dict[str, _JsonSchema]', patterns)
             mappings = [
                 f'matching `{pattern}` to {_type(values, defs)}'
                 for pattern, values in patterns.items()
@@ -467,7 +467,7 @@ def _type(schema: JsonSchema, defs: dict[str, JsonSchema]) -> str:
             return 'mapping of string ' + ', or '.join(mappings)
         values = schema.get('additionalProperties')
         if isinstance(values, dict) and values:
-            return f'mapping of string to {_type(typing.cast("JsonSchema", values), defs)}'
+            return f'mapping of string to {_type(typing.cast("_JsonSchema", values), defs)}'
         return 'object'
     if isinstance(type_, str):
         return _with_constraints(type_, schema)
@@ -496,7 +496,7 @@ _FORMATS = {
 }
 
 
-def _with_constraints(type_: str, schema: JsonSchema) -> str:
+def _with_constraints(type_: str, schema: _JsonSchema) -> str:
     text = type_
     if 'format' in schema:
         text += f' ({_FORMATS.get(schema["format"], schema["format"])})'
@@ -528,7 +528,7 @@ def _characters(n: int) -> str:
     return '1 character' if n == 1 else f'{n} characters'
 
 
-def _enum(values: list[typing.Any], schema: JsonSchema) -> str:
+def _enum(values: list[typing.Any], schema: _JsonSchema) -> str:
     """Describe an enum or const.
 
     The values are shown as code, which looks the same for `1` and `"1"`, so a type other
@@ -570,17 +570,17 @@ def _code(value: typing.Any) -> str:
     return f'`{json.dumps(value)}`'
 
 
-def _resolve(schema: JsonSchema, defs: dict[str, JsonSchema]) -> JsonSchema:
+def _resolve(schema: _JsonSchema, defs: dict[str, _JsonSchema]) -> _JsonSchema:
     return defs.get(schema['$ref'].rsplit('/', 1)[-1], {})
 
 
-def _nested_models(schema: JsonSchema, defs: dict[str, JsonSchema]) -> list[str]:
+def _nested_models(schema: _JsonSchema, defs: dict[str, _JsonSchema]) -> list[str]:
     """Return the $defs object models referenced directly by schema's properties, in order."""
     found: list[str] = []
 
     def walk(node: typing.Any) -> None:
         if isinstance(node, dict):
-            node = typing.cast('JsonSchema', node)
+            node = typing.cast('_JsonSchema', node)
             ref = node.get('$ref')
             if isinstance(ref, str):
                 name = ref.rsplit('/', 1)[-1]
