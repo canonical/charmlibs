@@ -1,6 +1,7 @@
-# Unreleased
+# 1.0.2 - 16 November 2026
 
 - Updated project URLs.
+- Require `crossplane>=0.5.4`. Releases 0.4.10 to 0.5.3 use the `unicode-internal` codec, which Python 3.8 removed, so `crossplane.build` fails with them.
 
 # 1.0.1 - 22 June 2026
 

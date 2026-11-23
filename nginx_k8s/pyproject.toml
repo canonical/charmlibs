@@ -16,12 +16,12 @@ classifiers = [
 dynamic = ["version"]
 dependencies = [
     "ops>=3,<4",
-    "crossplane",
+    "crossplane>=0.5.4",
 ]
 
 [dependency-groups]
 lint = [
-    "typing_extensions",
+    "typing_extensions>=4.6",
 ]
 unit = [
     "ops[testing]>=3,<4",
