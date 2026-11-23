@@ -21,7 +21,7 @@ dependencies = [
 
 [dependency-groups]
 lint = [
-    "typing_extensions",
+    "typing_extensions>=4.6",
 ]
 unit = [
     "ops[testing]>=3,<4",

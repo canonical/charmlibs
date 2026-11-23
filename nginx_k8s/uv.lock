@@ -34,7 +34,7 @@ integration = [
     { name = "jubilant" },
     { name = "pytest-jubilant", specifier = ">=2" },
 ]
-lint = [{ name = "typing-extensions" }]
+lint = [{ name = "typing-extensions", specifier = ">=4.6" }]
 unit = [{ name = "ops", extras = ["testing"], specifier = ">=3,<4" }]
 
 [[package]]
