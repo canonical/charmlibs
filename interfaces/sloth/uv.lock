@@ -31,7 +31,6 @@ lint = [
 ]
 unit = [
     { name = "ops", extra = ["testing"] },
-    { name = "pytest" },
 ]
 
 [package.metadata]
@@ -49,10 +48,7 @@ integration = [
     { name = "pytest-jubilant" },
 ]
 lint = [{ name = "typing-extensions" }]
-unit = [
-    { name = "ops", extras = ["testing"] },
-    { name = "pytest" },
-]
+unit = [{ name = "ops", extras = ["testing"] }]
 
 [[package]]
 name = "colorama"

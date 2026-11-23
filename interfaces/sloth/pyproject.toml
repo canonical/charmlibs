@@ -27,7 +27,6 @@ lint = [  # installed for `just lint interfaces/sloth` (unit, functional, and in
 ]
 unit = [  # installed for `just unit interfaces/sloth`
     "ops[testing]",
-    "pytest",
 ]
 functional = [  # installed for `just functional interfaces/sloth`
 ]
