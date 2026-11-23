@@ -13,6 +13,11 @@ In most cases, this will be accomplished using the [saml library](https://github
 The `saml` interface implements a provider/requirer pattern.
 The requirer is a charm that wishes to act as a SAML Service Provider, and the provider is a charm exposing a SAML Identity Provider.
 
+```mermaid
+flowchart TD
+    Provider -- metadata_url, entity_id, single_sign_on_service_redirect_url, single_sign_on_service_redirect_binding, x509certs --> Requirer
+```
+
 ## Behavior
 
 The requirer and the provider must adhere to a certain set of criteria to be considered compatible with the interface.

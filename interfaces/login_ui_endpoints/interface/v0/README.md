@@ -24,6 +24,12 @@ The full list of endpoints provided by login_ui_endpoints provider is the follow
 The interface will consist of a provider and a requirer. The provider is expected to supply its endpoints,
 while the requirer will just read the information from the application databag. For the full list of endpoints, please refer to the Endpoints section.
 
+```mermaid
+flowchart
+    Requirer ----> Provider
+    Provider -- default_url, consent_url... --> Requirer
+```
+
 ## Behavior
 
 Both the requirer and the provider need to adhere to a certain set of criteria to be considered compatible with the interface:

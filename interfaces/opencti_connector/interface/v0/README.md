@@ -9,6 +9,12 @@ In most cases, this will be accomplished using the [opencti-connector library](h
 ## Direction
 The `opencti-connector` interface does not implement a typical provider/requirer pattern. The interface is designed specifically for OpenCTI connectors, with the assumption that there will always be a single OpenCTI provider. To streamline the development of 20+ nearly identical connectors, a shared `OpenctiConnectorCharm` base class was created to encapsulate common relation logic, reducing boilerplate and simplifying charm creation. The `OpenctiConnectorCharm` class is inherited by connector charms that want to consume this library, such as the [crowdstrike connector charm](https://github.com/canonical/opencti-operator/tree/main/connectors/crowdstrike).
 
+```mermaid
+flowchart TD
+    Provider -- ConnectorDetails --> Requirer
+    Requirer -- OpenCTIConnection --> Provider
+```
+
 ## Behavior
 
 The requirer and the provider need to adhere to a certain set of criteria to be considered compatible with the interface.

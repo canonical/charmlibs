@@ -10,6 +10,12 @@ This relation interface describes the expected behavior of any charm claiming to
 
 ## Direction
 
+```mermaid
+flowchart LR
+    Requirer -- topic, extra-user-roles, consumer-group-prefix --> Provider
+    Provider -- topic, username, password, endpoints, consumer-group-prefix, zookeeper-uris --> Requirer
+```
+
 ## Behavior
 
 Both the Requirer and the Provider need to adhere to the criteria, to be considered compatible with the interface.

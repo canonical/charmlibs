@@ -16,7 +16,14 @@ The `v1` of the `s3` interface is different from `v0` of the same interface in t
 
 ## Direction
 
+```mermaid
+flowchart TD
+    Requirer -- bucket, path, requested-secrets, lib-version --> Provider
+    Provider -- bucket, path, secret-extra, lib-version, endpoint, region, etc. --> Requirer
+```
+
 As with all Juju relations, the `s3` interface consists of two parties: a Provider (object storage charm) and a Requirer (application charm). The Provider will be expected to provide S3 credentials (along with `endpoint`, `container`, `prefix` and other fields), which can be used to access the actual object storage.
+
 
 ## Migration Strategy
 To upgrade a charm that uses `v0` of this interface to `v1` interface is as simple as upgrading the interface charm-lib from `0.x` to `1.x`. The newer version of the lib still supports the charms using the `v0` interface; however the relation needs to be broken and created again to realize the changes in the interface in `v1`.

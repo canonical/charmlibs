@@ -10,6 +10,11 @@ SD-Core Webui Operator that is responsible for the configuration of the SD-Core 
 
 ## Direction
 
+```mermaid
+flowchart TD
+    Provider -- management_url --> Requirer
+```
+
 As with all Juju relations, the `sdcore_management` interface consists of two parties: a Provider and a Requirer.
 
 ## Behavior

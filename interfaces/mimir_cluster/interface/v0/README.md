@@ -9,6 +9,14 @@ This relation interface describes the protocol for communication between the `mi
 The `mimir_cluster` interface implements a provider/requirer pattern.
 The provider is `mimir-coordinator-k8s` and the requirers are `mimir-worker-k8s`.
 
+```mermaid
+flowchart TD
+    mimir-coordinator
+    mimir-worker-0 -- mimir_cluster --> mimir-coordinator
+    mimir-worker-1 -- mimir_cluster --> mimir-coordinator
+    mimir-worker-2 -- mimir_cluster --> mimir-coordinator
+```
+
 ## Behavior
 
 The requirer and provider should provide specific information to facilitate the running of Mimir.

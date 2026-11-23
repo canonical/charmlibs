@@ -6,6 +6,12 @@ Some charms require a secure key value store. This relation interface describes 
 
 ## Direction
 
+```mermaid
+flowchart TD
+    Requirer -- mount_suffix, nonce, egress_subnet, [wrap_ttl] --> Provider
+    Provider -- vault_url, ca_certificate, mount, credentials --> Requirer
+```
+
 ## Behavior
 
 Both the Requirer and the Provider need to adhere to criteria to be considered compatible with the interface.

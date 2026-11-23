@@ -14,6 +14,12 @@ Charm developers are free to provide alternative libraries as long as they fulfi
 The `grafana_datasource_exchange` interface implements a symmetrical provider/requirer pattern. 
 Symmetrical, in the sense that the role doesn't matter and the data to be exchanged is the same for the requirer and the provider.
 
+```mermaid
+flowchart TD
+    Provider -- Datasources --> Requirer
+    Requirer -- Datasources --> Provider
+```
+
 ## Behavior
 
 The requirer and the provider need to adhere to a certain set of criteria to be considered compatible with the interface.

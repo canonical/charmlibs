@@ -15,6 +15,11 @@ This interface implements a provider/requirer pattern. As is customary, the prov
 The interface is unidirectional: the provider doesn't need any information from the requirer.
 The provider shares any and all supported ingestion endpoints.
 
+```mermaid
+flowchart TD
+    Provider -- ProfilingEndpoints --> Requirer
+```
+
 ## Behavior
 ### Provider
 

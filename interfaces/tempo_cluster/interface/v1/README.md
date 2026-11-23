@@ -10,6 +10,12 @@ The coordinator will use the same relation to convey to the workers back the con
 
 This interface implements a provider/requirer pattern. The coordinator charm is the provider of the relation, the worker charm is the requirer. Information flows back and forth: first the requirer shares some data necessary for the coordinator to know the role of the worker, then the provider replies back with the configuration it should run with and other bits of configuration for the charm to use. 
 
+```mermaid
+flowchart TD
+    Requirer -- Role, JujuTopology --> Provider
+    Provider -- Config --> Requirer
+```
+
 ## Behavior
 
 ### Provider

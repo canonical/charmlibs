@@ -7,6 +7,12 @@ namespace and ConfigMap details.
 
 ## Direction
 
+```mermaid
+flowchart TD
+    Requirer ----> Provider
+    Provider -- admin_endpoint, public_endpoint, login_browser_endpoint, sessions_endpoint, providers_configmap_name, schemas_configmap_name, configmaps_namespace, mfa_enabled, oidc_webauthn_sequencing_enabled --> Requirer
+```
+
 ## Behavior
 
 Both the Requirer and the Provider need to adhere to criteria to be considered

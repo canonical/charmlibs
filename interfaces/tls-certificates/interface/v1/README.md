@@ -13,6 +13,12 @@ As with all Juju relations, the `tls-certificates` interface consists of a provi
 One of these, in this case the `provider`, will be expected to create TLS certificates where the
 `requirer` will be able to consume and use them for TLS communications.
 
+```mermaid
+flowchart
+    Requirer -- certificate_signing_requests --> Provider
+    Provider -- certificates --> Requirer
+```
+
 ## Behavior
 
 Both the requirer and the provider need to adhere to a certain set of criteria to be considered

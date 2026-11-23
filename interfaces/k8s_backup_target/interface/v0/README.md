@@ -8,6 +8,11 @@ The `k8s_backup_target` interface enables a **client charm** to specify what Kub
 
 This is a unidirectional interface where the provider (client) sends data and the requirer (backup charm or backup integrator) only receives data. There is no data sent back from the requirer side.
 
+```mermaid
+flowchart TD
+    Provider -- endpoint, app_name, model, spec --> Requirer
+```
+
 ## Behavior
 
 - **Provider (Client Charm)**: Provides the backup specification via its application relation data. Typically, a client charm will set this data as soon as the relation is formed.

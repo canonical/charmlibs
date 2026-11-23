@@ -13,6 +13,18 @@ In most cases, this will be accomplished using the [smtp library](https://github
 The `smtp` interface implements a provider/requirer pattern.
 The requirer is a charm that requires SMTP details to connect to an SMTP server, and the provider is a charm holding those details.
 
+```mermaid
+flowchart TD
+    Provider -- host, port, user, password_id, auth_type, transport_security, domain --> Requirer
+```
+
+or alternatively, if secrets are not supported by either sides
+
+```mermaid
+flowchart TD
+    Provider -- host, port, user, password, auth_type, transport_security, domain --> Requirer
+```
+
 ## Behavior
 
 The requirer and the provider must adhere to a certain set of criteria to be considered compatible with the interface.

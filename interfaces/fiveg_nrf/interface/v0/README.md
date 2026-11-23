@@ -8,6 +8,11 @@ This relation interface describes the expected behavior of any charm claiming to
 
 ## Direction
 
+```mermaid
+flowchart TD
+    Provider -- url --> Requirer
+```
+
 As with all Juju relations, the `fiveg_nrf` interface consists of two parties: a Provider and a Requirer.
 
 ## Behavior

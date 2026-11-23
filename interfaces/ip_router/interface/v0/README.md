@@ -7,6 +7,12 @@ to provide or consume IP routes.
 
 ## Direction
 
+```mermaid
+flowchart TD
+    Requirer -- Networks --> Provider
+    Provider -- Networks --> Requirer
+```
+
 As with all Juju relations, the `ip_router` interface consists of two parties: a Provider and a Requirer.
 
 ## Behavior

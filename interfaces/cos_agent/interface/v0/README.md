@@ -7,6 +7,19 @@ The `cos_agent` interface is meant to exchange information on several observabil
 
 ## Direction
 
+```mermaid
+flowchart TD
+    Provider["Provider (e.g. kafka)"] -- "relation_name
+    metrics_endpoints
+    metrics_rules_dir
+    logs_rules_dir
+    recursive_rules_dir
+    log_slots
+    dashboard_dirs
+    refresh_events" --> Requirer
+    Requirer["Requirer (e.g. grafana-agent)"] -- refresh_events --> Provider
+```
+
 As all Juju relations, the `cos_agent` interface consists of a provider and a requirer. In this case the `Provider` side of the relationship may provide telemetry settings, if not, the required side will use default values.
 
 ## Behavior

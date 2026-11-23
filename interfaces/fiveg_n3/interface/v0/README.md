@@ -12,6 +12,11 @@ In a typical 5G network, the 'requirer' of this interface would be a gNodeB (a 5
 
 ## Direction
 
+```mermaid
+flowchart TD
+    Provider -- IP address --> Requirer
+```
+
 As with all Juju relations, the `fiveg_n3` interface consists of two parties: a Provider 
 and a Requirer.
 

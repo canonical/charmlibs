@@ -7,6 +7,11 @@ This relation interface should be used for both Azure Blob Storage and Azure Dat
 
 ## Direction
 
+```mermaid
+flowchart TD
+    Provider -- container, storage-account, secret-key, connection-protocol, endpoint, path --> Requirer
+```
+
 As with all Juju relations, the `azure_storage` interface consists of two parties: a Provider (object storage charm) and a Requirer (application charm). The Provider will be expected to provide new unique credentials (along with `storage-account`, `container`, `connection-protocol` and other fields), which can be used to access the actual object storage.
 
 ## Behaviour

@@ -8,6 +8,12 @@ In most cases, this will be accomplished using the [openfga library](https://cha
 
 ## Direction
 
+```mermaid
+flowchart TD
+    Requirer -- store_name --> Provider
+    Provider -- store_id, token_secret_id, token, grpc_api_url, http_api_url --> Requirer
+```
+
 As with all Juju relations, the `openfga` interface consists of two parties: a Provider (openfga charm), and a Requirer (application charm). The Requirer will be expected to expose an authentication store name, and the Provider will create and forward new unique credentials (along with other optional fields), which can be used to access the OpenFGA store.
 
 ## Behavior

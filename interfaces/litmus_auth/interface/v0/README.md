@@ -13,6 +13,12 @@ This interface implements a provider/requirer pattern. The provider is the auth 
 
 Information flows back and forth: The requirer shares its gRPC server endpoint, and the provider also shares its gRPC server endpoint.
 
+```mermaid
+flowchart TD
+    Requirer -- Endpoint --> Provider
+    Provider -- Endpoint --> Requirer
+```
+
 ## Behavior
 
 ### Provider

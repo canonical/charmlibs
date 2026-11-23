@@ -14,6 +14,12 @@ The requirer is furthermore expected to share back to the provider:
 - a unique identifier assigned to the source. This can be used by the provider to share with other charms for data correlation and cross-referencing purposes.
 - a unique identifier for the grafana application itself.
 
+```mermaid
+flowchart TD
+    Provider -- DatasourceEndpoint --> Requirer
+    Requirer -- [DatasourceUID,GrafanaUID] --> Provider
+```
+
 ## Behavior
 
 The requirer and the provider need to adhere to a certain set of criteria to be considered compatible with the interface.
