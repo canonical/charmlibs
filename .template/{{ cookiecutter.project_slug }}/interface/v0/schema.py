@@ -20,11 +20,13 @@ is a Pydantic model for that databag, or `None` if nothing is written to it.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ProviderAppData(BaseModel):
     """The provider's application databag."""
+
+    model_config = ConfigDict(json_schema_extra={'examples': [{'url': 'https://example.com'}]})
 
     url: str = Field(
         description='The URL that the requirer connects to.',
@@ -34,6 +36,8 @@ class ProviderAppData(BaseModel):
 
 class RequirerAppData(BaseModel):
     """The requirer's application databag."""
+
+    model_config = ConfigDict(json_schema_extra={'examples': [{'name': 'my-app'}]})
 
     name: str = Field(
         description='The name that the provider uses for the requirer.',
