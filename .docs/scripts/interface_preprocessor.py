@@ -2,6 +2,7 @@
 
 # /// script
 # requires-python = ">=3.12"
+# dependencies = ["pyyaml~=6.0"]
 # ///
 
 # Copyright 2025 Canonical Ltd.
@@ -22,10 +23,15 @@
 
 Walks every interface returned by ``.scripts/ls.py interfaces``, and for each
 one writes an index stub with a glob toctree under ``reference/interfaces/``,
-plus one page per ``interface/v[0-9]*/README.md`` with relative links
-rewritten to absolute GitHub URLs. Where a version has a ``schema.py``, its
-page also gets relation data tables and a direction diagram generated from the
-schema. Any warning makes the script exit with an error once every page is written.
+plus one page per ``interface/v[0-9]*/README.md``. Each page has:
+
+* A header generated from ``interface.yaml``: the name, description, library, and status.
+* The README's content, without its title, and with relative links rewritten to
+  absolute GitHub URLs.
+* Where the version has a ``schema.py``, a 'Relation data' section generated from
+  the schema: a diagram, tables, and examples.
+
+Any warning makes the script exit with an error once every page is written.
 
 Run from ``just docs``; see ``docs.just`` for the invocation.
 
@@ -46,6 +52,8 @@ import re
 import subprocess
 import sys
 import typing
+
+import yaml
 
 _DOCS_DIR = pathlib.Path(__file__).parent.parent.resolve()
 _REPO_ROOT = _DOCS_DIR.parent
@@ -104,8 +112,14 @@ def _main() -> None:
         for p in (interface_dir / 'interface').glob('v[0-9]*/schema.py')
     )
     schemas = _load_schemas(root=_REPO_ROOT, schema_paths=schema_paths)
+    package_labels = _package_labels()
     for interface_dir in interface_dirs:
-        _generate_interface_docs(interface_dir=interface_dir, ref_dir=ref_dir, schemas=schemas)
+        _generate_interface_docs(
+            interface_dir=interface_dir,
+            ref_dir=ref_dir,
+            schemas=schemas,
+            package_labels=package_labels,
+        )
     if _logger.count:
         sys.exit(f'{_logger.count} warning(s) while generating the interface reference docs.')
 
@@ -124,8 +138,9 @@ def _generate_interface_docs(
     interface_dir: pathlib.Path,
     ref_dir: pathlib.Path,
     schemas: dict[str, _Databags | _SchemaError] | None = None,
+    package_labels: frozenset[str] = frozenset(),
 ) -> None:
-    """Write the index stub and rewritten version READMEs for one interface."""
+    """Write the index stub and the version pages for one interface."""
     interface_name = interface_dir.name
     interface_ref_dir = ref_dir / interface_name
     interface_ref_dir.mkdir(exist_ok=True)
@@ -133,14 +148,18 @@ def _generate_interface_docs(
     index = _INDEX_TEMPLATE.format(label=label, interface_name=interface_name)
     _write_if_needed(path=ref_dir / f'{interface_name}.md', content=index)
     for v in (interface_dir / 'interface').glob('v[0-9]*'):
-        readme_raw = (v / 'README.md').read_text()
+        body = _without_title((v / 'README.md').read_text())
         if schemas:
-            schema = schemas.get(str((v / 'schema.py').relative_to(_REPO_ROOT)))
             readme_path = (v / 'README.md').relative_to(_REPO_ROOT)
-            readme_raw = _with_generated_sections(readme_path, readme_raw, schema)
+            schema = schemas.get(str((v / 'schema.py').relative_to(_REPO_ROOT)))
+            body = _join(body, _render_generated_section(readme_path, schema))
         base_url = f'{_REPO_MAIN_URL}/interfaces/{interface_name}/interface/{v.name}'
-        readme = _rewrite_links(readme_raw, base_url)
-        content = f'({label}-{v.name})=\n' + readme
+        # The header isn't rewritten, as that would break its cross-reference to the library.
+        page = _join(
+            _render_header(v, package_labels),
+            _rewrite_links(body, base_url),
+        )
+        content = f'({label}-{v.name})=\n{page}\n'
         _write_if_needed(path=interface_ref_dir / f'{v.name}.md', content=content)
 
 
@@ -168,6 +187,113 @@ def _write_if_needed(path: pathlib.Path, content: str) -> None:
     """
     if not path.exists() or path.read_text() != content:
         path.write_text(content)
+
+
+########################################
+# header generated from interface.yaml #
+########################################
+
+# For example, charms.smtp_integrator.smtp: a library vendored with `charmcraft fetch-lib`.
+_CHARMHUB_LIB = re.compile(r'charms\.[A-Za-z_]\w*\.[A-Za-z_]\w*')
+# A Python distribution or import name, which PyPI normalises to the same project name.
+_PYPI_NAME = re.compile(r'[A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?')
+
+
+def _package_labels() -> frozenset[str]:
+    """Return the Sphinx labels of this repo's package reference pages.
+
+    These are the labels that ``package_docs_preprocessor.py`` writes, such as
+    ``charmlibs-interfaces-tls-certificates``.
+    """
+    cmd = [
+        _REPO_ROOT / '.scripts' / 'ls.py',
+        'packages',
+        '--exclude-examples',
+        '--exclude-placeholders',
+        '--exclude-testing',
+    ]
+    packages: list[str] = json.loads(subprocess.check_output(cmd, text=True))
+    return frozenset(
+        '-'.join(['charmlibs', *(_normalise(part) for part in package.split('/'))])
+        for package in packages
+    )
+
+
+def _normalise(name: str) -> str:
+    """Normalise a name the way PyPI normalises distribution names."""
+    return re.sub(r'[-_.]+', '-', name).lower()
+
+
+def _metadata(version_dir: pathlib.Path) -> dict[str, str]:
+    """Return the non-empty scalar fields of the version's interface.yaml, as strings."""
+    path = version_dir / 'interface.yaml'
+    if not path.is_file():
+        return {}
+    data = yaml.safe_load(path.read_text())
+    if not isinstance(data, dict):
+        _logger.warning('%s: expected a mapping.', path)
+        return {}
+    data = typing.cast('dict[str, object]', data)
+    return {
+        key: str(value).strip()
+        for key, value in data.items()
+        if value is not None and not isinstance(value, (list, dict)) and str(value).strip()
+    }
+
+
+def _render_header(version_dir: pathlib.Path, package_labels: frozenset[str]) -> str:
+    """Return the start of the page: the title, description, library, and status.
+
+    The title has the version, so that the versions of an interface can be told apart in
+    the navigation. Fields that interface.yaml doesn't have are left out.
+    """
+    metadata = _metadata(version_dir)
+    name = metadata.get('name', version_dir.parent.parent.name)
+    out = [f'# `{name}/{version_dir.name}`']
+    if description := metadata.get('description') or metadata.get('summary'):
+        out.append(description)
+    details: list[str] = []
+    if 'lib' in metadata:
+        details.append(f'* Library: {_render_lib(metadata["lib"], package_labels)}')
+    if 'status' in metadata:
+        details.append(f'* Status: {metadata["status"]}')
+    if details:
+        out.append('\n'.join(details))
+    return _join(*out)
+
+
+def _render_lib(lib: str, package_labels: frozenset[str]) -> str:
+    """Return the library, with a link where there is one to make.
+
+    * A package in this repo links to its reference page, or to PyPI if it doesn't have one.
+    * Any other Python package links to its PyPI project.
+    * A Charmhub-hosted library isn't linked, and neither is anything else.
+    """
+    code = f'`{lib}`'
+    if _CHARMHUB_LIB.fullmatch(lib):
+        return f'{code} (Charmhub-hosted)'
+    if not _PYPI_NAME.fullmatch(lib) or lib.startswith('charms.'):
+        return code
+    project = _normalise(lib)
+    if lib.startswith('charmlibs.') and project in package_labels:
+        return f'[{code}](project:#{project})'
+    return f'[{code}](https://pypi.org/project/{project}/)'
+
+
+def _without_title(readme: str) -> str:
+    """Return the README without its title, which the generated header replaces."""
+    lines = readme.splitlines()
+    for i, line in _lines_outside_fences(lines):
+        if line.startswith('# '):
+            return '\n'.join(lines[:i] + lines[i + 1 :]).strip()
+        if line.startswith('## '):
+            break
+    return readme.strip()
+
+
+def _join(*parts: str) -> str:
+    """Join the non-empty blocks of Markdown with blank lines."""
+    return '\n\n'.join(part.strip() for part in parts if part.strip())
 
 
 ##########################################
@@ -231,72 +357,25 @@ def _load_schemas(
     }
 
 
-def _with_generated_sections(
-    readme_path: pathlib.Path, readme: str, databags: _Databags | _SchemaError | None
+def _render_generated_section(
+    readme_path: pathlib.Path, databags: _Databags | _SchemaError | None
 ) -> str:
-    """Return the README with the generated sections added, if there is a schema.
+    """Return the 'Relation data' section, or '' if there is no schema.
 
     If the schema couldn't be loaded or rendered, warn, naming the README and the reason,
-    and return the README unchanged.
+    and return ''.
     """
     if databags is None:
-        return readme
+        return ''
     if isinstance(databags, _SchemaError):
         reason = f'could not load schema.py:\n{databags}'
     else:
         try:
-            return _add_generated_sections(readme, databags)
+            return _join('## Relation data', _render_relation_data(databags))
         except Exception as e:  # Any malformed schema.
             reason = f'could not render schema.py: {type(e).__name__}: {e}'
     _logger.warning('%s: relation data not generated, because it %s', readme_path, reason)
-    return readme
-
-
-def _add_generated_sections(readme: str, databags: _Databags) -> str:
-    """Add the relation data tables and the direction diagram generated from the schema.
-
-    The tables go directly under the 'Relation data' heading, or in a new section at the end
-    if there isn't one. The diagram goes at the end of the 'Direction' section, or at the
-    start of the generated relation data if there isn't one.
-    """
-    diagram = _render_direction_diagram(databags)
-    lines = readme.splitlines()
-    headings = _level_2_headings(lines)
-    direction = headings.get('direction')
-    relation_data = _render_relation_data(
-        databags,
-        link_schema='schema.py' not in readme,
-        diagram=diagram if direction is None else '',
-    )
-    if direction is not None and diagram:
-        end = _section_end(lines, direction)
-        while end > direction + 1 and not lines[end - 1].strip():
-            end -= 1
-        lines[end:end] = ['', *diagram.splitlines()]
-    # Look the heading up again: the diagram may have moved it.
-    relation_data_index = _level_2_headings(lines).get('relation data')
-    if relation_data_index is None:
-        lines.extend(['', '## Relation data', '', relation_data])
-    else:
-        lines[relation_data_index + 1 : relation_data_index + 1] = ['', relation_data]
-    return '\n'.join(lines) + '\n'
-
-
-def _level_2_headings(lines: list[str]) -> dict[str, int]:
-    """Map lowercased '## ' headings outside code fences to their line index."""
-    result: dict[str, int] = {}
-    for i, line in _lines_outside_fences(lines):
-        if line.startswith('## '):
-            result.setdefault(line[3:].strip().lower(), i)
-    return result
-
-
-def _section_end(lines: list[str], start: int) -> int:
-    """Return the index of the first '# ' or '## ' heading after start, or len(lines)."""
-    for i, line in _lines_outside_fences(lines):
-        if i > start and (line.startswith('# ') or line.startswith('## ')):
-            return i
-    return len(lines)
+    return ''
 
 
 def _lines_outside_fences(lines: list[str]) -> typing.Iterator[tuple[int, str]]:
@@ -347,17 +426,10 @@ _NESTED_REQUIRED_NOTE = (
 )
 
 
-def _render_relation_data(
-    databags: dict[str, _JsonSchema | None], link_schema: bool = True, diagram: str = ''
-) -> str:
-    """Return Markdown with a table per non-empty databag, and one per nested object.
-
-    If diagram is given, it goes before the tables (after the schema link, if any).
-    """
-    out: list[str] = []
-    if link_schema:
-        out.extend(['Generated from the [Pydantic schema](schema.py).', ''])
-    if diagram:
+def _render_relation_data(databags: dict[str, _JsonSchema | None]) -> str:
+    """Return Markdown with a diagram, and a table per non-empty databag and nested object."""
+    out = ['Generated from the [Pydantic schema](schema.py).', '']
+    if diagram := _render_direction_diagram(databags):
         out.extend([diagram, ''])
     empty = [title for name, title in _DATABAGS.items() if databags.get(name) is None]
     rendered: set[str] = set()
@@ -372,6 +444,7 @@ def _render_relation_data(
             rendered.add(schema['$ref'].rsplit('/', 1)[-1])
         schema = _databag_model(schema)
         out.extend([f'### {title}', '', *_fields_table(schema, defs), ''])
+        out.extend(_databag_examples(schema))
         pending = _nested_models(schema, defs)
         while pending:
             model = pending.pop(0)
@@ -418,10 +491,70 @@ def _fields_table(schema: _JsonSchema, defs: dict[str, _JsonSchema]) -> list[str
         description = prop.get('description', '')
         if not description and '$ref' in prop:
             description = _resolve(prop, defs).get('description', '')
+        description = _join_sentences(description, _field_examples(prop))
         type_ = _type(prop, defs).replace('|', '\\|')
         req = req.replace('|', '\\|')
-        rows.append(f'| `{field}` | {type_} | {req} | {_cell(description)} |')
+        rows.append(f'| `{field}` | {type_} | {req} | {description} |')
     return rows
+
+
+_MAX_FIELD_EXAMPLES = 3
+
+
+def _field_examples(prop: _JsonSchema) -> str:
+    """Return a sentence with the first few of a field's examples, or '' if it has none."""
+    examples = prop.get('examples')
+    # Pydantic doesn't check that a schema's examples are a list.
+    if not isinstance(examples, list) or not examples:
+        return ''
+    examples = typing.cast('list[object]', examples)
+    values = [_example_code(example) for example in examples[:_MAX_FIELD_EXAMPLES]]
+    return f'{"Example" if len(examples) == 1 else "Examples"}: {", ".join(values)}.'
+
+
+def _example_code(value: object) -> str:
+    text = value if isinstance(value, str) else json.dumps(value)
+    return _code_span(text).replace('|', '\\|')
+
+
+def _code_span(text: str) -> str:
+    """Return the text as a code span on one line, even if it contains backticks."""
+    text = ' '.join(text.split())
+    longest = max((len(run) for run in re.findall(r'`+', text)), default=0)
+    if not longest:
+        return f'`{text}`'
+    fence = '`' * (longest + 1)
+    return f'{fence} {text} {fence}'
+
+
+def _join_sentences(description: str, examples: str) -> str:
+    text = _cell(description)
+    if text and examples and text[-1] not in '.!?:':
+        text += '.'
+    return f'{text} {examples}'.strip()
+
+
+def _databag_examples(schema: _JsonSchema) -> list[str]:
+    """Return the lines of a YAML block for each of the databag model's own examples.
+
+    These aren't built from the fields' examples, because fields that can't be used together
+    often each have one.
+    """
+    examples = schema.get('examples')
+    if not isinstance(examples, list):
+        return []
+    out: list[str] = []
+    fields = list(schema.get('properties', {}))
+    for example in typing.cast('list[object]', examples):
+        if isinstance(example, dict):
+            # Pydantic sorts the keys, so put them back in the order of the fields.
+            example = typing.cast('dict[str, object]', example)
+            known = {field: example[field] for field in fields if field in example}
+            example = {**known, **example}
+        text = yaml.safe_dump(example, sort_keys=False, allow_unicode=True, width=10_000)
+        fence = '`' * max([3, *(len(run) + 1 for run in re.findall(r'`{3,}', text))])
+        out.extend(['Example:', '', f'{fence}yaml', *text.rstrip().splitlines(), fence, ''])
+    return out
 
 
 def _type(schema: _JsonSchema, defs: dict[str, _JsonSchema]) -> str:

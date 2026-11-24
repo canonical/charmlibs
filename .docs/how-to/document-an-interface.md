@@ -34,32 +34,30 @@ interfaces/<interface-name>/
 
 ## Write the specification README
 
-The `README.md` file is the heart of the specification. It is rendered word for word on the docs site (under {ref}`reference-interfaces`).
+The `README.md` file is the heart of the specification. On the docs site (under {ref}`reference-interfaces`), each page is made up of:
 
-Relative links to files in the repository are rewritten to GitHub URLs by the docs build. Absolute URLs are preserved as-is, and should be used for links to PyPI and Charmhub. Intersphinx links are not currently supported, so links to other documentation should use absolute URLs as well.
+1. A header generated from `interface.yaml`: the interface's name, description, recommended library, and status.
+2. The content of the README.
+3. A 'Relation data' section generated from `schema.py`: a diagram of which side writes which fields, and the fields, types, and examples for each databag.
 
-Start the README with a top-level heading of the form `# <interface-name>`, and a short paragraph explaining what the interface is for and which library charm authors should use to implement it, linking to the recommended `charmlibs.interfaces.<name>` package on PyPI.
+So don't repeat any of the generated content in the README. Nothing generated is committed: on GitHub, `interface.yaml` and `schema.py` are beside the README.
 
-Then add the following sections.
+Relative links in the README to files in the repository are rewritten to GitHub URLs by the docs build. Absolute URLs are preserved as-is, and should be used for links to PyPI and Charmhub. Intersphinx links are not currently supported, so links to other documentation should use absolute URLs as well.
+
+Start the README with a top-level heading of the form `# <interface-name>`, which the docs build replaces with the generated header. Then add the following sections.
 
 ### Direction
 
-Describe the provider/requirer (or requirer/provider) flow.
-Don't draw a diagram of which side writes which fields: the docs build generates one from `schema.py` and adds it to the end of this section.
-A hand-written Mermaid diagram is still useful when the order of the exchanges matters.
+Only include this section if the flow between the sides needs explaining, for example if the order of the exchanges matters. A hand-written Mermaid diagram can help with that. Don't describe or draw which side writes which fields, as that is generated.
 
 ### Behavior
 
 List the expectations for each side of the relation, under `### Requirer` and `### Provider` subheadings. Use bullets phrased as "Is expected to ...". These are the criteria a charm must meet to be considered compatible with the interface. These criteria should be the source of truth for validators written to check compliance with interfaces, and must be kept up-to-date with library behaviour.
 
-### Relation data
-
-Document the contents of the application and unit databags for each side at a high level. This should be the final section in the document. The docs build renders `schema.py` directly under this heading. It adds a link to the schema, unless the README already has one. It then adds a table for each databag the interface uses, giving each field's type, whether it's required, and its description. It also adds a table for each nested model, and a list of the empty databags. The tables are generated when the docs are built and aren't committed, so put each field's details in the schema's field descriptions rather than repeating them in the README. The `examples` of a field aren't rendered, so add any example databag contents by hand, after the high-level description. If the interface version has no `schema.py`, nothing is generated.
-
 ## Write the interface metadata
 
 The `interface.yaml` file holds machine-readable metadata about the interface version.
-It is consumed by tooling and displayed on the interface listing.
+It is consumed by tooling, displayed on the interface listing, and used for the start of the docs page.
 
 ```yaml
 name: tls-certificates
@@ -87,7 +85,7 @@ Use these fields:
 | `status` | Use `published` for a new interface. Some older interface definitions use `draft` and should instead use `published` if a charm has been published that uses the interface. Mark an interface as `retired` only if no supported charms use it. |
 | `lib` | The import path of the recommended `charmlibs.interfaces.<interface name>` library, when one exists. Otherwise the identifier for the legacy Charmhub-hosted library, without its version specifier: `charms.<charm>.<lib name>`. |
 | `summary` | A one-line description without any formatting, shown in the interfaces table on Charmhub. |
-| `description` | A longer description, interpreted as Markdown, and shown on the interface page on Charmhub. |
+| `description` | A longer description, interpreted as Markdown, and shown on the interface page on Charmhub and at the start of the docs page. Say what the interface is for and what each side provides. |
 | `providers` | A list of charms that provide the interface, each with `name` (the charm's name in `charmcraft.yaml`) and `url` (the Git repository where the charm is defined). May be empty. |
 | `requirers` | A list of charms that require the interface, in the same format. May be empty. |
 | `maintainer` | The team responsible for the interface (for example `tls`, `observability`). This should typically match the `CODEOWNERS` entry for this interface. |
@@ -98,6 +96,12 @@ The `schema.py` file defines the relation data format using [Pydantic](https://d
 You must provide four such classes, for the matrix of provider/requirer and app/unit relation data, or set the name to `None` for a databag that the interface doesn't use.
 These must have exactly the names `ProviderAppData`, `ProviderUnitData`, `RequirerAppData` and `RequirerUnitData`, and the docs build fails if one is missing.
 Some older schemas instead define `ProviderSchema` and `RequirerSchema` classes with `app` and `unit` fields, subclassing `DataBagSchema` from `pytest-interface-tester`. The docs build still accepts these, but new schemas should use the four names.
+
+The docs build generates the 'Relation data' section of the page from the schema, with a table for each databag and nested model. To make the most of this:
+
+- Give each field a `description`. This is the only place to document the field.
+- Give each field `examples`. The first three are shown after its description.
+- Give each databag model complete examples, using `model_config = ConfigDict(json_schema_extra={'examples': [{...}]})`. Each is shown as YAML after the table. These aren't put together from the field examples, because fields that can't be used together often each have one.
 
 Follow the design rules from {ref}`design-relation-interfaces` when designing the schema:
 no mandatory top-level fields, no field reuse, stable collection ordering, and so on.

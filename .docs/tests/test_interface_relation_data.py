@@ -78,6 +78,14 @@ def test_relation_data_tables():
     assert markdown == textwrap.dedent("""\
         Generated from the [Pydantic schema](schema.py).
 
+        ```mermaid
+        flowchart LR
+            provider[Provider]
+            requirer[Requirer]
+            provider -->|"app: host, port, mode,<br>user, endpoints, labels"| requirer
+            requirer -->|"unit: address, endpoint"| provider
+        ```
+
         ### Provider application databag
 
         | Field | Type | Required | Description |
@@ -105,11 +113,6 @@ def test_relation_data_tables():
         | `endpoint` | `Endpoint` object | no |  |
 
         Empty databags: provider unit, requirer application.""")
-
-
-def test_relation_data_without_schema_link():
-    markdown = ip._render_relation_data(DATABAGS, link_schema=False)
-    assert 'schema.py' not in markdown
 
 
 @pytest.mark.parametrize(
@@ -198,71 +201,77 @@ def test_direction_diagram_all_empty():
     assert ip._render_direction_diagram(dict.fromkeys(DATABAGS)) == ''
 
 
-README = """\
-# `foo/v0`
-
-## Direction
-
-The provider writes.
-
-```mermaid
-## Not a heading
-```
-
-## Behavior
-
-- Something.
-
-## Relation Data
-
-[\\[Pydantic Schema\\]](./schema.py)
-
-### Provider
-"""
+README_PATH = pathlib.Path('interfaces/foo/interface/v0/README.md')
 
 
-def test_add_generated_sections():
-    result = ip._add_generated_sections(README, DATABAGS)
-    lines = result.splitlines()
-    # The diagram goes at the end of the Direction section, after the existing fence.
-    diagram_start = lines.index('flowchart LR') - 1
-    assert lines[diagram_start - 2] == '```'
-    assert lines.index('## Behavior') > diagram_start
-    # The tables go directly under the Relation Data heading, before the hand-written content.
-    heading = lines.index('## Relation Data')
-    assert lines[heading + 2] == '### Provider application databag'
-    assert lines.index('### Provider') > heading
-    # The README already links the schema, so the generated content doesn't.
-    assert 'Generated from the' not in result
-
-
-def test_add_generated_sections_direction_ends_at_title():
-    readme = '# `foo/v0`\n\n## Direction\n\nThe provider writes.\n\n# Another title\n'
-    lines = ip._add_generated_sections(readme, DATABAGS).splitlines()
-    assert lines.index('```mermaid') < lines.index('# Another title')
-
-
-def test_add_generated_sections_relation_data_before_direction():
-    readme = (
-        '# `foo/v0`\n\n## Relation data\n\nHand-written.\n\n'
-        '## Direction\n\nThe provider writes.\n\n## Behavior\n\nStuff.\n'
-    )
-    lines = ip._add_generated_sections(readme, DATABAGS).splitlines()
-    direction = lines.index('## Direction')
-    tables = lines.index('### Provider application databag')
-    assert lines.index('## Relation data') < tables < lines.index('Hand-written.') < direction
-    diagram = lines.index('```mermaid')
-    assert direction < diagram < lines.index('## Behavior')
-
-
-def test_add_generated_sections_without_headings():
-    result = ip._add_generated_sections('# `foo/v0`\n\nSome text.\n', DATABAGS)
-    lines = result.splitlines()
-    heading = lines.index('## Relation data')
-    assert lines[heading + 2] == 'Generated from the [Pydantic schema](schema.py).'
-    # With no Direction section, the diagram leads the generated relation data.
-    assert lines.index('```mermaid') > heading
+def test_generated_section():
+    lines = ip._render_generated_section(README_PATH, DATABAGS).splitlines()
+    assert lines[:5] == [
+        '## Relation data',
+        '',
+        'Generated from the [Pydantic schema](schema.py).',
+        '',
+        '```mermaid',
+    ]
     assert lines.index('```mermaid') < lines.index('### Provider application databag')
+
+
+def test_generated_section_without_schema():
+    assert ip._render_generated_section(README_PATH, None) == ''
+
+
+def test_field_examples_follow_the_description():
+    fields: dict[str, typing.Any] = {
+        'host': {'type': 'string', 'description': 'The host', 'examples': ['a|b']},
+        'port': {'type': 'integer', 'examples': [1, 2, 3, 4]},
+        'secrets': {'type': 'array', 'description': 'What?', 'examples': [['x', 'y']]},
+        'odd': {'type': 'string', 'examples': ['a`b']},
+        'empty': {'type': 'string', 'examples': []},
+        'not_a_list': {'type': 'string', 'examples': 'x'},
+    }
+    rows = ip._fields_table({'properties': fields}, {})[2:]
+    assert rows == [
+        '| `host` | string | no | The host. Example: `a\\|b`. |',
+        '| `port` | integer | no | Examples: `1`, `2`, `3`. |',
+        '| `secrets` | list | no | What? Example: `["x", "y"]`. |',
+        '| `odd` | string | no | Example: `` a`b ``. |',
+        '| `empty` | string | no |  |',
+        '| `not_a_list` | string | no |  |',
+    ]
+
+
+def test_databag_examples_come_from_the_model():
+    databags: dict[str, typing.Any] = dict.fromkeys(DATABAGS)
+    databags['provider-app'] = {
+        'properties': {
+            'password': {'type': 'string', 'examples': ['p']},
+            'password_id': {'type': 'string', 'examples': ['secret:1']},
+        },
+        'examples': [{'password_id': 'secret:1'}, {'password': 'p', 'ca': 'one\ntwo'}],
+        'type': 'object',
+    }
+    markdown = ip._render_relation_data(databags)
+    assert 'Example:\n\n```yaml\npassword_id: secret:1\n```\n' in markdown
+    assert 'Example:\n\n```yaml\npassword: p\nca: ' in markdown
+    assert markdown.count('```yaml') == 2
+
+
+def test_databag_example_has_the_fields_in_order():
+    schema: dict[str, typing.Any] = {
+        'properties': {'port': {'type': 'integer'}, 'host': {'type': 'string'}},
+        'examples': [{'extra': 'x', 'host': 'example.com', 'port': 25}],
+    }
+    lines = ip._databag_examples(schema)
+    assert lines[3:6] == ['port: 25', 'host: example.com', 'extra: x']
+
+
+def test_databag_has_no_example_made_from_its_fields():
+    databags: dict[str, typing.Any] = dict.fromkeys(DATABAGS)
+    databags['provider-app'] = {
+        'properties': {'host': {'type': 'string', 'examples': ['example.com']}},
+        'type': 'object',
+    }
+    assert '```yaml' not in ip._render_relation_data(databags)
 
 
 def test_schema_script_handles_both_conventions(tmp_path: pathlib.Path):
@@ -354,8 +363,10 @@ def test_recursive_databag_model_lists_its_fields():
         'requirer-app': None,
         'requirer-unit': None,
     }
-    markdown = ip._render_relation_data(databags, link_schema=False)
-    assert markdown.splitlines()[:6] == [
+    markdown = ip._render_relation_data(databags)
+    lines = markdown.splitlines()
+    start = lines.index('### Provider application databag')
+    assert lines[start : start + 6] == [
         '### Provider application databag',
         '',
         '| Field | Type | Required | Description |',
@@ -379,28 +390,26 @@ class _Warnings:
 def test_schema_that_cannot_be_rendered_names_the_readme(monkeypatch: pytest.MonkeyPatch):
     warnings = _Warnings()
     monkeypatch.setattr(ip, '_logger', warnings)
-    readme = pathlib.Path('interfaces/foo/interface/v0/README.md')
     # A property schema that's a list rather than an object.
     databags: dict[str, typing.Any] = {
         **DATABAGS,
         'provider-app': {'properties': {'host': ['not', 'a', 'schema']}},
     }
-    result = ip._with_generated_sections(readme, '# `foo/v0`\n', databags)
-    assert result == '# `foo/v0`\n'
+    result = ip._render_generated_section(README_PATH, databags)
+    assert result == ''
     (message,) = warnings.messages
-    assert message.startswith(f'{readme}: relation data not generated')
+    assert message.startswith(f'{README_PATH}: relation data not generated')
     assert 'AttributeError' in message
 
 
 def test_schema_that_cannot_be_loaded_names_the_readme(monkeypatch: pytest.MonkeyPatch):
     warnings = _Warnings()
     monkeypatch.setattr(ip, '_logger', warnings)
-    readme = pathlib.Path('interfaces/foo/interface/v0/README.md')
     error = ip._SchemaError('Traceback ...\nValueError: schema does not define X')
-    result = ip._with_generated_sections(readme, '# `foo/v0`\n', error)
-    assert result == '# `foo/v0`\n'
+    result = ip._render_generated_section(README_PATH, error)
+    assert result == ''
     (message,) = warnings.messages
-    assert message.startswith(f'{readme}: relation data not generated')
+    assert message.startswith(f'{README_PATH}: relation data not generated')
     assert 'schema does not define X' in message
 
 
@@ -459,9 +468,9 @@ def test_pipes_in_type_and_default_are_escaped():
         },
         'type': 'object',
     }
-    rows = ip._render_relation_data(databags, link_schema=False).splitlines()
-    assert rows[4] == '| `mode` | string, matching `^(a\\|b)$` | no (default `a\\|b`) |  |'
-    assert rows[5] == '| `sep` | one of `\\|`, `,` | no |  |'
+    rows = [r for r in ip._render_relation_data(databags).splitlines() if r.startswith('| `')]
+    assert rows[0] == '| `mode` | string, matching `^(a\\|b)$` | no (default `a\\|b`) |  |'
+    assert rows[1] == '| `sep` | one of `\\|`, `,` | no |  |'
 
 
 def test_required_note_is_given_once():
@@ -484,7 +493,7 @@ def test_markup_in_description_and_diagram_is_escaped():
         'type': 'object',
     }
     databags['requirer-unit'] = {'properties': {'"quoted"': {'type': 'string'}}, 'type': 'object'}
-    markdown = ip._render_relation_data(databags, link_schema=False)
+    markdown = ip._render_relation_data(databags)
     assert '| `host` | string | no | Set to &lt;name>. |' in markdown
     diagram = ip._render_direction_diagram(databags)
     assert '-->|"unit: #quot;quoted#quot;"| provider' in diagram
@@ -498,15 +507,17 @@ def test_multi_line_description_stays_in_one_table_row():
         },
         'type': 'object',
     }
-    markdown = ip._render_relation_data(databags, link_schema=False)
+    markdown = ip._render_relation_data(databags)
     assert '| `host` | string | no | The host. Without the port. |' in markdown
 
 
 def test_databag_model_with_no_fields():
     databags: dict[str, typing.Any] = dict.fromkeys(DATABAGS)
     databags['provider-app'] = {'properties': {}, 'type': 'object'}
-    markdown = ip._render_relation_data(databags, link_schema=False)
-    assert markdown.splitlines()[:3] == [
+    markdown = ip._render_relation_data(databags)
+    lines = markdown.splitlines()
+    start = lines.index('### Provider application databag')
+    assert lines[start : start + 3] == [
         '### Provider application databag',
         '',
         'No fields are defined.',
@@ -528,7 +539,7 @@ def test_recursive_nested_model_is_listed_once():
         'properties': {'root': {'$ref': '#/$defs/Node'}},
         'type': 'object',
     }
-    markdown = ip._render_relation_data(databags, link_schema=False)
+    markdown = ip._render_relation_data(databags)
     assert '| `root` | `Node` object | no |  |' in markdown
     assert '| `children` | list of `Node` objects | no |  |' in markdown
     assert markdown.count('#### `Node`') == 1
