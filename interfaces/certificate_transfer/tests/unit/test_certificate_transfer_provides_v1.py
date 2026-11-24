@@ -6,6 +6,8 @@ from typing import Any
 
 import pytest
 import scenario
+import scenario.mocking
+from ops import RelationNotFoundError
 from ops.charm import ActionEvent, CharmBase
 
 from charmlibs.interfaces.certificate_transfer import (
@@ -15,6 +17,18 @@ from charmlibs.interfaces.certificate_transfer import (
 # Enough certificates that an unsorted (set iteration) order is overwhelmingly unlikely
 # to coincide with sorted order by chance.
 UNSORTED_CERTIFICATES = [f"certificate{i:02d}" for i in range(20, 0, -1)]
+
+
+def make_relation_gone(monkeypatch: pytest.MonkeyPatch, gone_relation_id: int) -> None:
+    """Make writes to the given relation fail the way they do for a relation Juju has forgotten."""
+    original_relation_set = scenario.mocking._MockModelBackend.relation_set
+
+    def relation_set(self: Any, relation_id: int, *args: Any, **kwargs: Any) -> None:
+        if relation_id == gone_relation_id:
+            raise RelationNotFoundError()
+        original_relation_set(self, relation_id, *args, **kwargs)
+
+    monkeypatch.setattr(scenario.mocking._MockModelBackend, "relation_set", relation_set)
 
 
 class DummyCertificateTransferProviderCharm(CharmBase):
@@ -849,3 +863,52 @@ the databags except using the public methods in the provider library and use ver
 
         app_data = state_out.get_relation(relation.id).local_app_data
         assert app_data == {"certificates": expected, "version": "1"}
+
+    @pytest.mark.parametrize(
+        "action, params",
+        [
+            ("add-certificates", {"certificates": "certificate1, certificate2"}),
+            ("remove-certificate", {"certificate": "certificate1"}),
+            ("remove-all-certificates", {}),
+        ],
+    )
+    def test_given_gone_relation_when_updating_certificates_then_other_relations_are_updated(
+        self,
+        caplog: pytest.LogCaptureFixture,
+        monkeypatch: pytest.MonkeyPatch,
+        action: str,
+        params: dict[str, str],
+    ):
+        existing = json.dumps(["certificate1", "certificate3"])
+        gone_relation = scenario.Relation(
+            endpoint="certificate_transfer",
+            interface="certificate_transfer",
+            remote_app_data={"version": "1"},
+            local_app_data={"certificates": existing, "version": "1"},
+        )
+        live_relation = scenario.Relation(
+            endpoint="certificate_transfer",
+            interface="certificate_transfer",
+            remote_app_data={"version": "1"},
+            local_app_data={"certificates": existing, "version": "1"},
+        )
+        state_in = scenario.State(leader=True, relations=[gone_relation, live_relation])
+        make_relation_gone(monkeypatch, gone_relation.id)
+
+        state_out = self.ctx.run(self.ctx.on.action(action, params=params), state_in)
+
+        expected: set[str] = {
+            "add-certificates": {"certificate1", "certificate2", "certificate3"},
+            "remove-certificate": {"certificate3"},
+            "remove-all-certificates": set[str](),
+        }[action]
+        live_data = state_out.get_relation(live_relation.id).local_app_data
+        assert set(json.loads(live_data["certificates"])) == expected
+        gone_data = state_out.get_relation(gone_relation.id).local_app_data
+        assert gone_data["certificates"] == existing
+        assert (
+            "WARNING",
+            "_certificate_transfer",
+            f"Skipping not found relation {gone_relation.id} with the relation name "
+            "'certificate_transfer'",
+        ) in [(r.levelname, r.module, r.message) for r in caplog.records]
