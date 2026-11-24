@@ -1,6 +1,7 @@
 # Words accepted by Vale's spell checker (Canonical.000-US-spellcheck).
 # One entry per line. Entries are treated as case-sensitive regular expressions.
 # Ensure the last line in this file has a newline at the end, to support concatenation.
+accessor
 ACME
 ACME's
 addons
@@ -12,6 +13,7 @@ armor
 autocomplete
 autocompletions
 balancer
+boolean
 bugfixes
 charmcraft
 Charmhub
@@ -22,6 +24,7 @@ codebase
 ContainerPath
 databag
 databags
+dataclass
 DCO
 deserialised
 dev
@@ -36,10 +39,13 @@ drwxr
 EBS
 EKS
 enablement
+enum
 favicon
 filesystem
 FQDN
 Furo
+getter
+getters
 Git
 GitHub
 GPG
@@ -94,6 +100,8 @@ podspec
 posix
 pre
 preprocessor
+Pydantic
+pydantic
 PYDEPS
 PyPI
 pytest
@@ -122,6 +130,7 @@ subprocess
 subtree
 symlink
 symlinks
+teardown
 templating
 TLS
 TODO
@@ -129,6 +138,7 @@ tooltip
 tooltips
 Ubuntu
 UI
+unhashable
 URI
 URIs
 userinfo
