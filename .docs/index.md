@@ -60,8 +60,8 @@ If you're new to charms, see {ref}`Juju | Charm <juju:charm>`.
 
 ### Packages
 
-- {doc}`charmlibs <reference/charmlibs>`
-- {doc}`charmlibs.interfaces <reference/charmlibs-interfaces>`
+- {doc}`charmlibs packages <reference/charmlibs>`
+- {doc}`charmlibs.interfaces packages <reference/charmlibs-interfaces>`
 
 ## How this documentation is organised
 
