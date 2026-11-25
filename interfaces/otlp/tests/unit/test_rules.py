@@ -4,6 +4,7 @@
 """Feature: Rules aggregation and labeling."""
 
 import json
+import logging
 from typing import Any
 
 import ops
@@ -317,6 +318,42 @@ def test_provider_rules(
                     assert f'juju_model="{MODEL_NAME}"' in rule['expr']
                     assert f'juju_model_uuid="{MODEL_UUID}"' in rule['expr']
                     assert f'juju_application="{app}"' in rule['expr']
+
+
+def test_provider_rules_drops_only_invalid_groups(
+    otlp_provider_ctx: testing.Context[ops.CharmBase], caplog: pytest.LogCaptureFixture
+):
+    # GIVEN a requirer offers two promql groups, one of which is invalid
+    rules: dict[str, Any] = {
+        'promql': {
+            'groups': [
+                {'name': 'test_promql_alert', 'rules': [SINGLE_PROMQL_ALERT]},
+                {
+                    'name': 'test_promql_broken',
+                    'rules': [{'alert': 'Broken', 'expr': 'up{', 'labels': {}}],
+                },
+            ]
+        },
+    }
+    receiver = Relation(
+        RECEIVE, remote_app_data={'rules': json.dumps(rules), 'metadata': json.dumps({})}
+    )
+    state = State(leader=True, relations=[receiver], model=MODEL)
+    with caplog.at_level(logging.WARNING, logger='charmlibs.interfaces.otlp._otlp'):
+        with otlp_provider_ctx(otlp_provider_ctx.on.update_status(), state=state) as mgr:
+            # WHEN the provider aggregates the rules from the databag
+            rule_store = OtlpProvider(mgr.charm, RECEIVE).rules[receiver.id]
+            promql = rule_store.promql.as_dict()
+    # THEN the valid promql group is kept and the invalid group is dropped
+    groups = promql.get('groups', [])
+    assert len(groups) == 1
+    assert all(group.get('name') != 'test_promql_broken' for group in groups)
+    alert_names = [rule.get('alert') for rule in groups[0].get('rules', [])]
+    assert 'Workload Missing' in alert_names
+    # AND the drop is logged once at WARNING
+    warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+    assert len(warnings) == 1
+    assert 'Dropped invalid promql rule groups' in warnings[0].getMessage()
 
 
 def _make_store() -> RuleStore:

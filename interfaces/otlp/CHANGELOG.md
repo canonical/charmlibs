@@ -46,3 +46,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Separated the package into 2 private modules: _otlp and _rules
 - Enable user-defined rule labels
+
+## [0.6.0]
+
+### Updated
+
+- `OtlpProvider.rules` keeps the valid rule groups of a query type when another group of that type fails validation, instead of discarding the whole query type
+- Dropped rule groups are logged as a warning per query type
+- Minimum `cosl` version raised to 1.12.0
