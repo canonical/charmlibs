@@ -22,7 +22,7 @@
             "title": "Kubernetes Service Name",
             "description": "The k8s service name"
         },
-        "url": {
+        "service-port": {
             "$id": "#/properties/service-port",
             "type": "string",
             "title": "Kubernetes Service Port",
