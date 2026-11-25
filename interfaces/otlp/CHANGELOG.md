@@ -53,4 +53,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `OtlpProvider.rules` keeps the valid rule groups of a query type when another group of that type fails validation, instead of discarding the whole query type
 - Dropped rule groups are logged as a warning per query type
-- Minimum `cosl` version raised to 1.12.0
+- Minimum `cosl` version raised to 1.12.1

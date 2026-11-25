@@ -16,7 +16,7 @@ classifiers = [
 dynamic = ["version"]
 dependencies = [
     # "ops",
-    "cosl>=1.12.0",
+    "cosl>=1.12.1",
     "requests",
 ]
 
