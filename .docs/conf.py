@@ -174,6 +174,8 @@ extensions = [
     "sphinx_related_links",
     # llms.txt generation (Sphinx Stack 2.0)
     "sphinx_llm.txt",
+    # For "In this documentation" on the homepage
+    "sphinx_structured_toc",
     # charmlibs-specific extensions
     "sphinxcontrib.cairosvgconverter",
     "sphinxcontrib.mermaid",

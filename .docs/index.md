@@ -31,42 +31,51 @@ If you're new to charms, see {ref}`Juju | Charm <juju:charm>`.
 
 ## In this documentation
 
-````{grid} 1 1 2 2
+### Libraries and interfaces
 
-```{grid-item-card} [Tutorials](tutorials/index)
-**Start here:** [Write your first charm library](tutorial) and contribute it to the monorepo.
+````{domain}
+```{slice} Available libraries
+{doc}`General libraries <reference/general-libs>`
+{doc}`Interface libraries <reference/interface-libs>`
 ```
 
-```{grid-item-card} [How-to guides](how-to/index)
-**Step-by-step guides**
-- {ref}`Manage charm libraries <how-to-manage-charm-libraries>`
-- {ref}`Distribute charm libraries <how-to-python-package>`
-- {ref}`Migrate your library to the monorepo <how-to-migrate>`
-- {ref}`Migrate your charm to a charmlibs package <how-to-migrate-charm>`
-- {ref}`Provide relation data for charm tests <how-to-provide-data-for-charm-tests>`
-- {ref}`Customize functional tests <how-to-customize-functional-tests>`
-- {ref}`Customize integration tests <how-to-customize-integration-tests>`
+```{slice} Use libraries in charms
+{doc}`Overview <explanation/charm-libs>`
+{doc}`Manage libraries <how-to/manage-libraries>`
 ```
 
+```{slice} Charmhub-hosted libraries
+{doc}`Overview of deprecation <explanation/charmhub-libraries-deprecation>`
+{doc}`Use replacements from Charmlibs <how-to/migrate-charm>`
+{doc}`Move libraries to Charmlibs <how-to/migrate>`
+```
+
+```{slice} Library development
+{doc}`Write your first library <tutorial>`
+{doc}`Distribute libraries <how-to/python-package>`
+{doc}`Provide relation data for charm tests <how-to/provide-relation-data-for-charm-tests>`
+{doc}`Add docs <how-to/add-library-docs>` slice
+```
+
+```{slice} Interface development
+{doc}`Design relation interfaces <how-to/design-relation-interfaces>`
+{doc}`Add docs <how-to/document-an-interface>` slice
+{doc}`Interface specifications <reference/interfaces>`
+```
+
+```{slice} CI
+{doc}`Publishing <explanation/charmlibs-publishing>`
+{doc}`Testing <explanation/charmlibs-tests>`
+{doc}`Customize functional tests <how-to/customize-functional-tests>`
+{doc}`Customize integration tests <how-to/customize-integration-tests>`
+```
 ````
 
-````{grid} 1 1 2 2
-:reverse:
+## How this documentation is organised
 
-```{grid-item-card} [Reference](reference/index)
-**Technical information**
-- {ref}`General libraries <general-libs-listing>` and {ref}`interface libraries <interface-libs-listing>`
-- {ref}`charmlibs package docs <reference-charmlibs>`
-- {ref}`charmlibs.interfaces package docs <reference-charmlibs-interfaces>`
-- {ref}`Interface specifications <reference-interfaces>`
-```
+This documentation uses the [Diátaxis documentation structure](https://diataxis.fr/).
 
-```{grid-item-card} [Explanation](explanation/index)
-**Discussion and clarification** of key topics
-- {ref}`Charm libraries <charm-libs>`
-- {ref}`Testing packages in the monorepo <charmlibs-tests>`
-- {ref}`Publishing packages from the monorepo <charmlibs-publishing>`
-```
-
-````
-
+- {doc}`Tutorials <tutorials/index>`
+- {doc}`How-to guides <how-to/index>`
+- {doc}`Reference <reference/index>`
+- {doc}`Explanation <explanation/index>`
