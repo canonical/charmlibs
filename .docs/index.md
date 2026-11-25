@@ -71,3 +71,15 @@ This documentation uses the [Diátaxis documentation structure](https://diataxis
 - {doc}`How-to guides <how-to/index>`
 - {doc}`Reference <reference/index>`
 - {doc}`Explanation <explanation/index>`
+
+## Project and community
+
+Charmlibs is a member of the Ubuntu family. It's an open source project ([Apache license](https://www.apache.org/licenses/LICENSE-2.0)) that warmly welcomes community contributions, suggestions, fixes and constructive feedback.
+
+- [Report a bug](https://github.com/canonical/charmlibs/issues)
+- [Contribute](https://github.com/canonical/charmlibs?tab=contributing-ov-file)
+- [Code of conduct](https://ubuntu.com/community/ethos/code-of-conduct)
+
+For support, join [Charm Development](https://matrix.to/#/#charmhub-charmdev:ubuntu.com) on Matrix. You'll be able to chat with the maintainers of charmlibs (the Canonical Charm Tech team) and a friendly community of library authors and charm developers!
+
+To follow along with updates and tips about charm development, join our [Discourse forum](https://discourse.charmhub.io/).
