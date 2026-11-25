@@ -1,7 +1,3 @@
----
-relatedlinks: "[Charmcraft](https://documentation.ubuntu.com/charmcraft/stable/), [Concierge](https://github.com/canonical/concierge), [Jubilant](https://canonical.com/juju/docs/jubilant/), [Juju](https://documentation.ubuntu.com/juju/3.6/), [Ops](https://canonical.com/juju/docs/ops/), [Pebble](https://ubuntu.com/docs/pebble/)"
----
-
 # Charmlibs
 
 ```{toctree}
