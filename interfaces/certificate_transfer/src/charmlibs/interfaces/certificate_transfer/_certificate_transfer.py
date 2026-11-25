@@ -30,6 +30,7 @@ from ops import (
     RelationBrokenEvent,
     RelationChangedEvent,
     RelationCreatedEvent,
+    RelationNotFoundError,
 )
 from ops.charm import CharmBase
 from ops.framework import Object, StoredState
@@ -273,9 +274,12 @@ class CertificateTransferProvides(Object):
             return
 
         for relation in relations:
-            existing_data = self._get_relation_data(relation)
-            existing_data.update(certificates)
-            self._set_relation_data(relation, existing_data)
+            try:
+                existing_data = self._get_relation_data(relation)
+                existing_data.update(certificates)
+                self._set_relation_data(relation, existing_data)
+            except RelationNotFoundError:  # noqa: PERF203
+                self._log_relation_not_found(relation)
 
     def remove_all_certificates(self, relation_id: int | None = None) -> None:
         """Remove all certificates from relation data.
@@ -306,7 +310,10 @@ class CertificateTransferProvides(Object):
             return
 
         for relation in relations:
-            self._set_relation_data(relation, set())
+            try:
+                self._set_relation_data(relation, set())
+            except RelationNotFoundError:  # noqa: PERF203
+                self._log_relation_not_found(relation)
 
     def remove_certificate(
         self,
@@ -342,9 +349,19 @@ class CertificateTransferProvides(Object):
             return
 
         for relation in relations:
-            existing_data = self._get_relation_data(relation)
-            existing_data.discard(certificate)
-            self._set_relation_data(relation, existing_data)
+            try:
+                existing_data = self._get_relation_data(relation)
+                existing_data.discard(certificate)
+                self._set_relation_data(relation, existing_data)
+            except RelationNotFoundError:  # noqa: PERF203
+                self._log_relation_not_found(relation)
+
+    def _log_relation_not_found(self, relation: Relation) -> None:
+        logger.warning(
+            "Skipping not found relation %d with the relation name '%s'",
+            relation.id,
+            self.relationship_name,
+        )
 
     def _get_active_relations(self, relation_id: int | None = None) -> list[Relation]:
         """Get the relation if relation is active and id is given, or all active relations."""
