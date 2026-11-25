@@ -21,7 +21,6 @@ from dataclasses import dataclass
 from typing import Any
 
 import ops
-from interface_tester.schema_base import DataBagSchema
 from pydantic import BaseModel, Field, Json, ValidationError
 
 
@@ -82,19 +81,6 @@ class UnitVaultKvRequirerSchema(BaseModel):
     )
 
 
-class ProviderSchema(DataBagSchema):
-    """The schema for the provider side of this interface."""
-
-    app: VaultKvProviderSchema  # pyright: ignore[reportIncompatibleVariableOverride, reportGeneralTypeIssues]
-
-
-class RequirerSchema(DataBagSchema):
-    """The schema for the requirer side of this interface."""
-
-    app: AppVaultKvRequirerSchema  # pyright: ignore[reportIncompatibleVariableOverride, reportGeneralTypeIssues]
-    unit: UnitVaultKvRequirerSchema  # pyright: ignore[reportIncompatibleVariableOverride, reportGeneralTypeIssues]
-
-
 @dataclass
 class KVRequest:
     """This class represents a kv request from an interface Requirer."""
@@ -121,10 +107,8 @@ def get_egress_subnets_list_from_relation_data(relation_databag: Mapping[str, st
 def is_requirer_data_valid(app_data: Mapping[str, str], unit_data: Mapping[str, str]) -> bool:
     """Return whether the requirer data is valid."""
     try:
-        RequirerSchema(
-            app=AppVaultKvRequirerSchema(**app_data),
-            unit=UnitVaultKvRequirerSchema(**unit_data),
-        )
+        AppVaultKvRequirerSchema(**app_data)
+        UnitVaultKvRequirerSchema(**unit_data)
         return True
     except ValidationError as e:
         logger.debug("Invalid data: %s", e)
@@ -134,8 +118,7 @@ def is_requirer_data_valid(app_data: Mapping[str, str], unit_data: Mapping[str, 
 def is_provider_data_valid(data: Mapping[str, str]) -> bool:
     """Return whether the provider data is valid."""
     try:
-        # https://github.com/pydantic/pydantic/issues/8616
-        ProviderSchema(app=VaultKvProviderSchema(**data))  # type: ignore
+        VaultKvProviderSchema(**data)  # pyright: ignore[reportArgumentType]
         return True
     except ValidationError as e:
         logger.debug("Invalid data: %s", e)

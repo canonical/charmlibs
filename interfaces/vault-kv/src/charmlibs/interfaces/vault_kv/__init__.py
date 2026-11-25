@@ -27,8 +27,7 @@ From a charm directory, add the library package:
 
 Requirer charm
 --------------
-The requirer charm is the charm requiring a secret value store. In this example, the requirer charm
-is requiring a secret value store.
+The requirer charm is the charm requiring a secret value store.
 
 .. code-block:: python
 
@@ -134,8 +133,6 @@ from ._vault_kv import (
     KVRequest,
     LogAdapter,
     NewVaultKvClientAttachedEvent,
-    ProviderSchema,
-    RequirerSchema,
     UnitVaultKvRequirerSchema,
     VaultKvBaseEvent,
     VaultKvClientDetachedEvent,
@@ -158,8 +155,6 @@ __all__ = [
     "KVRequest",
     "LogAdapter",
     "NewVaultKvClientAttachedEvent",
-    "ProviderSchema",
-    "RequirerSchema",
     "UnitVaultKvRequirerSchema",
     "VaultKvBaseEvent",
     "VaultKvClientDetachedEvent",

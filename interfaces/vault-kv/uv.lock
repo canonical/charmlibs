@@ -17,7 +17,6 @@ source = { editable = "." }
 dependencies = [
     { name = "ops" },
     { name = "pydantic" },
-    { name = "pytest-interface-tester" },
 ]
 
 [package.dev-dependencies]
@@ -33,7 +32,6 @@ unit = [
 requires-dist = [
     { name = "ops", specifier = ">=2.23,<4" },
     { name = "pydantic", specifier = ">=2,<3" },
-    { name = "pytest-interface-tester", specifier = ">=2,<4" },
 ]
 
 [package.metadata.requires-dev]
@@ -44,15 +42,6 @@ integration = [
 ]
 lint = []
 unit = [{ name = "ops", extras = ["testing"] }]
-
-[[package]]
-name = "click"
-version = "8.5.1"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/45/37/edbf1b0707709013c0cf2e8317e03d97ed29bf4cac709fe328904ae92a38/click-8.5.1.tar.gz", hash = "sha256:9bbfada76703fd1d784b83eea012e3e8c6a001a876543ef104fa56aaaeb072b4", size = 399151, upload-time = "2026-11-06T17:37:01.021Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/31/7d/164b7ffc8624fe9efb4221bf9af485d5c1e41b9ae118045d2b6dc5457d8b/click-8.5.1-py3-none-any.whl", hash = "sha256:8bb5376d2006950386f8c6427613334a2acadc5f559cb80e638d00b4df957e37", size = 126163, upload-time = "2026-11-06T17:36:59.287Z" },
-]
 
 [[package]]
 name = "colorama"
@@ -352,21 +341,6 @@ wheels = [
 ]
 
 [[package]]
-name = "pytest-interface-tester"
-version = "3.4.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "ops-scenario" },
-    { name = "pydantic" },
-    { name = "pytest" },
-    { name = "typer" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/58/ca/55ec97b38985e63c5f46ed65da4a1dcf76b9a7e67450e7fb7bd7110bbea5/pytest_interface_tester-3.4.1.tar.gz", hash = "sha256:95af07733981adf3891aeb4d0178582dd790ec78ee8dc23e1cd9498e3dea4200", size = 21474, upload-time = "2026-02-11T08:14:10.688Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/d6/d1/7f909a9b530c92afc109ffb81a3c0b18de1724a763dfc14fae49fc417ca7/pytest_interface_tester-3.4.1-py3-none-any.whl", hash = "sha256:1d1f346d04d78c4f5a18ee8d7ac8d7f288e1b5f5feafa72dd543bbc7af5cb031", size = 22192, upload-time = "2026-02-11T08:14:09.35Z" },
-]
-
-[[package]]
 name = "pytest-jubilant"
 version = "2.1.1"
 source = { registry = "https://pypi.org/simple" }
@@ -513,18 +487,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/1c/b8/63a75cfb27a17c38550e44025d3a6e7be64516fd8608a3b75703bf37d81b/tomli-2.5.0-cp315-cp315t-win_amd64.whl", hash = "sha256:f3fcbc57b1791fa6cbe5d8434179d51de12be1a4811469529f47f6e7487a2571", size = 117281, upload-time = "2026-10-07T12:23:34.648Z" },
     { url = "https://files.pythonhosted.org/packages/72/01/e8c1debb2173973372934c68fc8e46170ab60ef23ed4592dff4dec6e8993/tomli-2.5.0-cp315-cp315t-win_arm64.whl", hash = "sha256:d2ba24db8a9376921b5e87b4762b9adb0f3f1deaea68f2b8b0bb2c11efb9c3e7", size = 115069, upload-time = "2026-10-07T12:23:35.77Z" },
     { url = "https://files.pythonhosted.org/packages/60/3f/3e3f8fd0919249b0200c80fbc4f9a1e70be19f9883da71dfb7f8b9ab8aca/tomli-2.5.0-py3-none-any.whl", hash = "sha256:32a7b79ac57a2e83670ce329ccf675798bc5a2094783a63676866b70503f2e2b", size = 14765, upload-time = "2026-10-07T12:23:36.875Z" },
-]
-
-[[package]]
-name = "typer"
-version = "0.7.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "click" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/e1/45/bcbc581f87c8d8f2a56b513eb994d07ea4546322818d95dc6a3caf2c928b/typer-0.7.0.tar.gz", hash = "sha256:ff797846578a9f2a201b53442aedeb543319466870fbe1c701eab66dd7681165", size = 251871, upload-time = "2022-11-05T19:43:54.903Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/0d/44/56c3f48d2bb83d76f5c970aef8e2c3ebd6a832f09e3621c5395371fe6999/typer-0.7.0-py3-none-any.whl", hash = "sha256:b5e704f4e48ec263de1c0b3a2387cd405a13767d2f907f44c1a08cbad96f606d", size = 38377, upload-time = "2022-11-05T19:43:53.402Z" },
 ]
 
 [[package]]
