@@ -16,16 +16,7 @@ explanation/index
 
 `charmlibs` is the home of Canonical's charm libraries.
 
-If you're searching for a library to use in a charm, check out the library listings to learn which libraries are recommended and where to get them:
-
-- {ref}`General charm libraries<general-libs-listing>`
-- {ref}`Charm interface libraries<interface-libs-listing>`
-
-This site also hosts documentation for Python packages in the [charmlibs monorepo](https://github.com/canonical/charmlibs):
-
-- {ref}`reference-charmlibs` - General libraries, imported from `charmlibs` in charm code.
-- {ref}`reference-charmlibs-interfaces` - Interface libraries, imported from `charmlibs.interfaces` in charm code.
-
+If you're searching for a library to use in a charm, check out the library listings to learn which libraries are recommended and where to get them: {ref}`General charm libraries <general-libs-listing>` and {ref}`Charm interface libraries <interface-libs-listing>`. This site also hosts documentation for Python packages in the [charmlibs monorepo](https://github.com/canonical/charmlibs).
 
 If you're new to charms, see {ref}`Juju | Charm <juju:charm>`.
 
@@ -70,6 +61,11 @@ If you're new to charms, see {ref}`Juju | Charm <juju:charm>`.
 {doc}`Customize integration tests <how-to/customize-integration-tests>`
 ```
 ````
+
+### Packages
+
+- {doc}`charmlibs <reference/charmlibs>`
+- {doc}`charmlibs.interfaces <reference/charmlibs-interfaces>`
 
 ## How this documentation is organised
 
