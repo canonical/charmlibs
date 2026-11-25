@@ -1,0 +1,18 @@
+name: provider
+type: charm
+summary: A small vault-kv provider charm for use in integration tests.
+description: Publishes synthetic credentials over vault-kv in place of a real Vault server.
+
+base: ubuntu@24.04
+platforms:
+  amd64:
+
+provides:
+  vault-kv:
+    interface: vault-kv
+
+parts:
+  charm:
+    source: .
+    plugin: uv
+    build-snaps: [astral-uv]
