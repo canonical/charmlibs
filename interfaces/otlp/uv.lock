@@ -39,7 +39,7 @@ unit = [
 
 [package.metadata]
 requires-dist = [
-    { name = "cosl", specifier = ">=1.6.1" },
+    { name = "cosl", specifier = ">=1.12.1" },
     { name = "requests" },
 ]
 
@@ -152,18 +152,28 @@ wheels = [
 
 [[package]]
 name = "cosl"
-version = "1.9.0"
+version = "1.12.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
+    { name = "diskcache" },
     { name = "ops" },
     { name = "pydantic" },
     { name = "pyyaml" },
     { name = "tenacity" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/21/96/bf85615902a6cc36bfe1c72b1dbc4e97076c6e05a28fa675a124146fc67c/cosl-1.9.0.tar.gz", hash = "sha256:360491aa2b6d37be36cefbeb31855aea19bf61ce36d6078dc1d09a51b5eefa92", size = 149850, upload-time = "2026-03-30T20:42:17.642Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e7/f4/0362e434cba597a6afe53d0333411922ded7034481dbcf6f95631ecafbd5/cosl-1.12.1.tar.gz", hash = "sha256:9126f4d239ba83c0a36e3e06209a0f1df00484626797f8d12f5336a92e709afc", size = 189445, upload-time = "2026-11-25T20:10:32.846Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/68/7e/65837d35b2dab96b70fe55aa4a4b4fb7d2cd902e87c6074493392de769d3/cosl-1.9.0-py3-none-any.whl", hash = "sha256:026700e712cae75a5db038710997b0ffa27612fddc736a5a23d94111dec1f533", size = 37936, upload-time = "2026-03-30T20:42:16.487Z" },
+    { url = "https://files.pythonhosted.org/packages/aa/da/7947147e805308e9e2334256cc54f293175f87689fbf642ce69df106b160/cosl-1.12.1-py3-none-any.whl", hash = "sha256:b939004e0eaf4c5af4e28329309a7999a4204e45f6fb94704f66679898da7e2a", size = 47660, upload-time = "2026-11-25T20:10:31.903Z" },
+]
+
+[[package]]
+name = "diskcache"
+version = "5.6.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/3f/21/1c1ffc1a039ddcc459db43cc108658f32c57d271d7289a2794e401d0fdb6/diskcache-5.6.3.tar.gz", hash = "sha256:2c3a3fa2743d8535d832ec61c2054a1641f41775aa7c556758a109941e33e4fc", size = 67916, upload-time = "2023-08-31T06:12:00.316Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3f/27/4570e78fc0bf5ea0ca45eb1de3818a23787af9b390c0b0a0033a1b8236f9/diskcache-5.6.3-py3-none-any.whl", hash = "sha256:5e31b2d5fbad117cc363ebaf6b689474db18a1f6438bc82358b024abd4c2ca19", size = 45550, upload-time = "2023-08-31T06:11:58.822Z" },
 ]
 
 [[package]]
@@ -171,7 +181,7 @@ name = "exceptiongroup"
 version = "1.3.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions", marker = "python_full_version < '3.13'" },
+    { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/50/79/66800aadf48771f6b62f7eb014e352e5d06856655206165d775e675a02c9/exceptiongroup-1.3.1.tar.gz", hash = "sha256:8b412432c6055b0b7d14c310000ae93352ed6754f70fa8f7c34141f91c4e3219", size = 30371, upload-time = "2025-11-21T23:01:54.787Z" }
 wheels = [

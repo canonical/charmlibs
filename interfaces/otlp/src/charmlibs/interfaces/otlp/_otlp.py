@@ -307,7 +307,8 @@ class OtlpProvider:
 
             - have labels from the charm's Juju topology.
             - have expression labels from the charm's Juju topology.
-            - are validated using CosTool.
+            - are validated using CosTool, group by group; invalid groups are dropped
+              and the remaining groups are kept.
 
         Returns:
             a mapping of relation ID to a RuleStore object.
@@ -333,12 +334,23 @@ class OtlpProvider:
             promql_result = rules.promql.inject_and_validate_rules(
                 requirer.rules.promql, requirer.metadata
             )
-            if logql_result.rules and not logql_result.errmsg:
+            if logql_result.rules:
                 rules.logql.add(logql_result.rules)
-            if promql_result.rules and not promql_result.errmsg:
+            if promql_result.rules:
                 rules.promql.add(promql_result.rules)
-            for errmsg in [logql_result.errmsg, promql_result.errmsg]:
-                if errmsg and self._charm.unit.is_leader():
+            for query_type, errmsg in (
+                ('logql', logql_result.errmsg),
+                ('promql', promql_result.errmsg),
+            ):
+                if not errmsg:
+                    continue
+                logger.warning(
+                    'Dropped invalid %s rule groups from relation %s: %s',
+                    query_type,
+                    relation.id,
+                    errmsg,
+                )
+                if self._charm.unit.is_leader():
                     relation.data[self._charm.app]['event'] = json.dumps({'errors': errmsg})
 
             rules_map[relation.id] = rules
