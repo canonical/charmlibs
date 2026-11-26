@@ -59,7 +59,7 @@ def recipients_validator() -> Callable[[_F], _F]:
     """
     if _PYDANTIC_V2:
         return cast(Any, _pyd_field_validator)("recipients", mode="before")
-    return cast(Any, _pyd_validator)("recipients", pre=True)
+    return cast(Any, _pyd_validator)("recipients", pre=True, allow_reuse=True)
 
 
 class SmtpError(Exception):
