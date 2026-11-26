@@ -20,7 +20,7 @@ unit = [
 functional = []
 integration = [{ name = "jubilant" }]
 lint = []
-unit = [{ name = "ops", extras = ["testing"] }]
+unit = [{ name = "ops", extras = ["testing"], specifier = ">=2.17" }]
 
 [[package]]
 name = "jubilant"

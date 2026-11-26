@@ -32,8 +32,8 @@ lint = [  # installed for `just lint interfaces/tracing` (unit, functional, and 
     # "typing_extensions",
 ]
 unit = [  # installed for `just unit interfaces/tracing`
-    "ops[testing]",
-    "pytest",
+    "ops[testing]>=3.7.0",
+    "pytest>=8",
 ]
 functional = [  # installed for `just functional interfaces/tracing`
 ]

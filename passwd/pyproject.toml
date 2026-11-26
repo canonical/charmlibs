@@ -23,7 +23,7 @@ lint = [  # installed for `just lint passwd` (unit, functional, and integration 
     # "typing_extensions",
 ]
 unit = [  # installed for `just unit passwd`
-    "ops[testing]",
+    "ops[testing]>=2.17",
 ]
 functional = [  # installed for `just functional passwd`
 ]

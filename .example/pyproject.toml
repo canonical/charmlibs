@@ -30,7 +30,7 @@ lint = [  # installed for `just lint example` (unit, functional, and integration
     # "typing_extensions",
 ]
 unit = [  # installed for `just unit example`
-    "ops[testing]",
+    "ops[testing]>=2.17",
 ]
 functional = [  # installed for `just functional example`
 ]

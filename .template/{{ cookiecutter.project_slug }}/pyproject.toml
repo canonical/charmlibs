@@ -33,7 +33,7 @@ lint = [  # installed for `just lint {{ cookiecutter.__path_prefix }}{{ cookiecu
     # "typing_extensions",
 ]
 unit = [  # installed for `just unit {{ cookiecutter.__path_prefix }}{{ cookiecutter.project_slug }}`
-    "ops[testing]",
+    "ops[testing]>=2.17",
 {%- if cookiecutter._interface %}
     "{{ cookiecutter.__dist_pkg }}[testing]",
 {%- endif %}

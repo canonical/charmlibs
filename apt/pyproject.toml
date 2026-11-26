@@ -15,7 +15,7 @@ classifiers = [
 ]
 dynamic = ["version"]
 dependencies = [
-    "opentelemetry-api",
+    "opentelemetry-api>=1.16.0",
 ]
 
 [dependency-groups]
