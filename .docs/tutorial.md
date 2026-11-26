@@ -37,7 +37,7 @@ uv tool install rust-just
 ```
 
 If you want to run the Juju integration tests locally, you'll also need `charmcraft`installed for packing, as well as a Juju controller for your local K8s or machine clouds.
-In CI, these are installed and set up for you using [concierge](https://github.com/canonical/concierge?tab=readme-ov-file#presets), with the `microk8s` and `machine` presets.
+In CI, these are installed and set up for you using [concierge](https://github.com/canonical/concierge?tab=readme-ov-file#presets), with the `k8s` and `machine` presets.
 The `dev` preset is suitable for local development and testing of both K8s and machine charms, but you may find it easier to run the Juju integration tests in CI when following this tutorial.
 
 Read more:
