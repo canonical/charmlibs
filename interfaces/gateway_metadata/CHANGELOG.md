@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.2 - 16 November 2026
+
+- Require `ops>=2.23.0,<4`. 2.23 is the oldest ops 2 series that's still maintained. Without a lower bound, a charm could resolve an ops release too old to provide the APIs this library uses.
+- Require `pydantic>=2.12.0`, the first release with wheels for every Python version this library supports (up to 3.14).
+
 ## 1.0.1 - 16 June 2026
 
 - Minor docstring and README updates.
