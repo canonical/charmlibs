@@ -5,6 +5,13 @@ All notable changes to the charmlibs.interfaces.otlp library will be documented 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] - 2026-11-16
+
+### Fixed
+
+- Declare the `ops>=2.23.0` dependency. The library imports `ops` and uses `Relation.save` and `Relation.load`, which ops added in 2.23.0.
+- Require `cosl>=1.8.0` and `requests>=2.25.0`. The unit tests need `cosl.types.AlertingRuleFormat`, which became public in cosl 1.8.0, and requests releases before 2.25.0 don't import on Python 3.12.
+
 ## [0.1.0]
 
 ### Added
