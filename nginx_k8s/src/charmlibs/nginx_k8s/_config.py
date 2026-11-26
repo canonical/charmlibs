@@ -282,6 +282,7 @@ class NginxConfig:
         worker_connections: int = 4096,
         proxy_read_timeout: int = 300,
         proxy_connect_timeout: str = '5s',
+        client_max_body_size: str = '1m',
     ):
         """Constructor for a Nginx config generator object.
 
@@ -302,6 +303,9 @@ class NginxConfig:
             worker_connections: Max number of worker connections
             proxy_read_timeout: Proxy read timeout.
             proxy_connect_timeout: Proxy connect timeout.
+            client_max_body_size: Maximum allowed size of the client request body, in nginx
+              size syntax (for example ``'512k'``, ``'10m'``; ``'0'`` disables the check).
+              Defaults to ``'1m'``, matching the nginx default.
 
         Example:
             .. code-block:: python
@@ -349,6 +353,7 @@ class NginxConfig:
         self._worker_connections = worker_connections
         self._proxy_read_timeout = proxy_read_timeout
         self._proxy_connect_timeout = proxy_connect_timeout
+        self._client_max_body_size = client_max_body_size
 
         # number of file descriptors to open for each connection: one for upstream, one for
         # downstream. Do not exceed system ulimit.
@@ -416,6 +421,7 @@ class NginxConfig:
                     *directives.resolver(dns_ip_address=self._dns_IP_address),
                     # TODO: add custom http block for the user to config?
                     directives.proxy_read_timeout(str(self._proxy_read_timeout)),
+                    directives.client_max_body_size(self._client_max_body_size),
                     # server block
                     *directives.servers(
                         ports_to_locations=self._server_ports_to_locations,

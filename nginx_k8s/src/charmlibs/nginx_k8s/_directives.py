@@ -72,6 +72,10 @@ def proxy_read_timeout(*args: str) -> Directive:
     return {'directive': 'proxy_read_timeout', 'args': [*args]}
 
 
+def client_max_body_size(*args: str) -> Directive:
+    return {'directive': 'client_max_body_size', 'args': [*args]}
+
+
 def include(*args: str) -> Directive:
     return {'directive': 'include', 'args': [*args]}
 
