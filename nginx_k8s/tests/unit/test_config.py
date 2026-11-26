@@ -326,6 +326,52 @@ def test_generate_litmus_config_with_rewrite():
         assert sample_config_path.read_text() == generated_config
 
 
+def test_generate_nginx_config_with_client_max_body_size():
+    upstream_configs, server_ports_to_locations = _get_nginx_config_params('litmus')
+
+    addrs_by_role = {
+        'auth': ['worker-address'],
+        'backend': ['worker-address'],
+    }
+    with mock_resolv_conf(f'foo bar\nnameserver {sample_dns_ip}'):
+        nginx = NginxConfig(
+            'localhost',
+            upstream_configs=upstream_configs,
+            server_ports_to_locations=server_ports_to_locations,
+            enable_health_check=False,
+            enable_status_page=False,
+            client_max_body_size='10m',
+        )
+        generated_config = nginx.get_config(addrs_by_role, False)
+        sample_config_path = (
+            Path(__file__).parent
+            / 'resources'
+            / 'sample_litmus_conf_with_client_max_body_size.txt'
+        )
+        assert sample_config_path.read_text() == generated_config
+
+
+def test_client_max_body_size_default():
+    upstream_configs, server_ports_to_locations = _get_nginx_config_params('litmus')
+
+    addrs_by_role = {
+        'auth': ['worker-address'],
+        'backend': ['worker-address'],
+    }
+    with mock_resolv_conf(f'foo bar\nnameserver {sample_dns_ip}'):
+        nginx = NginxConfig(
+            'localhost',
+            upstream_configs=upstream_configs,
+            server_ports_to_locations=server_ports_to_locations,
+            enable_health_check=False,
+            enable_status_page=False,
+        )
+        generated_config = nginx.get_config(addrs_by_role, False)
+
+    # THEN the nginx default of 1m is rendered
+    assert 'client_max_body_size 1m;' in generated_config
+
+
 def test_generate_nginx_config_with_extra_location_directives():
     upstream_configs, server_ports_to_locations = _get_nginx_config_params('litmus_ssl')
 

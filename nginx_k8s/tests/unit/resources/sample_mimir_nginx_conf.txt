@@ -55,6 +55,7 @@ http {
     tcp_nopush on;
     resolver 198.18.0.0;
     proxy_read_timeout 300;
+    client_max_body_size 1m;
     server {
         listen 8080;
         listen [::]:8080;

@@ -1,3 +1,7 @@
+# 1.1.0 - 25 November 2026
+
+- Added the `client_max_body_size` argument to `NginxConfig` (default `'1m'`, matching the nginx default), rendering the `client_max_body_size` directive in the `http` block.
+
 # 1.0.2 - 16 November 2026
 
 - Updated project URLs.
