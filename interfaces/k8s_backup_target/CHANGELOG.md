@@ -1,3 +1,7 @@
+# 0.1.1 - 16 November 2026
+
+Require `ops>=2.23.0`, the first release with `Relation.save` and `Relation.load`, and `pydantic>=2.0`, since `Relation.save` can't serialise pydantic v1 models. Previously neither dependency had a lower bound.
+
 # 0.1.0.post1 - 16 June 2026
 
 Update project URLs.

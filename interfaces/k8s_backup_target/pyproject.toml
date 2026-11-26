@@ -15,8 +15,8 @@ classifiers = [
 ]
 dynamic = ["version"]
 dependencies = [
-    "ops",
-    "pydantic",
+    "ops>=2.23.0",
+    "pydantic>=2.0",
 ]
 
 [dependency-groups]
@@ -24,7 +24,7 @@ lint = [
 ]
 unit = [
     "ops[testing]",
-    "pytest",
+    "pytest>=8",
 ]
 functional = [
 ]
