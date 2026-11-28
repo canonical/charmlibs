@@ -22,7 +22,7 @@ dependencies = [
 
 [dependency-groups]
 lint = [  # installed for `just lint interfaces/tls_certificates` (unit, functional, and integration are also installed)
-    "typing_extensions",
+    "typing_extensions>=4.6",
 ]
 unit = [  # installed for `just unit interfaces/tls_certificates`
     "ops[testing]>=3.4.0",

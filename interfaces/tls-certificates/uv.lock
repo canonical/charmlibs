@@ -133,7 +133,7 @@ integration = [
     { name = "jubilant", specifier = "<2" },
     { name = "pytest-jubilant", specifier = "~=2.0" },
 ]
-lint = [{ name = "typing-extensions" }]
+lint = [{ name = "typing-extensions", specifier = ">=4.6" }]
 unit = [
     { name = "ops", extras = ["testing"], specifier = ">=3.4.0" },
     { name = "pkilint", specifier = ">=0.13.0" },
