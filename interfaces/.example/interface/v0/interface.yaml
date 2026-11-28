@@ -1,0 +1,13 @@
+name: example-interface
+version: 0
+status: published
+lib: charmlibs.interfaces.example_interface
+summary: One line saying what the interface is for.
+description: |
+  A short paragraph saying what the interface is for, and what each side provides.
+
+# Each entry has the charm's `name` and its repository's `url`.
+providers: []
+requirers: []
+
+maintainer: the owning team, for example observability

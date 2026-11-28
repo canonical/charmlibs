@@ -32,6 +32,14 @@ interfaces/<interface-name>/
 └── ...
 ```
 
+## Start a new specification
+
+For a new interface, run `just init --interface`.
+As well as the library, this writes `interface/v0/` with a `README.md`, `interface.yaml` and `schema.py` for you to fill in.
+If the interface's library isn't in this repository, run `just init --definition-only` instead, which writes only the `interface/` directory. In that case, `lib` in `interface.yaml` is commented out.
+
+The placeholder sentences in these files are plain text rather than comments, so that any you haven't replaced are easy to spot in review and on the docs site.
+
 ## Write the specification README
 
 The `README.md` file is the heart of the specification. It is rendered word for word on the docs site (under {ref}`reference-interfaces`).
@@ -57,7 +65,7 @@ flowchart
 
 ### Behavior
 
-List the expectations for each side of the relation, under `### Requirer` and `### Provider` subheadings. Use bullets phrased as "Is expected to ...". These are the criteria a charm must meet to be considered compatible with the interface. These criteria should be the source of truth for validators written to check compliance with interfaces, and must be kept up-to-date with library behaviour.
+List the expectations for each side of the relation, under `### Provider` and `### Requirer` subheadings. Start the section with the line "Keywords are as in RFC 2119.", and start each bullet with an upper-case [RFC 2119](https://www.rfc-editor.org/rfc/rfc2119) keyword, such as MUST, SHOULD or MAY. For example, "MUST write the URL to the application databag from the leader unit." These are the criteria a charm must meet to be considered compatible with the interface. These criteria should be the source of truth for validators written to check compliance with interfaces, and must be kept up-to-date with library behaviour.
 
 ### Relation data
 

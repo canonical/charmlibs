@@ -182,6 +182,21 @@ jobs:
           echo "$STATUS"
           test -z "$STATUS"
 
+  template-and-interface-definition-example-in-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e  # v10.3.2
+      - working-directory: interfaces
+        run: |
+          uvx --from rust-just just init --definition-only --no-input project_slug=example-interface
+          # only the definition is generated
+          test "$(ls -A example-interface)" = interface
+          # and it's the interface library example's definition, apart from the lib line
+          diff -r -I '^\(# \)\?lib: ' .example/interface example-interface/interface
+
   changelog-updated:
     needs: [init]
     if: ${{ needs.init.outputs.publish != '[]' }}

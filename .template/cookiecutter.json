@@ -3,6 +3,7 @@
   "min_python_version": "3.10",
   "author": "The Charm Tech team at Canonical",
   "_interface": false,
+  "_definition_only": false,
   "__path_prefix": "{{ 'interfaces/' if cookiecutter._interface else '' }}",
   "__ns": "charmlibs{{ '.interfaces' if cookiecutter._interface else '' }}",
   "__pkg": "{{ cookiecutter.project_slug.replace('-', '_') }}",
