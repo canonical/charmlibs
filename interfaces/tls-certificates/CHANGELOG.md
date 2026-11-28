@@ -1,6 +1,6 @@
 # 1.13.2 - 30 November 2026
 
-Require `ops>=2.19.0`, the first release with `Model.juju_version`, and `pydantic>=1.10.0`, the oldest release the pydantic v1 code path works with. Previously neither dependency had a lower bound.
+Require `ops>=2.23.0`, the oldest ops 2 series that's still maintained, and `pydantic>=1.10.0`, the oldest release the pydantic v1 code path works with. Previously neither dependency had a lower bound.
 
 # 1.13.1 - 6 November 2026
 

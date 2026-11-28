@@ -123,7 +123,7 @@ unit = [
 [package.metadata]
 requires-dist = [
     { name = "cryptography", specifier = ">=43.0.0" },
-    { name = "ops", specifier = ">=2.19.0" },
+    { name = "ops", specifier = ">=2.23.0" },
     { name = "pydantic", specifier = ">=1.10.0" },
 ]
 
